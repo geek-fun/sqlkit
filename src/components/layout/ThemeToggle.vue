@@ -1,12 +1,12 @@
 <script setup lang="ts">
-import { useTheme } from '@/composables/useTheme'
 import { Button } from '@/components/ui/button'
+import { useTheme } from '@/composables/useTheme'
 
 const { isDark, toggleTheme } = useTheme()
 </script>
 
 <template>
-  <Button variant="ghost" size="icon" @click="toggleTheme" title="Toggle theme">
+  <Button variant="ghost" size="icon" title="Toggle theme" @click="toggleTheme">
     <svg
       v-if="isDark"
       xmlns="http://www.w3.org/2000/svg"
