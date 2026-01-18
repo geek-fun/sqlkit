@@ -86,12 +86,17 @@ export function useMonacoEditor(
             insertText: type,
             range: range
           })),
-          ...SQL_FUNCTIONS.map(func => ({
-            label: func,
-            kind: monaco.languages.CompletionItemKind.Function,
-            insertText: `${func}()`,
-            range: range
-          }))
+          ...SQL_FUNCTIONS.map(func => {
+            // Some functions don't require parentheses in all SQL dialects
+            const noParenFunctions = ['NOW', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP']
+            const insertText = noParenFunctions.includes(func) ? func : `${func}()`
+            return {
+              label: func,
+              kind: monaco.languages.CompletionItemKind.Function,
+              insertText: insertText,
+              range: range
+            }
+          })
         ]
 
         return { suggestions }

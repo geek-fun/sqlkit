@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch, defineEmits } from 'vue'
+import type * as monaco from 'monaco-editor'
 import { useMonacoEditor, type SQLDialect, type MonacoEditorOptions } from '@/composables/useMonacoEditor'
 import { useTheme } from '@/composables/useTheme'
 
@@ -48,10 +49,10 @@ const { initEditor, getValue, setValue, updateTheme } = useMonacoEditor(
   editorOptions
 )
 
-let editor: any = null
+let editor: monaco.editor.IStandaloneCodeEditor | null = null
 
 onMounted(() => {
-  editor = initEditor()
+  editor = initEditor() ?? null
   
   if (editor) {
     // Listen for content changes
