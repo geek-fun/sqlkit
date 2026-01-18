@@ -7,7 +7,11 @@
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "lint:fix": "eslint --fix ./",
+    "lint:check": "eslint ./",
+    "test": "jest --runInBand --coverage --coverageReporters json-summary text html lcov",
+    "test:ci": "jest --runInBand --ci --coverage --coverageReporters json-summary text html lcov"
   },
   "dependencies": {
     "vue": "^3.5.13",
@@ -19,6 +23,17 @@
     "typescript": "~5.6.2",
     "vite": "^6.0.3",
     "vue-tsc": "^2.1.10",
-    "@tauri-apps/cli": "^2"
+    "@tauri-apps/cli": "^2",
+    "@types/jest": "^30.0.0",
+    "@typescript-eslint/eslint-plugin": "^8.50.1",
+    "@typescript-eslint/parser": "^8.50.1",
+    "eslint": "^9.39.2",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-prettier": "^5.5.4",
+    "eslint-plugin-vue": "^10.6.2",
+    "jest": "^30.2.0",
+    "prettier": "^3.7.4",
+    "ts-jest": "^29.4.6"
   }
 }
