@@ -2,6 +2,12 @@ import { defineConfig, presetUno, transformerDirectives } from 'unocss'
 import presetWind from '@unocss/preset-wind'
 
 export default defineConfig({
+  content: {
+    filesystem: [
+      './index.html',
+      './src/**/*.{vue,js,ts,jsx,tsx}',
+    ],
+  },
   presets: [
     presetWind(), // Tailwind-compatible utilities
     presetUno(),
