@@ -30,7 +30,7 @@
 //! # Example Usage
 //!
 //! ```ignore
-//! use sqlkit_lib::database::{
+//! use sqlkit::database::{
 //!     DatabaseAdapter, ConnectionConfig, DatabaseType,
 //! };
 //!

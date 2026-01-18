@@ -52,7 +52,7 @@ Comprehensive error handling through the `DbError` enum:
 ## Usage Example
 
 ```rust
-use sqlkit_lib::database::{
+use sqlkit::database::{
     DatabaseAdapter, ConnectionConfig, DatabaseType, SslMode
 };
 
@@ -100,7 +100,7 @@ async fn example<A: DatabaseAdapter>(mut adapter: A) -> Result<(), Box<dyn std::
 ## Configuration Example
 
 ```rust
-use sqlkit_lib::database::{ConnectionConfig, DatabaseType, SslMode, PoolConfig};
+use sqlkit::database::{ConnectionConfig, DatabaseType, SslMode, PoolConfig};
 use std::time::Duration;
 
 let pool_config = PoolConfig {

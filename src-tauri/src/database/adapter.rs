@@ -20,7 +20,7 @@ use std::sync::Arc;
 /// # Example
 ///
 /// ```ignore
-/// use sqlkit_lib::database::{DatabaseAdapter, ConnectionConfig};
+/// use sqlkit::database::{DatabaseAdapter, ConnectionConfig};
 ///
 /// async fn example(adapter: impl DatabaseAdapter) {
 ///     // Connect to the database
