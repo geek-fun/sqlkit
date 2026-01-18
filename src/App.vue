@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
+import SQLEditor from './components/SQLEditor.vue'
 import { Button } from './components/ui/button'
 import { Input } from './components/ui/input'
 import { Label } from './components/ui/label'
@@ -10,12 +11,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 
 const name = ref('')
 const dialogOpen = ref(false)
+const sqlQuery = ref(`-- Sample SQL Query
+SELECT 
+  u.id,
+  u.name,
+  u.email,
+  COUNT(o.id) as order_count
+FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+WHERE u.created_at > '2024-01-01'
+GROUP BY u.id, u.name, u.email
+ORDER BY order_count DESC
+LIMIT 10;`)
 
 const sampleData = [
   { id: 1, database: 'PostgreSQL', status: 'Connected', host: 'localhost:5432' },
   { id: 2, database: 'MySQL', status: 'Disconnected', host: 'localhost:3306' },
   { id: 3, database: 'SQLite', status: 'Connected', host: 'local' },
 ]
+
+const handleExecuteQuery = (query: string) => {
+  console.log('Executing query:', query)
+  // TODO: Implement query execution logic
+}
 </script>
 
 <template>
@@ -117,6 +135,32 @@ const sampleData = [
               </TableRow>
             </TableBody>
           </Table>
+        </CardContent>
+      </Card>
+
+      <!-- SQL Editor Demo -->
+      <Card>
+        <CardHeader>
+          <CardTitle>SQL Editor</CardTitle>
+          <CardDescription>
+            Monaco Editor with syntax highlighting, auto-completion, and keyboard shortcuts
+          </CardDescription>
+        </CardHeader>
+        <CardContent class="space-y-4">
+          <SQLEditor
+            v-model="sqlQuery"
+            :height="'300px'"
+            dialect="sql"
+            @execute="handleExecuteQuery"
+          />
+          <div class="flex gap-2">
+            <Button @click="handleExecuteQuery(sqlQuery)">
+              Execute Query (Ctrl+Enter)
+            </Button>
+            <Button variant="outline" @click="sqlQuery = ''">
+              Clear
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

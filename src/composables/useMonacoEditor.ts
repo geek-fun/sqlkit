@@ -1,0 +1,170 @@
+import { onBeforeUnmount, Ref } from 'vue'
+import * as monaco from 'monaco-editor'
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import { useTheme } from './useTheme'
+
+// Configure Monaco Editor workers for Vite
+self.MonacoEnvironment = {
+  getWorker(_: unknown, _label: string) {
+    return new editorWorker()
+  }
+}
+
+export type SQLDialect = 'sql' | 'mysql' | 'pgsql' | 'mssql' | 'plsql' | 'sqlite'
+
+export interface MonacoEditorOptions {
+  language?: SQLDialect
+  readOnly?: boolean
+  minimap?: boolean
+  fontSize?: number
+  tabSize?: number
+}
+
+// SQL keywords for auto-completion
+const SQL_KEYWORDS = [
+  'SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP',
+  'TABLE', 'INDEX', 'VIEW', 'DATABASE', 'SCHEMA', 'JOIN', 'INNER', 'LEFT', 'RIGHT',
+  'OUTER', 'ON', 'AS', 'AND', 'OR', 'NOT', 'NULL', 'IS', 'IN', 'BETWEEN', 'LIKE',
+  'ORDER', 'BY', 'GROUP', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'DISTINCT', 'COUNT',
+  'SUM', 'AVG', 'MAX', 'MIN', 'CAST', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
+  'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CONSTRAINT', 'UNIQUE', 'CHECK',
+  'DEFAULT', 'AUTO_INCREMENT', 'CASCADE', 'SET', 'VALUES', 'INTO', 'BEGIN', 'COMMIT',
+  'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'TRUNCATE', 'GRANT', 'REVOKE', 'WITH',
+  'RECURSIVE', 'WINDOW', 'PARTITION', 'OVER', 'ROW_NUMBER', 'RANK', 'DENSE_RANK'
+]
+
+// SQL data types
+const SQL_TYPES = [
+  'INT', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'DECIMAL', 'NUMERIC', 'FLOAT',
+  'REAL', 'DOUBLE', 'CHAR', 'VARCHAR', 'TEXT', 'NCHAR', 'NVARCHAR', 'NTEXT',
+  'DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'YEAR', 'BOOLEAN', 'BOOL', 'BINARY',
+  'VARBINARY', 'BLOB', 'CLOB', 'JSON', 'UUID', 'SERIAL', 'BIGSERIAL'
+]
+
+// SQL functions
+const SQL_FUNCTIONS = [
+  'CONCAT', 'SUBSTRING', 'UPPER', 'LOWER', 'TRIM', 'LTRIM', 'RTRIM', 'LENGTH',
+  'REPLACE', 'COALESCE', 'NULLIF', 'IFNULL', 'NOW', 'CURRENT_DATE', 'CURRENT_TIME',
+  'CURRENT_TIMESTAMP', 'DATE_ADD', 'DATE_SUB', 'DATEDIFF', 'EXTRACT', 'TO_CHAR',
+  'TO_DATE', 'TO_NUMBER', 'ROUND', 'CEIL', 'FLOOR', 'ABS', 'SIGN', 'MOD', 'POWER',
+  'SQRT', 'EXP', 'LN', 'LOG'
+]
+
+export function useMonacoEditor(
+  containerRef: Ref<HTMLElement | null>,
+  initialValue: Ref<string>,
+  options: MonacoEditorOptions = {}
+) {
+  let editor: monaco.editor.IStandaloneCodeEditor | null = null
+  let completionProvider: monaco.IDisposable | null = null
+  const { isDark } = useTheme()
+
+  const initEditor = () => {
+    if (!containerRef.value) return
+
+    // Set up auto-completion provider
+    completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
+      provideCompletionItems: (model, position) => {
+        const word = model.getWordUntilPosition(position)
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn
+        }
+
+        const suggestions: monaco.languages.CompletionItem[] = [
+          ...SQL_KEYWORDS.map(keyword => ({
+            label: keyword,
+            kind: monaco.languages.CompletionItemKind.Keyword,
+            insertText: keyword,
+            range: range
+          })),
+          ...SQL_TYPES.map(type => ({
+            label: type,
+            kind: monaco.languages.CompletionItemKind.TypeParameter,
+            insertText: type,
+            range: range
+          })),
+          ...SQL_FUNCTIONS.map(func => ({
+            label: func,
+            kind: monaco.languages.CompletionItemKind.Function,
+            insertText: `${func}()`,
+            range: range
+          }))
+        ]
+
+        return { suggestions }
+      }
+    })
+
+    // Create editor instance
+    editor = monaco.editor.create(containerRef.value, {
+      value: initialValue.value,
+      language: options.language || 'sql',
+      theme: isDark.value ? 'vs-dark' : 'vs',
+      automaticLayout: true,
+      readOnly: options.readOnly || false,
+      minimap: {
+        enabled: options.minimap !== false
+      },
+      fontSize: options.fontSize || 14,
+      tabSize: options.tabSize || 2,
+      lineNumbers: 'on',
+      roundedSelection: false,
+      scrollBeyondLastLine: false,
+      folding: true,
+      wordWrap: 'on',
+      contextmenu: true,
+      formatOnPaste: true,
+      formatOnType: true,
+      suggest: {
+        showKeywords: true,
+        showSnippets: true
+      }
+    })
+
+    // Add keyboard shortcuts
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
+      () => {
+        // This will be handled by parent component
+        const event = new CustomEvent('execute-query', {
+          detail: { query: editor?.getValue() }
+        })
+        containerRef.value?.dispatchEvent(event)
+      }
+    )
+
+    return editor
+  }
+
+  const getValue = (): string => {
+    return editor?.getValue() || ''
+  }
+
+  const setValue = (value: string) => {
+    editor?.setValue(value)
+  }
+
+  const updateTheme = (dark: boolean) => {
+    monaco.editor.setTheme(dark ? 'vs-dark' : 'vs')
+  }
+
+  const dispose = () => {
+    completionProvider?.dispose()
+    editor?.dispose()
+  }
+
+  onBeforeUnmount(() => {
+    dispose()
+  })
+
+  return {
+    initEditor,
+    getValue,
+    setValue,
+    updateTheme,
+    dispose
+  }
+}

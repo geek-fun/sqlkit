@@ -14,8 +14,10 @@
     "test:ci": "jest --runInBand --ci --coverage --coverageReporters json-summary text html lcov"
   },
   "dependencies": {
+    "@monaco-editor/loader": "^1.7.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "monaco-editor": "^0.55.1",
     "radix-vue": "^1.9.17",
     "vue": "^3.5.13"
   },
