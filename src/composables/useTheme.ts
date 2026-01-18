@@ -1,4 +1,4 @@
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount } from 'vue'
 
 export type Theme = 'dark' | 'light' | 'system'
 
@@ -7,6 +7,8 @@ const THEME_STORAGE_KEY = 'sqlkit-theme'
 export function useTheme() {
   const theme = ref<Theme>('system')
   const isDark = ref(false)
+  let mediaQuery: MediaQueryList | null = null
+  let handleChange: (() => void) | null = null
 
   const getSystemTheme = (): 'dark' | 'light' => {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -33,7 +35,11 @@ export function useTheme() {
 
   const setTheme = (newTheme: Theme) => {
     theme.value = newTheme
-    localStorage.setItem(THEME_STORAGE_KEY, newTheme)
+    try {
+      localStorage.setItem(THEME_STORAGE_KEY, newTheme)
+    } catch (error) {
+      console.error('Failed to save theme preference:', error)
+    }
     applyTheme(newTheme)
   }
 
@@ -44,21 +50,28 @@ export function useTheme() {
 
   onMounted(() => {
     // Load theme from localStorage or default to system
-    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null
+    let savedTheme: Theme | null = null
+    try {
+      savedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null
+    } catch (error) {
+      console.error('Failed to load theme preference:', error)
+    }
     theme.value = savedTheme || 'system'
     applyTheme(theme.value)
 
     // Listen for system theme changes
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-    const handleChange = () => {
+    mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+    handleChange = () => {
       if (theme.value === 'system') {
         applyTheme('system')
       }
     }
     mediaQuery.addEventListener('change', handleChange)
-    
-    // Cleanup
-    return () => {
+  })
+
+  onBeforeUnmount(() => {
+    // Cleanup event listener
+    if (mediaQuery && handleChange) {
       mediaQuery.removeEventListener('change', handleChange)
     }
   })
