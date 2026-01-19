@@ -558,7 +558,7 @@ impl DatabaseAdapter for SqlServerAdapter {
         let client = self.get_client().await?;
         let mut client = client.lock().await;
 
-        let mut stream = client
+        let stream = client
             .simple_query(&query)
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;

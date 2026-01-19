@@ -66,6 +66,7 @@ pub mod pool;
 pub mod postgres;
 pub mod mysql;
 pub mod sqlserver;
+pub mod sqlite;
 pub mod types;
 
 #[cfg(test)]
@@ -79,6 +80,7 @@ pub use pool::{ConnectionPool, PoolStats};
 pub use postgres::{PostgresAdapter, PostgresPool};
 pub use mysql::{MySQLAdapter, MySQLPool};
 pub use sqlserver::{SqlServerAdapter, SqlServerPool};
+pub use sqlite::{SQLiteAdapter, SQLitePool};
 pub use types::{
     ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
 };
