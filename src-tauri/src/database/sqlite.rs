@@ -107,15 +107,27 @@ impl ConnectionPool for SQLitePool {
     type Connection = Connection;
 
     async fn get_connection(&self) -> DbResult<Arc<Self::Connection>> {
-        // This method is not directly used in our implementation
-        // SQLite connections are managed through get_conn() instead
+        // NOTE: This method is not used in the current implementation.
+        // SQLite connections are managed through the custom get_conn() method instead,
+        // which returns Arc<Mutex<Connection>> for proper thread-safety.
+        // The ConnectionPool trait was designed for client-server databases (Postgres, MySQL)
+        // where connections can be safely shared as Arc<Connection>. SQLite requires
+        // Mutex wrapping for thread-safety, which doesn't fit cleanly into this trait design.
+        // This is a known architectural limitation. Future improvements could:
+        // 1. Make ConnectionPool trait generic over the wrapper type
+        // 2. Create a separate trait for embedded databases
+        // 3. Continue with current approach where this method is intentionally unused
         Err(DbError::UnsupportedOperation(
             "Direct connection access not supported - use get_conn() instead".to_string(),
         ))
     }
 
     async fn return_connection(&self, _connection: Arc<Self::Connection>) -> DbResult<()> {
-        // Connection is automatically returned when dropped
+        // NOTE: This method is not used in the current implementation.
+        // Connection return is handled by the custom return_conn() method which
+        // expects Arc<Mutex<Connection>> to match our thread-safety requirements.
+        // Connections are automatically returned to the pool via return_conn()
+        // or dropped when they go out of scope.
         Ok(())
     }
 
