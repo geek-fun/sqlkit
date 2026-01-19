@@ -813,4 +813,78 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn test_connection_string_with_multiple_options() {
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "db.example.com", 5433, "admin")
+            .with_database("production")
+            .with_password("secure_pass")
+            .with_ssl_mode(SslMode::VerifyFull)
+            .with_option("application_name", "sqlkit")
+            .with_option("connect_timeout", "10");
+
+        let adapter = PostgresAdapter::new(config);
+        let conn_str = adapter.build_connection_string();
+
+        assert!(conn_str.contains("host=db.example.com"));
+        assert!(conn_str.contains("port=5433"));
+        assert!(conn_str.contains("user=admin"));
+        assert!(conn_str.contains("password=secure_pass"));
+        assert!(conn_str.contains("dbname=production"));
+        assert!(conn_str.contains("sslmode=verify-full"));
+        assert!(conn_str.contains("application_name=sqlkit"));
+        assert!(conn_str.contains("connect_timeout=10"));
+    }
+
+    #[test]
+    fn test_connection_string_without_database() {
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+            .with_password("password");
+
+        let adapter = PostgresAdapter::new(config);
+        let conn_str = adapter.build_connection_string();
+
+        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("port=5432"));
+        assert!(conn_str.contains("user=postgres"));
+        assert!(conn_str.contains("password=password"));
+        assert!(!conn_str.contains("dbname="));
+    }
+
+    #[test]
+    fn test_connection_string_without_password() {
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+            .with_database("testdb");
+
+        let adapter = PostgresAdapter::new(config);
+        let conn_str = adapter.build_connection_string();
+
+        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("port=5432"));
+        assert!(conn_str.contains("user=postgres"));
+        assert!(conn_str.contains("dbname=testdb"));
+        assert!(!conn_str.contains("password="));
+    }
+
+    #[test]
+    fn test_get_config() {
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+            .with_database("testdb");
+
+        let adapter = PostgresAdapter::new(config.clone());
+        let retrieved_config = adapter.get_config();
+
+        assert_eq!(retrieved_config.host, config.host);
+        assert_eq!(retrieved_config.port, config.port);
+        assert_eq!(retrieved_config.username, config.username);
+        assert_eq!(retrieved_config.database, config.database);
+    }
+
+    #[test]
+    fn test_pool_initially_none() {
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres");
+        let adapter = PostgresAdapter::new(config);
+
+        assert!(adapter.get_pool().is_none());
+    }
 }
