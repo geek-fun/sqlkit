@@ -754,7 +754,7 @@ impl DatabaseAdapter for PostgresAdapter {
             "#;
 
             let stats_rows = client
-                .query(&stats_query, &[&schema_filter, &table])
+                .query(stats_query, &[&schema_filter, &table])
                 .await
                 .map_err(|e| DbError::QueryExecution(e.to_string()))?;
 

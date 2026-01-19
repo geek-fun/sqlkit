@@ -2,6 +2,35 @@
 
 AI-powered cross-platform SQL database GUI client, supporting PostgreSQL, MySQL, Oracle, SQL Server, DB2, SQLite, H2, and ClickHouse on macOS, Windows, and Linux.
 
+## Quick Start
+
+### Prerequisites
+
+Before building, ensure you have the required system dependencies installed. See [BUILD.md](BUILD.md) for detailed instructions.
+
+**Linux (Ubuntu/Debian):**
+
+```bash
+sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
+```
+
+**macOS:**
+
+```bash
+xcode-select --install
+```
+
+**Windows:** Install [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
+
+### Development
+
+```bash
+npm install
+npm run tauri dev
+```
+
+For more information, see [BUILD.md](BUILD.md).
+
 # Tauri + Vue + TypeScript
 
 This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
