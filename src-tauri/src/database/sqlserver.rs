@@ -134,8 +134,15 @@ impl SqlServerPool {
 
         if use_windows_auth {
             // Windows Authentication (Integrated Security)
-            // Note: This requires the connection to be from a domain-joined machine
-            tiberius_config.authentication(AuthMethod::Integrated);
+            // Note: In tiberius 0.12, Windows auth requires domain, username, and password
+            // For integrated auth without credentials, we use the current user
+            // This is a limitation of tiberius 0.12 - true integrated auth (SSPI) is not available
+            let domain = config.options.get("windows_domain").map(|s| s.as_str()).unwrap_or("");
+            tiberius_config.authentication(AuthMethod::windows(
+                domain,
+                &config.username,
+                config.password.as_deref().unwrap_or(""),
+            ));
         } else {
             // SQL Server Authentication (username/password)
             tiberius_config.authentication(AuthMethod::sql_server(
@@ -164,11 +171,9 @@ impl SqlServerPool {
         }
 
         // Set connection timeout
-        if let Some(timeout_str) = config.options.get("connect_timeout") {
-            if let Ok(timeout_secs) = timeout_str.parse::<u64>() {
-                tiberius_config.connect_timeout(Duration::from_secs(timeout_secs));
-            }
-        }
+        // Note: In tiberius 0.12, connection timeout is not configurable via Config
+        // The timeout is handled at the TCP level when establishing the connection
+        // You can set TCP connect timeout using tokio::time::timeout when calling Client::connect
 
         // Trust server certificate if specified
         if config
@@ -180,9 +185,20 @@ impl SqlServerPool {
             tiberius_config.trust_cert();
         }
 
-        // Establish TCP connection
-        let tcp = TcpStream::connect(tiberius_config.get_addr())
+        // Establish TCP connection with optional timeout
+        let connect_timeout = config
+            .options
+            .get("connect_timeout")
+            .and_then(|v| v.parse::<u64>().ok())
+            .map(Duration::from_secs)
+            .unwrap_or(Duration::from_secs(30)); // Default 30 second timeout
+
+        let tcp = tokio::time::timeout(
+            connect_timeout,
+            TcpStream::connect(tiberius_config.get_addr())
+        )
             .await
+            .map_err(|_| DbError::Connection(format!("Connection timeout after {:?}", connect_timeout)))?
             .map_err(|e| DbError::Connection(format!("Failed to connect to SQL Server: {}", e)))?;
 
         tcp.set_nodelay(true)
