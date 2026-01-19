@@ -188,6 +188,35 @@ impl SQLiteAdapter {
         }
     }
 
+    /// Validate and sanitize a table name to prevent SQL injection.
+    ///
+    /// Only allows alphanumeric characters, underscores, and optionally a schema prefix.
+    /// Returns an error if the table name contains invalid characters.
+    fn validate_table_name(table: &str) -> DbResult<()> {
+        if table.is_empty() {
+            return Err(DbError::InvalidQuery("Table name cannot be empty".to_string()));
+        }
+
+        // Check for valid characters: alphanumeric, underscore, and dot (for schema.table)
+        for c in table.chars() {
+            if !c.is_alphanumeric() && c != '_' && c != '.' {
+                return Err(DbError::InvalidQuery(format!(
+                    "Invalid character '{}' in table name. Only alphanumeric, underscore, and dot allowed",
+                    c
+                )));
+            }
+        }
+
+        // Additional validation: no consecutive dots, no leading/trailing dots
+        if table.starts_with('.') || table.ends_with('.') || table.contains("..") {
+            return Err(DbError::InvalidQuery(
+                "Invalid table name format: dots must separate schema and table names".to_string(),
+            ));
+        }
+
+        Ok(())
+    }
+
     /// Convert a rusqlite Row to QueryRow.
     fn row_to_query_row(row: &Row) -> DbResult<QueryRow> {
         let mut query_row = HashMap::new();
@@ -430,12 +459,11 @@ impl DatabaseAdapter for SQLiteAdapter {
         _schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
-        // Sanitize table name to prevent SQL injection
-        if table.contains('"') || table.contains('\'') || table.contains(';') {
-            return Err(DbError::InvalidQuery(format!("Invalid table name: {}", table)));
-        }
+        // Validate table name to prevent SQL injection
+        Self::validate_table_name(table)?;
 
-        let query = format!("PRAGMA table_info('{}')", table.replace("'", "''"));
+        // Use double quotes for identifier quoting in SQLite (SQL standard)
+        let query = format!("PRAGMA table_info(\"{}\")", table);
         let result = self.execute_query_internal(&query).await?;
 
         if result.rows.is_empty() {
@@ -502,12 +530,11 @@ impl DatabaseAdapter for SQLiteAdapter {
             .ok_or_else(|| DbError::TableNotFound(table.to_string()))?;
 
         // Try to get row count
-        // Sanitize table name to prevent SQL injection
-        if table.contains('"') || table.contains('\'') || table.contains(';') {
-            return Err(DbError::InvalidQuery(format!("Invalid table name: {}", table)));
-        }
+        // Validate table name to prevent SQL injection
+        Self::validate_table_name(table)?;
 
-        let count_query = format!("SELECT COUNT(*) as count FROM '{}'", table.replace("'", "''"));
+        // Use double quotes for identifier quoting in SQLite (SQL standard)
+        let count_query = format!("SELECT COUNT(*) as count FROM \"{}\"", table);
         let row_count = match self.execute_query_internal(&count_query).await {
             Ok(result) => result
                 .rows
