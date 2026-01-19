@@ -22,6 +22,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// Configuration key for query timeout in milliseconds.
+/// Use this key in ConnectionConfig options to set a timeout for query execution.
+/// Example: `config.with_option(STATEMENT_TIMEOUT_KEY, "5000")` for 5 second timeout.
+const STATEMENT_TIMEOUT_KEY: &str = "statement_timeout";
+
 /// MySQL connection pool wrapper.
 pub struct MySQLPool {
     pool: Pool,
@@ -46,18 +51,21 @@ impl ConnectionPool for MySQLPool {
     }
 
     fn active_connections(&self) -> usize {
-        // mysql_async doesn't expose detailed pool statistics
+        // Note: mysql_async doesn't expose detailed pool statistics
+        // Returning 0 as a placeholder since actual metrics are not available
         0
     }
 
     fn idle_connections(&self) -> usize {
-        // mysql_async doesn't expose detailed pool statistics
+        // Note: mysql_async doesn't expose detailed pool statistics
+        // Returning 0 as a placeholder since actual metrics are not available
         0
     }
 
     fn max_connections(&self) -> usize {
-        // Get max connections from pool constraints
-        10 // Default, actual value depends on configuration
+        // Note: mysql_async doesn't expose pool configuration after creation
+        // Returning default value as actual configuration is not accessible
+        10
     }
 
     async fn close(&self) -> DbResult<()> {
@@ -124,7 +132,9 @@ impl MySQLAdapter {
                 opts = opts.ssl_opts(None);
             }
             SslMode::Prefer | SslMode::Require => {
-                // Use SSL but don't verify certificates
+                // WARNING: Using SSL without certificate verification in Prefer/Require modes.
+                // This protects against passive eavesdropping but not active man-in-the-middle attacks.
+                // For production environments, use VerifyCA or VerifyFull modes instead.
                 let tls_connector = TlsConnector::builder()
                     .danger_accept_invalid_certs(true)
                     .build()
@@ -134,7 +144,7 @@ impl MySQLAdapter {
                 opts = opts.ssl_opts(Some(ssl_opts));
             }
             SslMode::VerifyCA | SslMode::VerifyFull => {
-                // Use SSL with certificate verification
+                // Use SSL with certificate verification for secure production environments
                 let tls_connector = TlsConnector::builder()
                     .danger_accept_invalid_certs(false)
                     .build()
@@ -308,7 +318,7 @@ impl DatabaseAdapter for MySQLAdapter {
         let timeout = self
             .config
             .options
-            .get("statement_timeout")
+            .get(STATEMENT_TIMEOUT_KEY)
             .and_then(|v| v.parse::<u64>().ok())
             .map(Duration::from_millis);
 
