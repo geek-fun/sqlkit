@@ -35,4 +35,5 @@ native-tls = "0.2"
 deadpool-postgres = "0.14"
 mysql_async = "0.34"
 tokio-native-tls = "0.3"
+rusqlite = { version = "0.32", features = ["bundled", "chrono"] }
 
