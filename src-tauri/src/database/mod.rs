@@ -65,6 +65,7 @@ pub mod error;
 pub mod pool;
 pub mod postgres;
 pub mod mysql;
+pub mod sqlserver;
 pub mod types;
 
 #[cfg(test)]
@@ -77,6 +78,7 @@ pub use error::{DbError, DbResult};
 pub use pool::{ConnectionPool, PoolStats};
 pub use postgres::{PostgresAdapter, PostgresPool};
 pub use mysql::{MySQLAdapter, MySQLPool};
+pub use sqlserver::{SqlServerAdapter, SqlServerPool};
 pub use types::{
     ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
 };
