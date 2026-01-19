@@ -15,7 +15,9 @@ use std::time::Duration;
 use tokio::task;
 
 fn get_test_config_file(db_name: &str) -> ConnectionConfig {
-    let db_path = format!("/tmp/{}.db", db_name);
+    let temp_dir = std::env::temp_dir();
+    let db_path = temp_dir.join(format!("{}.db", db_name));
+    let db_path_str = db_path.to_string_lossy().to_string();
 
     let pool_config = PoolConfig {
         min_connections: 1,
@@ -26,7 +28,7 @@ fn get_test_config_file(db_name: &str) -> ConnectionConfig {
     };
 
     ConnectionConfig::new(DatabaseType::SQLite, "localhost", 0, "local")
-        .with_database(db_path)
+        .with_database(db_path_str)
         .with_pool_config(pool_config)
         .with_ssl_mode(SslMode::Disable)
 }
@@ -47,10 +49,11 @@ fn get_test_config_memory() -> ConnectionConfig {
 }
 
 fn cleanup_db_file(db_name: &str) {
-    let db_path = format!("/tmp/{}.db", db_name);
+    let temp_dir = std::env::temp_dir();
+    let db_path = temp_dir.join(format!("{}.db", db_name));
     let _ = fs::remove_file(&db_path);
-    let _ = fs::remove_file(format!("{}-wal", db_path));
-    let _ = fs::remove_file(format!("{}-shm", db_path));
+    let _ = fs::remove_file(db_path.with_extension("db-wal"));
+    let _ = fs::remove_file(db_path.with_extension("db-shm"));
 }
 
 #[tokio::test]

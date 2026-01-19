@@ -32,12 +32,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn file_based_example() -> Result<(), Box<dyn std::error::Error>> {
-    let db_path = "/tmp/example.db";
+    let temp_dir = std::env::temp_dir();
+    let db_path = temp_dir.join("example.db");
+    let db_path_str = db_path.to_string_lossy().to_string();
     
     // Clean up any existing database
-    let _ = fs::remove_file(db_path);
-    let _ = fs::remove_file(format!("{}-wal", db_path));
-    let _ = fs::remove_file(format!("{}-shm", db_path));
+    let _ = fs::remove_file(&db_path);
+    let _ = fs::remove_file(db_path.with_extension("db-wal"));
+    let _ = fs::remove_file(db_path.with_extension("db-shm"));
 
     // Configure the database connection
     let pool_config = PoolConfig {
@@ -49,7 +51,7 @@ async fn file_based_example() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     let config = ConnectionConfig::new(DatabaseType::SQLite, "localhost", 0, "local")
-        .with_database(db_path)
+        .with_database(&db_path_str)
         .with_pool_config(pool_config)
         .with_ssl_mode(SslMode::Disable);
 
@@ -57,7 +59,7 @@ async fn file_based_example() -> Result<(), Box<dyn std::error::Error>> {
 
     // Connect to the database
     adapter.connect().await?;
-    println!("✓ Connected to file-based database: {}", db_path);
+    println!("✓ Connected to file-based database: {}", db_path_str);
 
     // Test the connection
     let status = adapter.test_connection().await?;
@@ -112,9 +114,9 @@ async fn file_based_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("✓ Disconnected");
 
     // Clean up
-    let _ = fs::remove_file(db_path);
-    let _ = fs::remove_file(format!("{}-wal", db_path));
-    let _ = fs::remove_file(format!("{}-shm", db_path));
+    let _ = fs::remove_file(&db_path);
+    let _ = fs::remove_file(db_path.with_extension("db-wal"));
+    let _ = fs::remove_file(db_path.with_extension("db-shm"));
 
     Ok(())
 }
@@ -173,15 +175,17 @@ async fn in_memory_example() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn metadata_example() -> Result<(), Box<dyn std::error::Error>> {
-    let db_path = "/tmp/metadata_example.db";
+    let temp_dir = std::env::temp_dir();
+    let db_path = temp_dir.join("metadata_example.db");
+    let db_path_str = db_path.to_string_lossy().to_string();
     
     // Clean up
-    let _ = fs::remove_file(db_path);
-    let _ = fs::remove_file(format!("{}-wal", db_path));
-    let _ = fs::remove_file(format!("{}-shm", db_path));
+    let _ = fs::remove_file(&db_path);
+    let _ = fs::remove_file(db_path.with_extension("db-wal"));
+    let _ = fs::remove_file(db_path.with_extension("db-shm"));
 
     let config = ConnectionConfig::new(DatabaseType::SQLite, "localhost", 0, "local")
-        .with_database(db_path)
+        .with_database(&db_path_str)
         .with_ssl_mode(SslMode::Disable);
 
     let mut adapter = SQLiteAdapter::new(config);
@@ -267,9 +271,9 @@ async fn metadata_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n✓ Disconnected");
 
     // Clean up
-    let _ = fs::remove_file(db_path);
-    let _ = fs::remove_file(format!("{}-wal", db_path));
-    let _ = fs::remove_file(format!("{}-shm", db_path));
+    let _ = fs::remove_file(&db_path);
+    let _ = fs::remove_file(db_path.with_extension("db-wal"));
+    let _ = fs::remove_file(db_path.with_extension("db-shm"));
 
     Ok(())
 }

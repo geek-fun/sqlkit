@@ -430,7 +430,12 @@ impl DatabaseAdapter for SQLiteAdapter {
         _schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
-        let query = format!("PRAGMA table_info('{}')", table);
+        // Sanitize table name to prevent SQL injection
+        if table.contains('"') || table.contains('\'') || table.contains(';') {
+            return Err(DbError::InvalidQuery(format!("Invalid table name: {}", table)));
+        }
+
+        let query = format!("PRAGMA table_info('{}')", table.replace("'", "''"));
         let result = self.execute_query_internal(&query).await?;
 
         if result.rows.is_empty() {
@@ -497,7 +502,12 @@ impl DatabaseAdapter for SQLiteAdapter {
             .ok_or_else(|| DbError::TableNotFound(table.to_string()))?;
 
         // Try to get row count
-        let count_query = format!("SELECT COUNT(*) as count FROM '{}'", table);
+        // Sanitize table name to prevent SQL injection
+        if table.contains('"') || table.contains('\'') || table.contains(';') {
+            return Err(DbError::InvalidQuery(format!("Invalid table name: {}", table)));
+        }
+
+        let count_query = format!("SELECT COUNT(*) as count FROM '{}'", table.replace("'", "''"));
         let row_count = match self.execute_query_internal(&count_query).await {
             Ok(result) => result
                 .rows
