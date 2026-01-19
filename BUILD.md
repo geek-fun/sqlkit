@@ -5,12 +5,15 @@ This document provides instructions for building the sqlkit application on vario
 ## Prerequisites
 
 ### Rust
+
 Install Rust using rustup:
+
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 ```
 
 ### Node.js and npm
+
 Install Node.js (version 18 or higher) and npm from [nodejs.org](https://nodejs.org/).
 
 ## Platform-Specific Dependencies
@@ -64,6 +67,7 @@ sudo pacman -S --needed \
 ### macOS
 
 Install Xcode Command Line Tools:
+
 ```bash
 xcode-select --install
 ```
@@ -71,6 +75,7 @@ xcode-select --install
 ### Windows
 
 Install the following:
+
 1. [Microsoft C++ Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/)
 2. [WebView2](https://developer.microsoft.com/en-us/microsoft-edge/webview2/) (usually pre-installed on Windows 11)
 
@@ -79,11 +84,13 @@ Install the following:
 ### Development Mode
 
 1. Install npm dependencies:
+
 ```bash
 npm install
 ```
 
 2. Run in development mode:
+
 ```bash
 npm run tauri dev
 ```
@@ -97,6 +104,7 @@ npm run tauri build
 ## Testing
 
 ### Run all tests:
+
 ```bash
 cd src-tauri
 cargo test
@@ -105,6 +113,7 @@ cargo test
 ### Run specific database adapter tests:
 
 **PostgreSQL:**
+
 ```bash
 # Set environment variables
 export POSTGRES_HOST=localhost
@@ -118,6 +127,7 @@ cargo test --test postgres_integration -- --ignored --nocapture
 ```
 
 **MySQL:**
+
 ```bash
 # Set environment variables
 export MYSQL_HOST=localhost
@@ -131,6 +141,7 @@ cargo test --test mysql_integration -- --ignored --nocapture
 ```
 
 **SQL Server:**
+
 ```bash
 # Set environment variables
 export SQLSERVER_HOST=localhost
@@ -157,6 +168,7 @@ Make sure you have `libwebkit2gtk-4.1-dev` (Ubuntu 24.04+) or `libwebkit2gtk-4.0
 ### Build fails on macOS
 
 Ensure Xcode Command Line Tools are installed:
+
 ```bash
 xcode-select --install
 ```

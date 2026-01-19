@@ -24,9 +24,13 @@ Add the required dependencies to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-tiberius = { version = "0.12", default-features = false, features = ["sql-browser-tokio", "tds73", "rustls"] }
-tokio-util = { version = "0.7", features = ["compat"] }
-tokio = { version = "1", features = ["full"] }
+tiberius = { version = "0.12", default-features = false, features = [
+  "sql-browser-tokio",
+  "tds73",
+  "rustls"
+] }
+tokio-util = { version = "0.7", features = [ "compat" ] }
+tokio = { version = "1", features = [ "full" ] }
 async-trait = "0.1"
 ```
 
@@ -190,7 +194,7 @@ let result = adapter.execute_query("SELECT * FROM entities").await?;
 
 ```rust
 let result = adapter.execute_query(
-    "SELECT 
+    "SELECT
         CAST('2024-01-15' AS DATE) as date_col,
         CAST('2024-01-15 10:30:00' AS DATETIME2) as datetime_col,
         CAST('2024-01-15 10:30:00 +00:00' AS DATETIMEOFFSET) as offset_col"
@@ -224,9 +228,9 @@ for schema in schemas {
 // List tables in 'dbo' schema
 let tables = adapter.list_tables(None, Some("dbo")).await?;
 for table in tables {
-    println!("Table: {}.{} ({})", 
-        table.schema.unwrap_or_default(), 
-        table.name, 
+    println!("Table: {}.{} ({})",
+        table.schema.unwrap_or_default(),
+        table.name,
         table.table_type
     );
 }
@@ -246,10 +250,10 @@ println!("Size: {:?} bytes", table_info.size_bytes);
 ```rust
 let columns = adapter.list_columns(None, Some("dbo"), "users").await?;
 for col in columns {
-    println!("Column: {} ({}) - Nullable: {}, PK: {}", 
-        col.name, 
-        col.data_type, 
-        col.nullable, 
+    println!("Column: {} ({}) - Nullable: {}, PK: {}",
+        col.name,
+        col.data_type,
+        col.nullable,
         col.is_primary_key
     );
 }
@@ -275,20 +279,20 @@ let result = adapter.execute_query("SELECT * FROM large_table").await;
 
 SQL Server types are mapped to `QueryValue` as follows:
 
-| SQL Server Type | QueryValue Type | Notes |
-|----------------|----------------|-------|
-| BIT | Bool | Boolean values |
-| TINYINT, SMALLINT, INT, BIGINT | Int(i64) | All integer types |
-| FLOAT, REAL | Float(f64) | Floating point numbers |
-| NUMERIC, DECIMAL | String | High precision decimals as strings |
-| CHAR, VARCHAR, NCHAR, NVARCHAR, TEXT, NTEXT | String | Character data |
-| BINARY, VARBINARY, IMAGE | Bytes(Vec<u8>) | Binary data |
-| DATE, DATETIME, DATETIME2, SMALLDATETIME | DateTime(String) | Date and time values |
-| DATETIMEOFFSET | DateTime(String) | Timezone-aware timestamps |
-| TIME | String | Time values |
-| UNIQUEIDENTIFIER | String | GUIDs as strings |
-| XML | String | XML documents as strings |
-| NULL | Null | Null values |
+| SQL Server Type                             | QueryValue Type  | Notes                              |
+| ------------------------------------------- | ---------------- | ---------------------------------- |
+| BIT                                         | Bool             | Boolean values                     |
+| TINYINT, SMALLINT, INT, BIGINT              | Int(i64)         | All integer types                  |
+| FLOAT, REAL                                 | Float(f64)       | Floating point numbers             |
+| NUMERIC, DECIMAL                            | String           | High precision decimals as strings |
+| CHAR, VARCHAR, NCHAR, NVARCHAR, TEXT, NTEXT | String           | Character data                     |
+| BINARY, VARBINARY, IMAGE                    | Bytes(Vec<u8>)   | Binary data                        |
+| DATE, DATETIME, DATETIME2, SMALLDATETIME    | DateTime(String) | Date and time values               |
+| DATETIMEOFFSET                              | DateTime(String) | Timezone-aware timestamps          |
+| TIME                                        | String           | Time values                        |
+| UNIQUEIDENTIFIER                            | String           | GUIDs as strings                   |
+| XML                                         | String           | XML documents as strings           |
+| NULL                                        | Null             | Null values                        |
 
 ## Error Handling
 
@@ -311,13 +315,13 @@ match adapter.execute_query("SELECT * FROM users").await {
 
 Additional options can be configured via `with_option()`:
 
-| Option | Type | Description |
-|--------|------|-------------|
-| `use_windows_auth` | bool | Enable Windows Authentication |
-| `trust_server_certificate` | bool | Trust self-signed certificates |
-| `connect_timeout` | u64 | Connection timeout in seconds |
-| `statement_timeout` | u64 | Query timeout in milliseconds |
-| `application_name` | string | Application name for connection tracking |
+| Option                     | Type   | Description                              |
+| -------------------------- | ------ | ---------------------------------------- |
+| `use_windows_auth`         | bool   | Enable Windows Authentication            |
+| `trust_server_certificate` | bool   | Trust self-signed certificates           |
+| `connect_timeout`          | u64    | Connection timeout in seconds            |
+| `statement_timeout`        | u64    | Query timeout in milliseconds            |
+| `application_name`         | string | Application name for connection tracking |
 
 ## Running Tests
 

@@ -5,6 +5,7 @@ This module provides a unified interface for interacting with various database s
 ## Overview
 
 The database adapter module is designed to support multiple database types:
+
 - **PostgreSQL** ✅ (Implemented - see [POSTGRES_README.md](./POSTGRES_README.md))
 - **MySQL** ✅ (Implemented)
 - **SQL Server** ✅ (Implemented)
@@ -17,7 +18,9 @@ The database adapter module is designed to support multiple database types:
 ## Implemented Adapters
 
 ### PostgreSQL
+
 Full-featured adapter with:
+
 - Connection pooling with deadpool-postgres
 - SSL/TLS support (all modes)
 - Complex type handling (arrays, JSON, JSONB, timestamps)
@@ -28,7 +31,9 @@ Full-featured adapter with:
 See [POSTGRES_README.md](./POSTGRES_README.md) for detailed documentation and usage examples.
 
 ### MySQL
+
 Full-featured adapter with:
+
 - Connection pooling with mysql_async
 - SSL/TLS support (all modes)
 - Complex type handling (JSON, binary data, timestamps)
@@ -37,7 +42,9 @@ Full-featured adapter with:
 - Prepared statements
 
 ### SQL Server
+
 Full-featured adapter with:
+
 - Connection pooling with custom implementation
 - TLS/SSL support with certificate validation
 - SQL Server and Windows Authentication
@@ -51,14 +58,18 @@ Full-featured adapter with:
 ### Core Components
 
 #### DatabaseAdapter Trait
+
 The main trait that defines the interface for all database operations:
+
 - Connection management (`connect`, `disconnect`, `test_connection`)
 - Query execution (`execute_query`)
 - Metadata retrieval (`list_databases`, `list_schemas`, `list_tables`, `list_columns`, `get_table_info`)
 - Connection pooling support
 
 #### Error Types
+
 Comprehensive error handling through the `DbError` enum:
+
 - Connection errors
 - Authentication failures
 - Query execution errors
@@ -67,16 +78,19 @@ Comprehensive error handling through the `DbError` enum:
 - And more...
 
 #### Configuration
+
 - `ConnectionConfig`: Database connection parameters
 - `DatabaseType`: Enum for supported database types
 - `SslMode`: SSL/TLS configuration options
 - `PoolConfig`: Connection pooling parameters
 
 #### Connection Pooling
+
 - `ConnectionPool` trait: Interface for connection pool implementations
 - `PoolStats`: Statistics and metrics for pool monitoring
 
 #### Data Types
+
 - `QueryResult`: Results from query execution
 - `QueryValue`: Individual cell values
 - `DatabaseSchema`, `TableInfo`, `ColumnInfo`: Metadata structures
@@ -91,40 +105,40 @@ use sqlkit::database::{
 async fn example<A: DatabaseAdapter>(mut adapter: A) -> Result<(), Box<dyn std::error::Error>> {
     // Connect to database
     adapter.connect().await?;
-    
+
     // Test connection
     let status = adapter.test_connection().await?;
     println!("Connected to: {:?}", status.server_version);
-    
+
     // Execute a query
     let result = adapter.execute_query("SELECT * FROM users LIMIT 10").await?;
     println!("Retrieved {} rows", result.rows.len());
-    
+
     // List databases
     let databases = adapter.list_databases().await?;
     for db in databases {
         println!("Database: {}", db.name);
     }
-    
+
     // List tables
     let tables = adapter.list_tables(None, None).await?;
     for table in tables {
         println!("Table: {}", table.name);
     }
-    
+
     // Get table info
     let table_info = adapter.get_table_info(None, None, "users").await?;
     println!("Table has {} rows", table_info.row_count.unwrap_or(0));
-    
+
     // List columns
     let columns = adapter.list_columns(None, None, "users").await?;
     for col in columns {
         println!("Column: {} ({})", col.name, col.data_type);
     }
-    
+
     // Disconnect
     adapter.disconnect().await?;
-    
+
     Ok(())
 }
 ```
@@ -161,6 +175,7 @@ let config = ConnectionConfig::new(
 To implement support for a new database:
 
 1. Create a struct for your adapter:
+
 ```rust
 pub struct MyDatabaseAdapter {
     config: ConnectionConfig,
@@ -170,33 +185,35 @@ pub struct MyDatabaseAdapter {
 ```
 
 2. Implement the `DatabaseAdapter` trait:
+
 ```rust
 #[async_trait]
 impl DatabaseAdapter for MyDatabaseAdapter {
     type Pool = MyConnectionPool;
-    
+
     async fn connect(&mut self) -> DbResult<()> {
         // Implementation
     }
-    
+
     async fn disconnect(&mut self) -> DbResult<()> {
         // Implementation
     }
-    
+
     // ... implement other required methods
 }
 ```
 
 3. Optionally implement the `ConnectionPool` trait for pooling support:
+
 ```rust
 #[async_trait]
 impl ConnectionPool for MyConnectionPool {
     type Connection = MyConnection;
-    
+
     async fn get_connection(&self) -> DbResult<Arc<Self::Connection>> {
         // Implementation
     }
-    
+
     // ... implement other required methods
 }
 ```

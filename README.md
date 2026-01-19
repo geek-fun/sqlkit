@@ -9,11 +9,13 @@ AI-powered cross-platform SQL database GUI client, supporting PostgreSQL, MySQL,
 Before building, ensure you have the required system dependencies installed. See [BUILD.md](BUILD.md) for detailed instructions.
 
 **Linux (Ubuntu/Debian):**
+
 ```bash
 sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev
 ```
 
 **macOS:**
+
 ```bash
 xcode-select --install
 ```
