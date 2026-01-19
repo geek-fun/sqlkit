@@ -17,7 +17,6 @@ use rusqlite::{types::ValueRef, Connection, OpenFlags, Row};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 /// SQLite connection pool wrapper.
 ///
