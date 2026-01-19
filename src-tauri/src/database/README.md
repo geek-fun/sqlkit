@@ -6,9 +6,9 @@ This module provides a unified interface for interacting with various database s
 
 The database adapter module is designed to support multiple database types:
 - **PostgreSQL** ✅ (Implemented - see [POSTGRES_README.md](./POSTGRES_README.md))
-- MySQL (Planned)
+- **MySQL** ✅ (Implemented)
+- **SQL Server** ✅ (Implemented)
 - Oracle (Planned)
-- SQL Server (Planned)
 - IBM DB2 (Planned)
 - SQLite (Planned)
 - H2 (Planned)
@@ -26,6 +26,25 @@ Full-featured adapter with:
 - Prepared statements
 
 See [POSTGRES_README.md](./POSTGRES_README.md) for detailed documentation and usage examples.
+
+### MySQL
+Full-featured adapter with:
+- Connection pooling with mysql_async
+- SSL/TLS support (all modes)
+- Complex type handling (JSON, binary data, timestamps)
+- Database-level operations
+- Query timeout
+- Prepared statements
+
+### SQL Server
+Full-featured adapter with:
+- Connection pooling with custom implementation
+- TLS/SSL support with certificate validation
+- SQL Server and Windows Authentication
+- Complex type handling (XML, UNIQUEIDENTIFIER, DATETIME2, etc.)
+- Schema support (databases, schemas, tables, columns)
+- Query timeout
+- Support for SQL Server 2016+
 
 ## Architecture
 
