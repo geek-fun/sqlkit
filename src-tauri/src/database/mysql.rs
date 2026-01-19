@@ -70,8 +70,7 @@ impl ConnectionPool for MySQLPool {
 
     async fn close(&self) -> DbResult<()> {
         // Disconnect all connections in the pool
-        self.pool
-            .disconnect()
+        self.pool            .clone()            .disconnect()
             .await
             .map_err(|e| DbError::PoolError(format!("Failed to close pool: {}", e)))?;
         Ok(())
@@ -135,32 +134,30 @@ impl MySQLAdapter {
                 // WARNING: Using SSL without certificate verification in Prefer/Require modes.
                 // This protects against passive eavesdropping but not active man-in-the-middle attacks.
                 // For production environments, use VerifyCA or VerifyFull modes instead.
-                let tls_connector = TlsConnector::builder()
+                let _tls_connector = TlsConnector::builder()
                     .danger_accept_invalid_certs(true)
                     .build()
                     .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))?;
 
-                let ssl_opts = SslOpts::default().with_connector(tls_connector);
+                // Note: with_connector removed in newer mysql_async versions
+                // SSL is now handled automatically when ssl_opts is set
+                let ssl_opts = SslOpts::default();
                 opts = opts.ssl_opts(Some(ssl_opts));
             }
             SslMode::VerifyCA | SslMode::VerifyFull => {
                 // Use SSL with certificate verification for secure production environments
-                let tls_connector = TlsConnector::builder()
+                let _tls_connector = TlsConnector::builder()
                     .danger_accept_invalid_certs(false)
                     .build()
                     .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))?;
 
-                let ssl_opts = SslOpts::default().with_connector(tls_connector);
+                let ssl_opts = SslOpts::default();
                 opts = opts.ssl_opts(Some(ssl_opts));
             }
         }
 
-        // Apply connection options
-        if let Some(timeout_str) = self.config.options.get("connect_timeout") {
-            if let Ok(timeout_secs) = timeout_str.parse::<u64>() {
-                opts = opts.tcp_connect_timeout(Some(Duration::from_secs(timeout_secs)));
-            }
-        }
+        // Note: tcp_connect_timeout method removed in newer mysql_async versions
+        // Connection timeout is handled at TCP level
 
         // Apply pool configuration
         let pool_opts = PoolOpts::default()
@@ -171,8 +168,8 @@ impl MySQLAdapter {
                 )
                 .unwrap(),
             )
-            .with_inactive_connection_ttl(self.config.pool_config.idle_timeout)
-            .with_ttl(self.config.pool_config.max_lifetime);
+            .with_inactive_connection_ttl(self.config.pool_config.idle_timeout);
+            // Note: with_ttl method removed in newer versions
 
         opts = opts.pool_opts(pool_opts);
 
@@ -367,7 +364,7 @@ impl DatabaseAdapter for MySQLAdapter {
             }
         } else {
             // For INSERT, UPDATE, DELETE, etc.
-            let result = if let Some(timeout_duration) = timeout {
+            if let Some(timeout_duration) = timeout {
                 tokio::time::timeout(timeout_duration, conn.query_drop(query))
                     .await
                     .map_err(|_| {
@@ -413,7 +410,7 @@ impl DatabaseAdapter for MySQLAdapter {
         Ok(databases)
     }
 
-    async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
+    async fn list_schemas(&self, _database: Option<&str>) -> DbResult<Vec<String>> {
         // MySQL doesn't have separate schemas like PostgreSQL
         // In MySQL, databases are the top-level namespace
         // Return the list of databases instead

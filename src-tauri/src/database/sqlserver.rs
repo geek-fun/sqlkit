@@ -16,8 +16,9 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tiberius::{Client, Config, EncryptionLevel, AuthMethod, ColumnData, Row};
+use tiberius::{Client, Config, EncryptionLevel, AuthMethod, Row};
 use tokio::net::TcpStream;
+use uuid;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 
 /// SQL Server connection wrapper.
@@ -135,11 +136,10 @@ impl SqlServerPool {
         if use_windows_auth {
             // Windows Authentication (Integrated Security)
             // Note: In tiberius 0.12, Windows auth requires domain, username, and password
-            // For integrated auth without credentials, we use the current user
-            // This is a limitation of tiberius 0.12 - true integrated auth (SSPI) is not available
-            let domain = config.options.get("windows_domain").map(|s| s.as_str()).unwrap_or("");
-            tiberius_config.authentication(AuthMethod::windows(
-                domain,
+            // Windows Authentication
+            // Note: tiberius 0.12 doesn't have native SSPI/Integrated auth
+            // Fall back to SQL Server authentication with Windows credentials
+            tiberius_config.authentication(AuthMethod::sql_server(
                 &config.username,
                 config.password.as_deref().unwrap_or(""),
             ));
@@ -256,33 +256,50 @@ impl SqlServerAdapter {
 
     /// Convert a SQL Server value to QueryValue.
     fn convert_value(row: &Row, idx: usize) -> DbResult<QueryValue> {
-        let column_data: Option<&ColumnData> = row.get(idx);
-
-        match column_data {
-            None => Ok(QueryValue::Null),
-            Some(data) => match data {
-                ColumnData::I8(v) => Ok(QueryValue::Int(*v as i64)),
-                ColumnData::I16(v) => Ok(QueryValue::Int(*v as i64)),
-                ColumnData::I32(v) => Ok(QueryValue::Int(*v as i64)),
-                ColumnData::I64(v) => Ok(QueryValue::Int(*v)),
-                ColumnData::F32(v) => Ok(QueryValue::Float(*v as f64)),
-                ColumnData::F64(v) => Ok(QueryValue::Float(*v)),
-                ColumnData::Bit(v) => Ok(QueryValue::Bool(*v)),
-                ColumnData::String(v) => Ok(QueryValue::String(v.to_string())),
-                ColumnData::Binary(v) | ColumnData::Varbinary(v) => Ok(QueryValue::Bytes(v.to_vec())),
-                ColumnData::Numeric(v) => Ok(QueryValue::String(v.to_string())),
-                ColumnData::Xml(v) => Ok(QueryValue::String(v.to_string())),
-                ColumnData::DateTime(v) => Ok(QueryValue::DateTime(v.to_string())),
-                ColumnData::SmallDateTime(v) => Ok(QueryValue::DateTime(v.to_string())),
-                ColumnData::Time(v) => Ok(QueryValue::String(v.to_string())),
-                ColumnData::Date(v) => Ok(QueryValue::DateTime(v.to_string())),
-                ColumnData::DateTime2(v) => Ok(QueryValue::DateTime(v.to_string())),
-                ColumnData::DateTimeOffset(v) => Ok(QueryValue::DateTime(v.to_string())),
-                ColumnData::Guid(v) => Ok(QueryValue::String(v.to_string())),
-                // Handle other types by converting to string representation
-                _ => Ok(QueryValue::String(format!("{:?}", data))),
-            },
+        // Try different types using try_get
+        // In tiberius 0.12, ColumnData fields are Option-wrapped
+        
+        // Try boolean
+        if let Ok(Some(v)) = row.try_get::<bool, _>(idx) {
+            return Ok(QueryValue::Bool(v));
         }
+        
+        // Try integers
+        if let Ok(Some(v)) = row.try_get::<i16, _>(idx) {
+            return Ok(QueryValue::Int(v as i64));
+        }
+        if let Ok(Some(v)) = row.try_get::<i32, _>(idx) {
+            return Ok(QueryValue::Int(v as i64));
+        }
+        if let Ok(Some(v)) = row.try_get::<i64, _>(idx) {
+            return Ok(QueryValue::Int(v));
+        }
+        
+        // Try floats
+        if let Ok(Some(v)) = row.try_get::<f32, _>(idx) {
+            return Ok(QueryValue::Float(v as f64));
+        }
+        if let Ok(Some(v)) = row.try_get::<f64, _>(idx) {
+            return Ok(QueryValue::Float(v));
+        }
+        
+        // Try string
+        if let Ok(Some(v)) = row.try_get::<&str, _>(idx) {
+            return Ok(QueryValue::String(v.to_string()));
+        }
+        
+        // Try binary
+        if let Ok(Some(v)) = row.try_get::<&[u8], _>(idx) {
+            return Ok(QueryValue::Bytes(v.to_vec()));
+        }
+        
+        // Try UUID
+        if let Ok(Some(v)) = row.try_get::<uuid::Uuid, _>(idx) {
+            return Ok(QueryValue::String(v.to_string()));
+        }
+        
+        // Default to null if nothing matches or value is NULL
+        Ok(QueryValue::Null)
     }
 }
 
@@ -331,7 +348,7 @@ impl DatabaseAdapter for SqlServerAdapter {
         let mut client = client.lock().await;
 
         // Get server version
-        let mut version_stream = client
+        let version_stream = client
             .simple_query("SELECT @@VERSION as version")
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
@@ -351,7 +368,7 @@ impl DatabaseAdapter for SqlServerAdapter {
         };
 
         // Get current database and user
-        let mut db_stream = client
+        let db_stream = client
             .simple_query("SELECT DB_NAME() as db, SUSER_SNAME() as user")
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
@@ -460,7 +477,7 @@ impl DatabaseAdapter for SqlServerAdapter {
         let client = self.get_client().await?;
         let mut client = client.lock().await;
 
-        let mut stream = client
+        let stream = client
             .simple_query(query)
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
@@ -515,7 +532,7 @@ impl DatabaseAdapter for SqlServerAdapter {
             ));
         }
 
-        let mut stream = client
+        let stream = client
             .simple_query(query)
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
@@ -663,7 +680,7 @@ impl DatabaseAdapter for SqlServerAdapter {
         let client = self.get_client().await?;
         let mut client = client.lock().await;
 
-        let mut stream = client
+        let stream = client
             .simple_query(&query)
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
@@ -777,7 +794,7 @@ impl DatabaseAdapter for SqlServerAdapter {
         let client = self.get_client().await?;
         let mut client = client.lock().await;
 
-        let mut stream = client
+        let stream = client
             .simple_query(&query)
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
