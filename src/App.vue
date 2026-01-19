@@ -3,10 +3,10 @@ import { ref } from 'vue'
 import AppLayout from './components/layout/AppLayout.vue'
 import SQLEditor from './components/SQLEditor.vue'
 import { Button } from './components/ui/button'
-import { Input } from './components/ui/input'
-import { Label } from './components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from './components/ui/dialog'
+import { Input } from './components/ui/input'
+import { Label } from './components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './components/ui/table'
 
 const name = ref('')
@@ -30,8 +30,8 @@ const sampleData = [
   { id: 3, database: 'SQLite', status: 'Connected', host: 'local' },
 ]
 
-const handleExecuteQuery = (query: string) => {
-  console.log('Executing query:', query)
+// function handleExecuteQuery(query: string) {
+function handleExecuteQuery() {
   // TODO: Implement query execution logic
 }
 </script>
@@ -40,14 +40,16 @@ const handleExecuteQuery = (query: string) => {
   <AppLayout>
     <div class="space-y-6">
       <div>
-        <h1 class="text-3xl font-bold tracking-tight">Welcome to SQLKit</h1>
+        <h1 class="text-3xl tracking-tight font-bold">
+          Welcome to SQLKit
+        </h1>
         <p class="text-muted-foreground mt-2">
           AI-powered cross-platform SQL database GUI client
         </p>
       </div>
 
       <!-- Components Demo Section -->
-      <div class="grid gap-6 md:grid-cols-2">
+      <div class="gap-6 grid md:grid-cols-2">
         <!-- Form Card -->
         <Card>
           <CardHeader>
@@ -61,7 +63,9 @@ const handleExecuteQuery = (query: string) => {
             </div>
             <div class="flex gap-2">
               <Button>Connect</Button>
-              <Button variant="outline">Cancel</Button>
+              <Button variant="outline">
+                Cancel
+              </Button>
             </div>
           </CardContent>
         </Card>
@@ -74,24 +78,40 @@ const handleExecuteQuery = (query: string) => {
           </CardHeader>
           <CardContent class="space-y-4">
             <div class="flex flex-wrap gap-2">
-              <Button variant="default">Default</Button>
-              <Button variant="secondary">Secondary</Button>
-              <Button variant="outline">Outline</Button>
-              <Button variant="ghost">Ghost</Button>
-              <Button variant="destructive">Destructive</Button>
+              <Button variant="default">
+                Default
+              </Button>
+              <Button variant="secondary">
+                Secondary
+              </Button>
+              <Button variant="outline">
+                Outline
+              </Button>
+              <Button variant="ghost">
+                Ghost
+              </Button>
+              <Button variant="destructive">
+                Destructive
+              </Button>
             </div>
             <Dialog v-model:open="dialogOpen">
               <DialogTrigger as-child>
-                <Button variant="outline">Open Dialog</Button>
+                <Button variant="outline">
+                  Open Dialog
+                </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogTitle>Dialog Example</DialogTitle>
                 <DialogDescription>
                   This is a sample dialog component. You can use it for modals, confirmations, and more.
                 </DialogDescription>
-                <div class="flex justify-end gap-2 mt-4">
-                  <Button variant="outline" @click="dialogOpen = false">Cancel</Button>
-                  <Button @click="dialogOpen = false">Confirm</Button>
+                <div class="mt-4 flex gap-2 justify-end">
+                  <Button variant="outline" @click="dialogOpen = false">
+                    Cancel
+                  </Button>
+                  <Button @click="dialogOpen = false">
+                    Confirm
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -118,11 +138,12 @@ const handleExecuteQuery = (query: string) => {
             <TableBody>
               <TableRow v-for="item in sampleData" :key="item.id">
                 <TableCell>{{ item.id }}</TableCell>
-                <TableCell class="font-medium">{{ item.database }}</TableCell>
+                <TableCell class="font-medium">
+                  {{ item.database }}
+                </TableCell>
                 <TableCell>
                   <span
-                    :class="[
-                      'inline-flex items-center rounded-full px-2 py-1 text-xs font-medium',
+                    class="text-xs font-medium px-2 py-1 rounded-full inline-flex items-center" :class="[
                       item.status === 'Connected'
                         ? 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300'
                         : 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
@@ -149,7 +170,7 @@ const handleExecuteQuery = (query: string) => {
         <CardContent class="space-y-4">
           <SQLEditor
             v-model="sqlQuery"
-            :height="'300px'"
+            height="300px"
             dialect="sql"
             @execute="handleExecuteQuery"
           />

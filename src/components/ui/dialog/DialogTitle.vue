@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { type HTMLAttributes, computed } from 'vue'
-import { DialogTitle, type DialogTitleProps } from 'radix-vue'
+import type { DialogTitleProps } from 'radix-vue'
+import type { HTMLAttributes } from 'vue'
+import { DialogTitle } from 'radix-vue'
+import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<DialogTitleProps & { class?: HTMLAttributes['class'] }>()

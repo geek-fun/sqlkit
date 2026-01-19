@@ -5,6 +5,7 @@ This directory contains the shadcn-vue UI components used in SQLKit.
 ## Components
 
 ### Base Components
+
 - **Button** - Customizable button component with multiple variants (default, secondary, outline, ghost, destructive, link)
 - **Input** - Text input component with consistent styling
 - **Label** - Form label component
@@ -13,7 +14,9 @@ This directory contains the shadcn-vue UI components used in SQLKit.
 - **Table** - Data table components (Table, TableHeader, TableBody, TableRow, TableHead, TableCell)
 
 ### Layout Components
+
 Located in `src/components/layout/`:
+
 - **AppLayout** - Main application layout wrapper
 - **AppHeader** - Top navigation header with theme toggle
 - **AppSidebar** - Left sidebar navigation
@@ -28,8 +31,8 @@ The application uses a custom theme with CSS variables for easy theming. Theme c
 ```vue
 <script setup lang="ts">
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
 </script>
 
 <template>

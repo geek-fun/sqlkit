@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, defineEmits } from 'vue'
 import type * as monaco from 'monaco-editor'
-import { useMonacoEditor, type SQLDialect, type MonacoEditorOptions } from '@/composables/useMonacoEditor'
+import type { MonacoEditorOptions, SQLDialect } from '@/composables/useMonacoEditor'
+import { defineEmits, onMounted, ref, watch } from 'vue'
+import { useMonacoEditor } from '@/composables/useMonacoEditor'
 import { useTheme } from '@/composables/useTheme'
 
 interface Props {
@@ -23,7 +24,7 @@ const props = withDefaults(defineProps<Props>(), {
   fontSize: 14,
   tabSize: 2,
   height: '400px',
-  placeholder: '-- Enter your SQL query here\n-- Press Ctrl+Enter to execute'
+  placeholder: '-- Enter your SQL query here\n-- Press Ctrl+Enter to execute',
 })
 
 const emit = defineEmits<{
@@ -40,20 +41,20 @@ const editorOptions: MonacoEditorOptions = {
   readOnly: props.readOnly,
   minimap: props.minimap,
   fontSize: props.fontSize,
-  tabSize: props.tabSize
+  tabSize: props.tabSize,
 }
 
 const { initEditor, getValue, setValue, updateTheme } = useMonacoEditor(
   editorContainer,
   editorValue,
-  editorOptions
+  editorOptions,
 )
 
 let editor: monaco.editor.IStandaloneCodeEditor | null = null
 
 onMounted(() => {
   editor = initEditor() ?? null
-  
+
   if (editor) {
     // Listen for content changes
     editor.onDidChangeModelContent(() => {
@@ -83,14 +84,14 @@ watch(isDark, (dark) => {
 // Expose methods for parent component
 defineExpose({
   getValue,
-  setValue
+  setValue,
 })
 </script>
 
 <template>
   <div class="sql-editor-wrapper" :style="{ height: props.height }">
-    <div 
-      ref="editorContainer" 
+    <div
+      ref="editorContainer"
       class="sql-editor-container"
       :style="{ height: '100%', width: '100%' }"
     />

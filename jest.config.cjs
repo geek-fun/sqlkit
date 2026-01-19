@@ -5,4 +5,4 @@ module.exports = {
   moduleNameMapper: {
     '^monaco-editor$': '<rootDir>/node_modules/monaco-editor/esm/vs/editor/editor.api.js',
   },
-};
+}

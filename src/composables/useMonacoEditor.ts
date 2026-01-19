@@ -1,13 +1,14 @@
-import { onBeforeUnmount, Ref } from 'vue'
+import type { Ref } from 'vue'
 import * as monaco from 'monaco-editor'
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import { onBeforeUnmount } from 'vue'
 import { useTheme } from './useTheme'
 
 // Configure Monaco Editor workers for Vite
-self.MonacoEnvironment = {
+globalThis.MonacoEnvironment = {
   getWorker(_: unknown, _label: string) {
-    return new editorWorker()
-  }
+    return new EditorWorker()
+  },
 }
 
 export type SQLDialect = 'sql' | 'mysql' | 'pgsql' | 'mssql' | 'plsql' | 'sqlite'
@@ -22,45 +23,170 @@ export interface MonacoEditorOptions {
 
 // SQL keywords for auto-completion
 const SQL_KEYWORDS = [
-  'SELECT', 'FROM', 'WHERE', 'INSERT', 'UPDATE', 'DELETE', 'CREATE', 'ALTER', 'DROP',
-  'TABLE', 'INDEX', 'VIEW', 'DATABASE', 'SCHEMA', 'JOIN', 'INNER', 'LEFT', 'RIGHT',
-  'OUTER', 'ON', 'AS', 'AND', 'OR', 'NOT', 'NULL', 'IS', 'IN', 'BETWEEN', 'LIKE',
-  'ORDER', 'BY', 'GROUP', 'HAVING', 'LIMIT', 'OFFSET', 'UNION', 'DISTINCT', 'COUNT',
-  'SUM', 'AVG', 'MAX', 'MIN', 'CAST', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
-  'PRIMARY', 'KEY', 'FOREIGN', 'REFERENCES', 'CONSTRAINT', 'UNIQUE', 'CHECK',
-  'DEFAULT', 'AUTO_INCREMENT', 'CASCADE', 'SET', 'VALUES', 'INTO', 'BEGIN', 'COMMIT',
-  'ROLLBACK', 'TRANSACTION', 'SAVEPOINT', 'TRUNCATE', 'GRANT', 'REVOKE', 'WITH',
-  'RECURSIVE', 'WINDOW', 'PARTITION', 'OVER', 'ROW_NUMBER', 'RANK', 'DENSE_RANK'
+  'SELECT',
+  'FROM',
+  'WHERE',
+  'INSERT',
+  'UPDATE',
+  'DELETE',
+  'CREATE',
+  'ALTER',
+  'DROP',
+  'TABLE',
+  'INDEX',
+  'VIEW',
+  'DATABASE',
+  'SCHEMA',
+  'JOIN',
+  'INNER',
+  'LEFT',
+  'RIGHT',
+  'OUTER',
+  'ON',
+  'AS',
+  'AND',
+  'OR',
+  'NOT',
+  'NULL',
+  'IS',
+  'IN',
+  'BETWEEN',
+  'LIKE',
+  'ORDER',
+  'BY',
+  'GROUP',
+  'HAVING',
+  'LIMIT',
+  'OFFSET',
+  'UNION',
+  'DISTINCT',
+  'COUNT',
+  'SUM',
+  'AVG',
+  'MAX',
+  'MIN',
+  'CAST',
+  'CASE',
+  'WHEN',
+  'THEN',
+  'ELSE',
+  'END',
+  'PRIMARY',
+  'KEY',
+  'FOREIGN',
+  'REFERENCES',
+  'CONSTRAINT',
+  'UNIQUE',
+  'CHECK',
+  'DEFAULT',
+  'AUTO_INCREMENT',
+  'CASCADE',
+  'SET',
+  'VALUES',
+  'INTO',
+  'BEGIN',
+  'COMMIT',
+  'ROLLBACK',
+  'TRANSACTION',
+  'SAVEPOINT',
+  'TRUNCATE',
+  'GRANT',
+  'REVOKE',
+  'WITH',
+  'RECURSIVE',
+  'WINDOW',
+  'PARTITION',
+  'OVER',
+  'ROW_NUMBER',
+  'RANK',
+  'DENSE_RANK',
 ]
 
 // SQL data types
 const SQL_TYPES = [
-  'INT', 'INTEGER', 'BIGINT', 'SMALLINT', 'TINYINT', 'DECIMAL', 'NUMERIC', 'FLOAT',
-  'REAL', 'DOUBLE', 'CHAR', 'VARCHAR', 'TEXT', 'NCHAR', 'NVARCHAR', 'NTEXT',
-  'DATE', 'TIME', 'DATETIME', 'TIMESTAMP', 'YEAR', 'BOOLEAN', 'BOOL', 'BINARY',
-  'VARBINARY', 'BLOB', 'CLOB', 'JSON', 'UUID', 'SERIAL', 'BIGSERIAL'
+  'INT',
+  'INTEGER',
+  'BIGINT',
+  'SMALLINT',
+  'TINYINT',
+  'DECIMAL',
+  'NUMERIC',
+  'FLOAT',
+  'REAL',
+  'DOUBLE',
+  'CHAR',
+  'VARCHAR',
+  'TEXT',
+  'NCHAR',
+  'NVARCHAR',
+  'NTEXT',
+  'DATE',
+  'TIME',
+  'DATETIME',
+  'TIMESTAMP',
+  'YEAR',
+  'BOOLEAN',
+  'BOOL',
+  'BINARY',
+  'VARBINARY',
+  'BLOB',
+  'CLOB',
+  'JSON',
+  'UUID',
+  'SERIAL',
+  'BIGSERIAL',
 ]
 
 // SQL functions
 const SQL_FUNCTIONS = [
-  'CONCAT', 'SUBSTRING', 'UPPER', 'LOWER', 'TRIM', 'LTRIM', 'RTRIM', 'LENGTH',
-  'REPLACE', 'COALESCE', 'NULLIF', 'IFNULL', 'NOW', 'CURRENT_DATE', 'CURRENT_TIME',
-  'CURRENT_TIMESTAMP', 'DATE_ADD', 'DATE_SUB', 'DATEDIFF', 'EXTRACT', 'TO_CHAR',
-  'TO_DATE', 'TO_NUMBER', 'ROUND', 'CEIL', 'FLOOR', 'ABS', 'SIGN', 'MOD', 'POWER',
-  'SQRT', 'EXP', 'LN', 'LOG'
+  'CONCAT',
+  'SUBSTRING',
+  'UPPER',
+  'LOWER',
+  'TRIM',
+  'LTRIM',
+  'RTRIM',
+  'LENGTH',
+  'REPLACE',
+  'COALESCE',
+  'NULLIF',
+  'IFNULL',
+  'NOW',
+  'CURRENT_DATE',
+  'CURRENT_TIME',
+  'CURRENT_TIMESTAMP',
+  'DATE_ADD',
+  'DATE_SUB',
+  'DATEDIFF',
+  'EXTRACT',
+  'TO_CHAR',
+  'TO_DATE',
+  'TO_NUMBER',
+  'ROUND',
+  'CEIL',
+  'FLOOR',
+  'ABS',
+  'SIGN',
+  'MOD',
+  'POWER',
+  'SQRT',
+  'EXP',
+  'LN',
+  'LOG',
 ]
 
 export function useMonacoEditor(
   containerRef: Ref<HTMLElement | null>,
   initialValue: Ref<string>,
-  options: MonacoEditorOptions = {}
+  options: MonacoEditorOptions = {},
 ) {
   let editor: monaco.editor.IStandaloneCodeEditor | null = null
   let completionProvider: monaco.IDisposable | null = null
   const { isDark } = useTheme()
 
   const initEditor = () => {
-    if (!containerRef.value) return
+    if (!containerRef.value)
+      return
 
     // Set up auto-completion provider
     completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
@@ -70,7 +196,7 @@ export function useMonacoEditor(
           startLineNumber: position.lineNumber,
           endLineNumber: position.lineNumber,
           startColumn: word.startColumn,
-          endColumn: word.endColumn
+          endColumn: word.endColumn,
         }
 
         const suggestions: monaco.languages.CompletionItem[] = [
@@ -78,29 +204,29 @@ export function useMonacoEditor(
             label: keyword,
             kind: monaco.languages.CompletionItemKind.Keyword,
             insertText: keyword,
-            range: range
+            range,
           })),
           ...SQL_TYPES.map(type => ({
             label: type,
             kind: monaco.languages.CompletionItemKind.TypeParameter,
             insertText: type,
-            range: range
+            range,
           })),
-          ...SQL_FUNCTIONS.map(func => {
+          ...SQL_FUNCTIONS.map((func) => {
             // Some functions don't require parentheses in all SQL dialects
             const noParenFunctions = ['NOW', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP']
             const insertText = noParenFunctions.includes(func) ? func : `${func}()`
             return {
               label: func,
               kind: monaco.languages.CompletionItemKind.Function,
-              insertText: insertText,
-              range: range
+              insertText,
+              range,
             }
-          })
+          }),
         ]
 
         return { suggestions }
-      }
+      },
     })
 
     // Create editor instance
@@ -111,7 +237,7 @@ export function useMonacoEditor(
       automaticLayout: true,
       readOnly: options.readOnly || false,
       minimap: {
-        enabled: options.minimap !== false
+        enabled: options.minimap !== false,
       },
       fontSize: options.fontSize || 14,
       tabSize: options.tabSize || 2,
@@ -125,8 +251,8 @@ export function useMonacoEditor(
       formatOnType: true,
       suggest: {
         showKeywords: true,
-        showSnippets: true
-      }
+        showSnippets: true,
+      },
     })
 
     // Add keyboard shortcuts
@@ -135,10 +261,10 @@ export function useMonacoEditor(
       () => {
         // This will be handled by parent component
         const event = new CustomEvent('execute-query', {
-          detail: { query: editor?.getValue() }
+          detail: { query: editor?.getValue() },
         })
         containerRef.value?.dispatchEvent(event)
-      }
+      },
     )
 
     return editor
@@ -170,6 +296,6 @@ export function useMonacoEditor(
     getValue,
     setValue,
     updateTheme,
-    dispose
+    dispose,
   }
 }
