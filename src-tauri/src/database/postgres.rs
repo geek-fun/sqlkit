@@ -31,17 +31,18 @@ impl ConnectionPool for PostgresPool {
     type Connection = Client;
 
     async fn get_connection(&self) -> DbResult<Arc<Self::Connection>> {
-        let client = self
-            .pool
-            .get()
-            .await
-            .map_err(|e| DbError::PoolError(format!("Failed to get connection: {}", e)))?;
-
-        // Create a wrapper that holds the pooled connection
-        // Note: We need to return the actual Client, but deadpool returns a wrapper
-        // For now, we'll use the connection directly through the pool
+        // NOTE: This method is not used in the current implementation because deadpool-postgres
+        // provides its own connection management through the pool.get() method.
+        // The PostgresAdapter methods directly call pool.get() instead of using this trait method.
+        // This is a known limitation of the current ConnectionPool trait design when used with
+        // deadpool, which wraps connections in its own guard type that cannot be easily converted
+        // to Arc<Client>. Future versions could either:
+        // 1. Redesign the ConnectionPool trait to be more generic
+        // 2. Use a different pooling strategy
+        // 3. Keep the current approach where this method is intentionally not used
         Err(DbError::UnsupportedOperation(
-            "Direct connection access not supported with deadpool".to_string(),
+            "Direct connection access not supported with deadpool - use pool.get() directly"
+                .to_string(),
         ))
     }
 
@@ -144,79 +145,107 @@ impl PostgresAdapter {
 
     /// Convert a PostgreSQL value to QueryValue.
     fn convert_value(row: &Row, idx: usize, col_type: &Type) -> DbResult<QueryValue> {
-        // Check for NULL first
-        if row.try_get::<_, Option<String>>(idx).ok().flatten().is_none() {
-            return Ok(QueryValue::Null);
-        }
-
         match *col_type {
             Type::BOOL => {
-                let val: bool = row
+                let val: Option<bool> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::Bool(val))
+                match val {
+                    Some(v) => Ok(QueryValue::Bool(v)),
+                    None => Ok(QueryValue::Null),
+                }
             }
             Type::INT2 | Type::INT4 => {
-                let val: i32 = row
+                let val: Option<i32> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::Int(val as i64))
+                match val {
+                    Some(v) => Ok(QueryValue::Int(v as i64)),
+                    None => Ok(QueryValue::Null),
+                }
             }
             Type::INT8 => {
-                let val: i64 = row
+                let val: Option<i64> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::Int(val))
+                match val {
+                    Some(v) => Ok(QueryValue::Int(v)),
+                    None => Ok(QueryValue::Null),
+                }
             }
             Type::FLOAT4 => {
-                let val: f32 = row
+                let val: Option<f32> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::Float(val as f64))
+                match val {
+                    Some(v) => Ok(QueryValue::Float(v as f64)),
+                    None => Ok(QueryValue::Null),
+                }
             }
             Type::FLOAT8 => {
-                let val: f64 = row
+                let val: Option<f64> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::Float(val))
+                match val {
+                    Some(v) => Ok(QueryValue::Float(v)),
+                    None => Ok(QueryValue::Null),
+                }
             }
             Type::VARCHAR | Type::TEXT | Type::BPCHAR | Type::NAME => {
-                let val: String = row
+                let val: Option<String> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::String(val))
+                match val {
+                    Some(v) => Ok(QueryValue::String(v)),
+                    None => Ok(QueryValue::Null),
+                }
             }
             Type::BYTEA => {
-                let val: Vec<u8> = row
+                let val: Option<Vec<u8>> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::Bytes(val))
+                match val {
+                    Some(v) => Ok(QueryValue::Bytes(v)),
+                    None => Ok(QueryValue::Null),
+                }
             }
             Type::JSON | Type::JSONB => {
-                let val: serde_json::Value = row
+                let val: Option<serde_json::Value> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::String(val.to_string()))
+                match val {
+                    Some(v) => Ok(QueryValue::String(v.to_string())),
+                    None => Ok(QueryValue::Null),
+                }
             }
             Type::TIMESTAMP | Type::TIMESTAMPTZ | Type::DATE | Type::TIME | Type::TIMETZ => {
-                let val: String = row
+                let val: Option<String> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::DateTime(val))
+                match val {
+                    Some(v) => Ok(QueryValue::DateTime(v)),
+                    None => Ok(QueryValue::Null),
+                }
             }
-            // Handle array types by converting to JSON string
+            // Handle array types by converting to string representation
             _ if col_type.name().ends_with("[]") => {
-                let val: String = row
+                let val: Option<String> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::String(val))
+                match val {
+                    Some(v) => Ok(QueryValue::String(v)),
+                    None => Ok(QueryValue::Null),
+                }
             }
             // Default to string representation
             _ => {
-                let val: String = row
+                let val: Option<String> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
-                Ok(QueryValue::String(val))
+                match val {
+                    Some(v) => Ok(QueryValue::String(v)),
+                    None => Ok(QueryValue::Null),
+                }
             }
         }
     }
@@ -243,9 +272,22 @@ impl DatabaseAdapter for PostgresAdapter {
                     .create_pool(Some(Runtime::Tokio1), NoTls)
                     .map_err(|e| DbError::Connection(format!("Failed to create pool: {}", e)))?
             }
-            _ => {
+            SslMode::Prefer | SslMode::Require => {
+                // For Prefer and Require modes, we don't verify certificates but still use SSL
                 let tls_connector = TlsConnector::builder()
-                    .danger_accept_invalid_certs(self.config.ssl_mode == SslMode::Prefer)
+                    .danger_accept_invalid_certs(true)
+                    .build()
+                    .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))?;
+
+                let tls = MakeTlsConnector::new(tls_connector);
+                pg_config
+                    .create_pool(Some(Runtime::Tokio1), tls)
+                    .map_err(|e| DbError::Connection(format!("Failed to create pool: {}", e)))?
+            }
+            SslMode::VerifyCA | SslMode::VerifyFull => {
+                // For VerifyCA and VerifyFull modes, verify certificates
+                let tls_connector = TlsConnector::builder()
+                    .danger_accept_invalid_certs(false)
                     .build()
                     .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))?;
 
@@ -701,19 +743,18 @@ impl DatabaseAdapter for PostgresAdapter {
 
         // Get row count and size for tables (not views)
         let (row_count, size_bytes) = if table_type == "TABLE" {
-            let stats_query = format!(
-                r#"
+            // Use a safer approach by constructing the qualified table name from validated schema and table
+            let stats_query = r#"
                 SELECT 
-                    reltuples::bigint as row_count,
-                    pg_total_relation_size('{}.{}') as size_bytes
-                FROM pg_class
-                WHERE oid = '{}.{}'::regclass
-                "#,
-                schema_filter, table, schema_filter, table
-            );
+                    c.reltuples::bigint as row_count,
+                    pg_total_relation_size(c.oid) as size_bytes
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = $1 AND c.relname = $2
+            "#;
 
             let stats_rows = client
-                .query(&stats_query, &[])
+                .query(&stats_query, &[&schema_filter, &table])
                 .await
                 .map_err(|e| DbError::QueryExecution(e.to_string()))?;
 

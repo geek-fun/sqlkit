@@ -290,7 +290,7 @@ async fn test_json_types() {
 #[tokio::test]
 #[ignore]
 async fn test_query_timeout() {
-    let config = get_test_config().with_option("statement_timeout", "1000"); // 1 second
+    let config = get_test_config().with_option("statement_timeout", "1000"); // 1000 milliseconds (1 second)
 
     let mut adapter = PostgresAdapter::new(config);
     adapter.connect().await.expect("Failed to connect");
