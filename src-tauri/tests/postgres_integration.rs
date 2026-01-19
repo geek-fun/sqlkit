@@ -290,12 +290,13 @@ async fn test_json_types() {
 #[tokio::test]
 #[ignore]
 async fn test_query_timeout() {
+    // Test that queries timeout when they exceed the configured statement_timeout
     let config = get_test_config().with_option("statement_timeout", "1000"); // 1000 milliseconds (1 second)
 
     let mut adapter = PostgresAdapter::new(config);
     adapter.connect().await.expect("Failed to connect");
 
-    // This query should timeout
+    // This query should timeout after 1 second (tries to sleep for 5 seconds)
     let result = adapter.execute_query("SELECT pg_sleep(5)").await;
 
     assert!(result.is_err());
