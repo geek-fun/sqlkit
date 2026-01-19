@@ -5,14 +5,27 @@ This module provides a unified interface for interacting with various database s
 ## Overview
 
 The database adapter module is designed to support multiple database types:
-- PostgreSQL
-- MySQL
-- Oracle
-- SQL Server  
-- IBM DB2
-- SQLite
-- H2
-- ClickHouse
+- **PostgreSQL** ✅ (Implemented - see [POSTGRES_README.md](./POSTGRES_README.md))
+- MySQL (Planned)
+- Oracle (Planned)
+- SQL Server (Planned)
+- IBM DB2 (Planned)
+- SQLite (Planned)
+- H2 (Planned)
+- ClickHouse (Planned)
+
+## Implemented Adapters
+
+### PostgreSQL
+Full-featured adapter with:
+- Connection pooling with deadpool-postgres
+- SSL/TLS support (all modes)
+- Complex type handling (arrays, JSON, JSONB, timestamps)
+- Schema support
+- Query timeout
+- Prepared statements
+
+See [POSTGRES_README.md](./POSTGRES_README.md) for detailed documentation and usage examples.
 
 ## Architecture
 
