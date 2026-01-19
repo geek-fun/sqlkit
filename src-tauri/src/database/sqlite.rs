@@ -18,6 +18,9 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+/// Constant for in-memory database identifier.
+const MEMORY_DB: &str = ":memory:";
+
 /// SQLite connection pool wrapper.
 ///
 /// SQLite has limited concurrency support compared to client-server databases.
@@ -174,7 +177,7 @@ impl SQLiteAdapter {
     /// - For in-memory databases: Use ":memory:" or leave database as None
     pub fn new(config: ConnectionConfig) -> Self {
         let db_path = config.database.as_ref().and_then(|db| {
-            if db == ":memory:" {
+            if db == MEMORY_DB {
                 None
             } else {
                 Some(PathBuf::from(db))
@@ -368,7 +371,7 @@ impl DatabaseAdapter for SQLiteAdapter {
             .db_path
             .as_ref()
             .and_then(|p| p.to_str())
-            .unwrap_or(":memory:")
+            .unwrap_or(MEMORY_DB)
             .to_string();
 
         drop(conn_guard);
@@ -394,7 +397,7 @@ impl DatabaseAdapter for SQLiteAdapter {
             .db_path
             .as_ref()
             .and_then(|p| p.to_str())
-            .unwrap_or(":memory:")
+            .unwrap_or(MEMORY_DB)
             .to_string();
 
         Ok(vec![DatabaseSchema {
@@ -460,9 +463,13 @@ impl DatabaseAdapter for SQLiteAdapter {
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
         // Validate table name to prevent SQL injection
+        // This uses a strict whitelist approach (alphanumeric, underscore, dot only)
         Self::validate_table_name(table)?;
 
-        // Use double quotes for identifier quoting in SQLite (SQL standard)
+        // SAFETY: After validation, table name is guaranteed to only contain safe characters.
+        // Using double quotes for SQL standard identifier quoting.
+        // Note: PRAGMA statements in SQLite don't support parameter binding,
+        // so we use string formatting with validated input as a defense-in-depth approach.
         let query = format!("PRAGMA table_info(\"{}\")", table);
         let result = self.execute_query_internal(&query).await?;
 
@@ -531,9 +538,11 @@ impl DatabaseAdapter for SQLiteAdapter {
 
         // Try to get row count
         // Validate table name to prevent SQL injection
+        // This uses a strict whitelist approach (alphanumeric, underscore, dot only)
         Self::validate_table_name(table)?;
 
-        // Use double quotes for identifier quoting in SQLite (SQL standard)
+        // SAFETY: After validation, table name is guaranteed to only contain safe characters.
+        // Using double quotes for SQL standard identifier quoting.
         let count_query = format!("SELECT COUNT(*) as count FROM \"{}\"", table);
         let row_count = match self.execute_query_internal(&count_query).await {
             Ok(result) => result
