@@ -64,6 +64,7 @@ pub mod config;
 pub mod error;
 pub mod pool;
 pub mod postgres;
+pub mod mysql;
 pub mod types;
 
 #[cfg(test)]
@@ -75,6 +76,7 @@ pub use config::{ConnectionConfig, DatabaseType, PoolConfig, SslMode};
 pub use error::{DbError, DbResult};
 pub use pool::{ConnectionPool, PoolStats};
 pub use postgres::{PostgresAdapter, PostgresPool};
+pub use mysql::{MySQLAdapter, MySQLPool};
 pub use types::{
     ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
 };
