@@ -5,7 +5,6 @@ export interface QueryResult {
   columns: string[]
   rows: Record<string, unknown>[]
   rowCount: number
-  executionTime?: number
 }
 
 export interface QueryTab {

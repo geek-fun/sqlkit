@@ -11,13 +11,13 @@ export interface TableInfo {
 
 export interface DatabaseMetadata {
   databases: string[]
-  schemas: Map<string, string[]>
-  tables: Map<string, TableInfo[]>
-  lastRefresh: Date
+  schemas: Record<string, string[]>
+  tables: Record<string, TableInfo[]>
+  lastRefresh: string
 }
 
 interface DatabaseStoreState {
-  metadata: Map<string, DatabaseMetadata>
+  metadata: Record<string, DatabaseMetadata>
   selectedDatabase: string | null
   selectedSchema: string | null
   loading: boolean
@@ -25,7 +25,7 @@ interface DatabaseStoreState {
 
 export const useDatabaseStore = defineStore('databases', {
   state: (): DatabaseStoreState => ({
-    metadata: new Map(),
+    metadata: {},
     selectedDatabase: null,
     selectedSchema: null,
     loading: false,
@@ -35,7 +35,7 @@ export const useDatabaseStore = defineStore('databases', {
     currentMetadata(state): DatabaseMetadata | null {
       const connectionStore = useConnectionStore()
       const connId = connectionStore.activeConnectionId
-      return connId ? state.metadata.get(connId) ?? null : null
+      return connId ? state.metadata[connId] ?? null : null
     },
 
     databases(): string[] {
@@ -45,14 +45,14 @@ export const useDatabaseStore = defineStore('databases', {
     schemas(state): string[] {
       if (!state.selectedDatabase)
         return []
-      return this.currentMetadata?.schemas.get(state.selectedDatabase) ?? []
+      return this.currentMetadata?.schemas[state.selectedDatabase] ?? []
     },
 
     tables(state): TableInfo[] {
       const key = state.selectedSchema
         ? `${state.selectedDatabase}.${state.selectedSchema}`
         : state.selectedDatabase
-      return key ? this.currentMetadata?.tables.get(key) ?? [] : []
+      return key ? this.currentMetadata?.tables[key] ?? [] : []
     },
   },
 
@@ -65,18 +65,17 @@ export const useDatabaseStore = defineStore('databases', {
         })
         const databases = result.databases.map(db => db.name)
 
-        if (!this.metadata.has(connectionId)) {
-          this.metadata.set(connectionId, {
+        if (!this.metadata[connectionId]) {
+          this.metadata[connectionId] = {
             databases,
-            schemas: new Map(),
-            tables: new Map(),
-            lastRefresh: new Date(),
-          })
+            schemas: {},
+            tables: {},
+            lastRefresh: new Date().toISOString(),
+          }
         }
         else {
-          const meta = this.metadata.get(connectionId)!
-          meta.databases = databases
-          meta.lastRefresh = new Date()
+          this.metadata[connectionId].databases = databases
+          this.metadata[connectionId].lastRefresh = new Date().toISOString()
         }
       }
       finally {
@@ -93,9 +92,9 @@ export const useDatabaseStore = defineStore('databases', {
         })
         const schemas = result.schemas.map(s => s.name)
 
-        const meta = this.metadata.get(connectionId)
+        const meta = this.metadata[connectionId]
         if (meta) {
-          meta.schemas.set(database, schemas)
+          meta.schemas[database] = schemas
         }
       }
       finally {
@@ -112,10 +111,10 @@ export const useDatabaseStore = defineStore('databases', {
           schema,
         })
 
-        const meta = this.metadata.get(connectionId)
+        const meta = this.metadata[connectionId]
         if (meta) {
           const key = schema ? `${database}.${schema}` : database
-          meta.tables.set(key, result.tables)
+          meta.tables[key] = result.tables
         }
       }
       finally {
@@ -124,7 +123,7 @@ export const useDatabaseStore = defineStore('databases', {
     },
 
     clearMetadata(connectionId: string) {
-      this.metadata.delete(connectionId)
+      delete this.metadata[connectionId]
     },
 
     selectDatabase(database: string) {

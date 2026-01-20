@@ -30,7 +30,7 @@ describe('databaseStore', () => {
     it('should have correct default values', () => {
       const store = useDatabaseStore()
 
-      expect(store.metadata.size).toBe(0)
+      expect(Object.keys(store.metadata)).toHaveLength(0)
       expect(store.selectedDatabase).toBeNull()
       expect(store.selectedSchema).toBeNull()
       expect(store.loading).toBe(false)
@@ -75,16 +75,16 @@ describe('databaseStore', () => {
   describe('clearMetadata', () => {
     it('should clear metadata for connection', () => {
       const store = useDatabaseStore()
-      store.metadata.set('conn-1', {
+      store.metadata['conn-1'] = {
         databases: ['db1'],
-        schemas: new Map(),
-        tables: new Map(),
-        lastRefresh: new Date(),
-      })
+        schemas: {},
+        tables: {},
+        lastRefresh: new Date().toISOString(),
+      }
 
       store.clearMetadata('conn-1')
 
-      expect(store.metadata.has('conn-1')).toBe(false)
+      expect(store.metadata['conn-1']).toBeUndefined()
     })
   })
 
@@ -96,7 +96,7 @@ describe('databaseStore', () => {
       await store.fetchDatabases('conn-1')
 
       expect(invoke).toHaveBeenCalledWith('list_databases', { connectionId: 'conn-1' })
-      expect(store.metadata.get('conn-1')?.databases).toEqual(['db1', 'db2'])
+      expect(store.metadata['conn-1']?.databases).toEqual(['db1', 'db2'])
       expect(store.loading).toBe(false)
     })
 
@@ -104,18 +104,18 @@ describe('databaseStore', () => {
       invoke.mockResolvedValue({ databases: [{ name: 'db3' }] })
 
       const store = useDatabaseStore()
-      store.metadata.set('conn-1', {
+      store.metadata['conn-1'] = {
         databases: ['db1', 'db2'],
-        schemas: new Map([['db1', ['public']]]),
-        tables: new Map(),
-        lastRefresh: new Date(2020, 0, 1),
-      })
+        schemas: { db1: ['public'] },
+        tables: {},
+        lastRefresh: new Date(2020, 0, 1).toISOString(),
+      }
 
       await store.fetchDatabases('conn-1')
 
-      expect(store.metadata.get('conn-1')?.databases).toEqual(['db3'])
+      expect(store.metadata['conn-1']?.databases).toEqual(['db3'])
       // Should preserve schemas
-      expect(store.metadata.get('conn-1')?.schemas.get('db1')).toEqual(['public'])
+      expect(store.metadata['conn-1']?.schemas.db1).toEqual(['public'])
     })
 
     it('should set loading to false even on error', async () => {
@@ -133,12 +133,12 @@ describe('databaseStore', () => {
       invoke.mockResolvedValue({ schemas: [{ name: 'public' }, { name: 'private' }] })
 
       const store = useDatabaseStore()
-      store.metadata.set('conn-1', {
+      store.metadata['conn-1'] = {
         databases: ['db1'],
-        schemas: new Map(),
-        tables: new Map(),
-        lastRefresh: new Date(),
-      })
+        schemas: {},
+        tables: {},
+        lastRefresh: new Date().toISOString(),
+      }
 
       await store.fetchSchemas('conn-1', 'db1')
 
@@ -146,7 +146,7 @@ describe('databaseStore', () => {
         connectionId: 'conn-1',
         database: 'db1',
       })
-      expect(store.metadata.get('conn-1')?.schemas.get('db1')).toEqual(['public', 'private'])
+      expect(store.metadata['conn-1']?.schemas.db1).toEqual(['public', 'private'])
     })
   })
 
@@ -159,12 +159,12 @@ describe('databaseStore', () => {
       invoke.mockResolvedValue({ tables: mockTables })
 
       const store = useDatabaseStore()
-      store.metadata.set('conn-1', {
+      store.metadata['conn-1'] = {
         databases: ['db1'],
-        schemas: new Map(),
-        tables: new Map(),
-        lastRefresh: new Date(),
-      })
+        schemas: {},
+        tables: {},
+        lastRefresh: new Date().toISOString(),
+      }
 
       await store.fetchTables('conn-1', 'db1', 'public')
 
@@ -173,23 +173,23 @@ describe('databaseStore', () => {
         database: 'db1',
         schema: 'public',
       })
-      expect(store.metadata.get('conn-1')?.tables.get('db1.public')).toEqual(mockTables)
+      expect(store.metadata['conn-1']?.tables['db1.public']).toEqual(mockTables)
     })
 
     it('should use database only as key when no schema', async () => {
       invoke.mockResolvedValue({ tables: [{ name: 'users' }] })
 
       const store = useDatabaseStore()
-      store.metadata.set('conn-1', {
+      store.metadata['conn-1'] = {
         databases: ['db1'],
-        schemas: new Map(),
-        tables: new Map(),
-        lastRefresh: new Date(),
-      })
+        schemas: {},
+        tables: {},
+        lastRefresh: new Date().toISOString(),
+      }
 
       await store.fetchTables('conn-1', 'db1')
 
-      expect(store.metadata.get('conn-1')?.tables.get('db1')).toEqual([{ name: 'users' }])
+      expect(store.metadata['conn-1']?.tables.db1).toEqual([{ name: 'users' }])
     })
   })
 
@@ -205,12 +205,12 @@ describe('databaseStore', () => {
       connectionStore.activeConnectionId = 'conn-1'
 
       const store = useDatabaseStore()
-      store.metadata.set('conn-1', {
+      store.metadata['conn-1'] = {
         databases: ['db1', 'db2'],
-        schemas: new Map(),
-        tables: new Map(),
-        lastRefresh: new Date(),
-      })
+        schemas: {},
+        tables: {},
+        lastRefresh: new Date().toISOString(),
+      }
 
       expect(store.databases).toEqual(['db1', 'db2'])
     })
@@ -227,12 +227,12 @@ describe('databaseStore', () => {
 
       const store = useDatabaseStore()
       store.selectedDatabase = 'db1'
-      store.metadata.set('conn-1', {
+      store.metadata['conn-1'] = {
         databases: ['db1'],
-        schemas: new Map([['db1', ['public', 'private']]]),
-        tables: new Map(),
-        lastRefresh: new Date(),
-      })
+        schemas: { db1: ['public', 'private'] },
+        tables: {},
+        lastRefresh: new Date().toISOString(),
+      }
 
       expect(store.schemas).toEqual(['public', 'private'])
     })
@@ -246,12 +246,12 @@ describe('databaseStore', () => {
       store.selectedSchema = 'public'
 
       const mockTables = [{ name: 'users' }, { name: 'orders' }]
-      store.metadata.set('conn-1', {
+      store.metadata['conn-1'] = {
         databases: ['db1'],
-        schemas: new Map(),
-        tables: new Map([['db1.public', mockTables]]),
-        lastRefresh: new Date(),
-      })
+        schemas: {},
+        tables: { 'db1.public': mockTables },
+        lastRefresh: new Date().toISOString(),
+      }
 
       expect(store.tables).toEqual(mockTables)
     })
