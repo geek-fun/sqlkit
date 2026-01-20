@@ -5,13 +5,16 @@ This module provides a complete implementation of the `DatabaseAdapter` trait fo
 ## Features
 
 ### Connection Management
+
 - **Connection Pooling**: Uses `deadpool-postgres` for efficient connection pooling
 - **Configurable Pool Size**: Set minimum and maximum connections via `PoolConfig`
 - **Connection Timeout**: Configurable timeout for acquiring connections from the pool
 - **Automatic Connection Reuse**: Connections are automatically returned to the pool when dropped
 
 ### SSL/TLS Support
+
 Supports all PostgreSQL SSL modes:
+
 - `Disable`: No SSL encryption
 - `Prefer`: Use SSL if available, fallback to unencrypted
 - `Require`: Require SSL, fail if not available
@@ -19,7 +22,9 @@ Supports all PostgreSQL SSL modes:
 - `VerifyFull`: Require SSL and verify the full certificate chain
 
 ### Complex Type Handling
+
 The adapter handles PostgreSQL's rich type system:
+
 - **Primitive Types**: BOOL, INT2, INT4, INT8, FLOAT4, FLOAT8
 - **String Types**: VARCHAR, TEXT, BPCHAR, NAME
 - **Binary Data**: BYTEA
@@ -28,20 +33,25 @@ The adapter handles PostgreSQL's rich type system:
 - **Array Types**: All array types (converted to string representation)
 
 ### Schema Support
+
 PostgreSQL's multi-schema architecture is fully supported:
+
 - List all schemas in a database
 - Filter tables and columns by schema
 - Default to "public" schema when not specified
 - Automatically exclude system schemas (pg_catalog, information_schema, pg_toast, pg_temp)
 
 ### Query Execution
+
 - **Timeout Support**: Configure query timeouts via `statement_timeout` option
 - **Prepared Statements**: Automatically used by tokio-postgres for better performance
 - **Query Type Detection**: Automatically distinguishes between SELECT and DML queries
 - **Execution Time Tracking**: Returns execution time for all queries
 
 ### Metadata Retrieval
+
 Comprehensive metadata access:
+
 - **Databases**: List all databases with descriptions
 - **Schemas**: List all user schemas (excluding system schemas)
 - **Tables**: List tables and views with schema information
@@ -99,8 +109,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Execute a query
     let result = adapter.execute_query("SELECT * FROM users LIMIT 10").await?;
-    println!("Retrieved {} rows in {}ms", 
-        result.rows.len(), 
+    println!("Retrieved {} rows in {}ms",
+        result.rows.len(),
         result.execution_time_ms.unwrap_or(0));
 
     // List all databases
@@ -118,24 +128,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // List tables in a specific schema
     let tables = adapter.list_tables(None, Some("public")).await?;
     for table in tables {
-        println!("Table: {}.{} ({})", 
-            table.schema.unwrap_or_default(), 
-            table.name, 
+        println!("Table: {}.{} ({})",
+            table.schema.unwrap_or_default(),
+            table.name,
             table.table_type);
     }
 
     // Get detailed column information
     let columns = adapter.list_columns(None, Some("public"), "users").await?;
     for col in columns {
-        println!("Column: {} {} {}", 
-            col.name, 
+        println!("Column: {} {} {}",
+            col.name,
             col.data_type,
             if col.is_primary_key { "[PK]" } else { "" });
     }
 
     // Get table statistics
     let table_info = adapter.get_table_info(None, Some("public"), "users").await?;
-    println!("Table 'users' has {} rows and is {} bytes", 
+    println!("Table 'users' has {} rows and is {} bytes",
         table_info.row_count.unwrap_or(0),
         table_info.size_bytes.unwrap_or(0));
 
@@ -149,6 +159,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 ## Configuration Options
 
 ### Connection Options
+
 You can pass additional PostgreSQL connection options using `with_option()`:
 
 ```rust
@@ -161,6 +172,7 @@ let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, 
 ```
 
 ### Pool Configuration
+
 Configure connection pooling behavior:
 
 ```rust
@@ -204,6 +216,7 @@ match adapter.execute_query("SELECT * FROM users").await {
 ## Testing
 
 The module includes comprehensive unit tests for:
+
 - Adapter creation
 - Connection string building
 - SSL mode mapping
@@ -211,11 +224,13 @@ The module includes comprehensive unit tests for:
 - Option handling
 
 Run tests with:
+
 ```bash
 cargo test --lib database::postgres
 ```
 
 For integration tests with a real PostgreSQL database, ensure you have a PostgreSQL instance running and set the appropriate environment variables:
+
 ```bash
 export POSTGRES_HOST=localhost
 export POSTGRES_PORT=5432
@@ -235,6 +250,7 @@ cargo test --test postgres_integration
 ## Future Enhancements
 
 Potential improvements for future versions:
+
 - Support for prepared statement caching
 - Streaming query results for large datasets
 - Support for PostgreSQL COPY protocol

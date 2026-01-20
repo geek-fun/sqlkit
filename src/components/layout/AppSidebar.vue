@@ -13,8 +13,8 @@ const activeItem = ref('connections')
 </script>
 
 <template>
-  <aside class="w-64 border-r bg-background">
-    <nav class="flex flex-col gap-2 p-4">
+  <aside class="border-r bg-background w-64">
+    <nav class="p-4 flex flex-col gap-2">
       <Button
         v-for="item in menuItems"
         :key="item.id"

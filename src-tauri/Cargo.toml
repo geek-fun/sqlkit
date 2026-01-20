@@ -28,15 +28,22 @@ serde = { version = "1", features = [ "derive" ] }
 serde_json = "1"
 async-trait = "0.1"
 thiserror = "1.0"
-tokio = { version = "1", features = ["full"] }
-tokio-postgres = { version = "0.7", features = ["with-serde_json-1"] }
+tokio = { version = "1", features = [ "full" ] }
+tokio-postgres = { version = "0.7", features = [ "with-serde_json-1" ] }
 postgres-native-tls = "0.5"
 native-tls = "0.2"
 deadpool-postgres = "0.14"
 mysql_async = "0.34"
 tokio-native-tls = "0.3"
-tiberius = { version = "0.12", default-features = false, features = ["sql-browser-tokio", "tds73", "rustls"] }
-tokio-util = { version = "0.7", features = ["compat"] }
-rusqlite = { version = "0.32", features = ["bundled", "chrono"] }
-uuid = { version = "1", features = ["v4"] }
-
+tiberius = { version = "0.12", default-features = false, features = [
+  "sql-browser-tokio",
+  "tds73",
+  "rustls"
+] }
+tokio-util = { version = "0.7", features = [ "compat" ] }
+rusqlite = { version = "0.32", features = [
+  "bundled",
+  "chrono"
+] }
+uuid = { version = "1", features = [ "v4" ] }
+tauri-plugin-store = "2"
