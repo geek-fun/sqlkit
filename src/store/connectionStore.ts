@@ -21,7 +21,7 @@ export interface SSHTunnelConfig {
 }
 
 export interface ServerConnection {
-  id?: number
+  id?: string
   name: string
   type: DatabaseType
   host: string
@@ -41,7 +41,7 @@ export const useConnectionStore = defineStore('connectionStore', {
     connectionOptions(state) {
       return state.connections.map(({ name }) => ({ label: name, value: name }))
     },
-    getConnectionById: state => (id: number) => {
+    getConnectionById: state => (id: string) => {
       return state.connections.find(c => c.id === id)
     },
     getConnectionByName: state => (name: string) => {
@@ -64,7 +64,7 @@ export const useConnectionStore = defineStore('connectionStore', {
       try {
         const newConnection = {
           ...connection,
-          id: connection.id || Date.now(),
+          id: connection.id || crypto.randomUUID(),
         }
 
         if (connection.id) {

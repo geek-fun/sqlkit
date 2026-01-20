@@ -35,18 +35,24 @@ export const storeApi = {
   },
 
   /**
-   * Get a sensitive value from the store.
+   * Get a value intended for sensitive data from the store.
+   * Note: Currently no encryption is applied. This is a placeholder
+   * for future encryption implementation using system keychain or
+   * encryption APIs.
    * @param key - The key to retrieve
    * @param defaultValue - The default value if key doesn't exist
    * @returns The value from the store or the default value
    */
   getSecret: async <T>(key: string, defaultValue: T): Promise<T> => {
-    const encryptedValue = (await store.get(key)) ?? defaultValue
-    return encryptedValue as T
+    const value = (await store.get(key)) ?? defaultValue
+    return value as T
   },
 
   /**
-   * Set a sensitive value in the store.
+   * Set a value intended for sensitive data in the store.
+   * Note: Currently no encryption is applied. This is a placeholder
+   * for future encryption implementation using system keychain or
+   * encryption APIs.
    * @param key - The key to set
    * @param value - The value to store
    */

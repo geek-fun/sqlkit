@@ -22,7 +22,7 @@ describe('connectionStore', () => {
   })
 
   const createMockConnection = (overrides: Partial<ServerConnection> = {}): ServerConnection => ({
-    id: Date.now(),
+    id: crypto.randomUUID(),
     name: 'Test Connection',
     type: DatabaseType.POSTGRESQL,
     host: 'localhost',
@@ -64,15 +64,15 @@ describe('connectionStore', () => {
   describe('getConnectionById getter', () => {
     it('should find connection by id', () => {
       const store = useConnectionStore()
-      const conn = createMockConnection({ id: 123 })
+      const conn = createMockConnection({ id: 'test-uuid-123' })
       store.connections = [conn]
 
-      expect(store.getConnectionById(123)).toEqual(conn)
+      expect(store.getConnectionById('test-uuid-123')).toEqual(conn)
     })
 
     it('should return undefined if connection not found', () => {
       const store = useConnectionStore()
-      expect(store.getConnectionById(999)).toBeUndefined()
+      expect(store.getConnectionById('non-existent-id')).toBeUndefined()
     })
   })
 
@@ -132,7 +132,7 @@ describe('connectionStore', () => {
       storeApi.set.mockResolvedValue(undefined)
 
       const store = useConnectionStore()
-      const existingConn = createMockConnection({ id: 123, name: 'Old Name' })
+      const existingConn = createMockConnection({ id: 'existing-uuid-123', name: 'Old Name' })
       store.connections = [existingConn]
 
       const updatedConn = { ...existingConn, name: 'New Name' }
@@ -160,14 +160,14 @@ describe('connectionStore', () => {
       storeApi.set.mockResolvedValue(undefined)
 
       const store = useConnectionStore()
-      const conn1 = createMockConnection({ id: 1 })
-      const conn2 = createMockConnection({ id: 2 })
+      const conn1 = createMockConnection({ id: 'conn-1' })
+      const conn2 = createMockConnection({ id: 'conn-2' })
       store.connections = [conn1, conn2]
 
       await store.removeConnection(conn1)
 
       expect(store.connections).toHaveLength(1)
-      expect(store.connections[0].id).toBe(2)
+      expect(store.connections[0].id).toBe('conn-2')
       expect(storeApi.set).toHaveBeenCalled()
     })
   })
