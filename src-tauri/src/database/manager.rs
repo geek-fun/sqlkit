@@ -197,7 +197,7 @@ impl<P: ConnectionPool> ConnectionManager<P> {
     }
 
     /// Mark a connection as released.
-    fn mark_connection_released(&self, connection_id: &str) -> DbResult<()> {
+    fn _mark_connection_released(&self, connection_id: &str) -> DbResult<()> {
         let mut metadata = self
             .metadata
             .write()
@@ -317,7 +317,7 @@ impl<P: ConnectionPool> ConnectionManager<P> {
             .read()
             .map_err(|e| DbError::PoolError(format!("Failed to acquire metadata lock: {}", e)))?;
 
-        let now = Instant::now();
+        let _now = Instant::now();
         let mut unhealthy_ids = Vec::new();
 
         for (id, meta) in metadata.iter() {

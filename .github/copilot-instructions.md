@@ -102,6 +102,8 @@ All database operations return `DbResult<T>` (type alias for `Result<T, DbError>
 - All adapter methods use `#[async_trait]` for trait async support
 - Use Tokio runtime (`tokio = { version = "1", features = ["full"] }`)
 - Connection pools return `Arc<Connection>` for shared ownership
+- **State synchronization**: Use `tokio::sync::Mutex` for state accessed across Tauri commands (not `std::sync::Mutex` - it's not Send across await points)
+- In tests: Use `blocking_lock()` for tokio::Mutex when in synchronous test setup functions
 
 ### Type Conversions
 
@@ -118,7 +120,22 @@ Use `<script setup lang="ts">` syntax with Composition API. Import UI components
 
 ### Tauri Commands
 
-Commands are defined with `#[tauri::command]` and registered in [lib.rs](src-tauri/src/lib.rs) via `generate_handler![]`. Currently only has a demo `greet` command - database operations need Tauri command wrappers.
+Commands are defined with `#[tauri::command]` and registered in [lib.rs](src-tauri/src/lib.rs) via `generate_handler![]`.
+
+**Implemented Commands** (15 total across 4 modules):
+
+- **Server Management** ([server.rs](src-tauri/src/commands/server.rs)): `save_server`, `list_servers`, `delete_server`, `test_connection`
+- **Connection Lifecycle** ([connection.rs](src-tauri/src/commands/connection.rs)): `connect_server`, `disconnect_server`, `get_connection_status`
+- **Query Execution** ([query.rs](src-tauri/src/commands/query.rs)): `execute_query`, `cancel_query` (placeholder), `explain_query`
+- **Database Browsing** ([browse.rs](src-tauri/src/commands/browse.rs)): `list_databases`, `list_schemas`, `list_tables`, `get_table_info`, `get_table_data`
+
+**State Management**: `AppState` ([state.rs](src-tauri/src/state.rs)) holds:
+
+- Active database connections (wrapped adapters in tokio::sync::Mutex)
+- Server configurations (persisted via `AppConfig`)
+- Uses `Arc<Mutex<T>>` for thread-safe shared state across commands
+
+**Key Pattern**: Commands store full adapter instances (not just pools) in `ActiveConnection` enum, making query execution straightforward without recreating adapters.
 
 ## Coding/Architecture Guidelines
 
@@ -162,5 +179,26 @@ Commands are defined with `#[tauri::command]` and registered in [lib.rs](src-tau
 2. Implement `DatabaseAdapter` trait and `ConnectionPool` trait for `YourDbPool`
 3. Add to [mod.rs](src-tauri/src/database/mod.rs) exports
 4. Create usage example in `src-tauri/examples/`
+5. Add variant to `ActiveConnection` enum in [state.rs](src-tauri/src/state.rs)
+6. Update command match statements in [connection.rs](src-tauri/src/commands/connection.rs), [query.rs](src-tauri/src/commands/query.rs), and [browse.rs](src-tauri/src/commands/browse.rs)
 
-**Adding Tauri commands**: Define in [lib.rs](src-tauri/src/lib.rs) with `#[tauri::command]`, add to `generate_handler![]`, and ensure proper error handling with serializable error types.
+**Adding Tauri commands**:
+
+1. Define in appropriate module under `src-tauri/src/commands/`
+2. Add `#[tauri::command]` attribute
+3. Use `State<'_, AppState>` parameter for accessing shared state
+4. Return `Result<T, String>` where T is JSON-serializable
+5. Export from [commands/mod.rs](src-tauri/src/commands/mod.rs)
+6. Register in [lib.rs](src-tauri/src/lib.rs) `generate_handler![]` macro
+7. Add unit tests in the same file using `#[tokio::test]`
+
+**Calling commands from frontend**: Use `@tauri-apps/api` invoke:
+
+```typescript
+import { invoke } from '@tauri-apps/api/core'
+
+const result = await invoke<QueryResult>('execute_query', {
+  connectionId: 'server-uuid',
+  sql: 'SELECT * FROM users'
+})
+```
