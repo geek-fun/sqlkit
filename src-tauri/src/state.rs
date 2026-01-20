@@ -142,6 +142,7 @@ impl ServerConfig {
 ///     let result = adapter.execute_query("SELECT 1").await?;
 /// }
 /// ```
+#[derive(Clone)]
 pub enum ActiveConnection {
     /// Active PostgreSQL connection backed by a [`PostgresAdapter`](crate::database::postgres::PostgresAdapter).
     ///

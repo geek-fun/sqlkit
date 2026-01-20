@@ -4,7 +4,7 @@
 //! including saving, listing, deleting, and testing connections.
 
 use crate::state::{AppState, ServerConfig};
-use crate::database::{ConnectionStatus, DatabaseAdapter};
+use crate::database::ConnectionStatus;
 use tauri::State;
 
 /// Save or update a server configuration.

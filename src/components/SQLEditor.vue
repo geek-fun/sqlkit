@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type * as monaco from 'monaco-editor'
 import type { MonacoEditorOptions, SQLDialect } from '@/composables/useMonacoEditor'
-import { defineEmits, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useMonacoEditor } from '@/composables/useMonacoEditor'
 import { useTheme } from '@/composables/useTheme'
 

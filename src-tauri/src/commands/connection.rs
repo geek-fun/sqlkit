@@ -5,9 +5,7 @@
 
 use crate::database::{ConnectionStatus, DatabaseAdapter};
 use crate::state::{ActiveConnection, AppState};
-use std::sync::Arc;
 use tauri::State;
-use tokio::sync::Mutex;
 
 /// Connect to a saved server.
 ///
