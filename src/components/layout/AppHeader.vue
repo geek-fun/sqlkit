@@ -3,10 +3,10 @@ import ThemeToggle from './ThemeToggle.vue'
 </script>
 
 <template>
-  <header class="sticky top-0 z-40 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+  <header class="border-b bg-background/95 w-full top-0 sticky z-40 backdrop-blur supports-[backdrop-filter]:bg-background/60">
     <div class="container flex h-14 items-center">
       <div class="flex flex-1 items-center justify-between">
-        <div class="flex items-center gap-2">
+        <div class="flex gap-2 items-center">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             width="24"
@@ -22,9 +22,9 @@ import ThemeToggle from './ThemeToggle.vue'
             <ellipse cx="12" cy="5" rx="9" ry="3" />
             <path d="M3 5v14a9 3 0 0 0 18 0V5" />
           </svg>
-          <span class="font-bold text-xl">SQLKit</span>
+          <span class="text-xl font-bold">SQLKit</span>
         </div>
-        <div class="flex items-center gap-2">
+        <div class="flex gap-2 items-center">
           <ThemeToggle />
         </div>
       </div>
