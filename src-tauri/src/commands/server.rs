@@ -86,51 +86,15 @@ pub async fn delete_server(id: String, state: State<'_, AppState>) -> Result<(),
 #[tauri::command]
 pub async fn test_connection(config: ServerConfig) -> Result<ConnectionStatus, String> {
     let conn_config = config.to_connection_config()?;
-
-    // Create a temporary adapter based on database type
-    match config.db_type.to_lowercase().as_str() {
-        "postgresql" | "postgres" => {
-            use crate::database::postgres::PostgresAdapter;
-            let mut adapter = PostgresAdapter::new(conn_config);
-            adapter
-                .connect()
-                .await
-                .map_err(|e| format!("Connection test failed: {}", e))?;
-            adapter.test_connection().await.map_err(|e| e.to_string())
-        }
-        "mysql" => {
-            use crate::database::mysql::MySQLAdapter;
-            let mut adapter = MySQLAdapter::new(conn_config);
-            adapter
-                .connect()
-                .await
-                .map_err(|e| format!("Connection test failed: {}", e))?;
-            adapter.test_connection().await.map_err(|e| e.to_string())
-        }
-        "sqlserver" | "mssql" => {
-            use crate::database::sqlserver::SqlServerAdapter;
-            let mut adapter = SqlServerAdapter::new(conn_config);
-            adapter
-                .connect()
-                .await
-                .map_err(|e| format!("Connection test failed: {}", e))?;
-            adapter.test_connection().await.map_err(|e| e.to_string())
-        }
-        "sqlite" => {
-            use crate::database::sqlite::SQLiteAdapter;
-            let mut adapter = SQLiteAdapter::new(conn_config);
-            adapter
-                .connect()
-                .await
-                .map_err(|e| format!("Connection test failed: {}", e))?;
-            adapter.test_connection().await.map_err(|e| e.to_string())
-        }
-        _ => Err(format!("Unsupported database type: {}", config.db_type)),
-    }
+    
+    // Use helper function to test connection
+    crate::commands::helpers::test_connection(&config.db_type, conn_config).await
 }
 
+// Tests for server commands are temporarily disabled.
+// TODO: Convert to integration tests with full Tauri context support.
+// When re-enabling, remove the #[ignore] attribute or convert to integration tests.
 #[cfg(test)]
-#[cfg(not(test))] // Temporarily disabled - need to convert to integration tests with Tauri context
 mod tests {
     use super::*;
     use crate::state::AppState;

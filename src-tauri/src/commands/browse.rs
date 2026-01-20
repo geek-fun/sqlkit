@@ -7,6 +7,20 @@ use crate::database::{DatabaseAdapter, QueryResult, TableInfo};
 use crate::state::{ActiveConnection, AppState};
 use tauri::State;
 
+/// Quote identifier for safe SQL interpolation.
+/// 
+/// This function quotes identifiers according to the database type to prevent
+/// SQL injection when building queries with table/column names.
+fn quote_identifier(identifier: &str, db_type: &str) -> String {
+    match db_type {
+        "postgres" => format!("\"{}\"", identifier.replace("\"", "\"\"")),
+        "mysql" => format!("`{}`", identifier.replace("`", "``")),
+        "sqlserver" => format!("[{}]", identifier.replace("]", "]]")),
+        "sqlite" => format!("\"{}\"", identifier.replace("\"", "\"\"")),
+        _ => identifier.to_string(),
+    }
+}
+
 /// List all databases on the server.
 ///
 /// # Arguments
@@ -259,39 +273,51 @@ pub async fn get_table_data(
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
 
-    // Build query with optional limit
-    let query = if let Some(limit_val) = limit {
-        format!("SELECT * FROM {} LIMIT {}", table, limit_val)
-    } else {
-        format!("SELECT * FROM {}", table)
-    };
-
-    // Execute query based on connection type
+    // Execute query based on connection type with proper identifier quoting
     let result = match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter
                 .lock().await;
+            let quoted_table = quote_identifier(&table, "postgres");
+            let query = if let Some(limit_val) = limit {
+                format!("SELECT * FROM {} LIMIT {}", quoted_table, limit_val)
+            } else {
+                format!("SELECT * FROM {}", quoted_table)
+            };
             adapter.execute_query(&query).await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter
                 .lock().await;
+            let quoted_table = quote_identifier(&table, "mysql");
+            let query = if let Some(limit_val) = limit {
+                format!("SELECT * FROM {} LIMIT {}", quoted_table, limit_val)
+            } else {
+                format!("SELECT * FROM {}", quoted_table)
+            };
             adapter.execute_query(&query).await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter
                 .lock().await;
+            let quoted_table = quote_identifier(&table, "sqlserver");
             // SQL Server uses TOP instead of LIMIT
             let query = if let Some(limit_val) = limit {
-                format!("SELECT TOP {} * FROM {}", limit_val, table)
+                format!("SELECT TOP {} * FROM {}", limit_val, quoted_table)
             } else {
-                format!("SELECT * FROM {}", table)
+                format!("SELECT * FROM {}", quoted_table)
             };
             adapter.execute_query(&query).await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter
                 .lock().await;
+            let quoted_table = quote_identifier(&table, "sqlite");
+            let query = if let Some(limit_val) = limit {
+                format!("SELECT * FROM {} LIMIT {}", quoted_table, limit_val)
+            } else {
+                format!("SELECT * FROM {}", quoted_table)
+            };
             adapter.execute_query(&query).await
         }
     }
@@ -300,8 +326,10 @@ pub async fn get_table_data(
     Ok(result)
 }
 
+// Tests for browse commands are temporarily disabled.
+// TODO: Convert to integration tests with full Tauri context support.
+// When re-enabling, remove the #[ignore] attribute or convert to integration tests.
 #[cfg(test)]
-#[cfg(not(test))] // Temporarily disabled - need to convert to integration tests with Tauri context
 mod tests {
     use super::*;
     use crate::commands::connection::connect_server;
@@ -337,6 +365,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Tauri context - convert to integration test
     async fn test_list_databases() {
         let state = create_test_state();
         let conn_id = setup_connection(&state).await;
@@ -348,6 +377,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Tauri context - convert to integration test
     async fn test_list_schemas() {
         let state = create_test_state();
         let conn_id = setup_connection(&state).await;
@@ -357,6 +387,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Tauri context - convert to integration test
     async fn test_list_tables() {
         let state = create_test_state();
         let conn_id = setup_connection(&state).await;
@@ -377,6 +408,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Tauri context - convert to integration test
     async fn test_get_table_info() {
         let state = create_test_state();
         let conn_id = setup_connection(&state).await;
@@ -390,7 +422,14 @@ mod tests {
         .await
         .unwrap();
 
-        let result = get_table_info(conn_id, "test".to_string(), State::from(&state)).await;
+        let result = get_table_info(
+            conn_id,
+            "main".to_string(),
+            None,
+            "test".to_string(),
+            State::from(&state),
+        )
+        .await;
         assert!(result.is_ok());
         let table_info = result.unwrap();
         assert_eq!(table_info.name, "test");
@@ -398,6 +437,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore] // Requires Tauri context - convert to integration test
     async fn test_get_table_data() {
         let state = create_test_state();
         let conn_id = setup_connection(&state).await;

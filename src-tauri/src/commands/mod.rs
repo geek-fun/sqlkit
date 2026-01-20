@@ -5,9 +5,11 @@
 //! - `connection`: Connection lifecycle management
 //! - `query`: SQL query execution
 //! - `browse`: Database metadata browsing
+//! - `helpers`: Shared utilities to reduce code duplication
 
 pub mod browse;
 pub mod connection;
+pub mod helpers;
 pub mod query;
 pub mod server;
 
