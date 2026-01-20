@@ -15,26 +15,55 @@ export enum LanguageType {
 export interface EditorConfig {
   fontSize: number
   fontWeight: string
+  fontFamily: string
+  tabSize: number
+  wordWrap: boolean
   showLineNumbers: boolean
   showMinimap: boolean
 }
 
+export interface QueryConfig {
+  defaultLimit: number
+  queryTimeout: number
+  autoSave: boolean
+}
+
+interface AppStoreState {
+  themeType: ThemeType
+  languageType: LanguageType
+  uiThemeType: Exclude<ThemeType, ThemeType.AUTO>
+  editorConfig: EditorConfig
+  queryConfig: QueryConfig
+  sidebarCollapsed: boolean
+}
+
 export const useAppStore = defineStore('app', {
-  state: () => ({
+  state: (): AppStoreState => ({
     themeType: ThemeType.AUTO,
     languageType: LanguageType.AUTO,
-    uiThemeType: ThemeType.LIGHT as Exclude<ThemeType, ThemeType.AUTO>,
+    uiThemeType: ThemeType.LIGHT,
     editorConfig: {
       fontSize: 14,
       fontWeight: 'normal',
+      fontFamily: 'Monaco, Menlo, Consolas, monospace',
+      tabSize: 2,
+      wordWrap: true,
       showLineNumbers: true,
       showMinimap: false,
-    } as EditorConfig,
-    queryTimeout: 30000,
-    defaultLimit: 1000,
-    autoSave: true,
+    },
+    queryConfig: {
+      defaultLimit: 1000,
+      queryTimeout: 30000,
+      autoSave: true,
+    },
+    sidebarCollapsed: false,
   }),
   persist: true,
+  getters: {
+    queryTimeout: (state): number => state.queryConfig.queryTimeout,
+    defaultLimit: (state): number => state.queryConfig.defaultLimit,
+    autoSave: (state): boolean => state.queryConfig.autoSave,
+  },
   actions: {
     setThemeType(themeType: ThemeType) {
       const uiThemeType = themeType === ThemeType.AUTO
@@ -62,13 +91,22 @@ export const useAppStore = defineStore('app', {
       this.editorConfig = { ...this.editorConfig, ...config }
     },
     setQueryTimeout(timeout: number) {
-      this.queryTimeout = timeout
+      this.queryConfig.queryTimeout = timeout
     },
     setDefaultLimit(limit: number) {
-      this.defaultLimit = limit
+      this.queryConfig.defaultLimit = limit
     },
     setAutoSave(autoSave: boolean) {
-      this.autoSave = autoSave
+      this.queryConfig.autoSave = autoSave
+    },
+    updateQueryConfig(config: Partial<QueryConfig>) {
+      this.queryConfig = { ...this.queryConfig, ...config }
+    },
+    toggleSidebar() {
+      this.sidebarCollapsed = !this.sidebarCollapsed
+    },
+    setSidebarCollapsed(collapsed: boolean) {
+      this.sidebarCollapsed = collapsed
     },
     getEditorTheme() {
       return this.uiThemeType === ThemeType.DARK ? 'vs-dark' : 'vs-light'
