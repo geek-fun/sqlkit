@@ -50,9 +50,28 @@ describe('appStore', () => {
       expect(store.editorConfig).toEqual({
         fontSize: 14,
         fontWeight: 'normal',
+        fontFamily: 'Monaco, Menlo, Consolas, monospace',
+        tabSize: 2,
+        wordWrap: true,
         showLineNumbers: true,
         showMinimap: false,
       })
+    })
+
+    it('should have correct default query config', () => {
+      const store = useAppStore()
+
+      expect(store.queryConfig).toEqual({
+        defaultLimit: 1000,
+        queryTimeout: 30000,
+        autoSave: true,
+      })
+    })
+
+    it('should have sidebar not collapsed by default', () => {
+      const store = useAppStore()
+
+      expect(store.sidebarCollapsed).toBe(false)
     })
   })
 
@@ -163,6 +182,49 @@ describe('appStore', () => {
       store.uiThemeType = ThemeType.DARK
 
       expect(store.getEditorTheme()).toBe('vs-dark')
+    })
+  })
+
+  describe('toggleSidebar', () => {
+    it('should toggle sidebar collapsed state', () => {
+      const store = useAppStore()
+      expect(store.sidebarCollapsed).toBe(false)
+
+      store.toggleSidebar()
+      expect(store.sidebarCollapsed).toBe(true)
+
+      store.toggleSidebar()
+      expect(store.sidebarCollapsed).toBe(false)
+    })
+  })
+
+  describe('setSidebarCollapsed', () => {
+    it('should set sidebar collapsed state directly', () => {
+      const store = useAppStore()
+
+      store.setSidebarCollapsed(true)
+      expect(store.sidebarCollapsed).toBe(true)
+
+      store.setSidebarCollapsed(false)
+      expect(store.sidebarCollapsed).toBe(false)
+    })
+  })
+
+  describe('updateQueryConfig', () => {
+    it('should update query config partially', () => {
+      const store = useAppStore()
+      store.updateQueryConfig({ defaultLimit: 500 })
+
+      expect(store.queryConfig.defaultLimit).toBe(500)
+      expect(store.queryConfig.queryTimeout).toBe(30000) // unchanged
+    })
+
+    it('should update multiple query config values', () => {
+      const store = useAppStore()
+      store.updateQueryConfig({ defaultLimit: 2000, autoSave: false })
+
+      expect(store.queryConfig.defaultLimit).toBe(2000)
+      expect(store.queryConfig.autoSave).toBe(false)
     })
   })
 })
