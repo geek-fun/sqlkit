@@ -71,6 +71,11 @@ watch(() => props.open, (open) => {
 })
 
 function handleDatabaseTypeChange(value: string) {
+  // Validate that value is a valid DatabaseType
+  if (!Object.values(DatabaseType).includes(value as DatabaseType)) {
+    console.error(`Invalid database type: ${value}`)
+    return
+  }
   const type = value as DatabaseType
   formData.value.type = type
   if (!props.connection || formData.value.port === defaultPorts[props.connection.type]) {
