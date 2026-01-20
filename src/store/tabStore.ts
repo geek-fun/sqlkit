@@ -20,15 +20,15 @@ export interface QueryTab {
   executionTime?: number
 }
 
-interface QueryStoreState {
+interface TabStoreState {
   tabs: QueryTab[]
   activeTabId: string | null
 }
 
 const generateId = (): string => crypto.randomUUID()
 
-export const useQueryStore = defineStore('queries', {
-  state: (): QueryStoreState => ({
+export const useTabStore = defineStore('tabs', {
+  state: (): TabStoreState => ({
     tabs: [],
     activeTabId: null,
   }),

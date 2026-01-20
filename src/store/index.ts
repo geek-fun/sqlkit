@@ -4,5 +4,5 @@ export { ConnectionStatus, DatabaseType, useConnectionStore } from './connection
 export type { ServerConnection, SSHTunnelConfig } from './connectionStore'
 export { useDatabaseStore } from './databaseStore'
 export type { DatabaseMetadata, TableInfo } from './databaseStore'
-export { useQueryStore } from './queryStore'
-export type { QueryResult, QueryTab } from './queryStore'
+export { useTabStore } from './tabStore'
+export type { QueryResult, QueryTab } from './tabStore'

@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { useQueryStore } from '../store/queryStore'
+import { useTabStore } from '../store/tabStore'
 
 // Mock the Tauri invoke API
 jest.mock('@tauri-apps/api/core', () => ({
@@ -16,7 +16,7 @@ Object.defineProperty(globalThis, 'crypto', {
   },
 })
 
-describe('queryStore', () => {
+describe('tabStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     jest.clearAllMocks()
@@ -25,7 +25,7 @@ describe('queryStore', () => {
 
   describe('initial state', () => {
     it('should have empty tabs and no active tab', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
 
       expect(store.tabs).toEqual([])
       expect(store.activeTabId).toBeNull()
@@ -35,7 +35,7 @@ describe('queryStore', () => {
   describe('createTab', () => {
     it('should create a new tab with correct defaults', () => {
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
-      const store = useQueryStore()
+      const store = useTabStore()
 
       const tab = store.createTab('conn-1')
 
@@ -54,7 +54,7 @@ describe('queryStore', () => {
 
     it('should create tab with database', () => {
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
-      const store = useQueryStore()
+      const store = useTabStore()
 
       const tab = store.createTab('conn-1', 'mydb')
 
@@ -62,7 +62,7 @@ describe('queryStore', () => {
     })
 
     it('should increment tab name based on count', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
       store.createTab('conn-1')
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
@@ -74,7 +74,7 @@ describe('queryStore', () => {
 
   describe('closeTab', () => {
     it('should remove tab from tabs', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
 
@@ -85,7 +85,7 @@ describe('queryStore', () => {
     })
 
     it('should set previous tab as active when closing active tab', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
       store.createTab('conn-1')
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
@@ -97,7 +97,7 @@ describe('queryStore', () => {
     })
 
     it('should not affect other tabs when closing non-active tab', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
       store.createTab('conn-1')
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
@@ -110,7 +110,7 @@ describe('queryStore', () => {
     })
 
     it('should handle closing non-existent tab', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
 
       store.closeTab('non-existent')
 
@@ -120,7 +120,7 @@ describe('queryStore', () => {
 
   describe('closeAllTabs', () => {
     it('should remove all tabs', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
       store.createTab('conn-1')
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
@@ -135,7 +135,7 @@ describe('queryStore', () => {
 
   describe('closeTabsForConnection', () => {
     it('should close only tabs for specified connection', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
       store.createTab('conn-1')
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
@@ -150,7 +150,7 @@ describe('queryStore', () => {
     })
 
     it('should update active tab if needed', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
       store.createTab('conn-1')
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
@@ -165,7 +165,7 @@ describe('queryStore', () => {
 
   describe('updateTabContent', () => {
     it('should update tab content and mark as unsaved', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
 
@@ -176,7 +176,7 @@ describe('queryStore', () => {
     })
 
     it('should not throw for non-existent tab', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
 
       expect(() => store.updateTabContent('non-existent', 'content')).not.toThrow()
     })
@@ -184,7 +184,7 @@ describe('queryStore', () => {
 
   describe('updateTabName', () => {
     it('should update tab name', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
 
@@ -196,7 +196,7 @@ describe('queryStore', () => {
 
   describe('setActiveTab', () => {
     it('should set active tab id', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
       store.createTab('conn-1')
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
@@ -208,7 +208,7 @@ describe('queryStore', () => {
     })
 
     it('should not set active tab if tab does not exist', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
 
@@ -220,7 +220,7 @@ describe('queryStore', () => {
 
   describe('markTabSaved', () => {
     it('should mark tab as saved', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
       store.updateTabContent('tab-1', 'content')
@@ -234,7 +234,7 @@ describe('queryStore', () => {
 
   describe('clearResults', () => {
     it('should clear tab results, error, and execution time', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
       store.tabs[0].results = { columns: [], rows: [], rowCount: 0 }
@@ -258,7 +258,7 @@ describe('queryStore', () => {
       }
       invoke.mockResolvedValue(mockResult)
 
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
       store.updateTabContent('tab-1', 'SELECT * FROM users')
@@ -277,7 +277,7 @@ describe('queryStore', () => {
     it('should set error on failure', async () => {
       invoke.mockRejectedValue(new Error('Query failed'))
 
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
       store.updateTabContent('tab-1', 'INVALID SQL')
@@ -289,7 +289,7 @@ describe('queryStore', () => {
     })
 
     it('should not execute for non-existent tab', async () => {
-      const store = useQueryStore()
+      const store = useTabStore()
 
       await store.executeQuery('non-existent')
 
@@ -299,7 +299,7 @@ describe('queryStore', () => {
 
   describe('getters', () => {
     it('activeTab getter should return active tab', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
 
@@ -307,13 +307,13 @@ describe('queryStore', () => {
     })
 
     it('activeTab getter should return undefined when no active tab', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
 
       expect(store.activeTab).toBeUndefined()
     })
 
     it('tabById getter should find tab by id', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
 
@@ -322,7 +322,7 @@ describe('queryStore', () => {
     })
 
     it('unsavedTabs getter should return tabs with unsaved changes', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
       store.createTab('conn-1')
       ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
@@ -334,7 +334,7 @@ describe('queryStore', () => {
     })
 
     it('tabCount getter should return number of tabs', () => {
-      const store = useQueryStore()
+      const store = useTabStore()
 
       expect(store.tabCount).toBe(0)
 
