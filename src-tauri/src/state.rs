@@ -11,6 +11,21 @@ use tokio::sync::Mutex;
 use uuid::Uuid;
 
 /// Server configuration with connection details.
+///
+/// # Security Warning
+///
+/// This struct includes a `password` field that is serialized to JSON when
+/// saved via `AppConfig`. While `skip_serializing_if` prevents `None` values
+/// from being serialized, actual passwords will be stored in plaintext in the
+/// configuration file.
+///
+/// **Recommendations for production use:**
+/// - Encrypt passwords before storage using a secure encryption method
+/// - Use a system credential manager (e.g., Windows Credential Manager, macOS Keychain)
+/// - Implement a master password or key derivation function
+/// - Document that `save_config()` will persist sensitive credentials
+///
+/// For now, this is a basic implementation suitable for development and testing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
     /// Unique identifier for the server configuration.
@@ -101,11 +116,58 @@ impl ServerConfig {
     }
 }
 
-/// Active database connection wrapper.
+/// Active database connection wrapper used by the application state.
+///
+/// This enum holds the currently active database adapters for a given connection
+/// ID (see [`AppState::connections`]). Each variant corresponds to a concrete
+/// database adapter implementation that conforms to the `DatabaseAdapter` trait
+/// in `crate::database`.
+///
+/// Adapters are wrapped in `Arc<Mutex<...>>` so they can be:
+///
+/// - **Shared** across multiple Tauri commands and async tasks (`Arc`)
+/// - **Mutably accessed** in an async context while preserving thread safety
+///   (`tokio::sync::Mutex`)
+///
+/// This allows commands to clone an `ActiveConnection`, lock the underlying
+/// adapter, and perform queries without needing to re-establish connections
+/// or manage lifetimes manually.
+///
+/// # Example
+///
+/// ```ignore
+/// let connections = state.connections.lock().await;
+/// if let Some(ActiveConnection::Postgres(adapter)) = connections.get(&conn_id) {
+///     let adapter = adapter.lock().await;
+///     let result = adapter.execute_query("SELECT 1").await?;
+/// }
+/// ```
 pub enum ActiveConnection {
+    /// Active PostgreSQL connection backed by a [`PostgresAdapter`](crate::database::postgres::PostgresAdapter).
+    ///
+    /// The adapter is wrapped in `Arc<Mutex<_>>` so that multiple commands can
+    /// share the same PostgreSQL connection pool/adapter instance and perform
+    /// concurrent operations by acquiring the async mutex lock when needed.
     Postgres(Arc<Mutex<crate::database::postgres::PostgresAdapter>>),
+    
+    /// Active MySQL connection backed by a [`MySQLAdapter`](crate::database::mysql::MySQLAdapter).
+    ///
+    /// Stored inside `Arc<Mutex<_>>` for shared, synchronized access to the
+    /// underlying MySQL connection pool/adapter from different Tauri commands.
     MySQL(Arc<Mutex<crate::database::mysql::MySQLAdapter>>),
+    
+    /// Active SQLite connection backed by a [`SQLiteAdapter`](crate::database::sqlite::SQLiteAdapter).
+    ///
+    /// The `Arc<Mutex<_>>` wrapper allows safe mutable access to the adapter
+    /// even when it is shared across async tasks, which is important because
+    /// SQLite connections are often single-threaded and must be coordinated.
     SQLite(Arc<Mutex<crate::database::sqlite::SQLiteAdapter>>),
+    
+    /// Active SQL Server connection backed by a [`SqlServerAdapter`](crate::database::sqlserver::SqlServerAdapter).
+    ///
+    /// As with the other variants, `Arc<Mutex<_>>` enables concurrent commands
+    /// to share a single SQL Server adapter instance while serializing mutable
+    /// access through the async mutex.
     SQLServer(Arc<Mutex<crate::database::sqlserver::SqlServerAdapter>>),
 }
 
@@ -145,17 +207,39 @@ impl AppState {
     }
 
     /// Load configuration from storage (placeholder for file-based config).
+    ///
+    /// # Returns
+    ///
+    /// An error indicating configuration loading is not yet implemented.
+    ///
+    /// # Note
+    ///
+    /// This is a placeholder method. Until persistence is implemented, calling
+    /// this method will return an error so that callers are aware that loading
+    /// has not actually succeeded.
     pub fn load_config(&self) -> Result<(), String> {
-        // TODO: Implement file-based configuration loading
-        // For now, we use in-memory configuration
-        Ok(())
+        // TODO: Implement file-based configuration loading.
+        // Until persistence is implemented, explicitly return an error
+        // so that callers do not assume loading has succeeded.
+        Err("Configuration loading is not yet implemented".to_string())
     }
 
     /// Save configuration to storage (placeholder for file-based config).
+    ///
+    /// # Returns
+    ///
+    /// An error indicating configuration saving is not yet implemented.
+    ///
+    /// # Note
+    ///
+    /// This is a placeholder method. Until persistence is implemented, calling
+    /// this method will return an error so that callers are aware that saving
+    /// has not actually succeeded. Configuration changes will only exist in memory.
     pub fn save_config(&self) -> Result<(), String> {
-        // TODO: Implement file-based configuration saving
-        // For now, configuration is only stored in memory
-        Ok(())
+        // TODO: Implement file-based configuration saving.
+        // Until persistence is implemented, explicitly return an error
+        // so that callers do not assume saving has succeeded.
+        Err("Configuration saving is not yet implemented".to_string())
     }
 }
 

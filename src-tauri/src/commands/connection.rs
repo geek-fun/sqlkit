@@ -40,63 +40,46 @@ pub async fn connect_server(
 
     let conn_config = config.to_connection_config()?;
 
-    // Create connection based on database type
-    let connection = match config.db_type.to_lowercase().as_str() {
-        "postgresql" | "postgres" => {
-            use crate::database::postgres::PostgresAdapter;
-            let mut adapter = PostgresAdapter::new(conn_config);
-            adapter
-                .connect()
-                .await
-                .map_err(|e| format!("Failed to connect: {}", e))?;
-            ActiveConnection::Postgres(Arc::new(Mutex::new(adapter)))
-        }
-        "mysql" => {
-            use crate::database::mysql::MySQLAdapter;
-            let mut adapter = MySQLAdapter::new(conn_config);
-            adapter
-                .connect()
-                .await
-                .map_err(|e| format!("Failed to connect: {}", e))?;
-            ActiveConnection::MySQL(Arc::new(Mutex::new(adapter)))
-        }
-        "sqlserver" | "mssql" => {
-            use crate::database::sqlserver::SqlServerAdapter;
-            let mut adapter = SqlServerAdapter::new(conn_config);
-            adapter
-                .connect()
-                .await
-                .map_err(|e| format!("Failed to connect: {}", e))?;
-            ActiveConnection::SQLServer(Arc::new(Mutex::new(adapter)))
-        }
-        "sqlite" => {
-            use crate::database::sqlite::SQLiteAdapter;
-            let mut adapter = SQLiteAdapter::new(conn_config);
-            adapter
-                .connect()
-                .await
-                .map_err(|e| format!("Failed to connect: {}", e))?;
-            ActiveConnection::SQLite(Arc::new(Mutex::new(adapter)))
-        }
-        _ => return Err(format!("Unsupported database type: {}", config.db_type)),
-    };
+    // Use helper function to create and connect adapter
+    let connection = crate::commands::helpers::create_and_connect_adapter(
+        &config.db_type,
+        conn_config,
+    )
+    .await?;
 
     // Store connection
     let mut connections = state.connections.lock().await;
-    connections.insert(id.clone(), connection);
+    connections.insert(id.clone(), connection.clone());
+    
+    // Get connection status with server metadata by calling test_connection
+    let status = match &connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.test_connection().await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.test_connection().await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.test_connection().await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.test_connection().await
+        }
+    }
+    .map_err(|e| format!("Failed to get connection status: {}", e))?;
 
-    Ok(ConnectionStatus {
-        is_connected: true,
-        server_version: None,
-        current_database: None,
-        current_user: None,
-        metadata: Default::default(),
-    })
+    Ok(status)
 }
 
 /// Disconnect from a server.
 ///
-/// Removes the active connection from the application state and cleans up resources.
+/// Removes the active connection from the application state and explicitly
+/// disconnects from the database to ensure proper cleanup of resources,
+/// including closing connections, releasing locks, and cleaning up transactions.
 ///
 /// # Arguments
 ///
@@ -106,8 +89,34 @@ pub async fn connect_server(
 pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result<(), String> {
     let mut connections = state.connections.lock().await;
 
-    if connections.remove(&id).is_none() {
-        return Err(format!("No active connection found for server '{}'", id));
+    // Remove and explicitly disconnect
+    let connection = connections
+        .remove(&id)
+        .ok_or_else(|| format!("No active connection found for server '{}'", id))?;
+    
+    // Call disconnect on the adapter to ensure proper cleanup
+    let disconnect_result = match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let mut adapter = adapter.lock().await;
+            adapter.disconnect().await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let mut adapter = adapter.lock().await;
+            adapter.disconnect().await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let mut adapter = adapter.lock().await;
+            adapter.disconnect().await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let mut adapter = adapter.lock().await;
+            adapter.disconnect().await
+        }
+    };
+    
+    // Log disconnect errors but don't fail the command since connection is already removed
+    if let Err(e) = disconnect_result {
+        eprintln!("Warning: Error during disconnect cleanup for '{}': {}", id, e);
     }
 
     Ok(())
@@ -141,8 +150,10 @@ pub async fn get_connection_status(
     })
 }
 
+// Tests for connection commands are temporarily disabled.
+// TODO: Convert to integration tests with full Tauri context support.
+// When re-enabling, remove the #[ignore] attribute or convert to integration tests.
 #[cfg(test)]
-#[cfg(not(test))] // Temporarily disabled - need to convert to integration tests with Tauri context
 mod tests {
     use super::*;
     use crate::state::{AppState, ServerConfig};
