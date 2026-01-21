@@ -401,7 +401,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                     Add New Connection
                   </p>
                   <p class="text-sm text-muted-foreground">
-                    Postgres, MySQL, Redis, Mongo...
+                    PostgreSQL, MySQL, SQLite...
                   </p>
                 </div>
               </div>
