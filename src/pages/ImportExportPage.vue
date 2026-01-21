@@ -10,22 +10,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
         <!-- Page Header -->
         <div class="flex gap-3 items-center">
           <h1 class="text-xl font-semibold">
-            History
+            Import / Export
           </h1>
           <span class="text-muted-foreground">|</span>
-          <span class="text-sm text-muted-foreground">View and manage your query history</span>
+          <span class="text-sm text-muted-foreground">Import and export your data</span>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Queries</CardTitle>
+            <CardTitle>Data Import / Export</CardTitle>
             <CardDescription>
-              Your recently executed queries
+              Import and export database schemas and data
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p class="text-muted-foreground">
-              No query history available yet.
+              Import and export functionality will be available in a future update.
             </p>
           </CardContent>
         </Card>

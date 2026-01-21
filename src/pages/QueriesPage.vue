@@ -24,37 +24,39 @@ function handleExecuteQuery() {
 
 <template>
   <AppLayout>
-    <div class="space-y-6">
-      <div>
-        <h1 class="text-3xl tracking-tight font-bold">
-          Queries
-        </h1>
-        <p class="text-muted-foreground mt-2">
-          Write and execute SQL queries
-        </p>
-      </div>
+    <div class="p-6 h-full">
+      <div class="space-y-6">
+        <!-- Page Header -->
+        <div class="flex gap-3 items-center">
+          <h1 class="text-xl font-semibold">
+            Queries
+          </h1>
+          <span class="text-muted-foreground">|</span>
+          <span class="text-sm text-muted-foreground">Write and execute SQL queries</span>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>SQL Editor</CardTitle>
-          <CardDescription>
-            Write your SQL queries here
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="space-y-4">
-          <SQLEditor
-            :model-value="sqlQuery"
-            height="400px"
-            dialect="sql"
-            @execute="handleExecuteQuery"
-          />
-          <div class="flex gap-2">
-            <Button @click="handleExecuteQuery">
-              Execute Query (Ctrl+Enter)
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>SQL Editor</CardTitle>
+            <CardDescription>
+              Write your SQL queries here
+            </CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4">
+            <SQLEditor
+              :model-value="sqlQuery"
+              height="400px"
+              dialect="sql"
+              @execute="handleExecuteQuery"
+            />
+            <div class="flex gap-2">
+              <Button @click="handleExecuteQuery">
+                Execute Query (Ctrl+Enter)
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   </AppLayout>
 </template>

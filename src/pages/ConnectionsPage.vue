@@ -128,167 +128,302 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
 
 <template>
   <AppLayout>
-    <div class="space-y-6">
-      <!-- Header -->
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+    <div class="p-6 h-full relative">
+      <div class="space-y-6">
+        <!-- Page Header - matching design -->
+        <div class="flex items-center justify-between">
+          <div class="flex gap-3 items-center">
+            <h1 class="text-xl font-semibold">
+              Connections
+            </h1>
+            <span class="text-muted-foreground">|</span>
+            <span class="text-sm text-muted-foreground">Manage your database connections</span>
+          </div>
+          <div class="w-64 relative">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="text-muted-foreground h-4 w-4 left-3 top-1/2 absolute -translate-y-1/2"
+            >
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
+            </svg>
+            <Input
+              v-model="searchQuery"
+              placeholder="Search connections..."
+              class="pl-9 bg-muted/50"
+            />
+          </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="gap-4 grid md:grid-cols-3">
+          <Card class="p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-muted-foreground">
+                  Total Connections
+                </p>
+                <p class="text-2xl font-bold">
+                  {{ stats.total }}
+                </p>
+              </div>
+              <div class="rounded-lg bg-primary/10 flex h-10 w-10 items-center justify-center">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-primary h-5 w-5"
+                >
+                  <ellipse cx="12" cy="5" rx="9" ry="3" />
+                  <path d="M3 5v14a9 3 0 0 0 18 0V5" />
+                </svg>
+              </div>
+            </div>
+          </Card>
+          <Card class="p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-muted-foreground">
+                  Active Sessions
+                </p>
+                <p class="text-2xl font-bold">
+                  {{ stats.active }}
+                </p>
+              </div>
+              <div class="rounded-lg bg-green-100 flex h-10 w-10 items-center justify-center dark:bg-green-900/30">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-green-600 h-5 w-5 dark:text-green-400"
+                >
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+              </div>
+            </div>
+          </Card>
+          <Card class="p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-muted-foreground">
+                  Last Sync
+                </p>
+                <p class="text-2xl font-bold">
+                  2m ago
+                </p>
+              </div>
+              <div class="rounded-lg bg-orange-100 flex h-10 w-10 items-center justify-center dark:bg-orange-900/30">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-orange-600 h-5 w-5 dark:text-orange-400"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        <!-- Error notification -->
+        <div
+          v-if="connectError"
+          class="p-4 rounded-md bg-red-50 dark:bg-red-900/20"
+        >
+          <div class="flex gap-3 items-start">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              class="text-red-600 mt-0.5 flex-shrink-0 h-5 w-5 dark:text-red-400"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" x2="12" y1="8" y2="12" />
+              <line x1="12" x2="12.01" y1="16" y2="16" />
+            </svg>
+            <div class="flex-1">
+              <h3 class="text-sm text-red-800 font-medium dark:text-red-200">
+                Connection Error
+              </h3>
+              <p class="text-sm text-red-700 mt-1 dark:text-red-300">
+                {{ connectError }}
+              </p>
+            </div>
+            <button
+              type="button"
+              class="text-red-500 hover:text-red-700"
+              @click="connectError = null"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="h-4 w-4"
+              >
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Saved Connections Section -->
         <div>
-          <h1 class="text-3xl tracking-tight font-bold">
-            Connections
-          </h1>
-          <p class="text-muted-foreground mt-1">
-            Manage your database connections
-          </p>
-        </div>
-        <div class="w-full relative sm:w-64">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="text-muted-foreground h-4 w-4 left-3 top-1/2 absolute -translate-y-1/2"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <Input
-            v-model="searchQuery"
-            placeholder="Search connections..."
-            class="pl-9"
-          />
-        </div>
-      </div>
+          <div class="mb-4 flex items-center justify-between">
+            <h2 class="text-lg font-semibold">
+              Saved Connections
+            </h2>
+            <div class="flex gap-2 items-center">
+              <Button
+                variant="ghost"
+                size="icon"
+                :class="{ 'bg-accent': viewMode === 'grid' }"
+                @click="viewMode = 'grid'"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="h-4 w-4"
+                >
+                  <rect width="7" height="7" x="3" y="3" rx="1" />
+                  <rect width="7" height="7" x="14" y="3" rx="1" />
+                  <rect width="7" height="7" x="14" y="14" rx="1" />
+                  <rect width="7" height="7" x="3" y="14" rx="1" />
+                </svg>
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                :class="{ 'bg-accent': viewMode === 'list' }"
+                @click="viewMode = 'list'"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="h-4 w-4"
+                >
+                  <line x1="8" x2="21" y1="6" y2="6" />
+                  <line x1="8" x2="21" y1="12" y2="12" />
+                  <line x1="8" x2="21" y1="18" y2="18" />
+                  <line x1="3" x2="3.01" y1="6" y2="6" />
+                  <line x1="3" x2="3.01" y1="12" y2="12" />
+                  <line x1="3" x2="3.01" y1="18" y2="18" />
+                </svg>
+              </Button>
+            </div>
+          </div>
 
-      <!-- Stats Cards -->
-      <div class="gap-4 grid md:grid-cols-3">
-        <Card class="p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-muted-foreground">
-                Total Connections
-              </p>
-              <p class="text-2xl font-bold">
-                {{ stats.total }}
-              </p>
-            </div>
-            <div class="rounded-lg bg-primary/10 flex h-10 w-10 items-center justify-center">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="text-primary h-5 w-5"
-              >
-                <ellipse cx="12" cy="5" rx="9" ry="3" />
-                <path d="M3 5v14a9 3 0 0 0 18 0V5" />
-              </svg>
-            </div>
-          </div>
-        </Card>
-        <Card class="p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-muted-foreground">
-                Active Sessions
-              </p>
-              <p class="text-2xl font-bold">
-                {{ stats.active }}
-              </p>
-            </div>
-            <div class="rounded-lg bg-green-100 flex h-10 w-10 items-center justify-center dark:bg-green-900/30">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="text-green-600 h-5 w-5 dark:text-green-400"
-              >
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-            </div>
-          </div>
-        </Card>
-        <Card class="p-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-sm text-muted-foreground">
-                Last Sync
-              </p>
-              <p class="text-2xl font-bold">
-                Just now
-              </p>
-            </div>
-            <div class="rounded-lg bg-orange-100 flex h-10 w-10 items-center justify-center dark:bg-orange-900/30">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="text-orange-600 h-5 w-5 dark:text-orange-400"
-              >
-                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-                <path d="M21 3v5h-5" />
-                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-                <path d="M8 16H3v5" />
-              </svg>
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <!-- Error notification -->
-      <div
-        v-if="connectError"
-        class="p-4 rounded-md bg-red-50 dark:bg-red-900/20"
-      >
-        <div class="flex gap-3 items-start">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="text-red-600 mt-0.5 flex-shrink-0 h-5 w-5 dark:text-red-400"
+          <!-- Connections Grid/List -->
+          <div
+            :class="viewMode === 'grid'
+              ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+              : 'flex flex-col gap-3'"
           >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="12" x2="12" y1="8" y2="12" />
-            <line x1="12" x2="12.01" y1="16" y2="16" />
-          </svg>
-          <div class="flex-1">
-            <h3 class="text-sm text-red-800 font-medium dark:text-red-200">
-              Connection Error
-            </h3>
-            <p class="text-sm text-red-700 mt-1 dark:text-red-300">
-              {{ connectError }}
-            </p>
+            <!-- Add New Connection Card -->
+            <Card
+              class="border-dashed cursor-pointer transition-colors hover:border-primary hover:bg-accent/50"
+              @click="handleAddConnection"
+            >
+              <div class="p-4 text-center flex flex-col min-h-40 items-center justify-center space-y-3">
+                <div class="text-muted-foreground border-2 rounded-full border-dashed flex h-10 w-10 items-center justify-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="h-5 w-5"
+                  >
+                    <path d="M5 12h14" />
+                    <path d="M12 5v14" />
+                  </svg>
+                </div>
+                <div>
+                  <p class="font-medium">
+                    Add New Connection
+                  </p>
+                  <p class="text-sm text-muted-foreground">
+                    Postgres, MySQL, Redis, Mongo...
+                  </p>
+                </div>
+              </div>
+            </Card>
+
+            <!-- Connection Cards -->
+            <ServerCard
+              v-for="connection in filteredConnections"
+              :key="connection.id"
+              :connection="connection"
+              :connection-status="getConnectionStatus(connection.id)"
+              @connect="handleConnect"
+              @edit="handleEditConnection"
+              @delete="handleDeleteConnection"
+              @duplicate="handleDuplicateConnection"
+            />
           </div>
-          <button
-            type="button"
-            class="text-red-500 hover:text-red-700"
-            @click="connectError = null"
+
+          <!-- Empty state -->
+          <div
+            v-if="filteredConnections.length === 0 && searchQuery"
+            class="py-12 text-center"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -300,156 +435,43 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
               stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
-              class="h-4 w-4"
+              class="text-muted-foreground mx-auto mb-4 h-12 w-12"
             >
-              <path d="M18 6 6 18" />
-              <path d="m6 6 12 12" />
+              <circle cx="11" cy="11" r="8" />
+              <path d="m21 21-4.3-4.3" />
             </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Saved Connections Section -->
-      <div>
-        <div class="mb-4 flex items-center justify-between">
-          <h2 class="text-lg font-semibold">
-            Saved Connections
-          </h2>
-          <div class="flex gap-2 items-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              :class="{ 'bg-accent': viewMode === 'grid' }"
-              @click="viewMode = 'grid'"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="h-4 w-4"
-              >
-                <rect width="7" height="7" x="3" y="3" rx="1" />
-                <rect width="7" height="7" x="14" y="3" rx="1" />
-                <rect width="7" height="7" x="14" y="14" rx="1" />
-                <rect width="7" height="7" x="3" y="14" rx="1" />
-              </svg>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              :class="{ 'bg-accent': viewMode === 'list' }"
-              @click="viewMode = 'list'"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="h-4 w-4"
-              >
-                <line x1="8" x2="21" y1="6" y2="6" />
-                <line x1="8" x2="21" y1="12" y2="12" />
-                <line x1="8" x2="21" y1="18" y2="18" />
-                <line x1="3" x2="3.01" y1="6" y2="6" />
-                <line x1="3" x2="3.01" y1="12" y2="12" />
-                <line x1="3" x2="3.01" y1="18" y2="18" />
-              </svg>
-            </Button>
+            <h3 class="text-lg font-semibold">
+              No connections found
+            </h3>
+            <p class="text-muted-foreground mt-1">
+              No connections match your search "{{ searchQuery }}"
+            </p>
           </div>
         </div>
-
-        <!-- Connections Grid/List -->
-        <div
-          :class="viewMode === 'grid'
-            ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-            : 'flex flex-col gap-3'"
-        >
-          <!-- Add New Connection Card -->
-          <Card
-            class="border-dashed cursor-pointer transition-colors hover:border-primary hover:bg-accent/50"
-            @click="handleAddConnection"
-          >
-            <div class="p-4 text-center flex flex-col min-h-40 items-center justify-center space-y-3">
-              <div class="text-muted-foreground border-2 rounded-full border-dashed flex h-10 w-10 items-center justify-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="h-5 w-5"
-                >
-                  <path d="M5 12h14" />
-                  <path d="M12 5v14" />
-                </svg>
-              </div>
-              <div>
-                <p class="font-medium">
-                  Add New Connection
-                </p>
-                <p class="text-sm text-muted-foreground">
-                  PostgreSQL, MySQL, SQLite...
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <!-- Connection Cards -->
-          <ServerCard
-            v-for="connection in filteredConnections"
-            :key="connection.id"
-            :connection="connection"
-            :connection-status="getConnectionStatus(connection.id)"
-            @connect="handleConnect"
-            @edit="handleEditConnection"
-            @delete="handleDeleteConnection"
-            @duplicate="handleDuplicateConnection"
-          />
-        </div>
-
-        <!-- Empty state -->
-        <div
-          v-if="filteredConnections.length === 0 && searchQuery"
-          class="py-12 text-center"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="text-muted-foreground mx-auto mb-4 h-12 w-12"
-          >
-            <circle cx="11" cy="11" r="8" />
-            <path d="m21 21-4.3-4.3" />
-          </svg>
-          <h3 class="text-lg font-semibold">
-            No connections found
-          </h3>
-          <p class="text-muted-foreground mt-1">
-            No connections match your search "{{ searchQuery }}"
-          </p>
-        </div>
       </div>
+
+      <!-- Floating Action Button -->
+      <Button
+        class="rounded-full h-14 w-14 shadow-lg bottom-6 right-6 fixed"
+        size="icon"
+        @click="handleAddConnection"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="24"
+          height="24"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="h-6 w-6"
+        >
+          <path d="M5 12h14" />
+          <path d="M12 5v14" />
+        </svg>
+      </Button>
     </div>
 
     <!-- Server Form Dialog -->

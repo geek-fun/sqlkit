@@ -10,22 +10,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
         <!-- Page Header -->
         <div class="flex gap-3 items-center">
           <h1 class="text-xl font-semibold">
-            History
+            Data Studio
           </h1>
           <span class="text-muted-foreground">|</span>
-          <span class="text-sm text-muted-foreground">View and manage your query history</span>
+          <span class="text-sm text-muted-foreground">AI-powered data analysis</span>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Queries</CardTitle>
+            <CardTitle>AI Data Studio</CardTitle>
             <CardDescription>
-              Your recently executed queries
+              Use AI to analyze and query your data
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p class="text-muted-foreground">
-              No query history available yet.
+              AI-powered data studio will be available in a future update.
             </p>
           </CardContent>
         </Card>

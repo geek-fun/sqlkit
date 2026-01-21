@@ -11,6 +11,16 @@ const routes = [
     component: () => import('@/pages/ConnectionsPage.vue'),
   },
   {
+    path: '/import-export',
+    name: 'import-export',
+    component: () => import('@/pages/ImportExportPage.vue'),
+  },
+  {
+    path: '/data-studio',
+    name: 'data-studio',
+    component: () => import('@/pages/DataStudioPage.vue'),
+  },
+  {
     path: '/queries',
     name: 'queries',
     component: () => import('@/pages/QueriesPage.vue'),
