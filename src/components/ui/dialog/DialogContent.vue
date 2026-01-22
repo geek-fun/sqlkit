@@ -27,7 +27,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 <template>
   <DialogPortal>
     <DialogOverlay
-      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 bg-black/50 inset-0 fixed z-50"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 bg-background/80 inset-0 fixed z-50"
     />
     <DialogContent
       v-bind="forwarded"
@@ -36,7 +36,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
       <slot />
 
       <DialogClose
-        class="rounded-sm opacity-70 ring-offset-background transition-opacity right-4 top-4 absolute data-[state=open]:text-muted-foreground focus:outline-none data-[state=open]:bg-accent hover:opacity-100 disabled:pointer-events-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+        class="rounded-sm opacity-70 cursor-pointer ring-offset-background transition-opacity right-4 top-4 absolute data-[state=open]:text-muted-foreground focus:outline-none data-[state=open]:bg-accent hover:opacity-100 disabled:pointer-events-none focus:ring-1 focus:ring-ring focus:ring-offset-1"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

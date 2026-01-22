@@ -7,6 +7,9 @@ pub mod state;
 // Tauri command handlers
 pub mod commands;
 
+// Menu setup
+pub mod menu;
+
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -23,6 +26,10 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .manage(app_state)
+        .setup(|app| {
+            menu::create_menu(app)?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             // Server management commands

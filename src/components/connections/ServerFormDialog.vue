@@ -178,10 +178,6 @@ function handleSave() {
   isOpen.value = false
 }
 
-function handleCancel() {
-  isOpen.value = false
-}
-
 const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
 </script>
 
@@ -377,7 +373,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
         </div>
 
         <!-- Actions -->
-        <div class="pt-4 flex justify-between">
+        <div class="pt-4 flex gap-2 justify-end">
           <Button
             type="button"
             variant="outline"
@@ -386,14 +382,9 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
           >
             Test Connection
           </Button>
-          <div class="flex gap-2">
-            <Button type="button" variant="outline" @click="handleCancel">
-              Cancel
-            </Button>
-            <Button type="submit">
-              {{ isEditing ? 'Save Changes' : 'Create Connection' }}
-            </Button>
-          </div>
+          <Button type="submit">
+            {{ isEditing ? 'Save Changes' : 'Create Connection' }}
+          </Button>
         </div>
       </form>
     </DialogContent>

@@ -452,7 +452,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
 
       <!-- Floating Action Button -->
       <button
-        class="text-white rounded-full bg-blue-600 flex h-14 w-14 cursor-pointer shadow-lg transition-colors items-center bottom-6 right-6 justify-center fixed hover:bg-blue-700"
+        class="text-white rounded-full bg-blue-600 flex h-14 w-14 cursor-pointer shadow-lg transition-colors items-center bottom-6 right-6 justify-center fixed dark:bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-700"
         @click="handleAddConnection"
       >
         <svg

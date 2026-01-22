@@ -45,13 +45,13 @@ const databaseIcons: Record<DatabaseType, string> = {
 const statusColor = computed(() => {
   switch (props.connectionStatus) {
     case ConnectionStatus.CONNECTED:
-      return 'bg-green-500'
+      return 'bg-green-600 dark:bg-green-500'
     case ConnectionStatus.CONNECTING:
-      return 'bg-yellow-500 animate-pulse'
+      return 'bg-yellow-600 dark:bg-yellow-500 animate-pulse'
     case ConnectionStatus.ERROR:
-      return 'bg-red-500'
+      return 'bg-red-600 dark:bg-red-500'
     default:
-      return 'bg-gray-400'
+      return 'bg-muted-foreground/50'
   }
 })
 
