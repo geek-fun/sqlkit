@@ -27,11 +27,11 @@ const emit = defineEmits<{
 }>()
 
 const databaseTypeColors: Record<DatabaseType, string> = {
-  [DatabaseType.POSTGRESQL]: 'bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300',
-  [DatabaseType.MYSQL]: 'bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300',
-  [DatabaseType.MARIADB]: 'bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300',
-  [DatabaseType.SQLITE]: 'bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
-  [DatabaseType.SQLSERVER]: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+  [DatabaseType.POSTGRESQL]: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  [DatabaseType.MYSQL]: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
+  [DatabaseType.MARIADB]: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+  [DatabaseType.SQLITE]: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+  [DatabaseType.SQLSERVER]: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 }
 
 const databaseIcons: Record<DatabaseType, string> = {

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { ref } from 'vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
@@ -10,8 +9,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useTheme } from '@/composables/useTheme'
 
-const theme = ref('system')
+const { theme, setTheme } = useTheme()
+
+function handleThemeChange(value: string) {
+  setTheme(value as 'light' | 'dark' | 'system')
+}
 </script>
 
 <template>
@@ -37,7 +41,7 @@ const theme = ref('system')
           <CardContent class="space-y-4">
             <div class="space-y-2">
               <Label>Theme</Label>
-              <Select v-model="theme">
+              <Select :model-value="theme" @update:model-value="handleThemeChange">
                 <SelectTrigger class="w-48">
                   <SelectValue placeholder="Select theme" />
                 </SelectTrigger>

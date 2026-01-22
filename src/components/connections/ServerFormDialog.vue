@@ -304,7 +304,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
             id="ssl"
             v-model="formData.ssl"
             type="checkbox"
-            class="text-primary border-gray-300 rounded h-4 w-4 focus:ring-primary"
+            class="text-primary border-input rounded h-4 w-4 focus:ring-ring"
           >
           <Label for="ssl" class="cursor-pointer">
             Use SSL/TLS encryption
@@ -314,16 +314,16 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
         <!-- Test Connection Status -->
         <div
           v-if="testStatus !== 'idle'" class="p-3 rounded-md" :class="{
-            'bg-blue-50 dark:bg-blue-900/20': testStatus === 'testing',
-            'bg-green-50 dark:bg-green-900/20': testStatus === 'success',
-            'bg-red-50 dark:bg-red-900/20': testStatus === 'error',
+            'bg-blue-50 dark:bg-blue-900/10': testStatus === 'testing',
+            'bg-green-50 dark:bg-green-900/10': testStatus === 'success',
+            'bg-red-50 dark:bg-red-900/10': testStatus === 'error',
           }"
         >
           <div class="flex gap-2 items-center">
             <!-- Loading spinner -->
             <svg
               v-if="testStatus === 'testing'"
-              class="text-blue-600 h-4 w-4 animate-spin"
+              class="text-blue-500 h-4 w-4 animate-spin dark:text-blue-400"
               xmlns="http://www.w3.org/2000/svg"
               fill="none"
               viewBox="0 0 24 24"
@@ -334,7 +334,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
             <!-- Success icon -->
             <svg
               v-if="testStatus === 'success'"
-              class="text-green-600 h-4 w-4"
+              class="text-green-500 h-4 w-4 dark:text-green-400"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
@@ -348,7 +348,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
             <!-- Error icon -->
             <svg
               v-if="testStatus === 'error'"
-              class="text-red-600 h-4 w-4"
+              class="text-red-500 h-4 w-4 dark:text-red-400"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
@@ -363,15 +363,15 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
             </svg>
             <span
               :class="{
-                'text-blue-700 dark:text-blue-300': testStatus === 'testing',
-                'text-green-700 dark:text-green-300': testStatus === 'success',
-                'text-red-700 dark:text-red-300': testStatus === 'error',
+                'text-blue-700 dark:text-blue-400': testStatus === 'testing',
+                'text-green-700 dark:text-green-400': testStatus === 'success',
+                'text-red-700 dark:text-red-400': testStatus === 'error',
               }"
             >
               {{ testStatus === 'testing' ? 'Testing connection...' : testStatus === 'success' ? 'Connection successful!' : 'Connection failed' }}
             </span>
           </div>
-          <p v-if="testError" class="text-sm text-red-600 mt-1 dark:text-red-400">
+          <p v-if="testError" class="text-sm text-red-600 mt-1 dark:text-red-500">
             {{ testError }}
           </p>
         </div>
