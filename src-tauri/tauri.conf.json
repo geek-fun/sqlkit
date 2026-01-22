@@ -1,20 +1,20 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "sqlkit",
-  "version": "0.1.0",
-  "identifier": "com.sqlkit.app",
+  "productName": "SqlKit",
+  "version": "../package.json",
+  "identifier": "club.geekfun.sqlkit",
   "build": {
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:1420",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
-        "title": "sqlkit",
-        "width": 800,
-        "height": 600
+        "title": "SqlKit",
+        "width": 1600,
+        "height": 1000
       }
     ],
     "security": {
