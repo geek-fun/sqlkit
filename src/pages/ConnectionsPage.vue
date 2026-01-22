@@ -451,9 +451,8 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
       </div>
 
       <!-- Floating Action Button -->
-      <Button
-        class="rounded-full h-14 w-14 shadow-lg bottom-6 right-6 fixed"
-        size="icon"
+      <button
+        class="text-white rounded-full bg-blue-600 flex h-14 w-14 cursor-pointer shadow-lg transition-colors items-center bottom-6 right-6 justify-center fixed hover:bg-blue-700"
         @click="handleAddConnection"
       >
         <svg
@@ -471,7 +470,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
           <path d="M5 12h14" />
           <path d="M12 5v14" />
         </svg>
-      </Button>
+      </button>
     </div>
 
     <!-- Server Form Dialog -->

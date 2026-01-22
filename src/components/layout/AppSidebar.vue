@@ -38,7 +38,7 @@ const isActive = (path: string) => computed(() => route.path === path)
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                class="mx-auto rounded-md flex h-10 w-10 transition-colors items-center justify-center relative" :class="[
+                class="mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center relative" :class="[
                   isActive(item.path).value
                     ? 'bg-secondary text-primary border border-border shadow-sm'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -159,7 +159,7 @@ const isActive = (path: string) => computed(() => route.path === path)
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                class="mx-auto rounded-md flex h-10 w-10 transition-colors items-center justify-center" :class="[
+                class="mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center" :class="[
                   isActive('/settings').value
                     ? 'bg-secondary text-primary border border-border shadow-sm'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
