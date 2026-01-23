@@ -197,7 +197,7 @@ Commands are defined with `#[tauri::command]` and registered in [lib.rs](src-tau
 ```typescript
 import { invoke } from '@tauri-apps/api/core'
 
-const result = await invoke<QueryResult>('execute_query', {
+const _result = await invoke<QueryResult>('execute_query', {
   connectionId: 'server-uuid',
   sql: 'SELECT * FROM users'
 })

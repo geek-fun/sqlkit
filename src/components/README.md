@@ -56,7 +56,7 @@ The theme system uses the `useTheme` composable:
 <script setup lang="ts">
 import { useTheme } from '@/composables/useTheme'
 
-const { theme, isDark, setTheme, toggleTheme } = useTheme()
+const { theme: _theme, isDark: _isDark, setTheme: _setTheme, toggleTheme: _toggleTheme } = useTheme()
 </script>
 ```
 
