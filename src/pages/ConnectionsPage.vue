@@ -373,6 +373,18 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
               ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
               : 'flex flex-col gap-3'"
           >
+            <!-- Connection Cards -->
+            <ServerCard
+              v-for="connection in filteredConnections"
+              :key="connection.id"
+              :connection="connection"
+              :connection-status="getConnectionStatus(connection.id)"
+              @connect="handleConnect"
+              @edit="handleEditConnection"
+              @delete="handleDeleteConnection"
+              @duplicate="handleDuplicateConnection"
+            />
+
             <!-- Add New Connection Card -->
             <Card
               class="border-dashed cursor-pointer transition-colors hover:border-primary hover:bg-accent/50"
@@ -406,18 +418,6 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                 </div>
               </div>
             </Card>
-
-            <!-- Connection Cards -->
-            <ServerCard
-              v-for="connection in filteredConnections"
-              :key="connection.id"
-              :connection="connection"
-              :connection-status="getConnectionStatus(connection.id)"
-              @connect="handleConnect"
-              @edit="handleEditConnection"
-              @delete="handleDeleteConnection"
-              @duplicate="handleDuplicateConnection"
-            />
           </div>
 
           <!-- Empty state -->

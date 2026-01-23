@@ -1,7 +1,20 @@
-import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
-import { pureObject } from '../common'
-import { storeApi } from '../datasources'
+import { connectionApi } from '../datasources'
+
+const dbTypeToBackend: Record<DatabaseType, string> = {
+  [DatabaseType.POSTGRESQL]: 'PostgreSQL',
+  [DatabaseType.MYSQL]: 'MySQL',
+  [DatabaseType.MARIADB]: 'MySQL',
+  [DatabaseType.SQLITE]: 'SQLite',
+  [DatabaseType.SQLSERVER]: 'SqlServer',
+}
+
+const dbTypeFromBackend: Record<string, DatabaseType> = {
+  PostgreSQL: DatabaseType.POSTGRESQL,
+  MySQL: DatabaseType.MYSQL,
+  SqlServer: DatabaseType.SQLSERVER,
+  SQLite: DatabaseType.SQLITE,
+}
 
 export enum DatabaseType {
   MYSQL = 'MYSQL',
@@ -77,8 +90,20 @@ export const useConnectionStore = defineStore('connectionStore', {
   actions: {
     async fetchConnections() {
       try {
-        const fetchedConnections = await storeApi.get<ServerConnection[]>('connections', [])
-        this.connections = fetchedConnections
+        const backendConnections = await connectionApi.list()
+
+        this.connections = backendConnections.map(conn => ({
+          id: conn.id,
+          name: conn.name,
+          type: dbTypeFromBackend[conn.db_type] || DatabaseType.POSTGRESQL,
+          host: conn.host,
+          port: conn.port,
+          username: conn.username,
+          password: conn.password || undefined,
+          database: conn.database || undefined,
+          ssl: conn.ssl_mode === 'require',
+          isConnected: false,
+        }))
       }
       catch (error) {
         console.error('Failed to fetch connections:', error)
@@ -88,11 +113,24 @@ export const useConnectionStore = defineStore('connectionStore', {
 
     async saveConnection(connection: ServerConnection): Promise<{ success: boolean, message: string }> {
       try {
-        const newConnection = {
-          ...connection,
-          id: connection.id || crypto.randomUUID(),
+        const id = connection.id || crypto.randomUUID()
+
+        const serverConfig = {
+          id,
+          name: connection.name,
+          db_type: dbTypeToBackend[connection.type] || 'PostgreSQL',
+          host: connection.host,
+          port: connection.port,
+          username: connection.username || '',
+          password: connection.password || null,
+          database: connection.database || null,
+          ssl_mode: connection.ssl ? 'require' : 'disable',
         }
 
+        await connectionApi.save(serverConfig)
+
+        // Update local state
+        const newConnection = { ...connection, id }
         if (connection.id) {
           const index = this.connections.findIndex(c => c.id === connection.id)
           if (index !== -1) {
@@ -103,7 +141,6 @@ export const useConnectionStore = defineStore('connectionStore', {
           this.connections.push(newConnection)
         }
 
-        await storeApi.set('connections', pureObject(this.connections))
         return { success: true, message: 'Connection saved successfully' }
       }
       catch (error) {
@@ -115,15 +152,33 @@ export const useConnectionStore = defineStore('connectionStore', {
     },
 
     async removeConnection(connection: ServerConnection) {
-      const updatedConnections = this.connections.filter(c => c.id !== connection.id)
-      this.connections = updatedConnections
-      await storeApi.set('connections', pureObject(updatedConnections))
+      if (connection.id) {
+        await connectionApi.delete(connection.id)
+        this.connections = this.connections.filter(c => c.id !== connection.id)
+      }
     },
 
-    async testConnection(_connection: ServerConnection): Promise<boolean> {
-      // Implement via Tauri command
-      // return await invoke('test_db_connection', { connection });
-      return true
+    async testConnection(connection: ServerConnection): Promise<boolean> {
+      try {
+        const serverConfig = {
+          id: connection.id || crypto.randomUUID(),
+          name: connection.name,
+          db_type: dbTypeToBackend[connection.type] || 'PostgreSQL',
+          host: connection.host,
+          port: connection.port,
+          username: connection.username || '',
+          password: connection.password || null,
+          database: connection.database || null,
+          ssl_mode: connection.ssl ? 'require' : 'disable',
+        }
+
+        const result = await connectionApi.test(serverConfig)
+        return result.is_connected
+      }
+      catch (error) {
+        console.error('Connection test failed:', error)
+        return false
+      }
     },
 
     async connect(connectionId: string) {
@@ -135,7 +190,20 @@ export const useConnectionStore = defineStore('connectionStore', {
       this.connectionStatus[connectionId] = ConnectionStatus.CONNECTING
 
       try {
-        const result = await invoke('connect_server', { id: connectionId })
+        const serverConfig = {
+          id: connection.id!,
+          name: connection.name,
+          db_type: dbTypeToBackend[connection.type] || 'PostgreSQL',
+          host: connection.host,
+          port: connection.port,
+          username: connection.username || '',
+          password: connection.password || null,
+          database: connection.database || null,
+          ssl_mode: connection.ssl ? 'require' : 'disable',
+        }
+
+        const result = await connectionApi.connect(serverConfig)
+
         connection.isConnected = true
         connection.lastUsed = new Date()
         this.connectionStatus[connectionId] = ConnectionStatus.CONNECTED
@@ -150,7 +218,7 @@ export const useConnectionStore = defineStore('connectionStore', {
 
     async disconnect(connectionId: string) {
       try {
-        await invoke('disconnect_server', { id: connectionId })
+        await connectionApi.disconnect(connectionId)
       }
       finally {
         const connection = this.getConnectionById(connectionId)

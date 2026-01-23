@@ -21,21 +21,32 @@ pub fn run() {
     use state::AppState;
 
     let app_state = AppState::new();
+    let store = commands::store::Store::new();
 
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .manage(app_state)
-        .setup(|app| {
+        .manage(store.clone())
+        .setup(move |app| {
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                store.set_app_handle(handle).await;
+            });
             menu::create_menu(app)?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             greet,
-            // Server management commands
-            commands::save_server,
-            commands::list_servers,
-            commands::delete_server,
+            // Store management (internal use)
+            commands::store_get,
+            commands::store_set,
+            commands::store_delete,
+            commands::store_clear,
+            // Connection management
+            commands::save_connection,
+            commands::list_connections,
+            commands::delete_connection,
             commands::test_connection,
             // Connection lifecycle commands
             commands::connect_server,

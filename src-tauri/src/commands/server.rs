@@ -1,75 +1,137 @@
-//! Server configuration management commands.
+//! Server connection management commands.
 //!
-//! This module provides Tauri commands for managing database server configurations,
-//! including saving, listing, deleting, and testing connections.
+//! This module provides Tauri commands for managing database server configurations
+//! and testing connections.
 
-use crate::state::{AppState, ServerConfig};
 use crate::database::ConnectionStatus;
+use crate::state::ServerConfig;
 use tauri::State;
 
-/// Save or update a server configuration.
+/// Save or update a server connection configuration.
 ///
 /// # Arguments
 ///
 /// * `config` - Server configuration to save
-/// * `state` - Application state
+/// * `state` - Store state
 ///
 /// # Returns
 ///
 /// The ID of the saved server configuration.
 #[tauri::command]
-pub async fn save_server(
+pub async fn save_connection(
     config: ServerConfig,
-    state: State<'_, AppState>,
+    state: State<'_, crate::commands::store::Store>,
 ) -> Result<String, String> {
-    let mut app_config = state.config.lock().await;
+    let id = config.id.clone();
+    
+    // Get store
+    let store = state.get_store().await?;
+    
+    // Get existing connections
+    let mut connections: Vec<ServerConfig> = match store.get("connections") {
+        Some(value) => {
+            if let Some(arr) = value.as_array() {
+                arr.iter()
+                    .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                    .collect()
+            } else {
+                Vec::new()
+            }
+        }
+        None => Vec::new(),
+    };
 
-    let server_id = config.id.clone();
-    app_config.servers.insert(server_id.clone(), config);
+    // Update or insert
+    if let Some(pos) = connections.iter().position(|c| c.id == id) {
+        connections[pos] = config;
+    } else {
+        connections.push(config);
+    }
 
-    // Save to persistent storage
-    drop(app_config);
-    state.save_config()?;
+    // Save back to store
+    store.set("connections".to_string(), serde_json::to_value(&connections).map_err(|e| e.to_string())?);
+    store
+        .save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
 
-    Ok(server_id)
+    Ok(id)
 }
 
-/// List all saved server configurations.
+/// List all saved server connection configurations.
 ///
 /// # Arguments
 ///
-/// * `state` - Application state
+/// * `state` - Store state
 ///
 /// # Returns
 ///
 /// Vector of all saved server configurations.
 #[tauri::command]
-pub async fn list_servers(state: State<'_, AppState>) -> Result<Vec<ServerConfig>, String> {
-    let app_config = state.config.lock().await;
-    Ok(app_config.servers.values().cloned().collect())
+pub async fn list_connections(
+    state: State<'_, crate::commands::store::Store>,
+) -> Result<Vec<ServerConfig>, String> {
+    let store = state.get_store().await?;
+    
+    match store.get("connections") {
+        Some(value) => {
+            if let Some(arr) = value.as_array() {
+                let connections: Vec<ServerConfig> = arr
+                    .iter()
+                    .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                    .collect();
+                Ok(connections)
+            } else {
+                Ok(Vec::new())
+            }
+        }
+        None => Ok(Vec::new()),
+    }
 }
 
-/// Delete a server configuration.
+/// Delete a server connection configuration.
 ///
 /// # Arguments
 ///
 /// * `id` - ID of the server to delete
-/// * `state` - Application state
+/// * `state` - Store state
 ///
 /// # Returns
 ///
 /// Empty result on success.
 #[tauri::command]
-pub async fn delete_server(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let mut app_config = state.config.lock().await;
+pub async fn delete_connection(
+    id: String,
+    state: State<'_, crate::commands::store::Store>,
+) -> Result<(), String> {
+    let store = state.get_store().await?;
+    
+    // Get existing connections
+    let mut connections: Vec<ServerConfig> = match store.get("connections") {
+        Some(value) => {
+            if let Some(arr) = value.as_array() {
+                arr.iter()
+                    .filter_map(|v| serde_json::from_value(v.clone()).ok())
+                    .collect()
+            } else {
+                return Err(format!("Connection with ID '{}' not found", id));
+            }
+        }
+        None => return Err(format!("Connection with ID '{}' not found", id)),
+    };
 
-    if app_config.servers.remove(&id).is_none() {
-        return Err(format!("Server with ID '{}' not found", id));
+    // Remove the connection
+    let initial_len = connections.len();
+    connections.retain(|c| c.id != id);
+    
+    if connections.len() == initial_len {
+        return Err(format!("Connection with ID '{}' not found", id));
     }
 
-    // Save to persistent storage
-    drop(app_config);
-    state.save_config()?;
+    // Save back to store
+    store.set("connections".to_string(), serde_json::to_value(&connections).map_err(|e| e.to_string())?);
+    store
+        .save()
+        .map_err(|e| format!("Failed to save store: {}", e))?;
 
     Ok(())
 }
@@ -86,22 +148,14 @@ pub async fn delete_server(id: String, state: State<'_, AppState>) -> Result<(),
 #[tauri::command]
 pub async fn test_connection(config: ServerConfig) -> Result<ConnectionStatus, String> {
     let conn_config = config.to_connection_config()?;
-    
+
     // Use helper function to test connection
     crate::commands::helpers::test_connection(&config.db_type, conn_config).await
 }
 
-// Tests for server commands are temporarily disabled.
-// TODO: Convert to integration tests with full Tauri context support.
-// When re-enabling, remove the #[ignore] attribute or convert to integration tests.
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::AppState;
-
-    fn create_test_state() -> AppState {
-        AppState::new()
-    }
 
     fn create_test_server() -> ServerConfig {
         ServerConfig::new(
@@ -111,46 +165,6 @@ mod tests {
             0,
             "".to_string(),
         )
-    }
-
-    #[tokio::test]
-    async fn test_save_and_list_servers() {
-        let state = create_test_state();
-        let server = create_test_server();
-        let server_id = server.id.clone();
-
-        // Save server
-        let result = save_server(server, State::from(&state)).await;
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), server_id);
-
-        // List servers
-        let servers = list_servers(State::from(&state)).await.unwrap();
-        assert_eq!(servers.len(), 1);
-        assert_eq!(servers[0].id, server_id);
-    }
-
-    #[tokio::test]
-    async fn test_delete_server() {
-        let state = create_test_state();
-        let server = create_test_server();
-        let server_id = server.id.clone();
-
-        // Save and delete server
-        save_server(server, State::from(&state)).await.unwrap();
-        let result = delete_server(server_id.clone(), State::from(&state)).await;
-        assert!(result.is_ok());
-
-        // Verify deletion
-        let servers = list_servers(State::from(&state)).await.unwrap();
-        assert_eq!(servers.len(), 0);
-    }
-
-    #[tokio::test]
-    async fn test_delete_nonexistent_server() {
-        let state = create_test_state();
-        let result = delete_server("nonexistent".to_string(), State::from(&state)).await;
-        assert!(result.is_err());
     }
 
     #[tokio::test]

@@ -173,29 +173,16 @@ pub enum ActiveConnection {
 }
 
 /// Application configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
-    /// Saved server configurations.
-    pub servers: HashMap<String, ServerConfig>,
     /// Application settings.
     pub settings: HashMap<String, String>,
-}
-
-impl Default for AppConfig {
-    fn default() -> Self {
-        Self {
-            servers: HashMap::new(),
-            settings: HashMap::new(),
-        }
-    }
 }
 
 /// Application state shared across all Tauri commands.
 pub struct AppState {
     /// Active database connections indexed by connection ID.
     pub connections: Arc<Mutex<HashMap<String, ActiveConnection>>>,
-    /// Application configuration.
-    pub config: Arc<tokio::sync::Mutex<AppConfig>>,
 }
 
 impl AppState {
@@ -203,44 +190,7 @@ impl AppState {
     pub fn new() -> Self {
         Self {
             connections: Arc::new(Mutex::new(HashMap::new())),
-            config: Arc::new(tokio::sync::Mutex::new(AppConfig::default())),
         }
-    }
-
-    /// Load configuration from storage (placeholder for file-based config).
-    ///
-    /// # Returns
-    ///
-    /// An error indicating configuration loading is not yet implemented.
-    ///
-    /// # Note
-    ///
-    /// This is a placeholder method. Until persistence is implemented, calling
-    /// this method will return an error so that callers are aware that loading
-    /// has not actually succeeded.
-    pub fn load_config(&self) -> Result<(), String> {
-        // TODO: Implement file-based configuration loading.
-        // Until persistence is implemented, explicitly return an error
-        // so that callers do not assume loading has succeeded.
-        Err("Configuration loading is not yet implemented".to_string())
-    }
-
-    /// Save configuration to storage (placeholder for file-based config).
-    ///
-    /// # Returns
-    ///
-    /// An error indicating configuration saving is not yet implemented.
-    ///
-    /// # Note
-    ///
-    /// This is a placeholder method. Until persistence is implemented, calling
-    /// this method will return an error so that callers are aware that saving
-    /// has not actually succeeded. Configuration changes will only exist in memory.
-    pub fn save_config(&self) -> Result<(), String> {
-        // TODO: Implement file-based configuration saving.
-        // Until persistence is implemented, explicitly return an error
-        // so that callers do not assume saving has succeeded.
-        Err("Configuration saving is not yet implemented".to_string())
     }
 }
 

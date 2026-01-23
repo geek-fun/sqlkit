@@ -217,6 +217,9 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
               <SelectItem :value="DatabaseType.POSTGRESQL">
                 🐘 PostgreSQL
               </SelectItem>
+              <SelectItem :value="DatabaseType.SQLSERVER">
+                🔷 SQL Server
+              </SelectItem>
               <SelectItem :value="DatabaseType.MYSQL">
                 🐬 MySQL
               </SelectItem>
@@ -225,9 +228,6 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
               </SelectItem>
               <SelectItem :value="DatabaseType.SQLITE">
                 📦 SQLite
-              </SelectItem>
-              <SelectItem :value="DatabaseType.SQLSERVER">
-                🔷 SQL Server
               </SelectItem>
             </SelectContent>
           </Select>

@@ -7,14 +7,14 @@ use crate::database::{ConnectionStatus, DatabaseAdapter};
 use crate::state::{ActiveConnection, AppState};
 use tauri::State;
 
-/// Connect to a saved server.
+/// Connect to a server using the provided configuration.
 ///
-/// Creates a new connection using a saved server configuration and stores it
+/// Creates a new connection using the provided server configuration and stores it
 /// in the application state for future queries.
 ///
 /// # Arguments
 ///
-/// * `id` - ID of the saved server to connect to
+/// * `config` - Server configuration to connect to
 /// * `state` - Application state
 ///
 /// # Returns
@@ -22,20 +22,10 @@ use tauri::State;
 /// Connection status indicating success or failure.
 #[tauri::command]
 pub async fn connect_server(
-    id: String,
+    config: crate::state::ServerConfig,
     state: State<'_, AppState>,
 ) -> Result<ConnectionStatus, String> {
-    // Get server config
-    let config = {
-        let app_config = state.config.lock().await;
-
-        app_config
-            .servers
-            .get(&id)
-            .cloned()
-            .ok_or_else(|| format!("Server with ID '{}' not found", id))?
-    };
-
+    let id = config.id.clone();
     let conn_config = config.to_connection_config()?;
 
     // Use helper function to create and connect adapter

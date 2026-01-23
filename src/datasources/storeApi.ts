@@ -1,6 +1,4 @@
-import { LazyStore } from '@tauri-apps/plugin-store'
-
-const store = new LazyStore('.sqlkit.dat')
+import { invoke } from '@tauri-apps/api/core'
 
 export interface QueryHistoryItem {
   id: number
@@ -13,52 +11,22 @@ export interface QueryHistoryItem {
 }
 
 export const storeApi = {
-  /**
-   * Get a value from the store.
-   * @param key - The key to retrieve
-   * @param defaultValue - The default value if key doesn't exist
-   * @returns The value from the store or the default value
-   */
   get: async <T>(key: string, defaultValue: T): Promise<T> => {
-    const val = (await store.get(key)) ?? defaultValue
-    return val as T
+    const val = await invoke<T | null>('store_get', { key })
+    return val ?? defaultValue
   },
 
-  /**
-   * Set a value in the store.
-   * @param key - The key to set
-   * @param value - The value to store
-   */
   set: async <T>(key: string, value: T) => {
-    await store.set(key, value)
-    await store.save()
+    await invoke('store_set', { key, value })
   },
 
-  /**
-   * Get a value intended for sensitive data from the store.
-   * Note: Currently no encryption is applied. This is a placeholder
-   * for future encryption implementation using system keychain or
-   * encryption APIs.
-   * @param key - The key to retrieve
-   * @param defaultValue - The default value if key doesn't exist
-   * @returns The value from the store or the default value
-   */
-  getSecret: async <T>(key: string, defaultValue: T): Promise<T> => {
-    const value = (await store.get(key)) ?? defaultValue
-    return value as T
+  getSecret: async <T>(key: string, defaultValue: T) => {
+    const encryptedValue = await invoke<T | null>('store_get', { key })
+    return encryptedValue ?? defaultValue
   },
 
-  /**
-   * Set a value intended for sensitive data in the store.
-   * Note: Currently no encryption is applied. This is a placeholder
-   * for future encryption implementation using system keychain or
-   * encryption APIs.
-   * @param key - The key to set
-   * @param value - The value to store
-   */
   setSecret: async (key: string, value: unknown) => {
-    await store.set(key, value)
-    await store.save()
+    await invoke('store_set', { key, value })
   },
 
   /**

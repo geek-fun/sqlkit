@@ -369,7 +369,7 @@ impl DatabaseAdapter for SqlServerAdapter {
 
         // Get current database and user
         let db_stream = client
-            .simple_query("SELECT DB_NAME() as db, SUSER_SNAME() as user")
+            .simple_query("SELECT DB_NAME() as db, SUSER_SNAME() as username")
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
 
@@ -383,11 +383,11 @@ impl DatabaseAdapter for SqlServerAdapter {
                 QueryValue::String(s) => Some(s),
                 _ => None,
             };
-            let user = match Self::convert_value(row, 1)? {
+            let username = match Self::convert_value(row, 1)? {
                 QueryValue::String(s) => Some(s),
                 _ => None,
             };
-            (db, user)
+            (db, username)
         } else {
             (None, None)
         };
