@@ -16,8 +16,6 @@ import {
 } from '@/components/ui/select'
 import { DatabaseType } from '@/store'
 
-const { t } = useI18n()
-
 const props = defineProps<{
   open: boolean
   connection: ServerConnection | null
@@ -27,6 +25,8 @@ const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'save', connection: ServerConnection): void
 }>()
+
+const { t } = useI18n()
 
 const isOpen = computed({
   get: () => props.open,

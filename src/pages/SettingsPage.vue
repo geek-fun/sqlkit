@@ -26,7 +26,7 @@ function handleThemeChange(value: string) {
 function handleLanguageChange(value: string) {
   currentLanguage.value = value
   localStorage.setItem('lang', value)
-  
+
   // Update locale
   if (value === 'auto') {
     locale.value = navigator.language === 'zh-CN' ? 'zhCN' : 'enUS'
@@ -35,7 +35,6 @@ function handleLanguageChange(value: string) {
     locale.value = value
   }
 }
-
 </script>
 
 <template>

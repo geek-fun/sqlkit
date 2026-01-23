@@ -15,8 +15,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ConnectionStatus, DatabaseType } from '@/store'
 
-const { t } = useI18n()
-
 const props = defineProps<{
   connection: ServerConnection
   connectionStatus: ConnectionStatus
@@ -28,6 +26,8 @@ const emit = defineEmits<{
   (e: 'delete', connection: ServerConnection): void
   (e: 'duplicate', connection: ServerConnection): void
 }>()
+
+const { t } = useI18n()
 
 const databaseTypeColors: Record<DatabaseType, string> = {
   [DatabaseType.POSTGRESQL]: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',

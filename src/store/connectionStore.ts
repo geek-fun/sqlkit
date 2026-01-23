@@ -1,6 +1,14 @@
 import { defineStore } from 'pinia'
 import { connectionApi } from '../datasources'
 
+export enum DatabaseType {
+  MYSQL = 'MYSQL',
+  POSTGRESQL = 'POSTGRESQL',
+  MARIADB = 'MARIADB',
+  SQLITE = 'SQLITE',
+  SQLSERVER = 'SQLSERVER',
+}
+
 const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.POSTGRESQL]: 'PostgreSQL',
   [DatabaseType.MYSQL]: 'MySQL',
@@ -14,14 +22,6 @@ const dbTypeFromBackend: Record<string, DatabaseType> = {
   MySQL: DatabaseType.MYSQL,
   SqlServer: DatabaseType.SQLSERVER,
   SQLite: DatabaseType.SQLITE,
-}
-
-export enum DatabaseType {
-  MYSQL = 'MYSQL',
-  POSTGRESQL = 'POSTGRESQL',
-  MARIADB = 'MARIADB',
-  SQLITE = 'SQLITE',
-  SQLSERVER = 'SQLSERVER',
 }
 
 export enum ConnectionStatus {
