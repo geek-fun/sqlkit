@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
+const { t } = useI18n()
 
 const sqlQuery = `-- Sample SQL Query
 SELECT 
@@ -29,17 +32,17 @@ function handleExecuteQuery() {
         <!-- Page Header -->
         <div class="flex gap-3 items-center">
           <h1 class="text-xl font-semibold">
-            Queries
+            {{ t('pages.queries.title') }}
           </h1>
           <span class="text-muted-foreground">|</span>
-          <span class="text-sm text-muted-foreground">Write and execute SQL queries</span>
+          <span class="text-sm text-muted-foreground">{{ t('pages.queries.subtitle') }}</span>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>SQL Editor</CardTitle>
+            <CardTitle>{{ t('pages.queries.editor.title') }}</CardTitle>
             <CardDescription>
-              Write your SQL queries here
+              {{ t('pages.queries.editor.description') }}
             </CardDescription>
           </CardHeader>
           <CardContent class="space-y-4">
@@ -51,7 +54,7 @@ function handleExecuteQuery() {
             />
             <div class="flex gap-2">
               <Button @click="handleExecuteQuery">
-                Execute Query (Ctrl+Enter)
+                {{ t('pages.queries.editor.execute') }}
               </Button>
             </div>
           </CardContent>
