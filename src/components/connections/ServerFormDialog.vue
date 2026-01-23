@@ -2,6 +2,7 @@
 import type { ServerConnection } from '@/store'
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -24,6 +25,8 @@ const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'save', connection: ServerConnection): void
 }>()
+
+const { t } = useI18n()
 
 const isOpen = computed({
   get: () => props.open,
@@ -93,20 +96,20 @@ function validateForm(): boolean {
   const errors: Record<string, string> = {}
 
   if (!formData.value.name.trim()) {
-    errors.name = 'Connection name is required'
+    errors.name = t('components.serverForm.errors.nameRequired')
   }
 
   if (formData.value.type === DatabaseType.SQLITE) {
     if (!formData.value.host.trim()) {
-      errors.host = 'Database file path is required'
+      errors.host = t('components.serverForm.errors.filePathRequired')
     }
   }
   else {
     if (!formData.value.host.trim()) {
-      errors.host = 'Host is required'
+      errors.host = t('components.serverForm.errors.hostRequired')
     }
     if (!formData.value.port || formData.value.port <= 0) {
-      errors.port = 'Port must be a positive number'
+      errors.port = t('components.serverForm.errors.portInvalid')
     }
   }
 
@@ -143,7 +146,7 @@ async function handleTestConnection() {
     }
     else {
       testStatus.value = 'error'
-      testError.value = 'Connection failed'
+      testError.value = t('common.status.failed')
     }
   }
   catch (error) {
@@ -185,20 +188,20 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
   <Dialog v-model:open="isOpen">
     <DialogContent class="sm:max-w-lg">
       <DialogTitle>
-        {{ isEditing ? 'Edit Connection' : 'New Connection' }}
+        {{ isEditing ? t('components.serverForm.title.edit') : t('components.serverForm.title.new') }}
       </DialogTitle>
       <DialogDescription>
-        {{ isEditing ? 'Update your database connection settings.' : 'Configure a new database connection.' }}
+        {{ isEditing ? t('components.serverForm.description.edit') : t('components.serverForm.description.new') }}
       </DialogDescription>
 
       <form class="space-y-4" @submit.prevent="handleSave">
         <!-- Connection Name -->
         <div class="space-y-2">
-          <Label for="name">Connection Name</Label>
+          <Label for="name">{{ t('components.serverForm.labels.connectionName') }}</Label>
           <Input
             id="name"
             v-model="formData.name"
-            placeholder="My Database"
+            :placeholder="t('components.serverForm.placeholders.connectionName')"
             :class="{ 'border-destructive': formErrors.name }"
           />
           <p v-if="formErrors.name" class="text-sm text-destructive">
@@ -208,26 +211,26 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
 
         <!-- Database Type -->
         <div class="space-y-2">
-          <Label for="type">Database Type</Label>
+          <Label for="type">{{ t('components.serverForm.labels.databaseType') }}</Label>
           <Select :model-value="formData.type" @update:model-value="handleDatabaseTypeChange">
             <SelectTrigger>
-              <SelectValue placeholder="Select database type" />
+              <SelectValue :placeholder="t('components.serverForm.placeholders.selectType')" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem :value="DatabaseType.POSTGRESQL">
-                🐘 PostgreSQL
+                {{ t('components.serverForm.databaseTypes.postgresql') }}
               </SelectItem>
               <SelectItem :value="DatabaseType.SQLSERVER">
-                🔷 SQL Server
+                {{ t('components.serverForm.databaseTypes.sqlserver') }}
               </SelectItem>
               <SelectItem :value="DatabaseType.MYSQL">
-                🐬 MySQL
+                {{ t('components.serverForm.databaseTypes.mysql') }}
               </SelectItem>
               <SelectItem :value="DatabaseType.MARIADB">
-                🦭 MariaDB
+                {{ t('components.serverForm.databaseTypes.mariadb') }}
               </SelectItem>
               <SelectItem :value="DatabaseType.SQLITE">
-                📦 SQLite
+                {{ t('components.serverForm.databaseTypes.sqlite') }}
               </SelectItem>
             </SelectContent>
           </Select>
@@ -235,11 +238,11 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
 
         <!-- Host / File path (for SQLite) -->
         <div class="space-y-2">
-          <Label for="host">{{ isSqlite ? 'Database File Path' : 'Host' }}</Label>
+          <Label for="host">{{ isSqlite ? t('components.serverForm.labels.databaseFilePath') : t('components.serverForm.labels.host') }}</Label>
           <Input
             id="host"
             v-model="formData.host"
-            :placeholder="isSqlite ? '/path/to/database.db' : 'localhost'"
+            :placeholder="isSqlite ? t('components.serverForm.placeholders.filePath') : t('components.serverForm.placeholders.host')"
             :class="{ 'border-destructive': formErrors.host }"
           />
           <p v-if="formErrors.host" class="text-sm text-destructive">
@@ -250,7 +253,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
         <!-- Port and Database (not for SQLite) -->
         <div v-if="!isSqlite" class="gap-4 grid grid-cols-2">
           <div class="space-y-2">
-            <Label for="port">Port</Label>
+            <Label for="port">{{ t('components.serverForm.labels.port') }}</Label>
             <Input
               id="port"
               v-model.number="formData.port"
@@ -262,11 +265,11 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
             </p>
           </div>
           <div class="space-y-2">
-            <Label for="database">Database</Label>
+            <Label for="database">{{ t('components.serverForm.labels.database') }}</Label>
             <Input
               id="database"
               v-model="formData.database"
-              placeholder="database_name"
+              :placeholder="t('components.serverForm.placeholders.database')"
             />
           </div>
         </div>
@@ -274,21 +277,21 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
         <!-- Username and Password (not for SQLite) -->
         <div v-if="!isSqlite" class="gap-4 grid grid-cols-2">
           <div class="space-y-2">
-            <Label for="username">Username</Label>
+            <Label for="username">{{ t('components.serverForm.labels.username') }}</Label>
             <Input
               id="username"
               v-model="formData.username"
-              placeholder="username"
+              :placeholder="t('components.serverForm.placeholders.username')"
               autocomplete="off"
             />
           </div>
           <div class="space-y-2">
-            <Label for="password">Password</Label>
+            <Label for="password">{{ t('components.serverForm.labels.password') }}</Label>
             <Input
               id="password"
               v-model="formData.password"
               type="password"
-              placeholder="••••••••"
+              :placeholder="t('components.serverForm.placeholders.password')"
               autocomplete="new-password"
             />
           </div>
@@ -303,7 +306,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
             class="text-primary border-input rounded h-4 w-4 focus:ring-ring"
           >
           <Label for="ssl" class="cursor-pointer">
-            Use SSL/TLS encryption
+            {{ t('components.serverForm.labels.ssl') }}
           </Label>
         </div>
 
@@ -364,7 +367,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
                 'text-red-700 dark:text-red-400': testStatus === 'error',
               }"
             >
-              {{ testStatus === 'testing' ? 'Testing connection...' : testStatus === 'success' ? 'Connection successful!' : 'Connection failed' }}
+              {{ testStatus === 'testing' ? t('common.status.testing') : testStatus === 'success' ? t('common.status.success') : t('common.status.failed') }}
             </span>
           </div>
           <p v-if="testError" class="text-sm text-red-600 mt-1 dark:text-red-500">
@@ -380,10 +383,10 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
             :disabled="testStatus === 'testing'"
             @click="handleTestConnection"
           >
-            Test Connection
+            {{ t('common.buttons.testConnection') }}
           </Button>
           <Button type="submit">
-            {{ isEditing ? 'Save Changes' : 'Create Connection' }}
+            {{ isEditing ? t('common.buttons.saveChanges') : t('common.buttons.createConnection') }}
           </Button>
         </div>
       </form>

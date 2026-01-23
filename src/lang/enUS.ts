@@ -1,0 +1,174 @@
+export const enUS = {
+  common: {
+    buttons: {
+      create: 'Create',
+      save: 'Save',
+      cancel: 'Cancel',
+      delete: 'Delete',
+      edit: 'Edit',
+      confirm: 'Confirm',
+      test: 'Test',
+      connect: 'Connect',
+      disconnect: 'Disconnect',
+      duplicate: 'Duplicate',
+      saveChanges: 'Save Changes',
+      createConnection: 'Create Connection',
+      testConnection: 'Test Connection',
+    },
+    status: {
+      connected: 'Connected',
+      disconnected: 'Disconnected',
+      connecting: 'Connecting...',
+      error: 'Connection Error',
+      testing: 'Testing connection...',
+      success: 'Connection successful!',
+      failed: 'Connection failed',
+    },
+  },
+  pages: {
+    connections: {
+      title: 'Connections',
+      subtitle: 'Manage your database connections',
+      search: 'Search connections...',
+      stats: {
+        totalConnections: 'Total Connections',
+        activeSessions: 'Active Sessions',
+        lastSync: 'Last Sync',
+        ago: '{time} ago',
+      },
+      saved: 'Saved Connections',
+      addNew: 'Add New Connection',
+      addNewHint: 'PostgreSQL, MySQL, SQLite...',
+      empty: {
+        title: 'No connections found',
+        message: 'No connections match your search "{query}"',
+      },
+      delete: {
+        title: 'Delete Connection',
+        message: 'Are you sure you want to delete "{name}"? This action cannot be undone.',
+      },
+      error: {
+        title: 'Connection Error',
+      },
+    },
+    settings: {
+      title: 'Settings',
+      subtitle: 'Configure your application preferences',
+      appearance: {
+        title: 'Appearance',
+        description: 'Customize the look and feel of the application',
+        theme: 'Theme',
+        themeSelect: 'Select theme',
+        themeHelp: 'Choose between light, dark, or system theme',
+        themes: {
+          light: 'Light',
+          dark: 'Dark',
+          system: 'System',
+        },
+        language: 'Language',
+        languageSelect: 'Select language',
+        languageHelp: 'Choose your preferred language',
+        languages: {
+          enUS: 'English',
+          zhCN: '简体中文',
+          auto: 'Auto (Follow System)',
+        },
+      },
+      preferences: {
+        title: 'Preferences',
+        description: 'Application settings',
+        comingSoon: 'Additional settings will be available in a future update.',
+      },
+    },
+    history: {
+      title: 'History',
+      subtitle: 'View and manage your query history',
+      recent: 'Recent Queries',
+      recentDescription: 'Your recently executed queries',
+      empty: 'No query history available yet.',
+    },
+    importExport: {
+      title: 'Import / Export',
+      subtitle: 'Import and export your data',
+      card: {
+        title: 'Data Import / Export',
+        description: 'Import and export database schemas and data',
+        comingSoon: 'Import and export functionality will be available in a future update.',
+      },
+    },
+    queries: {
+      title: 'Queries',
+      subtitle: 'Write and execute SQL queries',
+      editor: {
+        title: 'SQL Editor',
+        description: 'Write your SQL queries here',
+        execute: 'Execute Query (Ctrl+Enter)',
+      },
+    },
+    dataStudio: {
+      title: 'Data Studio',
+      subtitle: 'AI-powered data analysis',
+      card: {
+        title: 'AI Data Studio',
+        description: 'Use AI to analyze and query your data',
+        comingSoon: 'AI-powered data studio will be available in a future update.',
+      },
+    },
+  },
+  components: {
+    serverForm: {
+      title: {
+        edit: 'Edit Connection',
+        new: 'New Connection',
+      },
+      description: {
+        edit: 'Update your database connection settings.',
+        new: 'Configure a new database connection.',
+      },
+      labels: {
+        connectionName: 'Connection Name',
+        databaseType: 'Database Type',
+        host: 'Host',
+        databaseFilePath: 'Database File Path',
+        port: 'Port',
+        database: 'Database',
+        username: 'Username',
+        password: 'Password',
+        ssl: 'Use SSL/TLS encryption',
+      },
+      placeholders: {
+        connectionName: 'My Database',
+        selectType: 'Select database type',
+        host: 'localhost',
+        filePath: '/path/to/database.db',
+        database: 'database_name',
+        username: 'username',
+        password: '••••••••',
+      },
+      databaseTypes: {
+        postgresql: '🐘 PostgreSQL',
+        sqlserver: '🔷 SQL Server',
+        mysql: '🐬 MySQL',
+        mariadb: '🦭 MariaDB',
+        sqlite: '📦 SQLite',
+      },
+      errors: {
+        nameRequired: 'Connection name is required',
+        hostRequired: 'Host is required',
+        filePathRequired: 'Database file path is required',
+        portInvalid: 'Port must be a positive number',
+      },
+    },
+    serverCard: {
+      actions: {
+        connect: 'Connect',
+        edit: 'Edit',
+        duplicate: 'Duplicate',
+        delete: 'Delete',
+      },
+    },
+    header: {
+      appName: 'SQLKit',
+    },
+  },
+}

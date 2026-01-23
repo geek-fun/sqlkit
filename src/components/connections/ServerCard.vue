@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ServerConnection } from '@/store'
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -25,6 +26,8 @@ const emit = defineEmits<{
   (e: 'delete', connection: ServerConnection): void
   (e: 'duplicate', connection: ServerConnection): void
 }>()
+
+const { t } = useI18n()
 
 const databaseTypeColors: Record<DatabaseType, string> = {
   [DatabaseType.POSTGRESQL]: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
@@ -58,13 +61,13 @@ const statusColor = computed(() => {
 const statusText = computed(() => {
   switch (props.connectionStatus) {
     case ConnectionStatus.CONNECTED:
-      return 'Connected'
+      return t('common.status.connected')
     case ConnectionStatus.CONNECTING:
-      return 'Connecting...'
+      return t('common.status.connecting')
     case ConnectionStatus.ERROR:
-      return 'Connection Error'
+      return t('common.status.error')
     default:
-      return 'Disconnected'
+      return t('common.status.disconnected')
   }
 })
 
@@ -157,7 +160,7 @@ const handleDuplicate = () => emit('duplicate', props.connection)
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>Connect</p>
+              <p>{{ t('components.serverCard.actions.connect') }}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
@@ -200,7 +203,7 @@ const handleDuplicate = () => emit('duplicate', props.connection)
                 <path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" />
                 <path d="m15 5 4 4" />
               </svg>
-              Edit
+              {{ t('components.serverCard.actions.edit') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="handleDuplicate">
               <svg
@@ -218,7 +221,7 @@ const handleDuplicate = () => emit('duplicate', props.connection)
                 <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
                 <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
               </svg>
-              Duplicate
+              {{ t('components.serverCard.actions.duplicate') }}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem class="text-destructive focus:text-destructive" @click="handleDelete">
@@ -240,7 +243,7 @@ const handleDuplicate = () => emit('duplicate', props.connection)
                 <line x1="10" x2="10" y1="11" y2="17" />
                 <line x1="14" x2="14" y1="11" y2="17" />
               </svg>
-              Delete
+              {{ t('components.serverCard.actions.delete') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

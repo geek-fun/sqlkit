@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ServerConnection } from '@/store'
 import { computed, onMounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ServerCard, ServerFormDialog } from '@/components/connections'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import {
@@ -18,6 +19,7 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ConnectionStatus, useConnectionStore } from '@/store'
 
+const { t } = useI18n()
 const connectionStore = useConnectionStore()
 
 const searchQuery = ref('')
@@ -134,10 +136,10 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
         <div class="flex items-center justify-between">
           <div class="flex gap-3 items-center">
             <h1 class="text-xl font-semibold">
-              Connections
+              {{ t('pages.connections.title') }}
             </h1>
             <span class="text-muted-foreground">|</span>
-            <span class="text-sm text-muted-foreground">Manage your database connections</span>
+            <span class="text-sm text-muted-foreground">{{ t('pages.connections.subtitle') }}</span>
           </div>
           <div class="w-64 relative">
             <svg
@@ -157,7 +159,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             </svg>
             <Input
               v-model="searchQuery"
-              placeholder="Search connections..."
+              :placeholder="t('pages.connections.search')"
               class="pl-9 bg-muted/50"
             />
           </div>
@@ -169,7 +171,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm text-muted-foreground">
-                  Total Connections
+                  {{ t('pages.connections.stats.totalConnections') }}
                 </p>
                 <p class="text-2xl font-bold">
                   {{ stats.total }}
@@ -198,7 +200,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm text-muted-foreground">
-                  Active Sessions
+                  {{ t('pages.connections.stats.activeSessions') }}
                 </p>
                 <p class="text-2xl font-bold">
                   {{ stats.active }}
@@ -226,7 +228,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm text-muted-foreground">
-                  Last Sync
+                  {{ t('pages.connections.stats.lastSync') }}
                 </p>
                 <p class="text-2xl font-bold">
                   2m ago
@@ -277,7 +279,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             </svg>
             <div class="flex-1">
               <h3 class="text-sm text-red-800 font-medium dark:text-red-200">
-                Connection Error
+                {{ t('pages.connections.error.title') }}
               </h3>
               <p class="text-sm text-red-700 mt-1 dark:text-red-300">
                 {{ connectError }}
@@ -311,7 +313,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
         <div>
           <div class="mb-4 flex items-center justify-between">
             <h2 class="text-lg font-semibold">
-              Saved Connections
+              {{ t('pages.connections.saved') }}
             </h2>
             <div class="flex gap-2 items-center">
               <Button
@@ -410,10 +412,10 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                 </div>
                 <div>
                   <p class="font-medium">
-                    Add New Connection
+                    {{ t('pages.connections.addNew') }}
                   </p>
                   <p class="text-sm text-muted-foreground">
-                    PostgreSQL, MySQL, SQLite...
+                    {{ t('pages.connections.addNewHint') }}
                   </p>
                 </div>
               </div>
@@ -441,10 +443,10 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
               <path d="m21 21-4.3-4.3" />
             </svg>
             <h3 class="text-lg font-semibold">
-              No connections found
+              {{ t('pages.connections.empty.title') }}
             </h3>
             <p class="text-muted-foreground mt-1">
-              No connections match your search "{{ searchQuery }}"
+              {{ t('pages.connections.empty.message', { query: searchQuery }) }}
             </p>
           </div>
         </div>
@@ -484,19 +486,18 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
     <AlertDialog v-model:open="deleteDialogOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Delete Connection</AlertDialogTitle>
+          <AlertDialogTitle>{{ t('pages.connections.delete.title') }}</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete "{{ connectionToDelete?.name }}"?
-            This action cannot be undone.
+            {{ t('pages.connections.delete.message', { name: connectionToDelete?.name }) }}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogCancel>{{ t('common.buttons.cancel') }}</AlertDialogCancel>
           <AlertDialogAction
             class="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             @click="confirmDelete"
           >
-            Delete
+            {{ t('common.buttons.delete') }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

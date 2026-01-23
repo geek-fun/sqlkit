@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -10,22 +13,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
         <!-- Page Header -->
         <div class="flex gap-3 items-center">
           <h1 class="text-xl font-semibold">
-            Data Studio
+            {{ t('pages.dataStudio.title') }}
           </h1>
           <span class="text-muted-foreground">|</span>
-          <span class="text-sm text-muted-foreground">AI-powered data analysis</span>
+          <span class="text-sm text-muted-foreground">{{ t('pages.dataStudio.subtitle') }}</span>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>AI Data Studio</CardTitle>
+            <CardTitle>{{ t('pages.dataStudio.card.title') }}</CardTitle>
             <CardDescription>
-              Use AI to analyze and query your data
+              {{ t('pages.dataStudio.card.description') }}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p class="text-muted-foreground">
-              AI-powered data studio will be available in a future update.
+              {{ t('pages.dataStudio.card.comingSoon') }}
             </p>
           </CardContent>
         </Card>

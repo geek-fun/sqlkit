@@ -1,0 +1,174 @@
+export const zhCN = {
+  common: {
+    buttons: {
+      create: '创建',
+      save: '保存',
+      cancel: '取消',
+      delete: '删除',
+      edit: '编辑',
+      confirm: '确认',
+      test: '测试',
+      connect: '连接',
+      disconnect: '断开',
+      duplicate: '复制',
+      saveChanges: '保存更改',
+      createConnection: '创建连接',
+      testConnection: '测试连接',
+    },
+    status: {
+      connected: '已连接',
+      disconnected: '未连接',
+      connecting: '连接中...',
+      error: '连接错误',
+      testing: '正在测试连接...',
+      success: '连接成功！',
+      failed: '连接失败',
+    },
+  },
+  pages: {
+    connections: {
+      title: '连接管理',
+      subtitle: '管理您的数据库连接',
+      search: '搜索连接...',
+      stats: {
+        totalConnections: '总连接数',
+        activeSessions: '活跃会话',
+        lastSync: '最后同步',
+        ago: '{time}前',
+      },
+      saved: '已保存的连接',
+      addNew: '添加新连接',
+      addNewHint: 'PostgreSQL、MySQL、SQLite...',
+      empty: {
+        title: '未找到连接',
+        message: '没有匹配"{query}"的连接',
+      },
+      delete: {
+        title: '删除连接',
+        message: '确定要删除"{name}"吗？此操作无法撤销。',
+      },
+      error: {
+        title: '连接错误',
+      },
+    },
+    settings: {
+      title: '设置',
+      subtitle: '配置应用程序首选项',
+      appearance: {
+        title: '外观',
+        description: '自定义应用程序的外观',
+        theme: '主题',
+        themeSelect: '选择主题',
+        themeHelp: '在亮色、暗色或系统主题之间选择',
+        themes: {
+          light: '亮色',
+          dark: '暗色',
+          system: '跟随系统',
+        },
+        language: '语言',
+        languageSelect: '选择语言',
+        languageHelp: '选择您的首选语言',
+        languages: {
+          enUS: 'English',
+          zhCN: '简体中文',
+          auto: '自动（跟随系统）',
+        },
+      },
+      preferences: {
+        title: '偏好设置',
+        description: '应用程序设置',
+        comingSoon: '更多设置将在未来的更新中提供。',
+      },
+    },
+    history: {
+      title: '历史记录',
+      subtitle: '查看和管理您的查询历史',
+      recent: '最近的查询',
+      recentDescription: '您最近执行的查询',
+      empty: '暂无查询历史记录。',
+    },
+    importExport: {
+      title: '导入/导出',
+      subtitle: '导入和导出您的数据',
+      card: {
+        title: '数据导入/导出',
+        description: '导入和导出数据库架构和数据',
+        comingSoon: '导入和导出功能将在未来的更新中提供。',
+      },
+    },
+    queries: {
+      title: '查询',
+      subtitle: '编写和执行SQL查询',
+      editor: {
+        title: 'SQL编辑器',
+        description: '在此处编写您的SQL查询',
+        execute: '执行查询 (Ctrl+Enter)',
+      },
+    },
+    dataStudio: {
+      title: '数据工作室',
+      subtitle: 'AI驱动的数据分析',
+      card: {
+        title: 'AI数据工作室',
+        description: '使用AI分析和查询您的数据',
+        comingSoon: 'AI数据工作室功能将在未来的更新中提供。',
+      },
+    },
+  },
+  components: {
+    serverForm: {
+      title: {
+        edit: '编辑连接',
+        new: '新建连接',
+      },
+      description: {
+        edit: '更新数据库连接设置。',
+        new: '配置新的数据库连接。',
+      },
+      labels: {
+        connectionName: '连接名称',
+        databaseType: '数据库类型',
+        host: '主机地址',
+        databaseFilePath: '数据库文件路径',
+        port: '端口',
+        database: '数据库',
+        username: '用户名',
+        password: '密码',
+        ssl: '使用SSL/TLS加密',
+      },
+      placeholders: {
+        connectionName: '我的数据库',
+        selectType: '选择数据库类型',
+        host: 'localhost',
+        filePath: '/path/to/database.db',
+        database: 'database_name',
+        username: 'username',
+        password: '••••••••',
+      },
+      databaseTypes: {
+        postgresql: '🐘 PostgreSQL',
+        sqlserver: '🔷 SQL Server',
+        mysql: '🐬 MySQL',
+        mariadb: '🦭 MariaDB',
+        sqlite: '📦 SQLite',
+      },
+      errors: {
+        nameRequired: '连接名称是必填项',
+        hostRequired: '主机地址是必填项',
+        filePathRequired: '数据库文件路径是必填项',
+        portInvalid: '端口必须是正数',
+      },
+    },
+    serverCard: {
+      actions: {
+        connect: '连接',
+        edit: '编辑',
+        duplicate: '复制',
+        delete: '删除',
+      },
+    },
+    header: {
+      appName: 'SQLKit',
+    },
+  },
+}

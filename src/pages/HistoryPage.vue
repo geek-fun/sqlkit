@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -10,22 +13,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
         <!-- Page Header -->
         <div class="flex gap-3 items-center">
           <h1 class="text-xl font-semibold">
-            History
+            {{ t('pages.history.title') }}
           </h1>
           <span class="text-muted-foreground">|</span>
-          <span class="text-sm text-muted-foreground">View and manage your query history</span>
+          <span class="text-sm text-muted-foreground">{{ t('pages.history.subtitle') }}</span>
         </div>
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent Queries</CardTitle>
+            <CardTitle>{{ t('pages.history.recent') }}</CardTitle>
             <CardDescription>
-              Your recently executed queries
+              {{ t('pages.history.recentDescription') }}
             </CardDescription>
           </CardHeader>
           <CardContent>
             <p class="text-muted-foreground">
-              No query history available yet.
+              {{ t('pages.history.empty') }}
             </p>
           </CardContent>
         </Card>
