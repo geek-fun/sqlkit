@@ -99,10 +99,27 @@ export const zhCN = {
     queries: {
       title: '查询',
       subtitle: '编写和执行SQL查询',
+      selectDatabase: '选择数据库',
+      noTab: '没有打开的查询标签页',
+      newTab: '新建查询',
       editor: {
         title: 'SQL编辑器',
         description: '在此处编写您的SQL查询',
+        execute: '执行',
+        explain: '解释',
+      },
+      shortcuts: {
         execute: '执行查询 (Ctrl+Enter)',
+        explain: '解释查询 (F6)',
+        save: '保存 (Ctrl+S)',
+        comment: '切换注释 (Ctrl+/)',
+      },
+      status: {
+        connection: '连接',
+        database: '数据库',
+        rows: '行数',
+        time: '耗时',
+        executing: '执行中...',
       },
     },
     dataStudio: {
@@ -165,6 +182,39 @@ export const zhCN = {
         edit: '编辑',
         duplicate: '复制',
         delete: '删除',
+      },
+    },
+    databaseBrowser: {
+      title: '数据库浏览器',
+      search: '搜索表...',
+      refresh: '刷新',
+      loading: '加载中...',
+      empty: '未找到数据库。请先连接到服务器。',
+      contextMenu: {
+        selectTopN: '查询前100条',
+        viewStructure: '查看结构',
+        createScript: 'CREATE脚本',
+        exportData: '导出数据',
+      },
+    },
+    queryResult: {
+      title: '结果',
+      rows: '{count} 行',
+      time: '{time}',
+      close: '关闭',
+      executing: '正在执行查询...',
+      error: '查询错误',
+      success: '查询执行成功',
+      noData: '无数据返回',
+      noResults: '执行查询以查看结果',
+    },
+    queryTabs: {
+      unsaved: '未保存的更改',
+      new: '新建查询',
+      closeDialog: {
+        title: '未保存的更改',
+        message: '查询"{name}"有未保存的更改。是否要放弃它们？',
+        discard: '放弃',
       },
     },
     header: {

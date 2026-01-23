@@ -99,10 +99,27 @@ export const enUS = {
     queries: {
       title: 'Queries',
       subtitle: 'Write and execute SQL queries',
+      selectDatabase: 'Select a database',
+      noTab: 'No query tab open',
+      newTab: 'New Query',
       editor: {
         title: 'SQL Editor',
         description: 'Write your SQL queries here',
-        execute: 'Execute Query (Ctrl+Enter)',
+        execute: 'Execute',
+        explain: 'Explain',
+      },
+      shortcuts: {
+        execute: 'Execute query (Ctrl+Enter)',
+        explain: 'Explain query (F6)',
+        save: 'Save (Ctrl+S)',
+        comment: 'Toggle comment (Ctrl+/)',
+      },
+      status: {
+        connection: 'Connection',
+        database: 'Database',
+        rows: 'Rows',
+        time: 'Time',
+        executing: 'Executing...',
       },
     },
     dataStudio: {
@@ -165,6 +182,39 @@ export const enUS = {
         edit: 'Edit',
         duplicate: 'Duplicate',
         delete: 'Delete',
+      },
+    },
+    databaseBrowser: {
+      title: 'Database Browser',
+      search: 'Search tables...',
+      refresh: 'Refresh',
+      loading: 'Loading...',
+      empty: 'No databases found. Connect to a server first.',
+      contextMenu: {
+        selectTopN: 'Select Top 100',
+        viewStructure: 'View Structure',
+        createScript: 'CREATE Script',
+        exportData: 'Export Data',
+      },
+    },
+    queryResult: {
+      title: 'Results',
+      rows: '{count} rows',
+      time: '{time}',
+      close: 'Close',
+      executing: 'Executing query...',
+      error: 'Query Error',
+      success: 'Query executed successfully',
+      noData: 'No data returned',
+      noResults: 'Execute a query to see results',
+    },
+    queryTabs: {
+      unsaved: 'Unsaved changes',
+      new: 'New query',
+      closeDialog: {
+        title: 'Unsaved Changes',
+        message: 'The query "{name}" has unsaved changes. Do you want to discard them?',
+        discard: 'Discard',
       },
     },
     header: {
