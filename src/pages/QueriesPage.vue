@@ -23,28 +23,22 @@ const connectionStore = useConnectionStore()
 const databaseStore = useDatabaseStore()
 const tabStore = useTabStore()
 
-const editorRef = ref<InstanceType<typeof SQLEditor> | null>(null)
 const showResultPanel = ref(false)
-const selectedDatabase = ref<string>('')
 const sidebarWidth = ref(250)
 const isResizingSidebar = ref(false)
 
-// Get connection from route or store
-const connectionId = computed(() => {
-  return (route.query.connectionId as string) || connectionStore.activeConnectionId
-})
+// Available connections
+const availableConnections = computed(() => connectionStore.connections)
+
+// Get active connection ID (can be changed by user)
+const selectedConnectionId = ref<string>('')
 
 const activeConnection = computed(() => {
-  if (connectionId.value) {
-    return connectionStore.getConnectionById(connectionId.value)
+  const id = selectedConnectionId.value || connectionStore.activeConnectionId
+  if (id) {
+    return connectionStore.getConnectionById(id)
   }
   return null
-})
-
-const databases = computed(() => {
-  if (!connectionId.value)
-    return []
-  return databaseStore.metadata[connectionId.value]?.databases || []
 })
 
 const activeTab = computed(() => tabStore.activeTab)
@@ -62,31 +56,39 @@ const editorContent = computed({
 onMounted(async () => {
   // Set active connection from route if provided
   if (route.query.connectionId) {
+    selectedConnectionId.value = route.query.connectionId as string
     connectionStore.setActiveConnection(route.query.connectionId as string)
+  }
+  else if (connectionStore.activeConnectionId) {
+    selectedConnectionId.value = connectionStore.activeConnectionId
   }
 
   // Create initial tab if none exists
-  if (connectionId.value && tabStore.tabs.length === 0) {
-    tabStore.createTab(connectionId.value, selectedDatabase.value || undefined)
+  const connId = selectedConnectionId.value
+  if (connId && tabStore.tabs.length === 0) {
+    const connection = connectionStore.getConnectionById(connId)
+    tabStore.createTab(connId, connection?.database || undefined)
   }
 
   // Fetch databases for active connection
-  if (connectionId.value) {
-    await databaseStore.fetchDatabases(connectionId.value)
-
-    // Set default database if connection has one
-    if (activeConnection.value?.database) {
-      selectedDatabase.value = activeConnection.value.database
-    }
+  if (connId) {
+    await databaseStore.fetchDatabases(connId)
   }
 })
 
-// Watch for database changes
-watch(selectedDatabase, (newDb) => {
-  if (newDb) {
-    databaseStore.selectDatabase(newDb)
+// Watch for connection changes
+watch(selectedConnectionId, async (newConnId) => {
+  if (newConnId) {
+    connectionStore.setActiveConnection(newConnId)
+    await databaseStore.fetchDatabases(newConnId)
+
+    // Create new tab for the connection
+    const connection = connectionStore.getConnectionById(newConnId)
+    tabStore.createTab(newConnId, connection?.database || undefined)
   }
 })
+
+// Watch for database changes (removed since we handle it at connection level now)
 
 // Execute query
 async function executeQuery() {
@@ -98,36 +100,8 @@ async function executeQuery() {
   await tabStore.executeQuery(activeTab.value.id)
 }
 
-// Handle keyboard shortcuts
-function handleKeyDown(event: KeyboardEvent) {
-  // Ctrl+Enter - Execute query
-  if (event.ctrlKey && event.key === 'Enter') {
-    event.preventDefault()
-    executeQuery()
-  }
-
-  // F6 - Explain query
-  if (event.key === 'F6') {
-    event.preventDefault()
-    handleExplainQuery()
-  }
-
-  // Ctrl+S - Save (mark as saved)
-  if (event.ctrlKey && event.key === 's') {
-    event.preventDefault()
-    if (activeTab.value) {
-      tabStore.markTabSaved(activeTab.value.id)
-    }
-  }
-
-  // Ctrl+Tab - Switch tabs
-  if (event.ctrlKey && event.key === 'Tab') {
-    event.preventDefault()
-    switchToNextTab()
-  }
-}
-
-function switchToNextTab() {
+// Unused currently, but kept for future keyboard shortcut implementation
+function _switchToNextTab() {
   if (tabStore.tabs.length <= 1)
     return
 
@@ -142,8 +116,10 @@ async function handleExplainQuery() {
 
 // Tab management
 function handleNewTab() {
-  if (connectionId.value) {
-    tabStore.createTab(connectionId.value, selectedDatabase.value || undefined)
+  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  if (connId) {
+    const connection = connectionStore.getConnectionById(connId)
+    tabStore.createTab(connId, connection?.database || undefined)
   }
 }
 
@@ -168,8 +144,9 @@ CREATE TABLE ${schemaPrefix}"${table.name}" (
   -- columns will be generated here
 );`
 
-  if (connectionId.value) {
-    const tab = tabStore.createTab(connectionId.value, database)
+  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  if (connId) {
+    const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, script)
     tabStore.updateTabName(tab.id, `CREATE_${table.name}`)
   }
@@ -179,8 +156,9 @@ function handleSelectTopN(table: TableInfo, database: string, schema?: string, n
   const schemaPrefix = schema ? `"${schema}".` : ''
   const query = `SELECT * FROM ${schemaPrefix}"${table.name}" LIMIT ${n};`
 
-  if (connectionId.value) {
-    const tab = tabStore.createTab(connectionId.value, database)
+  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  if (connId) {
+    const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, query)
     tabStore.updateTabName(tab.id, `SELECT_${table.name}`)
 
@@ -200,8 +178,9 @@ SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
 WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` : ''};`
 
-  if (connectionId.value) {
-    const tab = tabStore.createTab(connectionId.value, database)
+  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  if (connId) {
+    const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, query)
     tabStore.updateTabName(tab.id, `STRUCTURE_${table.name}`)
   }
@@ -238,27 +217,29 @@ function closeResultPanel() {
 
 <template>
   <AppLayout>
-    <div class="flex flex-col h-full" @keydown="handleKeyDown">
-      <!-- Main content area with sidebar -->
+    <div class="flex flex-col h-full">
       <div class="flex flex-1 overflow-hidden">
         <!-- Database Browser Sidebar -->
         <div
           class="border-r bg-background flex flex-col"
           :style="{ width: `${sidebarWidth}px` }"
         >
-          <!-- Database selector -->
+          <!-- Connection selector -->
           <div class="p-2 border-b">
-            <Select v-model="selectedDatabase">
+            <Select v-model="selectedConnectionId">
               <SelectTrigger class="text-xs h-8">
-                <SelectValue :placeholder="t('pages.queries.selectDatabase')" />
+                <SelectValue :placeholder="t('pages.queries.selectConnection')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
-                  v-for="db in databases"
-                  :key="db"
-                  :value="db"
+                  v-for="conn in availableConnections"
+                  :key="conn.id"
+                  :value="conn.id!"
                 >
-                  {{ db }}
+                  <div class="flex gap-2 items-center">
+                    <span class="font-medium">{{ conn.name }}</span>
+                    <span class="text-xs text-muted-foreground">({{ conn.host }})</span>
+                  </div>
                 </SelectItem>
               </SelectContent>
             </Select>
@@ -344,7 +325,7 @@ function closeResultPanel() {
             <!-- Status info -->
             <div v-if="activeTab" class="text-xs text-muted-foreground flex gap-2 items-center">
               <span v-if="activeConnection">{{ activeConnection.name }}</span>
-              <span v-if="selectedDatabase">/ {{ selectedDatabase }}</span>
+              <span v-if="activeConnection?.database">/ {{ activeConnection.database }}</span>
             </div>
           </div>
 
@@ -352,7 +333,6 @@ function closeResultPanel() {
           <div class="flex-1 overflow-hidden">
             <SQLEditor
               v-if="activeTab"
-              ref="editorRef"
               v-model="editorContent"
               height="100%"
               dialect="sql"
@@ -387,11 +367,8 @@ function closeResultPanel() {
       <!-- Status bar -->
       <div class="text-xs text-muted-foreground px-3 py-1 border-t bg-muted/30 flex items-center justify-between">
         <div class="flex gap-4 items-center">
-          <span v-if="activeConnection">
-            {{ t('pages.queries.status.connection') }}: {{ activeConnection.name }}
-          </span>
-          <span v-if="selectedDatabase">
-            {{ t('pages.queries.status.database') }}: {{ selectedDatabase }}
+          <span v-if="activeConnection?.database">
+            {{ t('pages.queries.status.database') }}: {{ activeConnection.database }}
           </span>
         </div>
         <div class="flex gap-4 items-center">
