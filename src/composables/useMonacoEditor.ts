@@ -259,8 +259,32 @@ export function useMonacoEditor(
     editor.addCommand(
       monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
       () => {
+        // Get cursor position
+        const position = editor?.getPosition()
+        const selection = editor?.getSelection()
+        
         // This will be handled by parent component
         const event = new CustomEvent('execute-query', {
+          detail: { 
+            query: editor?.getValue(),
+            cursorPosition: position,
+            selection: selection ? {
+              startLineNumber: selection.startLineNumber,
+              startColumn: selection.startColumn,
+              endLineNumber: selection.endLineNumber,
+              endColumn: selection.endColumn,
+            } : undefined,
+          },
+        })
+        containerRef.value?.dispatchEvent(event)
+      },
+    )
+
+    editor.addCommand(
+      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
+      () => {
+        // This will be handled by parent component
+        const event = new CustomEvent('save-query', {
           detail: { query: editor?.getValue() },
         })
         containerRef.value?.dispatchEvent(event)

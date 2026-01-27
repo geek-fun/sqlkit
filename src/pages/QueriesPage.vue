@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import type { CursorPosition, Selection } from '@/common/sqlParser'
 import type { TableInfo } from '@/store/databaseStore'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
+import { extractStatementAtCursor } from '@/common/sqlParser'
 import { DatabaseBrowser, QueryResultPanel, QueryTabs } from '@/components/database-browser'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
@@ -15,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { saveQueryFile } from '@/datasources'
 import { useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
 const { t } = useI18n()
@@ -105,23 +108,31 @@ watch(selectedConnectionId, async (newConnId) => {
 // Watch for database changes (removed since we handle it at connection level now)
 
 // Execute query
-async function executeQuery() {
+async function executeQuery(details?: { query: string, cursorPosition?: CursorPosition, selection?: Selection }) {
   if (!activeTab.value || !activeTab.value.content.trim()) {
     return
   }
 
+  let sqlToExecute = activeTab.value.content
+
+  // If details are provided (from keyboard shortcut), extract statement at cursor
+  if (details) {
+    sqlToExecute = extractStatementAtCursor(
+      details.query,
+      details.cursorPosition,
+      details.selection,
+    )
+  }
+
+  // Update tab content temporarily for execution
+  const originalContent = activeTab.value.content
+  activeTab.value.content = sqlToExecute
+
   showResultPanel.value = true
   await tabStore.executeQuery(activeTab.value.id)
-}
 
-// Unused currently, but kept for future keyboard shortcut implementation
-function _switchToNextTab() {
-  if (tabStore.tabs.length <= 1)
-    return
-
-  const currentIndex = tabStore.tabs.findIndex(t => t.id === tabStore.activeTabId)
-  const nextIndex = (currentIndex + 1) % tabStore.tabs.length
-  tabStore.setActiveTab(tabStore.tabs[nextIndex].id)
+  // Restore original content
+  activeTab.value.content = originalContent
 }
 
 async function handleExplainQuery() {
@@ -162,7 +173,7 @@ CREATE TABLE ${schemaPrefix}"${table.name}" (
   if (connId) {
     const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, script)
-    tabStore.updateTabName(tab.id, `CREATE_${table.name}`)
+    tabStore.updateTabName(tab.id, `CREATE_${table.name}.sql`)
   }
 }
 
@@ -226,6 +237,28 @@ function stopSidebarResize() {
 
 function closeResultPanel() {
   showResultPanel.value = false
+}
+
+// Save query to file
+async function handleSaveQuery() {
+  if (!activeTab.value || !activeTab.value.content.trim()) {
+    return
+  }
+
+  try {
+    const result = await saveQueryFile(
+      activeTab.value.content,
+      activeTab.value.filePath,
+      activeTab.value.filePath ? undefined : `${activeTab.value.name}.sql`,
+    )
+
+    if (result.success && result.file_path) {
+      tabStore.markTabSaved(activeTab.value.id, result.file_path)
+    }
+  }
+  catch (error) {
+    console.error('Failed to save query:', error)
+  }
 }
 </script>
 
@@ -352,7 +385,9 @@ function closeResultPanel() {
               v-model="editorContent"
               height="100%"
               dialect="sql"
-              @execute="executeQuery"
+              :is-executing="activeTab.isExecuting"
+              @execute="(details) => executeQuery(details)"
+              @save="handleSaveQuery"
             />
             <div v-else class="text-muted-foreground flex h-full items-center justify-center">
               <div class="text-center">

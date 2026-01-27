@@ -3,13 +3,6 @@ import type { TableInfo } from '@/store/databaseStore'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -628,16 +621,16 @@ function getIcon(type: 'table' | 'view' | 'database' | 'column' | 'schema') {
     </div>
 
     <!-- Context Menu -->
-    <DropdownMenu v-model:open="showContextMenu">
-      <DropdownMenuTrigger as-child>
+    <div
+      v-if="showContextMenu"
+      class="text-popover-foreground border rounded-md bg-popover w-48 shadow-md fixed z-50"
+      :style="{ left: `${contextMenuPosition.x}px`, top: `${contextMenuPosition.y}px` }"
+    >
+      <div class="p-1">
         <div
-          v-if="showContextMenu"
-          class="fixed z-50"
-          :style="{ left: `${contextMenuPosition.x}px`, top: `${contextMenuPosition.y}px` }"
-        />
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" class="w-48">
-        <DropdownMenuItem @click="handleContextAction('selectTopN')">
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleContextAction('selectTopN')"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
             <path d="m3 16 4 4 4-4" />
             <path d="M7 20V4" />
@@ -646,16 +639,22 @@ function getIcon(type: 'table' | 'view' | 'database' | 'column' | 'schema') {
             <path d="M11 12h10" />
           </svg>
           {{ t('components.databaseBrowser.contextMenu.selectTopN') }}
-        </DropdownMenuItem>
-        <DropdownMenuItem @click="handleContextAction('viewStructure')">
+        </div>
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleContextAction('viewStructure')"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
             <rect width="18" height="18" x="3" y="3" rx="2" />
             <path d="M3 9h18" />
             <path d="M9 21V9" />
           </svg>
           {{ t('components.databaseBrowser.contextMenu.viewStructure') }}
-        </DropdownMenuItem>
-        <DropdownMenuItem @click="handleContextAction('createScript')">
+        </div>
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleContextAction('createScript')"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
             <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
             <path d="M14 2v4a2 2 0 0 0 2 2h4" />
@@ -663,18 +662,21 @@ function getIcon(type: 'table' | 'view' | 'database' | 'column' | 'schema') {
             <path d="M14 18a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1 1 1 0 0 1-1-1v-1a1 1 0 0 0-1-1" />
           </svg>
           {{ t('components.databaseBrowser.contextMenu.createScript') }}
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem @click="handleContextAction('exportData')">
+        </div>
+        <div class="my-1 bg-border h-px" />
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleContextAction('exportData')"
+        >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
             <polyline points="7 10 12 15 17 10" />
             <line x1="12" x2="12" y1="15" y2="3" />
           </svg>
           {{ t('components.databaseBrowser.contextMenu.exportData') }}
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 

@@ -15,6 +15,7 @@ export interface QueryTab {
   database?: string
   isExecuting: boolean
   hasUnsavedChanges: boolean
+  filePath?: string
   results?: QueryResult
   error?: string
   executionTime?: number
@@ -134,10 +135,16 @@ export const useTabStore = defineStore('tabs', {
       }
     },
 
-    markTabSaved(tabId: string) {
+    markTabSaved(tabId: string, filePath?: string) {
       const tab = this.tabs.find(t => t.id === tabId)
       if (tab) {
         tab.hasUnsavedChanges = false
+        if (filePath) {
+          tab.filePath = filePath
+          // Update tab name to just the filename
+          const fileName = filePath.split('/').pop() || filePath
+          tab.name = fileName.replace(/\.sql$/, '')
+        }
       }
     },
 
