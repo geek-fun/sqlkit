@@ -11,6 +11,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useConnectionStore, useDatabaseStore } from '@/store'
 
 export interface TreeNodeMetadata extends TableInfo {
@@ -29,12 +36,18 @@ export interface TreeNode {
   metadata?: TreeNodeMetadata
 }
 
+const props = defineProps<{
+  connectionId?: string
+  selectedDatabase?: string
+}>()
+
 const emit = defineEmits<{
   (e: 'selectTable', table: TableInfo, database: string, schema?: string): void
   (e: 'createScript', table: TableInfo, database: string, schema?: string): void
   (e: 'selectTopN', table: TableInfo, database: string, schema?: string, n?: number): void
   (e: 'viewStructure', table: TableInfo, database: string, schema?: string): void
   (e: 'exportData', table: TableInfo, database: string, schema?: string): void
+  (e: 'update:selectedDatabase', database: string): void
 }>()
 
 const { t } = useI18n()
@@ -47,9 +60,15 @@ const selectedNodeId = ref<string | null>(null)
 const contextMenuNode = ref<TreeNode | null>(null)
 const contextMenuPosition = ref({ x: 0, y: 0 })
 const showContextMenu = ref(false)
+const showTables = ref(true)
+const showViews = ref(false)
+const showSavedQueries = ref(false)
 
-const activeConnection = computed(() => connectionStore.activeConnection)
-const connectionId = computed(() => connectionStore.activeConnectionId)
+const activeConnection = computed(() => {
+  const connId = props.connectionId || connectionStore.activeConnectionId
+  return connId ? connectionStore.getConnectionById(connId) : connectionStore.activeConnection
+})
+const connectionId = computed(() => props.connectionId || connectionStore.activeConnectionId)
 
 // Build tree structure from database metadata
 const treeNodes = computed<TreeNode[]>(() => {
@@ -88,7 +107,7 @@ const treeNodes = computed<TreeNode[]>(() => {
         schemaNode.children = tables.map(table => ({
           id: `table-${database}-${schema}-${table.name}`,
           name: table.name,
-          type: 'table' as const,
+          type: table.table_type?.toLowerCase() === 'view' ? ('view' as const) : ('table' as const),
           parentId: schemaNode.id,
           metadata: { database, schema, ...table },
         }))
@@ -102,7 +121,7 @@ const treeNodes = computed<TreeNode[]>(() => {
       dbNode.children = tables.map(table => ({
         id: `table-${database}--${table.name}`,
         name: table.name,
-        type: 'table' as const,
+        type: table.table_type?.toLowerCase() === 'view' ? ('view' as const) : ('table' as const),
         parentId: dbNode.id,
         metadata: { database, ...table },
       }))
@@ -114,35 +133,53 @@ const treeNodes = computed<TreeNode[]>(() => {
   return nodes
 })
 
-// Filter nodes based on search query
-const filteredNodes = computed(() => {
-  if (!searchQuery.value.trim()) {
-    return treeNodes.value
+// Separate tables and views from filtered nodes
+const tablesAndViews = computed(() => {
+  const currentDb = props.selectedDatabase || activeConnection.value?.database
+  if (!currentDb || !connectionId.value || !databaseStore.metadata[connectionId.value]) {
+    return { tables: [], views: [] }
   }
 
-  const query = searchQuery.value.toLowerCase()
+  const metadata = databaseStore.metadata[connectionId.value]
+  const schemas = metadata.schemas[currentDb] || []
+  const allItems: TreeNode[] = []
 
-  const filterNode = (node: TreeNode): TreeNode | null => {
-    if (node.name.toLowerCase().includes(query)) {
-      return { ...node, isExpanded: true }
+  if (schemas.length > 0) {
+    // Has schemas - collect from all schemas
+    for (const schema of schemas) {
+      const tablesKey = `${currentDb}.${schema}`
+      const tables = metadata.tables[tablesKey] || []
+      allItems.push(...tables.map((table): TreeNode => ({
+        id: `table-${currentDb}-${schema}-${table.name}`,
+        name: table.name,
+        type: table.table_type?.toLowerCase() === 'view' ? ('view' as const) : ('table' as const),
+        parentId: `schema-${currentDb}-${schema}`,
+        metadata: { database: currentDb, schema, ...table },
+      })))
     }
-
-    if (node.children) {
-      const filteredChildren = node.children
-        .map(filterNode)
-        .filter((n): n is TreeNode => n !== null)
-
-      if (filteredChildren.length > 0) {
-        return { ...node, children: filteredChildren, isExpanded: true }
-      }
-    }
-
-    return null
+  }
+  else {
+    // No schemas - get tables directly
+    const tables = metadata.tables[currentDb] || []
+    allItems.push(...tables.map((table): TreeNode => ({
+      id: `table-${currentDb}--${table.name}`,
+      name: table.name,
+      type: table.table_type?.toLowerCase() === 'view' ? ('view' as const) : ('table' as const),
+      parentId: `db-${currentDb}`,
+      metadata: { database: currentDb, ...table },
+    })))
   }
 
-  return treeNodes.value
-    .map(filterNode)
-    .filter((n): n is TreeNode => n !== null)
+  // Filter by search query
+  const query = searchQuery.value.toLowerCase().trim()
+  const filtered = query
+    ? allItems.filter(item => item.name.toLowerCase().includes(query))
+    : allItems
+
+  return {
+    tables: filtered.filter(item => item.type === 'table'),
+    views: filtered.filter(item => item.type === 'view'),
+  }
 })
 
 async function toggleNode(node: TreeNode) {
@@ -159,15 +196,19 @@ async function toggleNode(node: TreeNode) {
       const database = node.name
       const metadata = databaseStore.metadata[connectionId.value]
 
-      // Load schemas if not already loaded
-      if (!metadata?.schemas[database]) {
-        await databaseStore.fetchSchemas(connectionId.value, database)
-      }
+      // Only fetch if this is the connected database or no database was specified in connection
+      const connectedDb = activeConnection.value?.database
+      if (!connectedDb || connectedDb === database) {
+        // Load schemas if not already loaded
+        if (!metadata?.schemas[database]) {
+          await databaseStore.fetchSchemas(connectionId.value, database)
+        }
 
-      // Load tables if no schemas exist
-      if (!metadata?.schemas[database] || metadata.schemas[database].length === 0) {
-        if (!metadata?.tables[database]) {
-          await databaseStore.fetchTables(connectionId.value, database)
+        // Load tables if no schemas exist
+        if (!metadata?.schemas[database] || metadata.schemas[database].length === 0) {
+          if (!metadata?.tables[database]) {
+            await databaseStore.fetchTables(connectionId.value, database)
+          }
         }
       }
     }
@@ -178,8 +219,12 @@ async function toggleNode(node: TreeNode) {
       const tablesKey = `${database}.${schema}`
       const metadata = databaseStore.metadata[connectionId.value]
 
-      if (!metadata?.tables[tablesKey]) {
-        await databaseStore.fetchTables(connectionId.value, database, schema)
+      // Only fetch if this is the connected database or no database was specified in connection
+      const connectedDb = activeConnection.value?.database
+      if (!connectedDb || connectedDb === database) {
+        if (!metadata?.tables[tablesKey]) {
+          await databaseStore.fetchTables(connectionId.value, database, schema)
+        }
       }
     }
   }
@@ -240,17 +285,127 @@ function handleContextAction(action: 'createScript' | 'selectTopN' | 'viewStruct
 
 async function refreshTree() {
   if (connectionId.value) {
+    const connection = activeConnection.value
+    if (!connection?.isConnected) {
+      console.warn('Connection not established, cannot refresh')
+      return
+    }
+
     databaseStore.clearMetadata(connectionId.value)
     await databaseStore.fetchDatabases(connectionId.value)
+
+    // Auto-load tables for connected database
+    const connectedDb = connection.database
+    if (connectedDb) {
+      // Fetch schemas first
+      await databaseStore.fetchSchemas(connectionId.value, connectedDb)
+
+      // Then fetch tables
+      const metadata = databaseStore.metadata[connectionId.value]
+      const schemas = metadata?.schemas[connectedDb] || []
+
+      if (schemas.length > 0) {
+        // Fetch tables for each schema
+        for (const schema of schemas) {
+          await databaseStore.fetchTables(connectionId.value, connectedDb, schema)
+        }
+      }
+      else {
+        // No schemas - fetch tables directly
+        await databaseStore.fetchTables(connectionId.value, connectedDb)
+      }
+    }
   }
 }
 
 // Load databases when connection changes
 watch(connectionId, async (newId) => {
   if (newId) {
+    // Check if connection is actually connected
+    const connection = activeConnection.value
+    if (!connection?.isConnected) {
+      console.warn('Connection not established yet, skipping data fetch')
+      return
+    }
+
     await databaseStore.fetchDatabases(newId)
+
+    // Auto-load tables for connected database
+    const connectedDb = connection.database
+    if (connectedDb) {
+      // Fetch schemas first
+      await databaseStore.fetchSchemas(newId, connectedDb)
+
+      // Then fetch tables
+      const metadata = databaseStore.metadata[newId]
+      const schemas = metadata?.schemas[connectedDb] || []
+
+      if (schemas.length > 0) {
+        // Fetch tables for each schema
+        for (const schema of schemas) {
+          await databaseStore.fetchTables(newId, connectedDb, schema)
+        }
+      }
+      else {
+        // No schemas - fetch tables directly
+        await databaseStore.fetchTables(newId, connectedDb)
+      }
+    }
   }
 }, { immediate: true })
+
+// Watch for connection status changes
+watch(() => activeConnection.value?.isConnected, async (isConnected) => {
+  if (isConnected && connectionId.value) {
+    // Connection just became connected, fetch data
+    await databaseStore.fetchDatabases(connectionId.value)
+
+    // Auto-load tables for connected database
+    const connectedDb = activeConnection.value?.database
+    if (connectedDb) {
+      // Fetch schemas first
+      await databaseStore.fetchSchemas(connectionId.value, connectedDb)
+
+      // Then fetch tables
+      const metadata = databaseStore.metadata[connectionId.value]
+      const schemas = metadata?.schemas[connectedDb] || []
+
+      if (schemas.length > 0) {
+        // Fetch tables for each schema
+        for (const schema of schemas) {
+          await databaseStore.fetchTables(connectionId.value, connectedDb, schema)
+        }
+      }
+      else {
+        // No schemas - fetch tables directly
+        await databaseStore.fetchTables(connectionId.value, connectedDb)
+      }
+    }
+  }
+})
+
+// Watch for database selection changes
+watch(() => props.selectedDatabase, async (newDb) => {
+  if (newDb && connectionId.value) {
+    // Fetch schemas first
+    await databaseStore.fetchSchemas(connectionId.value, newDb)
+
+    // Then fetch tables
+    const metadata = databaseStore.metadata[connectionId.value]
+    const schemas = metadata?.schemas[newDb] || []
+
+    if (schemas.length > 0) {
+      // Fetch tables for each schema
+      for (const schema of schemas) {
+        await databaseStore.fetchTables(connectionId.value, newDb, schema)
+      }
+    }
+    else {
+      // No schemas - fetch tables directly
+      await databaseStore.fetchTables(connectionId.value, newDb)
+    }
+  }
+})
 
 // Close context menu on click outside
 function closeContextMenu() {
@@ -258,20 +413,18 @@ function closeContextMenu() {
   contextMenuNode.value = null
 }
 
-function getNodeIcon(type: TreeNode['type']) {
+function getIcon(type: 'table' | 'view' | 'database' | 'column' | 'schema') {
   switch (type) {
     case 'database':
-      return '🗄️'
-    case 'schema':
-      return '📁'
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></svg>`
     case 'table':
-      return '📋'
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>`
     case 'view':
-      return '👁️'
-    case 'column':
-      return '📊'
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`
+    case 'schema':
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`
     default:
-      return '📄'
+      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
   }
 }
 </script>
@@ -325,125 +478,138 @@ function getNodeIcon(type: TreeNode['type']) {
       </div>
     </div>
 
-    <!-- Connection info -->
-    <div v-if="activeConnection" class="text-xs px-2 py-1 border-b bg-muted/50">
-      <span class="font-medium">{{ activeConnection.name }}</span>
-      <span class="text-muted-foreground ml-1">({{ activeConnection.host }})</span>
+    <!-- Database selector (only show if no database specified in connection) -->
+    <div v-if="activeConnection && !activeConnection.database" class="px-2 py-1 border-b">
+      <Select :model-value="props.selectedDatabase" @update:model-value="(val) => emit('update:selectedDatabase', val)">
+        <SelectTrigger class="text-xs h-7">
+          <SelectValue :placeholder="t('components.databaseBrowser.selectDatabase')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem
+            v-for="db in treeNodes"
+            :key="db.id"
+            :value="db.name"
+          >
+            {{ db.name }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
     </div>
 
     <!-- Tree view -->
-    <div class="p-1 flex-1 overflow-auto">
-      <template v-if="filteredNodes.length > 0">
-        <div
-          v-for="node in filteredNodes"
-          :key="node.id"
+    <div class="flex-1 overflow-auto">
+      <!-- TABLES Section -->
+      <div class="border-b">
+        <button
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          @click="showTables = !showTables"
         >
-          <!-- Database node -->
-          <div
-            class="tree-node text-sm px-1 py-0.5 rounded flex gap-1 cursor-pointer items-center hover:bg-accent"
-            :class="{ 'bg-accent': selectedNodeId === node.id }"
-            @click="selectNode(node)"
-            @dblclick="handleDoubleClick(node)"
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="transition-transform"
+            :class="{ 'rotate-90': showTables }"
           >
-            <button
-              class="flex h-4 w-4 items-center justify-center"
-              @click.stop="toggleNode(node)"
-            >
-              <svg
-                v-if="node.children && node.children.length > 0"
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="transition-transform"
-                :class="{ 'rotate-90': expandedNodes.has(node.id) }"
-              >
-                <path d="m9 18 6-6-6-6" />
-              </svg>
-            </button>
-            <span>{{ getNodeIcon(node.type) }}</span>
-            <span class="truncate">{{ node.name }}</span>
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+          {{ t('components.databaseBrowser.sections.tables') }}
+        </button>
+        <div v-if="showTables" class="py-1">
+          <div
+            v-for="table in tablesAndViews.tables"
+            :key="table.id"
+            class="tree-node text-sm px-2 py-1 flex gap-2 cursor-pointer items-center hover:bg-accent"
+            :class="{ 'bg-accent': selectedNodeId === table.id }"
+            @click="selectNode(table)"
+            @dblclick="handleDoubleClick(table)"
+            @contextmenu="handleContextMenu($event, table)"
+          >
+            <span class="opacity-70 flex-shrink-0" v-html="getIcon('table')" />
+            <span class="truncate">{{ table.name }}</span>
           </div>
-
-          <!-- Children (schemas or tables) -->
-          <div v-if="expandedNodes.has(node.id) && node.children" class="pl-4">
-            <template v-for="child in node.children" :key="child.id">
-              <!-- Schema node -->
-              <div
-                v-if="child.type === 'schema'"
-                class="tree-node text-sm px-1 py-0.5 rounded flex gap-1 cursor-pointer items-center hover:bg-accent"
-                :class="{ 'bg-accent': selectedNodeId === child.id }"
-                @click="selectNode(child)"
-                @dblclick="toggleNode(child)"
-              >
-                <button
-                  class="flex h-4 w-4 items-center justify-center"
-                  @click.stop="toggleNode(child)"
-                >
-                  <svg
-                    v-if="child.children && child.children.length > 0"
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="12"
-                    height="12"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    class="transition-transform"
-                    :class="{ 'rotate-90': expandedNodes.has(child.id) }"
-                  >
-                    <path d="m9 18 6-6-6-6" />
-                  </svg>
-                </button>
-                <span>{{ getNodeIcon(child.type) }}</span>
-                <span class="truncate">{{ child.name }}</span>
-              </div>
-
-              <!-- Tables under schema -->
-              <div v-if="child.type === 'schema' && expandedNodes.has(child.id) && child.children" class="pl-4">
-                <div
-                  v-for="table in child.children"
-                  :key="table.id"
-                  class="tree-node text-sm px-1 py-0.5 rounded flex gap-1 cursor-pointer items-center hover:bg-accent"
-                  :class="{ 'bg-accent': selectedNodeId === table.id }"
-                  @click="selectNode(table)"
-                  @dblclick="handleDoubleClick(table)"
-                  @contextmenu="handleContextMenu($event, table)"
-                >
-                  <span class="w-4" />
-                  <span>{{ getNodeIcon(table.type) }}</span>
-                  <span class="truncate">{{ table.name }}</span>
-                </div>
-              </div>
-
-              <!-- Table node (when no schema) -->
-              <div
-                v-if="child.type === 'table' || child.type === 'view'"
-                class="tree-node text-sm px-1 py-0.5 rounded flex gap-1 cursor-pointer items-center hover:bg-accent"
-                :class="{ 'bg-accent': selectedNodeId === child.id }"
-                @click="selectNode(child)"
-                @dblclick="handleDoubleClick(child)"
-                @contextmenu="handleContextMenu($event, child)"
-              >
-                <span class="w-4" />
-                <span>{{ getNodeIcon(child.type) }}</span>
-                <span class="truncate">{{ child.name }}</span>
-              </div>
-            </template>
+          <div v-if="tablesAndViews.tables.length === 0 && !databaseStore.loading" class="text-xs text-muted-foreground px-2 py-2">
+            {{ t('components.databaseBrowser.noTables') }}
           </div>
         </div>
-      </template>
+      </div>
 
-      <!-- Empty state -->
-      <div v-else-if="!databaseStore.loading" class="text-sm text-muted-foreground py-8 text-center">
-        <p>{{ t('components.databaseBrowser.empty') }}</p>
+      <!-- VIEWS Section -->
+      <div class="border-b">
+        <button
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          @click="showViews = !showViews"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="transition-transform"
+            :class="{ 'rotate-90': showViews }"
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+          {{ t('components.databaseBrowser.sections.views') }}
+        </button>
+        <div v-if="showViews" class="py-1">
+          <div
+            v-for="view in tablesAndViews.views"
+            :key="view.id"
+            class="tree-node text-sm px-2 py-1 flex gap-2 cursor-pointer items-center hover:bg-accent"
+            :class="{ 'bg-accent': selectedNodeId === view.id }"
+            @click="selectNode(view)"
+            @dblclick="handleDoubleClick(view)"
+            @contextmenu="handleContextMenu($event, view)"
+          >
+            <span class="opacity-70 flex-shrink-0" v-html="getIcon('view')" />
+            <span class="truncate">{{ view.name }}</span>
+          </div>
+          <div v-if="tablesAndViews.views.length === 0 && !databaseStore.loading" class="text-xs text-muted-foreground px-2 py-2">
+            {{ t('components.databaseBrowser.noViews') }}
+          </div>
+        </div>
+      </div>
+
+      <!-- SAVED QUERIES Section -->
+      <div class="border-b">
+        <button
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          @click="showSavedQueries = !showSavedQueries"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="transition-transform"
+            :class="{ 'rotate-90': showSavedQueries }"
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+          {{ t('components.databaseBrowser.sections.savedQueries') }}
+        </button>
+        <div v-if="showSavedQueries" class="py-1">
+          <div class="text-xs text-muted-foreground px-2 py-2">
+            {{ t('components.databaseBrowser.comingSoon') }}
+          </div>
+        </div>
       </div>
 
       <!-- Loading state -->

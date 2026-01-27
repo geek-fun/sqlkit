@@ -26,6 +26,7 @@ const tabStore = useTabStore()
 const showResultPanel = ref(false)
 const sidebarWidth = ref(250)
 const isResizingSidebar = ref(false)
+const selectedDatabase = ref<string>('')
 
 // Available connections
 const availableConnections = computed(() => connectionStore.connections)
@@ -70,6 +71,14 @@ onMounted(async () => {
     tabStore.createTab(connId, connection?.database || undefined)
   }
 
+  // Set selectedDatabase from connection
+  if (connId) {
+    const connection = connectionStore.getConnectionById(connId)
+    if (connection?.database) {
+      selectedDatabase.value = connection.database
+    }
+  }
+
   // Fetch databases for active connection
   if (connId) {
     await databaseStore.fetchDatabases(connId)
@@ -82,8 +91,13 @@ watch(selectedConnectionId, async (newConnId) => {
     connectionStore.setActiveConnection(newConnId)
     await databaseStore.fetchDatabases(newConnId)
 
-    // Create new tab for the connection
+    // Set selectedDatabase from connection
     const connection = connectionStore.getConnectionById(newConnId)
+    if (connection?.database) {
+      selectedDatabase.value = connection.database
+    }
+
+    // Create new tab for the connection
     tabStore.createTab(newConnId, connection?.database || undefined)
   }
 })
@@ -247,6 +261,8 @@ function closeResultPanel() {
 
           <!-- Database Browser -->
           <DatabaseBrowser
+            v-model:selected-database="selectedDatabase"
+            :connection-id="selectedConnectionId"
             class="flex-1"
             @create-script="handleCreateScript"
             @select-top-n="handleSelectTopN"

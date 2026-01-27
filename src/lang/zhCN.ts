@@ -98,8 +98,7 @@ export const zhCN = {
     },
     queries: {
       title: '查询',
-      subtitle: '编写和执行SQL查询',
-      selectDatabase: '选择数据库',
+      subtitle: '编写和执行SQL查询',      selectConnection: '选择连接',      selectDatabase: '选择数据库',
       noTab: '没有打开的查询标签页',
       newTab: '新建查询',
       editor: {
@@ -190,6 +189,21 @@ export const zhCN = {
       refresh: '刷新',
       loading: '加载中...',
       empty: '未找到数据库。请先连接到服务器。',
+      selectDatabase: '选择数据库',
+      noTables: '未找到表',
+      noViews: '未找到视图',
+      comingSoon: '即将推出',
+      sections: {
+        tables: '表',
+        views: '视图',
+        savedQueries: '已保存的查询',
+      },
+      errors: {
+        fetchDatabases: '获取数据库列表失败',
+        fetchSchemas: '获取模式列表失败',
+        fetchTables: '获取表列表失败',
+        invalidResponse: '服务器响应无效',
+      },
       contextMenu: {
         selectTopN: '查询前100条',
         viewStructure: '查看结构',

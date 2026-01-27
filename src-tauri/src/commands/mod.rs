@@ -6,10 +6,12 @@
 //! - `query`: SQL query execution
 //! - `browse`: Database metadata browsing
 //! - `store`: Key-value store management
+//! - `converter`: Data conversion utilities for JSON serialization
 //! - `helpers`: Shared utilities to reduce code duplication
 
 pub mod browse;
 pub mod connection;
+pub mod converter;
 pub mod helpers;
 pub mod query;
 pub mod server;

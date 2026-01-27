@@ -99,6 +99,7 @@ export const enUS = {
     queries: {
       title: 'Queries',
       subtitle: 'Write and execute SQL queries',
+      selectConnection: 'Select a connection',
       selectDatabase: 'Select a database',
       noTab: 'No query tab open',
       newTab: 'New Query',
@@ -190,6 +191,21 @@ export const enUS = {
       refresh: 'Refresh',
       loading: 'Loading...',
       empty: 'No databases found. Connect to a server first.',
+      selectDatabase: 'Select Database',
+      noTables: 'No tables found',
+      noViews: 'No views found',
+      comingSoon: 'Coming soon',
+      sections: {
+        tables: 'Tables',
+        views: 'Views',
+        savedQueries: 'Saved Queries',
+      },
+      errors: {
+        fetchDatabases: 'Failed to fetch databases',
+        fetchSchemas: 'Failed to fetch schemas',
+        fetchTables: 'Failed to fetch tables',
+        invalidResponse: 'Invalid response from server',
+      },
       contextMenu: {
         selectTopN: 'Select Top 100',
         viewStructure: 'View Structure',
