@@ -33,9 +33,7 @@ const { t } = useI18n()
 const showCloseDialog = ref(false)
 const tabToClose = ref<QueryTab | null>(null)
 
-function getTabTitle(tab: QueryTab) {
-  return tab.name
-}
+const getTabTitle = (tab: QueryTab) => tab.name
 
 function handleTabClick(tabId: string) {
   emit('select', tabId)
@@ -70,9 +68,7 @@ function handleNewTab() {
   emit('new')
 }
 
-function isActiveTab(tabId: string) {
-  return props.activeTabId === tabId
-}
+const isActiveTab = (tabId: string) => props.activeTabId === tabId
 </script>
 
 <template>

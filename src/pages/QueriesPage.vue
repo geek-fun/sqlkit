@@ -117,33 +117,23 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
 
 // Watch for database changes (removed since we handle it at connection level now)
 
-// Execute query
-async function executeQuery(details?: { query: string, cursorPosition?: CursorPosition, selection?: Selection }) {
+interface ExecuteQueryDetails { query: string, cursorPosition?: CursorPosition, selection?: Selection }
+
+async function executeQuery(details?: ExecuteQueryDetails) {
   if (!activeTab.value) {
     return
   }
 
-  // Ensure content is a valid string
   const tabContent = activeTab.value.content || ''
-
   if (!tabContent.trim()) {
     return
   }
 
-  let sqlToExecute = tabContent
+  const sqlToExecute = details && typeof details === 'object' && 'query' in details
+    ? extractStatementAtCursor(details.query || '', details.cursorPosition, details.selection)
+    : tabContent
 
-  // If details are provided (from keyboard shortcut), extract statement at cursor
-  // Check if details has the expected structure (not just a DOM event)
-  if (details && typeof details === 'object' && 'query' in details) {
-    sqlToExecute = extractStatementAtCursor(
-      details.query || '',
-      details.cursorPosition,
-      details.selection,
-    )
-  }
-
-  // Ensure we have valid SQL to execute
-  if (!sqlToExecute || !sqlToExecute.trim()) {
+  if (!sqlToExecute?.trim()) {
     return
   }
 
@@ -155,9 +145,10 @@ async function handleExplainQuery() {
   // TODO: Implement explain query
 }
 
-// Tab management
+const getConnectionId = () => selectedConnectionId.value || connectionStore.activeConnectionId
+
 function handleNewTab() {
-  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  const connId = getConnectionId()
   if (connId) {
     const connection = connectionStore.getConnectionById(connId)
     tabStore.createTab(connId, connection?.database || undefined)
@@ -176,7 +167,6 @@ function handleTabCloseForce(tabId: string) {
   tabStore.closeTab(tabId)
 }
 
-// Database browser handlers
 function handleCreateScript(table: TableInfo, database: string, schema?: string) {
   const schemaPrefix = schema ? `"${schema}".` : ''
   const script = `-- CREATE TABLE script for ${table.name}
@@ -185,7 +175,7 @@ CREATE TABLE ${schemaPrefix}"${table.name}" (
   -- columns will be generated here
 );`
 
-  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  const connId = getConnectionId()
   if (connId) {
     const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, script)
@@ -197,20 +187,18 @@ function handleSelectTopN(table: TableInfo, database: string, schema?: string, n
   const schemaPrefix = schema ? `"${schema}".` : ''
   const query = `SELECT * FROM ${schemaPrefix}"${table.name}" LIMIT ${n};`
 
-  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  const connId = getConnectionId()
   if (connId) {
     const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, query)
     tabStore.updateTabName(tab.id, `SELECT_${table.name}`)
 
-    // Auto-execute the query
     tabStore.executeQuery(tab.id)
     showResultPanel.value = true
   }
 }
 
 function handleViewStructure(table: TableInfo, database: string, schema?: string) {
-  // Create a query to show table structure
   const query = `-- Table structure for ${table.name}
 -- Database: ${database}${schema ? `\n-- Schema: ${schema}` : ''}
 
@@ -219,7 +207,7 @@ SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
 WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` : ''};`
 
-  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  const connId = getConnectionId()
   if (connId) {
     const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, query)
@@ -231,7 +219,6 @@ function handleExportData(_table: TableInfo, _database: string, _schema?: string
   // TODO: Implement export data functionality
 }
 
-// Sidebar resize
 function startSidebarResize(_e: MouseEvent) {
   isResizingSidebar.value = true
   document.addEventListener('mousemove', handleSidebarResize)
@@ -255,7 +242,6 @@ function closeResultPanel() {
   showResultPanel.value = false
 }
 
-// Save query to file
 async function handleSaveQuery() {
   if (!activeTab.value || !activeTab.value.content.trim()) {
     return

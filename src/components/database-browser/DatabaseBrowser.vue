@@ -13,15 +13,17 @@ import {
 } from '@/components/ui/select'
 import { useConnectionStore, useDatabaseStore } from '@/store'
 
-export interface TreeNodeMetadata extends TableInfo {
+export type TreeNodeMetadata = TableInfo & {
   database: string
   schema?: string
 }
 
+export type TreeNodeType = 'connection' | 'database' | 'schema' | 'table' | 'view' | 'column'
+
 export interface TreeNode {
   id: string
   name: string
-  type: 'connection' | 'database' | 'schema' | 'table' | 'view' | 'column'
+  type: TreeNodeType
   children?: TreeNode[]
   isExpanded?: boolean
   isLoading?: boolean
@@ -63,70 +65,59 @@ const activeConnection = computed(() => {
 })
 const connectionId = computed(() => props.connectionId || connectionStore.activeConnectionId)
 
-// Build tree structure from database metadata
+function createTableNode(database: string, schema: string | undefined, table: TableInfo, parentId: string): TreeNode {
+  return {
+    id: `table-${database}-${schema || ''}-${table.name}`,
+    name: table.name,
+    type: table.table_type?.toLowerCase() === 'view' ? 'view' : 'table',
+    parentId,
+    metadata: { database, schema, ...table },
+  }
+}
+
+function createSchemaNode(database: string, schema: string, tables: TableInfo[], parentId: string): TreeNode {
+  const schemaId = `schema-${database}-${schema}`
+  return {
+    id: schemaId,
+    name: schema,
+    type: 'schema',
+    parentId,
+    isExpanded: expandedNodes.value.has(schemaId),
+    children: tables.map(table => createTableNode(database, schema, table, schemaId)),
+  }
+}
+
+function createDatabaseNode(database: string, metadata: { schemas: Record<string, string[]>, tables: Record<string, TableInfo[]> }): TreeNode {
+  const dbId = `db-${database}`
+  const schemas = metadata.schemas[database] || []
+
+  const children = schemas.length > 0
+    ? schemas.map(schema => createSchemaNode(
+        database,
+        schema,
+        metadata.tables[`${database}.${schema}`] || [],
+        dbId,
+      ))
+    : (metadata.tables[database] || []).map(table => createTableNode(database, undefined, table, dbId))
+
+  return {
+    id: dbId,
+    name: database,
+    type: 'database',
+    isExpanded: expandedNodes.value.has(dbId),
+    children,
+  }
+}
+
 const treeNodes = computed<TreeNode[]>(() => {
   if (!connectionId.value || !databaseStore.metadata[connectionId.value]) {
     return []
   }
 
   const metadata = databaseStore.metadata[connectionId.value]
-  const nodes: TreeNode[] = []
-
-  for (const database of metadata.databases) {
-    const dbNode: TreeNode = {
-      id: `db-${database}`,
-      name: database,
-      type: 'database',
-      children: [],
-      isExpanded: expandedNodes.value.has(`db-${database}`),
-    }
-
-    // Add schemas if they exist for this database
-    const schemas = metadata.schemas[database] || []
-    if (schemas.length > 0) {
-      for (const schema of schemas) {
-        const schemaNode: TreeNode = {
-          id: `schema-${database}-${schema}`,
-          name: schema,
-          type: 'schema',
-          parentId: dbNode.id,
-          children: [],
-          isExpanded: expandedNodes.value.has(`schema-${database}-${schema}`),
-        }
-
-        // Add tables for this schema
-        const tablesKey = `${database}.${schema}`
-        const tables = metadata.tables[tablesKey] || []
-        schemaNode.children = tables.map(table => ({
-          id: `table-${database}-${schema}-${table.name}`,
-          name: table.name,
-          type: table.table_type?.toLowerCase() === 'view' ? ('view' as const) : ('table' as const),
-          parentId: schemaNode.id,
-          metadata: { database, schema, ...table },
-        }))
-
-        dbNode.children!.push(schemaNode)
-      }
-    }
-    else {
-      // No schemas - add tables directly under database
-      const tables = metadata.tables[database] || []
-      dbNode.children = tables.map(table => ({
-        id: `table-${database}--${table.name}`,
-        name: table.name,
-        type: table.table_type?.toLowerCase() === 'view' ? ('view' as const) : ('table' as const),
-        parentId: dbNode.id,
-        metadata: { database, ...table },
-      }))
-    }
-
-    nodes.push(dbNode)
-  }
-
-  return nodes
+  return metadata.databases.map(database => createDatabaseNode(database, metadata))
 })
 
-// Separate tables and views from filtered nodes
 const tablesAndViews = computed(() => {
   const currentDb = props.selectedDatabase || activeConnection.value?.database
   if (!currentDb || !connectionId.value || !databaseStore.metadata[connectionId.value]) {
@@ -135,35 +126,17 @@ const tablesAndViews = computed(() => {
 
   const metadata = databaseStore.metadata[connectionId.value]
   const schemas = metadata.schemas[currentDb] || []
-  const allItems: TreeNode[] = []
 
-  if (schemas.length > 0) {
-    // Has schemas - collect from all schemas
-    for (const schema of schemas) {
-      const tablesKey = `${currentDb}.${schema}`
-      const tables = metadata.tables[tablesKey] || []
-      allItems.push(...tables.map((table): TreeNode => ({
-        id: `table-${currentDb}-${schema}-${table.name}`,
-        name: table.name,
-        type: table.table_type?.toLowerCase() === 'view' ? ('view' as const) : ('table' as const),
-        parentId: `schema-${currentDb}-${schema}`,
-        metadata: { database: currentDb, schema, ...table },
-      })))
-    }
-  }
-  else {
-    // No schemas - get tables directly
-    const tables = metadata.tables[currentDb] || []
-    allItems.push(...tables.map((table): TreeNode => ({
-      id: `table-${currentDb}--${table.name}`,
-      name: table.name,
-      type: table.table_type?.toLowerCase() === 'view' ? ('view' as const) : ('table' as const),
-      parentId: `db-${currentDb}`,
-      metadata: { database: currentDb, ...table },
-    })))
-  }
+  const allItems: TreeNode[] = schemas.length > 0
+    ? schemas.flatMap((schema) => {
+        const tablesKey = `${currentDb}.${schema}`
+        const tables = metadata.tables[tablesKey] || []
+        return tables.map(table => createTableNode(currentDb, schema, table, `schema-${currentDb}-${schema}`))
+      })
+    : (metadata.tables[currentDb] || []).map(table =>
+        createTableNode(currentDb, undefined, table, `db-${currentDb}`),
+      )
 
-  // Filter by search query
   const query = searchQuery.value.toLowerCase().trim()
   const filtered = query
     ? allItems.filter(item => item.name.toLowerCase().includes(query))
@@ -179,25 +152,21 @@ async function toggleNode(node: TreeNode) {
   const nodeId = node.id
 
   if (expandedNodes.value.has(nodeId)) {
-    expandedNodes.value.delete(nodeId)
+    expandedNodes.value = new Set([...expandedNodes.value].filter(id => id !== nodeId))
   }
   else {
-    expandedNodes.value.add(nodeId)
+    expandedNodes.value = new Set([...expandedNodes.value, nodeId])
 
-    // Lazy load data when expanding
     if (node.type === 'database' && connectionId.value) {
       const database = node.name
       const metadata = databaseStore.metadata[connectionId.value]
 
-      // Only fetch if this is the connected database or no database was specified in connection
       const connectedDb = activeConnection.value?.database
       if (!connectedDb || connectedDb === database) {
-        // Load schemas if not already loaded
         if (!metadata?.schemas[database]) {
           await databaseStore.fetchSchemas(connectionId.value, database)
         }
 
-        // Load tables if no schemas exist
         if (!metadata?.schemas[database] || metadata.schemas[database].length === 0) {
           if (!metadata?.tables[database]) {
             await databaseStore.fetchTables(connectionId.value, database)
@@ -212,7 +181,6 @@ async function toggleNode(node: TreeNode) {
       const tablesKey = `${database}.${schema}`
       const metadata = databaseStore.metadata[connectionId.value]
 
-      // Only fetch if this is the connected database or no database was specified in connection
       const connectedDb = activeConnection.value?.database
       if (!connectedDb || connectedDb === database) {
         if (!metadata?.tables[tablesKey]) {
@@ -250,176 +218,124 @@ function handleContextMenu(event: MouseEvent, node: TreeNode) {
   showContextMenu.value = true
 }
 
-function handleContextAction(action: 'createScript' | 'selectTopN' | 'viewStructure' | 'exportData') {
+type ContextAction = 'createScript' | 'selectTopN' | 'viewStructure' | 'exportData'
+
+const contextActionEmitters: Record<ContextAction, (metadata: TreeNodeMetadata) => void> = {
+  createScript: metadata => emit('createScript', metadata, metadata.database, metadata.schema),
+  selectTopN: metadata => emit('selectTopN', metadata, metadata.database, metadata.schema, 100),
+  viewStructure: metadata => emit('viewStructure', metadata, metadata.database, metadata.schema),
+  exportData: metadata => emit('exportData', metadata, metadata.database, metadata.schema),
+}
+
+function handleContextAction(action: ContextAction) {
   if (!contextMenuNode.value || !contextMenuNode.value.metadata) {
     return
   }
 
-  const metadata = contextMenuNode.value.metadata
-
-  switch (action) {
-    case 'createScript':
-      emit('createScript', metadata, metadata.database, metadata.schema)
-      break
-    case 'selectTopN':
-      emit('selectTopN', metadata, metadata.database, metadata.schema, 100)
-      break
-    case 'viewStructure':
-      emit('viewStructure', metadata, metadata.database, metadata.schema)
-      break
-    case 'exportData':
-      emit('exportData', metadata, metadata.database, metadata.schema)
-      break
-  }
-
+  contextActionEmitters[action](contextMenuNode.value.metadata)
   showContextMenu.value = false
   contextMenuNode.value = null
 }
 
-async function refreshTree() {
-  if (connectionId.value) {
-    const connection = activeConnection.value
-    if (!connection?.isConnected) {
-      console.warn('Connection not established, cannot refresh')
-      return
-    }
-
-    databaseStore.clearMetadata(connectionId.value)
-    await databaseStore.fetchDatabases(connectionId.value)
-
-    // Auto-load tables for connected database
-    const connectedDb = connection.database
-    if (connectedDb) {
-      // Fetch schemas first
-      await databaseStore.fetchSchemas(connectionId.value, connectedDb)
-
-      // Then fetch tables
-      const metadata = databaseStore.metadata[connectionId.value]
-      const schemas = metadata?.schemas[connectedDb] || []
-
-      if (schemas.length > 0) {
-        // Fetch tables for each schema
-        for (const schema of schemas) {
-          await databaseStore.fetchTables(connectionId.value, connectedDb, schema)
-        }
-      }
-      else {
-        // No schemas - fetch tables directly
-        await databaseStore.fetchTables(connectionId.value, connectedDb)
-      }
-    }
+async function fetchTablesForSchemas(connId: string, database: string, schemas: string[]) {
+  if (schemas.length > 0) {
+    await Promise.all(schemas.map(schema => databaseStore.fetchTables(connId, database, schema)))
+  }
+  else {
+    await databaseStore.fetchTables(connId, database)
   }
 }
 
-// Load databases when connection changes
+async function refreshTree() {
+  if (!connectionId.value) {
+    return
+  }
+
+  const connection = activeConnection.value
+  if (!connection?.isConnected) {
+    console.warn('Connection not established, cannot refresh')
+    return
+  }
+
+  databaseStore.clearMetadata(connectionId.value)
+  await databaseStore.fetchDatabases(connectionId.value)
+
+  const connectedDb = connection.database
+  if (connectedDb) {
+    await databaseStore.fetchSchemas(connectionId.value, connectedDb)
+
+    const metadata = databaseStore.metadata[connectionId.value]
+    const schemas = metadata?.schemas[connectedDb] || []
+
+    await fetchTablesForSchemas(connectionId.value, connectedDb, schemas)
+  }
+}
+
+async function loadDatabaseData(connId: string, database: string) {
+  await databaseStore.fetchSchemas(connId, database)
+
+  const metadata = databaseStore.metadata[connId]
+  const schemas = metadata?.schemas[database] || []
+
+  await fetchTablesForSchemas(connId, database, schemas)
+}
+
 watch(connectionId, async (newId) => {
-  if (newId) {
-    // Check if connection is actually connected
-    const connection = activeConnection.value
-    if (!connection?.isConnected) {
-      console.warn('Connection not established yet, skipping data fetch')
-      return
-    }
+  if (!newId) {
+    return
+  }
 
-    await databaseStore.fetchDatabases(newId)
+  const connection = activeConnection.value
+  if (!connection?.isConnected) {
+    console.warn('Connection not established yet, skipping data fetch')
+    return
+  }
 
-    // Auto-load tables for connected database
-    const connectedDb = connection.database
-    if (connectedDb) {
-      // Fetch schemas first
-      await databaseStore.fetchSchemas(newId, connectedDb)
+  await databaseStore.fetchDatabases(newId)
 
-      // Then fetch tables
-      const metadata = databaseStore.metadata[newId]
-      const schemas = metadata?.schemas[connectedDb] || []
-
-      if (schemas.length > 0) {
-        // Fetch tables for each schema
-        for (const schema of schemas) {
-          await databaseStore.fetchTables(newId, connectedDb, schema)
-        }
-      }
-      else {
-        // No schemas - fetch tables directly
-        await databaseStore.fetchTables(newId, connectedDb)
-      }
-    }
+  const connectedDb = connection.database
+  if (connectedDb) {
+    await loadDatabaseData(newId, connectedDb)
   }
 }, { immediate: true })
 
-// Watch for connection status changes
 watch(() => activeConnection.value?.isConnected, async (isConnected) => {
-  if (isConnected && connectionId.value) {
-    // Connection just became connected, fetch data
-    await databaseStore.fetchDatabases(connectionId.value)
+  if (!isConnected || !connectionId.value) {
+    return
+  }
 
-    // Auto-load tables for connected database
-    const connectedDb = activeConnection.value?.database
-    if (connectedDb) {
-      // Fetch schemas first
-      await databaseStore.fetchSchemas(connectionId.value, connectedDb)
+  await databaseStore.fetchDatabases(connectionId.value)
 
-      // Then fetch tables
-      const metadata = databaseStore.metadata[connectionId.value]
-      const schemas = metadata?.schemas[connectedDb] || []
-
-      if (schemas.length > 0) {
-        // Fetch tables for each schema
-        for (const schema of schemas) {
-          await databaseStore.fetchTables(connectionId.value, connectedDb, schema)
-        }
-      }
-      else {
-        // No schemas - fetch tables directly
-        await databaseStore.fetchTables(connectionId.value, connectedDb)
-      }
-    }
+  const connectedDb = activeConnection.value?.database
+  if (connectedDb) {
+    await loadDatabaseData(connectionId.value, connectedDb)
   }
 })
 
-// Watch for database selection changes
 watch(() => props.selectedDatabase, async (newDb) => {
-  if (newDb && connectionId.value) {
-    // Fetch schemas first
-    await databaseStore.fetchSchemas(connectionId.value, newDb)
-
-    // Then fetch tables
-    const metadata = databaseStore.metadata[connectionId.value]
-    const schemas = metadata?.schemas[newDb] || []
-
-    if (schemas.length > 0) {
-      // Fetch tables for each schema
-      for (const schema of schemas) {
-        await databaseStore.fetchTables(connectionId.value, newDb, schema)
-      }
-    }
-    else {
-      // No schemas - fetch tables directly
-      await databaseStore.fetchTables(connectionId.value, newDb)
-    }
+  if (!newDb || !connectionId.value) {
+    return
   }
+
+  await loadDatabaseData(connectionId.value, newDb)
 })
 
-// Close context menu on click outside
 function closeContextMenu() {
   showContextMenu.value = false
   contextMenuNode.value = null
 }
 
-function getIcon(type: 'table' | 'view' | 'database' | 'column' | 'schema') {
-  switch (type) {
-    case 'database':
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></svg>`
-    case 'table':
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>`
-    case 'view':
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`
-    case 'schema':
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`
-    default:
-      return `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`
-  }
+type IconType = 'table' | 'view' | 'database' | 'column' | 'schema'
+
+const iconMap: Record<IconType, string> = {
+  database: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></svg>`,
+  table: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>`,
+  view: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`,
+  schema: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`,
+  column: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
 }
+
+const getIcon = (type: IconType) => iconMap[type] || iconMap.column
 </script>
 
 <template>

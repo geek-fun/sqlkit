@@ -31,7 +31,6 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
-// Format error with translation
 const formattedError = computed(() => {
   if (!props.error)
     return ''
@@ -48,20 +47,17 @@ const startHeight = ref(0)
 const formattedTime = computed(() => {
   if (!props.executionTime)
     return ''
-  if (props.executionTime < 1000) {
-    return `${props.executionTime}ms`
-  }
-  return `${(props.executionTime / 1000).toFixed(2)}s`
+  return props.executionTime < 1000
+    ? `${props.executionTime}ms`
+    : `${(props.executionTime / 1000).toFixed(2)}s`
 })
 
 function formatValue(value: unknown): string {
-  if (value === null || value === undefined) {
-    return 'NULL'
-  }
-  if (typeof value === 'object') {
-    return JSON.stringify(value)
-  }
-  return String(value)
+  return value === null || value === undefined
+    ? 'NULL'
+    : typeof value === 'object'
+      ? JSON.stringify(value)
+      : String(value)
 }
 
 function isNullValue(value: unknown): boolean {

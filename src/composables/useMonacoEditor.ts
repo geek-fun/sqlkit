@@ -262,18 +262,20 @@ export function useMonacoEditor(
         // Get cursor position
         const position = editor?.getPosition()
         const selection = editor?.getSelection()
-        
+
         // This will be handled by parent component
         const event = new CustomEvent('execute-query', {
-          detail: { 
+          detail: {
             query: editor?.getValue(),
             cursorPosition: position,
-            selection: selection ? {
-              startLineNumber: selection.startLineNumber,
-              startColumn: selection.startColumn,
-              endLineNumber: selection.endLineNumber,
-              endColumn: selection.endColumn,
-            } : undefined,
+            selection: selection
+              ? {
+                  startLineNumber: selection.startLineNumber,
+                  startColumn: selection.startColumn,
+                  endLineNumber: selection.endLineNumber,
+                  endColumn: selection.endColumn,
+                }
+              : undefined,
           },
         })
         containerRef.value?.dispatchEvent(event)

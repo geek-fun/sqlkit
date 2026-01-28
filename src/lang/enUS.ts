@@ -247,28 +247,28 @@ export const enUS = {
       CONNECTION_TIMEOUT: 'Connection timeout',
       CONNECTION_REFUSED: 'Connection refused',
       AUTHENTICATION_FAILED: 'Authentication failed',
-      
+
       // Query errors
       QUERY_SYNTAX_ERROR: 'SQL syntax error',
       QUERY_EXECUTION_ERROR: 'Query execution failed',
       QUERY_TIMEOUT: 'Query execution timed out',
-      
+
       // Resource errors
       DATABASE_NOT_FOUND: 'Database not found',
       TABLE_NOT_FOUND: 'Table does not exist',
       COLUMN_NOT_FOUND: 'Column does not exist',
-      
+
       // Permission errors
       PERMISSION_DENIED: 'Permission denied',
       INSUFFICIENT_PRIVILEGES: 'Insufficient privileges',
-      
+
       // Data errors
       CONSTRAINT_VIOLATION: 'Constraint violation',
       FOREIGN_KEY_VIOLATION: 'Foreign key constraint violated',
       UNIQUE_VIOLATION: 'Unique constraint violated',
       NOT_NULL_VIOLATION: 'NOT NULL constraint violated',
       CHECK_VIOLATION: 'Check constraint violated',
-      
+
       // System errors
       INTERNAL_ERROR: 'Internal error',
       UNSUPPORTED_OPERATION: 'Operation not supported',

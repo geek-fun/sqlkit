@@ -98,7 +98,9 @@ export const zhCN = {
     },
     queries: {
       title: '查询',
-      subtitle: '编写和执行SQL查询',      selectConnection: '选择连接',      selectDatabase: '选择数据库',
+      subtitle: '编写和执行SQL查询',
+      selectConnection: '选择连接',
+      selectDatabase: '选择数据库',
       noTab: '没有打开的查询标签页',
       newTab: '新建查询',
       editor: {
@@ -245,28 +247,28 @@ export const zhCN = {
       CONNECTION_TIMEOUT: '连接超时',
       CONNECTION_REFUSED: '连接被拒绝',
       AUTHENTICATION_FAILED: '身份验证失败',
-      
+
       // 查询错误
       QUERY_SYNTAX_ERROR: 'SQL 语法错误',
       QUERY_EXECUTION_ERROR: '查询执行失败',
       QUERY_TIMEOUT: '查询执行超时',
-      
+
       // 资源错误
       DATABASE_NOT_FOUND: '数据库未找到',
       TABLE_NOT_FOUND: '表不存在',
       COLUMN_NOT_FOUND: '列不存在',
-      
+
       // 权限错误
       PERMISSION_DENIED: '权限被拒绝',
       INSUFFICIENT_PRIVILEGES: '权限不足',
-      
+
       // 数据错误
       CONSTRAINT_VIOLATION: '约束违规',
       FOREIGN_KEY_VIOLATION: '外键约束违规',
       UNIQUE_VIOLATION: '唯一约束违规',
       NOT_NULL_VIOLATION: '非空约束违规',
       CHECK_VIOLATION: '检查约束违规',
-      
+
       // 系统错误
       INTERNAL_ERROR: '内部错误',
       UNSUPPORTED_OPERATION: '不支持的操作',

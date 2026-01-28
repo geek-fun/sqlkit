@@ -2,9 +2,9 @@
 import type * as monaco from 'monaco-editor'
 import type { MonacoEditorOptions, SQLDialect } from '@/composables/useMonacoEditor'
 import { onMounted, ref, watch } from 'vue'
+import { ProgressBar } from '@/components/ui/progress'
 import { useMonacoEditor } from '@/composables/useMonacoEditor'
 import { useTheme } from '@/composables/useTheme'
-import { ProgressBar } from '@/components/ui/progress'
 
 interface Props {
   modelValue?: string
@@ -114,6 +114,7 @@ defineExpose({
   overflow: hidden;
 }
 </style>
+
 <style scoped>
 .sql-editor-wrapper {
   border: 1px solid var(--border-color, #e5e7eb);
