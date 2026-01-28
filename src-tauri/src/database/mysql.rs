@@ -22,6 +22,34 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+/// Convert MySQL error to DbError with detailed information
+fn mysql_error_to_db_error(error: mysql_async::Error) -> DbError {
+    let mut error_parts = Vec::new();
+    
+    // Add the main error message
+    error_parts.push(error.to_string());
+    
+    // Try to extract server-specific error details
+    if let mysql_async::Error::Server(server_error) = &error {
+        let mut details = Vec::new();
+        
+        // MySQL error code
+        details.push(format!("Error Code: {}", server_error.code));
+        
+        // SQL state
+        details.push(format!("SQL State: {}", server_error.state));
+        
+        // Error message (usually already included but MySQL provides it separately)
+        details.push(format!("Message: {}", server_error.message));
+        
+        if !details.is_empty() {
+            error_parts.push(details.join("\n"));
+        }
+    }
+    
+    DbError::QueryExecution(error_parts.join("\n"))
+}
+
 /// Configuration key for query timeout in milliseconds.
 /// Use this key in ConnectionConfig options to set a timeout for query execution.
 /// Example: `config.with_option(STATEMENT_TIMEOUT_KEY, "5000")` for 5 second timeout.
@@ -183,11 +211,26 @@ impl MySQLAdapter {
 
         for (idx, column) in columns.iter().enumerate() {
             let name = column.name_str().to_string();
-            let value = Self::convert_value(&row, idx)?;
+            // Use safe conversion with fallback
+            let value = Self::convert_value_safe(&row, idx);
             query_row.insert(name, value);
         }
 
         Ok(query_row)
+    }
+
+    /// Safely convert a MySQL value to QueryValue with fallback.
+    fn convert_value_safe(row: &Row, idx: usize) -> QueryValue {
+        match Self::convert_value(row, idx) {
+            Ok(value) => value,
+            Err(_) => {
+                // Fallback to string representation
+                match row.get::<Value, _>(idx) {
+                    Some(val) => QueryValue::String(format!("{:?}", val)),
+                    None => QueryValue::Null,
+                }
+            }
+        }
     }
 
     /// Convert a MySQL value to QueryValue.
@@ -336,11 +379,11 @@ impl DatabaseAdapter for MySQLAdapter {
                     .map_err(|_| {
                         DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
                     })?
-                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .map_err(mysql_error_to_db_error)?
             } else {
                 conn.query(query)
                     .await
-                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .map_err(mysql_error_to_db_error)?
             };
 
             execution_time = start.elapsed().as_millis() as u64;
@@ -370,11 +413,11 @@ impl DatabaseAdapter for MySQLAdapter {
                     .map_err(|_| {
                         DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
                     })?
-                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .map_err(mysql_error_to_db_error)?
             } else {
                 conn.query_drop(query)
                     .await
-                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .map_err(mysql_error_to_db_error)?
             };
 
             execution_time = start.elapsed().as_millis() as u64;
@@ -393,7 +436,7 @@ impl DatabaseAdapter for MySQLAdapter {
         let rows: Vec<Row> = conn
             .query(query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         let databases = rows
             .into_iter()

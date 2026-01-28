@@ -1,6 +1,9 @@
 // Database adapter module
 pub mod database;
 
+// API response types
+pub mod api_response;
+
 // Application state management
 pub mod state;
 

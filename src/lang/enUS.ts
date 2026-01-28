@@ -216,12 +216,14 @@ export const enUS = {
     queryResult: {
       title: 'Results',
       rows: '{count} rows',
+      rowsAffected: '{count} row(s) affected',
       time: '{time}',
       close: 'Close',
       executing: 'Executing query...',
       error: 'Query Error',
       success: 'Query executed successfully',
       noData: 'No data returned',
+      commandCompleted: 'Command completed',
       noResults: 'Execute a query to see results',
     },
     queryTabs: {
@@ -235,6 +237,68 @@ export const enUS = {
     },
     header: {
       appName: 'SQLKit',
+    },
+  },
+  errors: {
+    unexpected: 'Unexpected error: {error}',
+    codes: {
+      // Connection errors
+      CONNECTION_FAILED: 'Failed to connect to database',
+      CONNECTION_TIMEOUT: 'Connection timeout',
+      CONNECTION_REFUSED: 'Connection refused',
+      AUTHENTICATION_FAILED: 'Authentication failed',
+      
+      // Query errors
+      QUERY_SYNTAX_ERROR: 'SQL syntax error',
+      QUERY_EXECUTION_ERROR: 'Query execution failed',
+      QUERY_TIMEOUT: 'Query execution timed out',
+      
+      // Resource errors
+      DATABASE_NOT_FOUND: 'Database not found',
+      TABLE_NOT_FOUND: 'Table does not exist',
+      COLUMN_NOT_FOUND: 'Column does not exist',
+      
+      // Permission errors
+      PERMISSION_DENIED: 'Permission denied',
+      INSUFFICIENT_PRIVILEGES: 'Insufficient privileges',
+      
+      // Data errors
+      CONSTRAINT_VIOLATION: 'Constraint violation',
+      FOREIGN_KEY_VIOLATION: 'Foreign key constraint violated',
+      UNIQUE_VIOLATION: 'Unique constraint violated',
+      NOT_NULL_VIOLATION: 'NOT NULL constraint violated',
+      CHECK_VIOLATION: 'Check constraint violated',
+      
+      // System errors
+      INTERNAL_ERROR: 'Internal error',
+      UNSUPPORTED_OPERATION: 'Operation not supported',
+      INVALID_CONFIGURATION: 'Invalid configuration',
+    },
+    titles: {
+      CONNECTION_FAILED: 'Connection Failed',
+      AUTHENTICATION_FAILED: 'Authentication Failed',
+      QUERY_SYNTAX_ERROR: 'SQL Syntax Error',
+      QUERY_EXECUTION_ERROR: 'Query Execution Error',
+      TABLE_NOT_FOUND: 'Table Not Found',
+      COLUMN_NOT_FOUND: 'Column Not Found',
+      PERMISSION_DENIED: 'Permission Denied',
+      FOREIGN_KEY_VIOLATION: 'Foreign Key Constraint Violated',
+      UNIQUE_VIOLATION: 'Unique Constraint Violated',
+      NOT_NULL_VIOLATION: 'NOT NULL Constraint Violated',
+    },
+    hints: {
+      CONNECTION_FAILED: 'Check your connection settings and ensure the database server is running',
+      AUTHENTICATION_FAILED: 'Verify your username and password',
+      QUERY_SYNTAX_ERROR: 'Check your SQL syntax and try again',
+      QUERY_TIMEOUT: 'Try optimizing your query or increasing the timeout limit',
+      DATABASE_NOT_FOUND: 'Ensure the database exists and you have access to it',
+      TABLE_NOT_FOUND: 'Check the table name and ensure it exists in the database',
+      COLUMN_NOT_FOUND: 'Verify the column name matches the table schema',
+      FOREIGN_KEY_VIOLATION: 'Ensure referenced records exist in the parent table',
+      UNIQUE_VIOLATION: 'A record with this value already exists',
+      NOT_NULL_VIOLATION: 'This field requires a value',
+      CHECK_VIOLATION: 'The value does not satisfy the table constraints',
+      PERMISSION_DENIED: 'You don\'t have sufficient privileges for this operation',
     },
   },
 }

@@ -61,47 +61,57 @@ onMounted(async () => {
   // Set active connection from route if provided
   if (route.query.connectionId) {
     selectedConnectionId.value = route.query.connectionId as string
-    connectionStore.setActiveConnection(route.query.connectionId as string)
+    // Connection will be established by the watch
   }
   else if (connectionStore.activeConnectionId) {
     selectedConnectionId.value = connectionStore.activeConnectionId
-  }
-
-  // Create initial tab if none exists
-  const connId = selectedConnectionId.value
-  if (connId && tabStore.tabs.length === 0) {
+    // If already connected, just sync the UI
+    const connId = connectionStore.activeConnectionId
     const connection = connectionStore.getConnectionById(connId)
-    tabStore.createTab(connId, connection?.database || undefined)
-  }
 
-  // Set selectedDatabase from connection
-  if (connId) {
-    const connection = connectionStore.getConnectionById(connId)
+    // Create initial tab if none exists
+    if (tabStore.tabs.length === 0) {
+      tabStore.createTab(connId, connection?.database || undefined)
+    }
+
+    // Set selectedDatabase from connection
     if (connection?.database) {
       selectedDatabase.value = connection.database
     }
-  }
 
-  // Fetch databases for active connection
-  if (connId) {
+    // Fetch databases for active connection
     await databaseStore.fetchDatabases(connId)
   }
 })
 
 // Watch for connection changes
-watch(selectedConnectionId, async (newConnId) => {
-  if (newConnId) {
-    connectionStore.setActiveConnection(newConnId)
-    await databaseStore.fetchDatabases(newConnId)
+watch(selectedConnectionId, async (newConnId, oldConnId) => {
+  if (newConnId && newConnId !== oldConnId) {
+    try {
+      // Establish the connection first
+      await connectionStore.connect(newConnId)
 
-    // Set selectedDatabase from connection
-    const connection = connectionStore.getConnectionById(newConnId)
-    if (connection?.database) {
-      selectedDatabase.value = connection.database
+      // Set as active connection
+      connectionStore.setActiveConnection(newConnId)
+
+      // Fetch databases for the connection
+      await databaseStore.fetchDatabases(newConnId)
+
+      // Set selectedDatabase from connection
+      const connection = connectionStore.getConnectionById(newConnId)
+      if (connection?.database) {
+        selectedDatabase.value = connection.database
+      }
+
+      // Create new tab for the connection if no tabs exist
+      if (tabStore.tabs.length === 0) {
+        tabStore.createTab(newConnId, connection?.database || undefined)
+      }
     }
-
-    // Create new tab for the connection
-    tabStore.createTab(newConnId, connection?.database || undefined)
+    catch (error) {
+      console.error('Failed to connect:', error)
+      // Optionally show error to user
+    }
   }
 })
 
@@ -109,30 +119,36 @@ watch(selectedConnectionId, async (newConnId) => {
 
 // Execute query
 async function executeQuery(details?: { query: string, cursorPosition?: CursorPosition, selection?: Selection }) {
-  if (!activeTab.value || !activeTab.value.content.trim()) {
+  if (!activeTab.value) {
     return
   }
 
-  let sqlToExecute = activeTab.value.content
+  // Ensure content is a valid string
+  const tabContent = activeTab.value.content || ''
+
+  if (!tabContent.trim()) {
+    return
+  }
+
+  let sqlToExecute = tabContent
 
   // If details are provided (from keyboard shortcut), extract statement at cursor
-  if (details) {
+  // Check if details has the expected structure (not just a DOM event)
+  if (details && typeof details === 'object' && 'query' in details) {
     sqlToExecute = extractStatementAtCursor(
-      details.query,
+      details.query || '',
       details.cursorPosition,
       details.selection,
     )
   }
 
-  // Update tab content temporarily for execution
-  const originalContent = activeTab.value.content
-  activeTab.value.content = sqlToExecute
+  // Ensure we have valid SQL to execute
+  if (!sqlToExecute || !sqlToExecute.trim()) {
+    return
+  }
 
   showResultPanel.value = true
-  await tabStore.executeQuery(activeTab.value.id)
-
-  // Restore original content
-  activeTab.value.content = originalContent
+  await tabStore.executeQuery(activeTab.value.id, sqlToExecute)
 }
 
 async function handleExplainQuery() {

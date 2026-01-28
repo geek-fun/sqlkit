@@ -1,20 +1,14 @@
 <script setup lang="ts">
 import type { QueryResult } from '@/store/tabStore'
+import type { ApiError } from '@/types/api'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
+import { formatApiError } from '@/types/api'
 
 interface Props {
   results?: QueryResult | null
-  error?: string | null
+  error?: ApiError | string | null
   isExecuting?: boolean
   executionTime?: number
   height?: string
@@ -36,6 +30,15 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+// Format error with translation
+const formattedError = computed(() => {
+  if (!props.error)
+    return ''
+  if (typeof props.error === 'string')
+    return props.error
+  return formatApiError(props.error, t)
+})
 
 const panelHeight = ref(300)
 const isResizing = ref(false)
@@ -115,7 +118,8 @@ function close() {
           {{ t('components.queryResult.title') }}
         </span>
         <div v-if="results" class="text-xs text-muted-foreground flex gap-2 items-center">
-          <span>{{ t('components.queryResult.rows', { count: results.rowCount }) }}</span>
+          <span v-if="results.columns.length > 0">{{ t('components.queryResult.rows', { count: results.rowCount }) }}</span>
+          <span v-else-if="results.rowsAffected !== undefined">{{ t('components.queryResult.rowsAffected', { count: results.rowsAffected }) }}</span>
           <span v-if="formattedTime">• {{ t('components.queryResult.time', { time: formattedTime }) }}</span>
         </div>
       </div>
@@ -155,71 +159,80 @@ function close() {
 
       <!-- Error state -->
       <div v-else-if="error" class="p-4">
-        <div class="p-3 border border-red-200 rounded-md bg-red-50 dark:border-red-800 dark:bg-red-900/20">
-          <div class="flex gap-2 items-start">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600 mt-0.5 flex-shrink-0 dark:text-red-400">
+        <div class="p-4 border border-red-200 rounded-md bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+          <div class="flex gap-3 items-start">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600 mt-0.5 flex-shrink-0 dark:text-red-400">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" x2="12" y1="8" y2="12" />
               <line x1="12" x2="12.01" y1="16" y2="16" />
             </svg>
-            <div class="flex-1">
-              <p class="text-sm text-red-800 font-medium dark:text-red-200">
-                {{ t('components.queryResult.error') }}
-              </p>
-              <pre class="text-xs text-red-700 font-mono mt-1 whitespace-pre-wrap dark:text-red-300">{{ error }}</pre>
+            <div class="flex-1 space-y-2">
+              <div class="space-y-1">
+                <p
+                  v-for="(line, index) in formattedError.split('\n\n')"
+                  :key="index"
+                  class="text-sm dark:text-red-200"
+                  :class="line.startsWith('💡') ? 'text-amber-700 dark:text-amber-300' : 'text-red-800 dark:text-red-200'"
+                >
+                  {{ line }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Results table -->
-      <div v-else-if="results && results.columns.length > 0" class="h-full">
-        <Table>
-          <TableHeader class="bg-muted top-0 sticky z-10">
-            <TableRow>
-              <TableHead class="text-center bg-muted w-12">
+      <div v-else-if="results && results.columns.length > 0" class="h-full overflow-auto">
+        <table class="results-table w-full">
+          <thead>
+            <tr class="border-b">
+              <th class="results-table-header text-center w-12">
                 #
-              </TableHead>
-              <TableHead
+              </th>
+              <th
                 v-for="column in results.columns"
                 :key="column"
-                class="bg-muted whitespace-nowrap"
+                class="results-table-header text-left whitespace-nowrap"
               >
                 {{ column }}
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-for="(row, index) in results.rows" :key="index">
-              <TableCell class="text-xs text-muted-foreground text-center w-12">
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(row, index) in results.rows" :key="index" class="border-b hover:bg-muted/50">
+              <td class="text-xs text-muted-foreground px-4 py-2 text-center w-12">
                 {{ index + 1 }}
-              </TableCell>
-              <TableCell
+              </td>
+              <td
                 v-for="column in results.columns"
                 :key="`${index}-${column}`"
-                class="max-w-xs truncate"
-                :class="{ 'text-muted-foreground italic': isNullValue(row[column]) }"
+                class="text-sm px-4 py-2 max-w-xs truncate"
+                :class="{ 'italic text-muted-foreground': isNullValue(row[column]) }"
                 :title="formatValue(row[column])"
               >
                 {{ formatValue(row[column]) }}
-              </TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
 
-      <!-- Empty state -->
+      <!-- Empty state (DDL/DML success) -->
       <div v-else-if="results && results.columns.length === 0" class="flex h-full items-center justify-center">
         <div class="text-muted-foreground text-center">
           <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2 opacity-50">
             <circle cx="12" cy="12" r="10" />
             <path d="m9 12 2 2 4-4" />
           </svg>
-          <p class="text-sm">
+          <p class="text-sm font-medium">
             {{ t('components.queryResult.success') }}
           </p>
-          <p class="text-xs mt-1">
-            {{ t('components.queryResult.noData') }}
+          <p v-if="results.rowsAffected !== undefined" class="text-xs mt-1">
+            {{ t('components.queryResult.rowsAffected', { count: results.rowsAffected }) }}
+          </p>
+          <p v-else class="text-xs mt-1">
+            {{ t('components.queryResult.commandCompleted') }}
           </p>
         </div>
       </div>
@@ -241,6 +254,20 @@ function close() {
 </template>
 
 <style scoped>
+.results-table {
+  border-collapse: collapse;
+}
+
+.results-table-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: hsl(var(--muted));
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
 .resize-handle {
   position: relative;
 }

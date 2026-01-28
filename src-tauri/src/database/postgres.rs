@@ -21,6 +21,54 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_postgres::{types::Type, Client, NoTls, Row};
 
+/// Convert PostgreSQL error to DbError with detailed information
+fn postgres_error_to_db_error(error: tokio_postgres::Error) -> DbError {
+    // For database errors, we want to preserve structured information
+    // by creating a formatted string that our api_response parser can understand
+    if let Some(db_error) = error.as_db_error() {
+        let mut error_details = Vec::new();
+        
+        // Main error message
+        error_details.push(db_error.message().to_string());
+        
+        // Add structured fields
+        error_details.push(format!("[SQLSTATE: {}]", db_error.code().code()));
+        
+        if let Some(detail) = db_error.detail() {
+            error_details.push(format!("[Detail] {}", detail));
+        }
+        
+        if let Some(hint) = db_error.hint() {
+            error_details.push(format!("[Hint] {}", hint));
+        }
+        
+        if let Some(schema) = db_error.schema() {
+            error_details.push(format!("[Schema: {}]", schema));
+        }
+        
+        if let Some(table) = db_error.table() {
+            error_details.push(format!("[Table: {}]", table));
+        }
+        
+        if let Some(column) = db_error.column() {
+            error_details.push(format!("[Column: {}]", column));
+        }
+        
+        if let Some(constraint) = db_error.constraint() {
+            error_details.push(format!("[Constraint: {}]", constraint));
+        }
+        
+        if let Some(position) = db_error.position() {
+            error_details.push(format!("[Position: {:?}]", position));
+        }
+        
+        DbError::QueryExecution(error_details.join("\n"))
+    } else {
+        // For non-database errors, just use the error message
+        DbError::QueryExecution(error.to_string())
+    }
+}
+
 /// PostgreSQL connection pool wrapper.
 pub struct PostgresPool {
     pool: Pool,
@@ -136,11 +184,32 @@ impl PostgresAdapter {
 
         for (idx, column) in row.columns().iter().enumerate() {
             let name = column.name().to_string();
-            let value = Self::convert_value(row, idx, column.type_())?;
+            // Use a resilient conversion that falls back to string representation
+            let value = Self::convert_value_safe(row, idx, column.type_());
             query_row.insert(name, value);
         }
 
         Ok(query_row)
+    }
+
+    /// Safely convert a PostgreSQL value to QueryValue with fallback to string.
+    fn convert_value_safe(row: &Row, idx: usize, col_type: &Type) -> QueryValue {
+        // Try the typed conversion first
+        match Self::convert_value(row, idx, col_type) {
+            Ok(value) => value,
+            Err(_) => {
+                // If typed conversion fails, try to get as raw text
+                // This handles unsupported types gracefully
+                match row.try_get::<_, Option<String>>(idx) {
+                    Ok(Some(s)) => QueryValue::String(s),
+                    Ok(None) => QueryValue::Null,
+                    Err(_) => {
+                        // Last resort: use type name as placeholder
+                        QueryValue::String(format!("<{}>", col_type.name()))
+                    }
+                }
+            }
+        }
     }
 
     /// Convert a PostgreSQL value to QueryValue.
@@ -386,12 +455,12 @@ impl DatabaseAdapter for PostgresAdapter {
                     .map_err(|_| {
                         DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
                     })?
-                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .map_err(postgres_error_to_db_error)?
             } else {
                 client
                     .query(query, &[])
                     .await
-                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .map_err(postgres_error_to_db_error)?
             };
 
             execution_time = start.elapsed().as_millis() as u64;
@@ -421,12 +490,12 @@ impl DatabaseAdapter for PostgresAdapter {
                     .map_err(|_| {
                         DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
                     })?
-                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .map_err(postgres_error_to_db_error)?
             } else {
                 client
                     .execute(query, &[])
                     .await
-                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .map_err(postgres_error_to_db_error)?
             };
 
             execution_time = start.elapsed().as_millis() as u64;
