@@ -5,6 +5,7 @@ import { useConnectionStore } from './connectionStore'
 export interface TableInfo {
   name: string
   schema?: string
+  table_type?: string
   rowCount?: number
   size?: string
 }
@@ -60,10 +61,16 @@ export const useDatabaseStore = defineStore('databases', {
     async fetchDatabases(connectionId: string) {
       this.loading = true
       try {
-        const result = await invoke<{ databases: { name: string }[] }>('list_databases', {
+        const result = await invoke<string[]>('list_databases', {
           connectionId,
         })
-        const databases = result.databases.map(db => db.name)
+
+        if (!result || !Array.isArray(result)) {
+          console.error('Invalid response from server', result)
+          return
+        }
+
+        const databases = result
 
         if (!this.metadata[connectionId]) {
           this.metadata[connectionId] = {
@@ -78,6 +85,9 @@ export const useDatabaseStore = defineStore('databases', {
           this.metadata[connectionId].lastRefresh = new Date().toISOString()
         }
       }
+      catch (error) {
+        console.error('Failed to fetch databases:', error)
+      }
       finally {
         this.loading = false
       }
@@ -86,16 +96,25 @@ export const useDatabaseStore = defineStore('databases', {
     async fetchSchemas(connectionId: string, database: string) {
       this.loading = true
       try {
-        const result = await invoke<{ schemas: { name: string }[] }>('list_schemas', {
+        const result = await invoke<string[]>('list_schemas', {
           connectionId,
           database,
         })
-        const schemas = result.schemas.map(s => s.name)
+
+        if (!result || !Array.isArray(result)) {
+          console.error('Invalid response from server', result)
+          return
+        }
+
+        const schemas = result
 
         const meta = this.metadata[connectionId]
         if (meta) {
           meta.schemas[database] = schemas
         }
+      }
+      catch (error) {
+        console.error('Failed to fetch schemas:', error)
       }
       finally {
         this.loading = false
@@ -105,17 +124,25 @@ export const useDatabaseStore = defineStore('databases', {
     async fetchTables(connectionId: string, database: string, schema?: string) {
       this.loading = true
       try {
-        const result = await invoke<{ tables: TableInfo[] }>('list_tables', {
+        const result = await invoke<TableInfo[]>('list_tables', {
           connectionId,
           database,
           schema,
         })
 
+        if (!result || !Array.isArray(result)) {
+          console.error('Invalid response from server', result)
+          return
+        }
+
         const meta = this.metadata[connectionId]
         if (meta) {
           const key = schema ? `${database}.${schema}` : database
-          meta.tables[key] = result.tables
+          meta.tables[key] = result
         }
+      }
+      catch (error) {
+        console.error('Failed to fetch tables:', error)
       }
       finally {
         this.loading = false

@@ -2,6 +2,7 @@
 import type * as monaco from 'monaco-editor'
 import type { MonacoEditorOptions, SQLDialect } from '@/composables/useMonacoEditor'
 import { onMounted, ref, watch } from 'vue'
+import { ProgressBar } from '@/components/ui/progress'
 import { useMonacoEditor } from '@/composables/useMonacoEditor'
 import { useTheme } from '@/composables/useTheme'
 
@@ -14,6 +15,7 @@ interface Props {
   tabSize?: number
   height?: string
   placeholder?: string
+  isExecuting?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -25,11 +27,13 @@ const props = withDefaults(defineProps<Props>(), {
   tabSize: 2,
   height: '400px',
   placeholder: '-- Enter your SQL query here\n-- Press Ctrl+Enter to execute',
+  isExecuting: false,
 })
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
-  'execute': [query: string]
+  'execute': [details: { query: string, cursorPosition?: { lineNumber: number, column: number }, selection?: { startLineNumber: number, startColumn: number, endLineNumber: number, endColumn: number } }]
+  'save': [query: string]
 }>()
 
 const editorContainer = ref<HTMLElement | null>(null)
@@ -64,7 +68,12 @@ onMounted(() => {
 
     // Listen for execute command
     editorContainer.value?.addEventListener('execute-query', ((event: CustomEvent) => {
-      emit('execute', event.detail.query)
+      emit('execute', event.detail)
+    }) as EventListener)
+
+    // Listen for save command
+    editorContainer.value?.addEventListener('save-query', ((event: CustomEvent) => {
+      emit('save', event.detail.query)
     }) as EventListener)
   }
 })
@@ -90,6 +99,7 @@ defineExpose({
 
 <template>
   <div class="sql-editor-wrapper" :style="{ height: props.height }">
+    <ProgressBar :visible="props.isExecuting" />
     <div
       ref="editorContainer"
       class="sql-editor-container"
@@ -97,6 +107,13 @@ defineExpose({
     />
   </div>
 </template>
+
+<style scoped>
+.sql-editor-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+</style>
 
 <style scoped>
 .sql-editor-wrapper {

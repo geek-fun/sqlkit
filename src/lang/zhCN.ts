@@ -99,10 +99,28 @@ export const zhCN = {
     queries: {
       title: '查询',
       subtitle: '编写和执行SQL查询',
+      selectConnection: '选择连接',
+      selectDatabase: '选择数据库',
+      noTab: '没有打开的查询标签页',
+      newTab: '新建查询',
       editor: {
         title: 'SQL编辑器',
         description: '在此处编写您的SQL查询',
+        execute: '执行',
+        explain: '解释',
+      },
+      shortcuts: {
         execute: '执行查询 (Ctrl+Enter)',
+        explain: '解释查询 (F6)',
+        save: '保存 (Ctrl+S)',
+        comment: '切换注释 (Ctrl+/)',
+      },
+      status: {
+        connection: '连接',
+        database: '数据库',
+        rows: '行数',
+        time: '耗时',
+        executing: '执行中...',
       },
     },
     dataStudio: {
@@ -167,8 +185,120 @@ export const zhCN = {
         delete: '删除',
       },
     },
+    databaseBrowser: {
+      title: '数据库浏览器',
+      search: '搜索表...',
+      refresh: '刷新',
+      loading: '加载中...',
+      empty: '未找到数据库。请先连接到服务器。',
+      selectDatabase: '选择数据库',
+      noTables: '未找到表',
+      noViews: '未找到视图',
+      comingSoon: '即将推出',
+      sections: {
+        tables: '表',
+        views: '视图',
+        savedQueries: '已保存的查询',
+      },
+      errors: {
+        fetchDatabases: '获取数据库列表失败',
+        fetchSchemas: '获取模式列表失败',
+        fetchTables: '获取表列表失败',
+        invalidResponse: '服务器响应无效',
+      },
+      contextMenu: {
+        selectTopN: '查询前100条',
+        viewStructure: '查看结构',
+        createScript: 'CREATE脚本',
+        exportData: '导出数据',
+      },
+    },
+    queryResult: {
+      title: '结果',
+      rows: '{count} 行',
+      rowsAffected: '影响 {count} 行',
+      time: '{time}',
+      close: '关闭',
+      executing: '正在执行查询...',
+      error: '查询错误',
+      success: '查询执行成功',
+      noData: '无返回数据',
+      commandCompleted: '命令执行完成',
+      noResults: '执行查询以查看结果',
+    },
+    queryTabs: {
+      unsaved: '未保存的更改',
+      new: '新建查询',
+      closeDialog: {
+        title: '未保存的更改',
+        message: '查询"{name}"有未保存的更改。是否要放弃它们？',
+        discard: '放弃',
+      },
+    },
     header: {
       appName: 'SQLKit',
+    },
+  },
+  errors: {
+    unexpected: '意外错误：{error}',
+    codes: {
+      // 连接错误
+      CONNECTION_FAILED: '无法连接到数据库',
+      CONNECTION_TIMEOUT: '连接超时',
+      CONNECTION_REFUSED: '连接被拒绝',
+      AUTHENTICATION_FAILED: '身份验证失败',
+
+      // 查询错误
+      QUERY_SYNTAX_ERROR: 'SQL 语法错误',
+      QUERY_EXECUTION_ERROR: '查询执行失败',
+      QUERY_TIMEOUT: '查询执行超时',
+
+      // 资源错误
+      DATABASE_NOT_FOUND: '数据库未找到',
+      TABLE_NOT_FOUND: '表不存在',
+      COLUMN_NOT_FOUND: '列不存在',
+
+      // 权限错误
+      PERMISSION_DENIED: '权限被拒绝',
+      INSUFFICIENT_PRIVILEGES: '权限不足',
+
+      // 数据错误
+      CONSTRAINT_VIOLATION: '约束违规',
+      FOREIGN_KEY_VIOLATION: '外键约束违规',
+      UNIQUE_VIOLATION: '唯一约束违规',
+      NOT_NULL_VIOLATION: '非空约束违规',
+      CHECK_VIOLATION: '检查约束违规',
+
+      // 系统错误
+      INTERNAL_ERROR: '内部错误',
+      UNSUPPORTED_OPERATION: '不支持的操作',
+      INVALID_CONFIGURATION: '无效的配置',
+    },
+    titles: {
+      CONNECTION_FAILED: '连接失败',
+      AUTHENTICATION_FAILED: '身份验证失败',
+      QUERY_SYNTAX_ERROR: 'SQL 语法错误',
+      QUERY_EXECUTION_ERROR: '查询执行错误',
+      TABLE_NOT_FOUND: '表未找到',
+      COLUMN_NOT_FOUND: '列未找到',
+      PERMISSION_DENIED: '权限被拒绝',
+      FOREIGN_KEY_VIOLATION: '外键约束违规',
+      UNIQUE_VIOLATION: '唯一约束违规',
+      NOT_NULL_VIOLATION: '非空约束违规',
+    },
+    hints: {
+      CONNECTION_FAILED: '请检查连接设置并确保数据库服务器正在运行',
+      AUTHENTICATION_FAILED: '请验证您的用户名和密码',
+      QUERY_SYNTAX_ERROR: '请检查您的 SQL 语法并重试',
+      QUERY_TIMEOUT: '尝试优化查询或增加超时限制',
+      DATABASE_NOT_FOUND: '确保数据库存在且您有访问权限',
+      TABLE_NOT_FOUND: '请检查表名并确保它存在于数据库中',
+      COLUMN_NOT_FOUND: '请验证列名是否与表结构匹配',
+      FOREIGN_KEY_VIOLATION: '确保父表中存在引用的记录',
+      UNIQUE_VIOLATION: '已存在具有此值的记录',
+      NOT_NULL_VIOLATION: '此字段需要一个值',
+      CHECK_VIOLATION: '该值不满足表约束',
+      PERMISSION_DENIED: '您没有足够的权限执行此操作',
     },
   },
 }

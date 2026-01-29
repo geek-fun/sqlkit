@@ -3,6 +3,7 @@
 //! This module provides Tauri commands for executing SQL queries, canceling queries,
 //! and getting query execution plans.
 
+use crate::api_response::{ApiResponse, db_error_to_api_error};
 use crate::database::{DatabaseAdapter, QueryResult};
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
@@ -35,12 +36,12 @@ pub async fn execute_query(
     connection_id: String,
     sql: String,
     state: State<'_, AppState>,
-) -> Result<QueryResult, String> {
+) -> Result<ApiResponse<QueryResult>, String> {
     let connections = state.connections.lock().await;
 
     let connection = connections
         .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+        .ok_or_else(|| "No active connection found".to_string())?;
 
     // Execute query based on connection type
     let result = match connection {
@@ -62,7 +63,13 @@ pub async fn execute_query(
         }
     };
 
-    result.map_err(|e| format!("Query execution failed: {}", e))
+    match result {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(e) => {
+            let api_error = db_error_to_api_error(&e);
+            Ok(ApiResponse::error(api_error))
+        }
+    }
 }
 
 /// Cancel a running query.

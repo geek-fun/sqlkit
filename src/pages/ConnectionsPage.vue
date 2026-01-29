@@ -2,6 +2,7 @@
 import type { ServerConnection } from '@/store'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import { ServerCard, ServerFormDialog } from '@/components/connections'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import {
@@ -20,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { ConnectionStatus, useConnectionStore } from '@/store'
 
 const { t } = useI18n()
+const router = useRouter()
 const connectionStore = useConnectionStore()
 
 const searchQuery = ref('')
@@ -80,9 +82,14 @@ async function handleConnect(connection: ServerConnection) {
     }
   }
   else {
-    // Connect
+    // Connect and navigate to query editor
     try {
       await connectionStore.connect(connection.id)
+      // Navigate to queries page with connection ID
+      router.push({
+        name: 'queries',
+        query: { connectionId: connection.id },
+      })
     }
     catch (error) {
       connectError.value = error instanceof Error ? error.message : String(error)

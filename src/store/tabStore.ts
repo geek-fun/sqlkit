@@ -1,10 +1,14 @@
+import type { ApiError, ApiResponse } from '@/types/api'
 import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
+import { isApiError, isApiSuccess } from '@/types/api'
 
 export interface QueryResult {
   columns: string[]
   rows: Record<string, unknown>[]
   rowCount: number
+  rowsAffected?: number
+  executionTimeMs?: number
 }
 
 export interface QueryTab {
@@ -15,8 +19,9 @@ export interface QueryTab {
   database?: string
   isExecuting: boolean
   hasUnsavedChanges: boolean
+  filePath?: string
   results?: QueryResult
-  error?: string
+  error?: ApiError | string
   executionTime?: number
 }
 
@@ -101,10 +106,18 @@ export const useTabStore = defineStore('tabs', {
       }
     },
 
-    async executeQuery(tabId: string) {
+    async executeQuery(tabId: string, sqlToExecute?: string) {
       const tab = this.tabs.find(t => t.id === tabId)
-      if (!tab)
+      if (!tab) {
         return
+      }
+
+      const sql = sqlToExecute !== undefined ? sqlToExecute : tab.content
+
+      // Validate SQL is a non-empty string
+      if (typeof sql !== 'string' || sql.trim() === '') {
+        return
+      }
 
       tab.isExecuting = true
       tab.error = undefined
@@ -112,13 +125,18 @@ export const useTabStore = defineStore('tabs', {
       const startTime = Date.now()
 
       try {
-        const result = await invoke<QueryResult>('execute_query', {
+        const response = await invoke<ApiResponse<QueryResult>>('execute_query', {
           connectionId: tab.connectionId,
-          sql: tab.content,
+          sql,
         })
 
-        tab.results = result
-        tab.executionTime = Date.now() - startTime
+        if (isApiSuccess(response)) {
+          tab.results = response.data
+          tab.executionTime = Date.now() - startTime
+        }
+        else if (isApiError(response)) {
+          tab.error = response.error
+        }
       }
       catch (error) {
         tab.error = String(error)
@@ -134,10 +152,16 @@ export const useTabStore = defineStore('tabs', {
       }
     },
 
-    markTabSaved(tabId: string) {
+    markTabSaved(tabId: string, filePath?: string) {
       const tab = this.tabs.find(t => t.id === tabId)
       if (tab) {
         tab.hasUnsavedChanges = false
+        if (filePath) {
+          tab.filePath = filePath
+          // Update tab name to just the filename
+          const fileName = filePath.split('/').pop() || filePath
+          tab.name = fileName.replace(/\.sql$/, '')
+        }
       }
     },
 
