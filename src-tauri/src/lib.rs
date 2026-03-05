@@ -65,6 +65,7 @@ pub fn run() {
             commands::list_tables,
             commands::get_table_info,
             commands::get_table_data,
+            commands::get_table_count,
             // File operations commands
             commands::save_query_file,
             commands::load_query_file,

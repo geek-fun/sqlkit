@@ -197,6 +197,13 @@ function selectNode(node: TreeNode) {
   selectedNodeId.value = node.id
 }
 
+function handleTableClick(node: TreeNode) {
+  selectNode(node)
+  if ((node.type === 'table' || node.type === 'view') && node.metadata) {
+    emit('selectTable', node.metadata, node.metadata.database, node.metadata.schema)
+  }
+}
+
 function handleDoubleClick(node: TreeNode) {
   if (node.type === 'table' || node.type === 'view') {
     const metadata = node.metadata
@@ -457,7 +464,7 @@ const getIcon = (type: IconType) => iconMap[type] || iconMap.column
             :key="table.id"
             class="tree-node text-sm px-2 py-1 flex gap-2 cursor-pointer items-center hover:bg-accent"
             :class="{ 'bg-accent': selectedNodeId === table.id }"
-            @click="selectNode(table)"
+            @click="handleTableClick(table)"
             @dblclick="handleDoubleClick(table)"
             @contextmenu="handleContextMenu($event, table)"
           >
@@ -499,7 +506,7 @@ const getIcon = (type: IconType) => iconMap[type] || iconMap.column
             :key="view.id"
             class="tree-node text-sm px-2 py-1 flex gap-2 cursor-pointer items-center hover:bg-accent"
             :class="{ 'bg-accent': selectedNodeId === view.id }"
-            @click="selectNode(view)"
+            @click="handleTableClick(view)"
             @dblclick="handleDoubleClick(view)"
             @contextmenu="handleContextMenu($event, view)"
           >

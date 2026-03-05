@@ -5,7 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { extractStatementAtCursor } from '@/common/sqlParser'
-import { DatabaseBrowser, QueryResultPanel, QueryTabs } from '@/components/database-browser'
+import { DatabaseBrowser, DataTableView, QueryResultPanel, QueryTabs } from '@/components/database-browser'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,14 @@ const showResultPanel = ref(false)
 const sidebarWidth = ref(250)
 const isResizingSidebar = ref(false)
 const selectedDatabase = ref<string>('')
+
+interface ActiveTableView {
+  table: TableInfo
+  database: string
+  schema?: string
+}
+
+const activeTableView = ref<ActiveTableView | null>(null)
 
 // Available connections
 const availableConnections = computed(() => connectionStore.connections)
@@ -173,6 +181,7 @@ function handleNewTab() {
 
 function handleTabSelect(tabId: string) {
   tabStore.setActiveTab(tabId)
+  activeTableView.value = null
 }
 
 function handleTabClose(tabId: string) {
@@ -233,6 +242,10 @@ WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` :
 
 function handleExportData(_table: TableInfo, _database: string, _schema?: string) {
   // TODO: Implement export data functionality
+}
+
+function handleSelectTable(table: TableInfo, database: string, schema?: string) {
+  activeTableView.value = { table, database, schema }
 }
 
 function startSidebarResize(_e: MouseEvent) {
@@ -315,6 +328,7 @@ async function handleSaveQuery() {
             v-model:selected-database="selectedDatabase"
             :connection-id="selectedConnectionId"
             class="flex-1"
+            @select-table="handleSelectTable"
             @create-script="handleCreateScript"
             @select-top-n="handleSelectTopN"
             @view-structure="handleViewStructure"
@@ -340,101 +354,114 @@ async function handleSaveQuery() {
             @new="handleNewTab"
           />
 
-          <!-- Toolbar -->
-          <div class="px-2 py-1 border-b bg-muted/30 flex gap-2 items-center">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    class="gap-1 h-7"
-                    :disabled="!activeTab"
-                    @click="executeQuery"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polygon points="6 3 20 12 6 21 6 3" />
-                    </svg>
-                    {{ t('pages.queries.editor.execute') }}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ t('pages.queries.shortcuts.execute') }}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <!-- Data Table View (shown when a table is selected in the sidebar) -->
+          <DataTableView
+            v-if="activeTableView"
+            :connection-id="getConnectionId() || ''"
+            :database="activeTableView.database"
+            :schema="activeTableView.schema"
+            :table-name="activeTableView.table.name"
+            class="flex-1"
+          />
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    class="gap-1 h-7"
-                    :disabled="!activeTab"
-                    @click="handleExplainQuery"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 20h9" />
-                      <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" />
-                    </svg>
-                    {{ t('pages.queries.editor.explain') }}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ t('pages.queries.shortcuts.explain') }}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <!-- Query editor area (shown when no table is selected) -->
+          <template v-else>
+            <!-- Toolbar -->
+            <div class="px-2 py-1 border-b bg-muted/30 flex gap-2 items-center">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="gap-1 h-7"
+                      :disabled="!activeTab"
+                      @click="executeQuery"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="6 3 20 12 6 21 6 3" />
+                      </svg>
+                      {{ t('pages.queries.editor.execute') }}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{{ t('pages.queries.shortcuts.execute') }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-            <div class="flex-1" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="gap-1 h-7"
+                      :disabled="!activeTab"
+                      @click="handleExplainQuery"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" />
+                      </svg>
+                      {{ t('pages.queries.editor.explain') }}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{{ t('pages.queries.shortcuts.explain') }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-            <!-- Status info -->
-            <div v-if="activeTab" class="text-xs text-muted-foreground flex gap-2 items-center">
-              <span v-if="activeConnection">{{ activeConnection.name }}</span>
-              <span v-if="activeConnection?.database">/ {{ activeConnection.database }}</span>
-            </div>
-          </div>
+              <div class="flex-1" />
 
-          <!-- Editor -->
-          <div class="flex-1 overflow-hidden">
-            <SQLEditor
-              v-if="activeTab"
-              v-model="editorContent"
-              height="100%"
-              dialect="sql"
-              :is-executing="activeTab.isExecuting"
-              :font-size="appStore.editorConfig.fontSize"
-              :tab-size="appStore.editorConfig.tabSize"
-              :word-wrap="appStore.editorConfig.wordWrap"
-              :minimap="appStore.editorConfig.showMinimap"
-              :show-line-numbers="appStore.editorConfig.showLineNumbers"
-              @execute="(details) => executeQuery(details)"
-              @save="handleSaveQuery"
-            />
-            <div v-else class="text-muted-foreground flex h-full items-center justify-center">
-              <div class="text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 opacity-50">
-                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-                <p>{{ t('pages.queries.noTab') }}</p>
-                <Button variant="outline" size="sm" class="mt-2" @click="handleNewTab">
-                  {{ t('pages.queries.newTab') }}
-                </Button>
+              <!-- Status info -->
+              <div v-if="activeTab" class="text-xs text-muted-foreground flex gap-2 items-center">
+                <span v-if="activeConnection">{{ activeConnection.name }}</span>
+                <span v-if="activeConnection?.database">/ {{ activeConnection.database }}</span>
               </div>
             </div>
-          </div>
 
-          <!-- Result Panel -->
-          <QueryResultPanel
-            v-if="showResultPanel"
-            :results="activeTab?.results"
-            :error="activeTab?.error"
-            :is-executing="activeTab?.isExecuting"
-            :execution-time="activeTab?.executionTime"
-            @close="closeResultPanel"
-          />
+            <!-- Editor -->
+            <div class="flex-1 overflow-hidden">
+              <SQLEditor
+                v-if="activeTab"
+                v-model="editorContent"
+                height="100%"
+                dialect="sql"
+                :is-executing="activeTab.isExecuting"
+                :font-size="appStore.editorConfig.fontSize"
+                :tab-size="appStore.editorConfig.tabSize"
+                :word-wrap="appStore.editorConfig.wordWrap"
+                :minimap="appStore.editorConfig.showMinimap"
+                :show-line-numbers="appStore.editorConfig.showLineNumbers"
+                @execute="(details) => executeQuery(details)"
+                @save="handleSaveQuery"
+              />
+              <div v-else class="text-muted-foreground flex h-full items-center justify-center">
+                <div class="text-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 opacity-50">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <p>{{ t('pages.queries.noTab') }}</p>
+                  <Button variant="outline" size="sm" class="mt-2" @click="handleNewTab">
+                    {{ t('pages.queries.newTab') }}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Result Panel -->
+            <QueryResultPanel
+              v-if="showResultPanel"
+              :results="activeTab?.results"
+              :error="activeTab?.error"
+              :is-executing="activeTab?.isExecuting"
+              :execution-time="activeTab?.executionTime"
+              @close="closeResultPanel"
+            />
+          </template>
         </div>
       </div>
 

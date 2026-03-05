@@ -21,6 +21,58 @@ fn quote_identifier(identifier: &str, db_type: &str) -> String {
     }
 }
 
+/// Build a schema-qualified table identifier.
+fn build_qualified_table(schema: Option<&str>, table: &str, db_type: &str) -> String {
+    match schema {
+        Some(s) if !s.is_empty() => format!(
+            "{}.{}",
+            quote_identifier(s, db_type),
+            quote_identifier(table, db_type)
+        ),
+        _ => quote_identifier(table, db_type),
+    }
+}
+
+/// Build a paginated SELECT query.
+///
+/// # Security Note
+///
+/// The `filter` parameter is user-supplied SQL for the WHERE clause. Since SQLKit is a
+/// desktop application where users manage their own database connections, this is
+/// intentional — users already have full query access via the SQL editor.
+fn build_paginated_select(
+    qualified_table: &str,
+    filter: Option<&str>,
+    limit: u32,
+    offset: u32,
+    db_type: &str,
+) -> String {
+    let where_clause = filter
+        .filter(|f| !f.trim().is_empty())
+        .map(|f| format!(" WHERE {}", f))
+        .unwrap_or_default();
+
+    match db_type {
+        "sqlserver" => format!(
+            "SELECT * FROM {}{} ORDER BY (SELECT NULL) OFFSET {} ROWS FETCH NEXT {} ROWS ONLY",
+            qualified_table, where_clause, offset, limit
+        ),
+        _ => format!(
+            "SELECT * FROM {}{} LIMIT {} OFFSET {}",
+            qualified_table, where_clause, limit, offset
+        ),
+    }
+}
+
+/// Build a COUNT(*) query for pagination.
+fn build_count_query(qualified_table: &str, filter: Option<&str>) -> String {
+    let where_clause = filter
+        .filter(|f| !f.trim().is_empty())
+        .map(|f| format!(" WHERE {}", f))
+        .unwrap_or_default();
+    format!("SELECT COUNT(*) FROM {}{}", qualified_table, where_clause)
+}
+
 /// List all databases on the server.
 ///
 /// # Arguments
@@ -246,23 +298,29 @@ pub async fn get_table_info(
     Ok(table_info)
 }
 
-/// Get table data with optional pagination.
+/// Get table data with pagination and optional WHERE-clause filter.
 ///
 /// # Arguments
 ///
 /// * `connection_id` - ID of the active connection
 /// * `table` - Table name
-/// * `limit` - Optional row limit for pagination
+/// * `schema` - Optional schema (or database for MySQL)
+/// * `filter` - Optional SQL WHERE clause expression
+/// * `limit` - Row limit per page (defaults to 100)
+/// * `offset` - Row offset for pagination (defaults to 0)
 /// * `state` - Application state
 ///
 /// # Returns
 ///
-/// Query result with table data.
+/// Query result with table data for the requested page.
 #[tauri::command]
 pub async fn get_table_data(
     connection_id: String,
     table: String,
+    schema: Option<String>,
+    filter: Option<String>,
     limit: Option<u32>,
+    offset: Option<u32>,
     state: State<'_, AppState>,
 ) -> Result<QueryResult, String> {
     let connections = state
@@ -273,57 +331,116 @@ pub async fn get_table_data(
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
 
+    let limit_val = limit.unwrap_or(100);
+    let offset_val = offset.unwrap_or(0);
+    let filter_ref = filter.as_deref();
+
     // Execute query based on connection type with proper identifier quoting
     let result = match connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter
-                .lock().await;
-            let quoted_table = quote_identifier(&table, "postgres");
-            let query = if let Some(limit_val) = limit {
-                format!("SELECT * FROM {} LIMIT {}", quoted_table, limit_val)
-            } else {
-                format!("SELECT * FROM {}", quoted_table)
-            };
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "postgres");
+            let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "postgres");
             adapter.execute_query(&query).await
         }
         ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter
-                .lock().await;
-            let quoted_table = quote_identifier(&table, "mysql");
-            let query = if let Some(limit_val) = limit {
-                format!("SELECT * FROM {} LIMIT {}", quoted_table, limit_val)
-            } else {
-                format!("SELECT * FROM {}", quoted_table)
-            };
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "mysql");
+            let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "mysql");
             adapter.execute_query(&query).await
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter
-                .lock().await;
-            let quoted_table = quote_identifier(&table, "sqlserver");
-            // SQL Server uses TOP instead of LIMIT
-            let query = if let Some(limit_val) = limit {
-                format!("SELECT TOP {} * FROM {}", limit_val, quoted_table)
-            } else {
-                format!("SELECT * FROM {}", quoted_table)
-            };
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlserver");
+            let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlserver");
             adapter.execute_query(&query).await
         }
         ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter
-                .lock().await;
-            let quoted_table = quote_identifier(&table, "sqlite");
-            let query = if let Some(limit_val) = limit {
-                format!("SELECT * FROM {} LIMIT {}", quoted_table, limit_val)
-            } else {
-                format!("SELECT * FROM {}", quoted_table)
-            };
+            let adapter = adapter.lock().await;
+            // SQLite has no schemas
+            let qualified = build_qualified_table(None, &table, "sqlite");
+            let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
             adapter.execute_query(&query).await
         }
     }
     .map_err(|e| format!("Failed to get table data: {}", e))?;
 
     Ok(result)
+}
+
+/// Get the total row count for a table, optionally filtered by a WHERE clause.
+///
+/// # Arguments
+///
+/// * `connection_id` - ID of the active connection
+/// * `table` - Table name
+/// * `schema` - Optional schema (or database for MySQL)
+/// * `filter` - Optional SQL WHERE clause expression
+/// * `state` - Application state
+///
+/// # Returns
+///
+/// Total number of rows matching the filter.
+#[tauri::command]
+pub async fn get_table_count(
+    connection_id: String,
+    table: String,
+    schema: Option<String>,
+    filter: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<u64, String> {
+    let connections = state
+        .connections
+        .lock().await;
+
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    let filter_ref = filter.as_deref();
+
+    let result = match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "postgres");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "mysql");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlserver");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(None, &table, "sqlite");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+    }
+    .map_err(|e| format!("Failed to get table count: {}", e))?;
+
+    // Extract COUNT(*) value from the first cell of the first row.
+    // Returns an error if the count cannot be parsed (e.g. unexpected result format).
+    let count = result
+        .rows
+        .first()
+        .and_then(|row| row.values().next())
+        .and_then(|val| match val {
+            crate::database::types::QueryValue::Int(n) => Some(*n as u64),
+            crate::database::types::QueryValue::String(s) => s.parse::<u64>().ok(),
+            _ => None,
+        })
+        .ok_or_else(|| "Failed to extract row count from query result".to_string())?;
+
+    Ok(count)
 }
 
 // Tests for browse commands are temporarily disabled.
