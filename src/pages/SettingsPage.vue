@@ -61,10 +61,6 @@ function handleFontSizeChange(val: string | number) {
 }
 
 const fontFamilyInput = ref(appStore.editorConfig.fontFamily)
-function handleFontFamilyChange(val: string | number) {
-  fontFamilyInput.value = String(val)
-  appStore.setEditorConfig({ fontFamily: String(val) })
-}
 
 const tabSizeInput = ref(String(appStore.editorConfig.tabSize))
 const tabSizeError = ref('')
@@ -126,354 +122,363 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
 
 <template>
   <AppLayout>
-    <div class="p-6 h-full overflow-y-auto">
-      <div class="max-w-3xl space-y-8">
-        <!-- Page Header -->
-        <div class="flex gap-3 items-center">
+    <div class="flex flex-col h-full">
+      <!-- Sticky header -->
+      <div class="px-6 py-4 border-b bg-background top-0 sticky z-10">
+        <div class="mx-auto flex gap-3 max-w-3xl items-center">
           <h1 class="text-xl font-semibold">
             {{ t('pages.settings.title') }}
           </h1>
           <span class="text-muted-foreground">|</span>
           <span class="text-sm text-muted-foreground">{{ t('pages.settings.subtitle') }}</span>
         </div>
+      </div>
 
-        <!-- Appearance Card -->
-        <Card>
-          <CardHeader>
-            <CardTitle>{{ t('pages.settings.appearance.title') }}</CardTitle>
-            <CardDescription>{{ t('pages.settings.appearance.description') }}</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-6">
-            <!-- Theme selector -->
-            <div class="space-y-3">
-              <Label>{{ t('pages.settings.appearance.theme') }}</Label>
-              <div class="gap-4 grid grid-cols-3">
-                <button
-                  v-for="opt in themeOptions"
-                  :key="opt.value"
-                  class="p-2 border-2 rounded-lg cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  :class="currentTheme === opt.value
-                    ? 'border-primary'
-                    : 'border-border hover:border-muted-foreground'"
-                  @click="handleThemeChange(opt.value)"
-                >
-                  <!-- Theme preview -->
-                  <div class="mb-2 rounded flex h-24 overflow-hidden" :class="opt.value === ThemeType.LIGHT ? 'bg-white' : 'bg-zinc-900'">
-                    <!-- Auto: split preview -->
-                    <template v-if="opt.value === ThemeType.AUTO">
-                      <div class="flex h-full w-1/2">
+      <!-- Scrollable content -->
+      <div class="px-6 py-6 flex-1 overflow-y-auto">
+        <div class="mx-auto max-w-3xl space-y-8">
+          <!-- Appearance Card -->
+          <Card>
+            <CardHeader>
+              <CardTitle>{{ t('pages.settings.appearance.title') }}</CardTitle>
+              <CardDescription>{{ t('pages.settings.appearance.description') }}</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-6">
+              <!-- Theme selector -->
+              <div class="space-y-3">
+                <Label>{{ t('pages.settings.appearance.theme') }}</Label>
+                <div class="gap-4 grid grid-cols-3">
+                  <button
+                    v-for="opt in themeOptions"
+                    :key="opt.value"
+                    class="p-2 border-2 rounded-lg cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    :class="currentTheme === opt.value
+                      ? 'border-primary'
+                      : 'border-border hover:border-muted-foreground'"
+                    @click="handleThemeChange(opt.value)"
+                  >
+                    <!-- Theme preview -->
+                    <div class="mb-2 rounded flex h-24 overflow-hidden" :class="opt.value === ThemeType.LIGHT ? 'bg-white' : 'bg-zinc-900'">
+                      <!-- Auto: split preview -->
+                      <template v-if="opt.value === ThemeType.AUTO">
+                        <div class="flex h-full w-1/2">
+                          <div class="p-1 bg-zinc-800 flex flex-col gap-1 h-full w-6">
+                            <div class="rounded-sm bg-zinc-600 h-3 w-3" />
+                            <div class="rounded-sm bg-zinc-600 h-3 w-3" />
+                            <div class="rounded-sm bg-zinc-600 h-3 w-3" />
+                          </div>
+                          <div class="p-1 bg-zinc-900 flex-1 space-y-1">
+                            <div class="rounded bg-zinc-700 h-1.5" />
+                            <div class="rounded bg-zinc-700 h-1.5 w-3/4" />
+                            <div class="rounded bg-zinc-700 h-1.5 w-1/2" />
+                          </div>
+                        </div>
+                        <div class="flex h-full w-1/2">
+                          <div class="p-1 bg-gray-200 flex flex-col gap-1 h-full w-6">
+                            <div class="rounded-sm bg-gray-400 h-3 w-3" />
+                            <div class="rounded-sm bg-gray-400 h-3 w-3" />
+                            <div class="rounded-sm bg-gray-400 h-3 w-3" />
+                          </div>
+                          <div class="p-1 bg-white flex-1 space-y-1">
+                            <div class="rounded bg-gray-200 h-1.5" />
+                            <div class="rounded bg-gray-200 h-1.5 w-3/4" />
+                            <div class="rounded bg-gray-200 h-1.5 w-1/2" />
+                          </div>
+                        </div>
+                      </template>
+                      <!-- Dark preview -->
+                      <template v-else-if="opt.value === ThemeType.DARK">
                         <div class="p-1 bg-zinc-800 flex flex-col gap-1 h-full w-6">
                           <div class="rounded-sm bg-zinc-600 h-3 w-3" />
                           <div class="rounded-sm bg-zinc-600 h-3 w-3" />
                           <div class="rounded-sm bg-zinc-600 h-3 w-3" />
                         </div>
-                        <div class="p-1 bg-zinc-900 flex-1 space-y-1">
-                          <div class="rounded bg-zinc-700 h-1.5" />
-                          <div class="rounded bg-zinc-700 h-1.5 w-3/4" />
-                          <div class="rounded bg-zinc-700 h-1.5 w-1/2" />
+                        <div class="p-2 bg-zinc-900 flex-1 space-y-1.5">
+                          <div class="rounded bg-zinc-700 h-2" />
+                          <div class="rounded bg-zinc-700 h-2 w-3/4" />
+                          <div class="rounded bg-zinc-700 h-2 w-1/2" />
+                          <div class="rounded bg-zinc-800 h-2 w-5/6" />
                         </div>
-                      </div>
-                      <div class="flex h-full w-1/2">
+                      </template>
+                      <!-- Light preview -->
+                      <template v-else>
                         <div class="p-1 bg-gray-200 flex flex-col gap-1 h-full w-6">
                           <div class="rounded-sm bg-gray-400 h-3 w-3" />
                           <div class="rounded-sm bg-gray-400 h-3 w-3" />
                           <div class="rounded-sm bg-gray-400 h-3 w-3" />
                         </div>
-                        <div class="p-1 bg-white flex-1 space-y-1">
-                          <div class="rounded bg-gray-200 h-1.5" />
-                          <div class="rounded bg-gray-200 h-1.5 w-3/4" />
-                          <div class="rounded bg-gray-200 h-1.5 w-1/2" />
+                        <div class="p-2 bg-white flex-1 space-y-1.5">
+                          <div class="rounded bg-gray-200 h-2" />
+                          <div class="rounded bg-gray-200 h-2 w-3/4" />
+                          <div class="rounded bg-gray-200 h-2 w-1/2" />
+                          <div class="rounded bg-gray-100 h-2 w-5/6" />
                         </div>
-                      </div>
-                    </template>
-                    <!-- Dark preview -->
-                    <template v-else-if="opt.value === ThemeType.DARK">
-                      <div class="p-1 bg-zinc-800 flex flex-col gap-1 h-full w-6">
-                        <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                        <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                        <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                      </div>
-                      <div class="p-2 bg-zinc-900 flex-1 space-y-1.5">
-                        <div class="rounded bg-zinc-700 h-2" />
-                        <div class="rounded bg-zinc-700 h-2 w-3/4" />
-                        <div class="rounded bg-zinc-700 h-2 w-1/2" />
-                        <div class="rounded bg-zinc-800 h-2 w-5/6" />
-                      </div>
-                    </template>
-                    <!-- Light preview -->
-                    <template v-else>
-                      <div class="p-1 bg-gray-200 flex flex-col gap-1 h-full w-6">
-                        <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                        <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                        <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                      </div>
-                      <div class="p-2 bg-white flex-1 space-y-1.5">
-                        <div class="rounded bg-gray-200 h-2" />
-                        <div class="rounded bg-gray-200 h-2 w-3/4" />
-                        <div class="rounded bg-gray-200 h-2 w-1/2" />
-                        <div class="rounded bg-gray-100 h-2 w-5/6" />
-                      </div>
-                    </template>
-                  </div>
-                  <!-- Selected checkmark -->
-                  <div
-                    v-if="currentTheme === opt.value"
-                    class="rounded-full bg-primary flex h-5 w-5 items-center right-2 top-2 justify-center absolute"
-                  >
-                    <svg class="text-primary-foreground h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                      <polyline points="20 6 9 17 4 12" />
-                    </svg>
-                  </div>
-                  <p class="text-sm font-medium text-center">
-                    {{ opt.label() }}
-                  </p>
-                </button>
+                      </template>
+                    </div>
+                    <!-- Selected checkmark -->
+                    <div
+                      v-if="currentTheme === opt.value"
+                      class="rounded-full bg-primary flex h-5 w-5 items-center right-2 top-2 justify-center absolute"
+                    >
+                      <svg class="text-primary-foreground h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    </div>
+                    <p class="text-sm font-medium text-center">
+                      {{ opt.label() }}
+                    </p>
+                  </button>
+                </div>
               </div>
-            </div>
 
-            <!-- Language selector -->
-            <div class="space-y-3">
-              <Label>{{ t('pages.settings.appearance.language') }}</Label>
-              <p class="text-sm text-muted-foreground">
-                {{ t('pages.settings.appearance.languageHelp') }}
-              </p>
-              <div class="flex flex-wrap gap-2">
+              <!-- Language selector -->
+              <div class="space-y-3">
+                <Label>{{ t('pages.settings.appearance.language') }}</Label>
+                <p class="text-sm text-muted-foreground">
+                  {{ t('pages.settings.appearance.languageHelp') }}
+                </p>
+                <div class="flex flex-wrap gap-2">
+                  <button
+                    v-for="opt in languageOptions"
+                    :key="opt.value"
+                    class="text-sm px-4 py-2 border rounded-full flex gap-2 cursor-pointer transition-colors items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    :class="currentLanguage === opt.value
+                      ? 'border-primary text-primary bg-primary/10'
+                      : 'border-border text-foreground hover:border-muted-foreground'"
+                    @click="handleLanguageChange(opt.value)"
+                  >
+                    <span
+                      class="border-2 rounded-full flex-shrink-0 h-3.5 w-3.5"
+                      :class="currentLanguage === opt.value
+                        ? 'border-primary bg-primary'
+                        : 'border-muted-foreground'"
+                    />
+                    {{ opt.label() }}
+                  </button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <!-- Editor Card -->
+          <Card>
+            <CardHeader>
+              <CardTitle>{{ t('pages.settings.editor.title') }}</CardTitle>
+              <CardDescription>{{ t('pages.settings.editor.description') }}</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-5">
+              <!-- Font Size -->
+              <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.editor.fontSize') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.editor.fontSizeHelp') }}
+                  </p>
+                </div>
+                <div class="space-y-1">
+                  <Input
+                    type="number"
+                    :model-value="fontSizeInput"
+                    min="8"
+                    max="32"
+                    class="w-28"
+                    @update:model-value="handleFontSizeChange($event)"
+                  />
+                  <p v-if="fontSizeError" class="text-xs text-destructive">
+                    {{ fontSizeError }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Font Family -->
+              <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.editor.fontFamily') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.editor.fontFamilyHelp') }}
+                  </p>
+                </div>
+                <p class="text-sm text-muted-foreground font-mono px-3 py-2 border border-border rounded-md bg-muted cursor-default select-none">
+                  {{ fontFamilyInput }}
+                </p>
+              </div>
+
+              <!-- Tab Size -->
+              <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.editor.tabSize') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.editor.tabSizeHelp') }}
+                  </p>
+                </div>
+                <div class="space-y-1">
+                  <Input
+                    type="number"
+                    :model-value="tabSizeInput"
+                    min="1"
+                    max="8"
+                    class="w-28"
+                    @update:model-value="handleTabSizeChange($event)"
+                  />
+                  <p v-if="tabSizeError" class="text-xs text-destructive">
+                    {{ tabSizeError }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Word Wrap -->
+              <div class="flex items-center justify-between">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.editor.wordWrap') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.editor.wordWrapHelp') }}
+                  </p>
+                </div>
                 <button
-                  v-for="opt in languageOptions"
-                  :key="opt.value"
-                  class="text-sm px-4 py-2 border rounded-full flex gap-2 cursor-pointer transition-colors items-center focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  :class="currentLanguage === opt.value
-                    ? 'border-primary text-primary bg-primary/10'
-                    : 'border-border text-foreground hover:border-muted-foreground'"
-                  @click="handleLanguageChange(opt.value)"
+                  class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="wordWrap ? 'bg-primary' : 'bg-muted'"
+                  role="switch"
+                  :aria-checked="wordWrap"
+                  @click="toggleWordWrap"
                 >
                   <span
-                    class="border-2 rounded-full flex-shrink-0 h-3.5 w-3.5"
-                    :class="currentLanguage === opt.value
-                      ? 'border-primary bg-primary'
-                      : 'border-muted-foreground'"
+                    class="rounded-full bg-background h-5 w-5 inline-block pointer-events-none shadow transition-transform"
+                    :class="wordWrap ? 'translate-x-5' : 'translate-x-0'"
                   />
-                  {{ opt.label() }}
                 </button>
               </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <!-- Editor Card -->
-        <Card>
-          <CardHeader>
-            <CardTitle>{{ t('pages.settings.editor.title') }}</CardTitle>
-            <CardDescription>{{ t('pages.settings.editor.description') }}</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-5">
-            <!-- Font Size -->
-            <div class="gap-4 grid grid-cols-2 items-start">
-              <div class="space-y-1">
-                <Label>{{ t('pages.settings.editor.fontSize') }}</Label>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('pages.settings.editor.fontSizeHelp') }}
-                </p>
+              <!-- Show Line Numbers -->
+              <div class="flex items-center justify-between">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.editor.showLineNumbers') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.editor.showLineNumbersHelp') }}
+                  </p>
+                </div>
+                <button
+                  class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="showLineNumbers ? 'bg-primary' : 'bg-muted'"
+                  role="switch"
+                  :aria-checked="showLineNumbers"
+                  @click="toggleLineNumbers"
+                >
+                  <span
+                    class="rounded-full bg-background h-5 w-5 inline-block pointer-events-none shadow transition-transform"
+                    :class="showLineNumbers ? 'translate-x-5' : 'translate-x-0'"
+                  />
+                </button>
               </div>
-              <div class="space-y-1">
-                <Input
-                  type="number"
-                  :model-value="fontSizeInput"
-                  min="8"
-                  max="32"
-                  class="w-28"
-                  @update:model-value="handleFontSizeChange($event)"
-                />
-                <p v-if="fontSizeError" class="text-xs text-destructive">
-                  {{ fontSizeError }}
-                </p>
-              </div>
-            </div>
 
-            <!-- Font Family -->
-            <div class="gap-4 grid grid-cols-2 items-start">
-              <div class="space-y-1">
-                <Label>{{ t('pages.settings.editor.fontFamily') }}</Label>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('pages.settings.editor.fontFamilyHelp') }}
-                </p>
+              <!-- Show Minimap -->
+              <div class="flex items-center justify-between">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.editor.showMinimap') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.editor.showMinimapHelp') }}
+                  </p>
+                </div>
+                <button
+                  class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="showMinimap ? 'bg-primary' : 'bg-muted'"
+                  role="switch"
+                  :aria-checked="showMinimap"
+                  @click="toggleMinimap"
+                >
+                  <span
+                    class="rounded-full bg-background h-5 w-5 inline-block pointer-events-none shadow transition-transform"
+                    :class="showMinimap ? 'translate-x-5' : 'translate-x-0'"
+                  />
+                </button>
               </div>
-              <Input
-                type="text"
-                :model-value="fontFamilyInput"
-                class="w-full"
-                @update:model-value="handleFontFamilyChange($event)"
-              />
-            </div>
+            </CardContent>
+          </Card>
 
-            <!-- Tab Size -->
-            <div class="gap-4 grid grid-cols-2 items-start">
-              <div class="space-y-1">
-                <Label>{{ t('pages.settings.editor.tabSize') }}</Label>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('pages.settings.editor.tabSizeHelp') }}
-                </p>
+          <!-- Query Card -->
+          <Card>
+            <CardHeader>
+              <CardTitle>{{ t('pages.settings.query.title') }}</CardTitle>
+              <CardDescription>{{ t('pages.settings.query.description') }}</CardDescription>
+            </CardHeader>
+            <CardContent class="space-y-5">
+              <!-- Default Row Limit -->
+              <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.query.defaultLimit') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.query.defaultLimitHelp') }}
+                  </p>
+                </div>
+                <div class="space-y-1">
+                  <Input
+                    type="number"
+                    :model-value="defaultLimitInput"
+                    min="10"
+                    max="10000"
+                    class="w-32"
+                    @update:model-value="handleDefaultLimitChange($event)"
+                  />
+                  <p v-if="defaultLimitError" class="text-xs text-destructive">
+                    {{ defaultLimitError }}
+                  </p>
+                </div>
               </div>
-              <div class="space-y-1">
-                <Input
-                  type="number"
-                  :model-value="tabSizeInput"
-                  min="1"
-                  max="8"
-                  class="w-28"
-                  @update:model-value="handleTabSizeChange($event)"
-                />
-                <p v-if="tabSizeError" class="text-xs text-destructive">
-                  {{ tabSizeError }}
-                </p>
-              </div>
-            </div>
 
-            <!-- Word Wrap -->
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <Label>{{ t('pages.settings.editor.wordWrap') }}</Label>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('pages.settings.editor.wordWrapHelp') }}
-                </p>
+              <!-- Query Timeout -->
+              <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.query.queryTimeout') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.query.queryTimeoutHelp') }}
+                  </p>
+                </div>
+                <div class="space-y-1">
+                  <Input
+                    type="number"
+                    :model-value="queryTimeoutInput"
+                    min="1"
+                    max="300"
+                    class="w-32"
+                    @update:model-value="handleQueryTimeoutChange($event)"
+                  />
+                  <p v-if="queryTimeoutError" class="text-xs text-destructive">
+                    {{ queryTimeoutError }}
+                  </p>
+                </div>
               </div>
-              <button
-                class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="wordWrap ? 'bg-primary' : 'bg-muted'"
-                role="switch"
-                :aria-checked="wordWrap"
-                @click="toggleWordWrap"
-              >
-                <span
-                  class="rounded-full bg-background h-5 w-5 inline-block pointer-events-none shadow transition-transform"
-                  :class="wordWrap ? 'translate-x-5' : 'translate-x-0'"
-                />
-              </button>
-            </div>
 
-            <!-- Show Line Numbers -->
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <Label>{{ t('pages.settings.editor.showLineNumbers') }}</Label>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('pages.settings.editor.showLineNumbersHelp') }}
-                </p>
+              <!-- Auto Save -->
+              <div class="flex items-center justify-between">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.query.autoSave') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.query.autoSaveHelp') }}
+                  </p>
+                </div>
+                <button
+                  class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  :class="autoSave ? 'bg-primary' : 'bg-muted'"
+                  role="switch"
+                  :aria-checked="autoSave"
+                  @click="toggleAutoSave"
+                >
+                  <span
+                    class="rounded-full bg-background h-5 w-5 inline-block pointer-events-none shadow transition-transform"
+                    :class="autoSave ? 'translate-x-5' : 'translate-x-0'"
+                  />
+                </button>
               </div>
-              <button
-                class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="showLineNumbers ? 'bg-primary' : 'bg-muted'"
-                role="switch"
-                :aria-checked="showLineNumbers"
-                @click="toggleLineNumbers"
-              >
-                <span
-                  class="rounded-full bg-background h-5 w-5 inline-block pointer-events-none shadow transition-transform"
-                  :class="showLineNumbers ? 'translate-x-5' : 'translate-x-0'"
-                />
-              </button>
-            </div>
-
-            <!-- Show Minimap -->
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <Label>{{ t('pages.settings.editor.showMinimap') }}</Label>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('pages.settings.editor.showMinimapHelp') }}
-                </p>
-              </div>
-              <button
-                class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="showMinimap ? 'bg-primary' : 'bg-muted'"
-                role="switch"
-                :aria-checked="showMinimap"
-                @click="toggleMinimap"
-              >
-                <span
-                  class="rounded-full bg-background h-5 w-5 inline-block pointer-events-none shadow transition-transform"
-                  :class="showMinimap ? 'translate-x-5' : 'translate-x-0'"
-                />
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <!-- Query Card -->
-        <Card>
-          <CardHeader>
-            <CardTitle>{{ t('pages.settings.query.title') }}</CardTitle>
-            <CardDescription>{{ t('pages.settings.query.description') }}</CardDescription>
-          </CardHeader>
-          <CardContent class="space-y-5">
-            <!-- Default Row Limit -->
-            <div class="gap-4 grid grid-cols-2 items-start">
-              <div class="space-y-1">
-                <Label>{{ t('pages.settings.query.defaultLimit') }}</Label>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('pages.settings.query.defaultLimitHelp') }}
-                </p>
-              </div>
-              <div class="space-y-1">
-                <Input
-                  type="number"
-                  :model-value="defaultLimitInput"
-                  min="10"
-                  max="10000"
-                  class="w-32"
-                  @update:model-value="handleDefaultLimitChange($event)"
-                />
-                <p v-if="defaultLimitError" class="text-xs text-destructive">
-                  {{ defaultLimitError }}
-                </p>
-              </div>
-            </div>
-
-            <!-- Query Timeout -->
-            <div class="gap-4 grid grid-cols-2 items-start">
-              <div class="space-y-1">
-                <Label>{{ t('pages.settings.query.queryTimeout') }}</Label>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('pages.settings.query.queryTimeoutHelp') }}
-                </p>
-              </div>
-              <div class="space-y-1">
-                <Input
-                  type="number"
-                  :model-value="queryTimeoutInput"
-                  min="1"
-                  max="300"
-                  class="w-32"
-                  @update:model-value="handleQueryTimeoutChange($event)"
-                />
-                <p v-if="queryTimeoutError" class="text-xs text-destructive">
-                  {{ queryTimeoutError }}
-                </p>
-              </div>
-            </div>
-
-            <!-- Auto Save -->
-            <div class="flex items-center justify-between">
-              <div class="space-y-1">
-                <Label>{{ t('pages.settings.query.autoSave') }}</Label>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('pages.settings.query.autoSaveHelp') }}
-                </p>
-              </div>
-              <button
-                class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                :class="autoSave ? 'bg-primary' : 'bg-muted'"
-                role="switch"
-                :aria-checked="autoSave"
-                @click="toggleAutoSave"
-              >
-                <span
-                  class="rounded-full bg-background h-5 w-5 inline-block pointer-events-none shadow transition-transform"
-                  :class="autoSave ? 'translate-x-5' : 'translate-x-0'"
-                />
-              </button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   </AppLayout>
 </template>
+
+<style scoped>
+input[type='number']::-webkit-inner-spin-button,
+input[type='number']::-webkit-outer-spin-button {
+  cursor: pointer;
+}
+</style>

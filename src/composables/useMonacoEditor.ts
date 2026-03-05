@@ -19,6 +19,8 @@ export interface MonacoEditorOptions {
   minimap?: boolean
   fontSize?: number
   tabSize?: number
+  showLineNumbers?: boolean
+  wordWrap?: boolean
 }
 
 // SQL keywords for auto-completion
@@ -241,11 +243,9 @@ export function useMonacoEditor(
       },
       fontSize: options.fontSize || 14,
       tabSize: options.tabSize || 2,
-      lineNumbers: 'on',
+      lineNumbers: options.showLineNumbers === false ? 'off' : 'on',
+      wordWrap: options.wordWrap === false ? 'off' : 'on',
       roundedSelection: false,
-      scrollBeyondLastLine: false,
-      folding: true,
-      wordWrap: 'on',
       contextmenu: true,
       formatOnPaste: true,
       formatOnType: true,
@@ -304,6 +304,18 @@ export function useMonacoEditor(
     editor?.setValue(value)
   }
 
+  const updateOptions = (newOpts: Partial<MonacoEditorOptions>) => {
+    if (!editor)
+      return
+    editor.updateOptions({
+      ...(newOpts.showLineNumbers !== undefined && { lineNumbers: newOpts.showLineNumbers ? 'on' : 'off' }),
+      ...(newOpts.fontSize !== undefined && { fontSize: newOpts.fontSize }),
+      ...(newOpts.tabSize !== undefined && { tabSize: newOpts.tabSize }),
+      ...(newOpts.minimap !== undefined && { minimap: { enabled: newOpts.minimap } }),
+      ...(newOpts.wordWrap !== undefined && { wordWrap: newOpts.wordWrap ? 'on' : 'off' }),
+    })
+  }
+
   const updateTheme = (dark: boolean) => {
     monaco.editor.setTheme(dark ? 'vs-dark' : 'vs')
   }
@@ -322,6 +334,7 @@ export function useMonacoEditor(
     getValue,
     setValue,
     updateTheme,
+    updateOptions,
     dispose,
   }
 }

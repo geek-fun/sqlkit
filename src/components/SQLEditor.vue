@@ -13,6 +13,8 @@ interface Props {
   minimap?: boolean
   fontSize?: number
   tabSize?: number
+  showLineNumbers?: boolean
+  wordWrap?: boolean
   height?: string
   placeholder?: string
   isExecuting?: boolean
@@ -25,6 +27,8 @@ const props = withDefaults(defineProps<Props>(), {
   minimap: true,
   fontSize: 14,
   tabSize: 2,
+  showLineNumbers: true,
+  wordWrap: true,
   height: '400px',
   placeholder: '-- Enter your SQL query here\n-- Press Ctrl+Enter to execute',
   isExecuting: false,
@@ -46,9 +50,11 @@ const editorOptions: MonacoEditorOptions = {
   minimap: props.minimap,
   fontSize: props.fontSize,
   tabSize: props.tabSize,
+  showLineNumbers: props.showLineNumbers,
+  wordWrap: props.wordWrap,
 }
 
-const { initEditor, getValue, setValue, updateTheme } = useMonacoEditor(
+const { initEditor, getValue, setValue, updateTheme, updateOptions } = useMonacoEditor(
   editorContainer,
   editorValue,
   editorOptions,
@@ -89,6 +95,13 @@ watch(() => props.modelValue, (newValue) => {
 watch(isDark, (dark) => {
   updateTheme(dark)
 })
+
+// Watch for editor option changes
+watch(() => props.showLineNumbers, val => updateOptions({ showLineNumbers: val }))
+watch(() => props.wordWrap, val => updateOptions({ wordWrap: val }))
+watch(() => props.fontSize, val => updateOptions({ fontSize: val }))
+watch(() => props.tabSize, val => updateOptions({ tabSize: val }))
+watch(() => props.minimap, val => updateOptions({ minimap: val }))
 
 // Expose methods for parent component
 defineExpose({
