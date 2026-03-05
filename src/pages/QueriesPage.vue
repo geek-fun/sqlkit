@@ -18,10 +18,11 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { saveQueryFile } from '@/datasources'
-import { ConnectionStatus, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
+import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
 const { t } = useI18n()
 const route = useRoute()
+const appStore = useAppStore()
 const connectionStore = useConnectionStore()
 const databaseStore = useDatabaseStore()
 const tabStore = useTabStore()
@@ -163,11 +164,11 @@ async function handleExplainQuery() {
 const getConnectionId = () => selectedConnectionId.value || connectionStore.activeConnectionId
 
 function handleNewTab() {
-  const connId = getConnectionId()
-  if (connId) {
-    const connection = connectionStore.getConnectionById(connId)
-    tabStore.createTab(connId, connection?.database || undefined)
-  }
+  const connId = getConnectionId() || ''
+  const db = connId
+    ? (selectedDatabase.value || connectionStore.getCurrentDatabase(connId) || connectionStore.getConnectionById(connId)?.database || undefined)
+    : undefined
+  tabStore.createTab(connId, db)
 }
 
 function handleTabSelect(tabId: string) {
@@ -403,6 +404,11 @@ async function handleSaveQuery() {
               height="100%"
               dialect="sql"
               :is-executing="activeTab.isExecuting"
+              :font-size="appStore.editorConfig.fontSize"
+              :tab-size="appStore.editorConfig.tabSize"
+              :word-wrap="appStore.editorConfig.wordWrap"
+              :minimap="appStore.editorConfig.showMinimap"
+              :show-line-numbers="appStore.editorConfig.showLineNumbers"
               @execute="(details) => executeQuery(details)"
               @save="handleSaveQuery"
             />
