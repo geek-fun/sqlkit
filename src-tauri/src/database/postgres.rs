@@ -548,6 +548,19 @@ impl DatabaseAdapter for PostgresAdapter {
     }
 
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
+        // If a different database is requested, create a temporary connection to it.
+        // PostgreSQL connections are per-database, so we cannot query another database's
+        // schemas through the current connection.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = PostgresAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_schemas(None).await;
+            }
+        }
+
         let query = r#"
             SELECT schema_name
             FROM information_schema.schemata
@@ -568,13 +581,6 @@ impl DatabaseAdapter for PostgresAdapter {
             .await
             .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
 
-        // If a different database is specified, we would need a new connection
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list schemas from a different database without reconnecting".to_string(),
-            ));
-        }
-
         let rows = client
             .query(query, &[])
             .await
@@ -590,10 +596,17 @@ impl DatabaseAdapter for PostgresAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list tables from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        // PostgreSQL connections are per-database, so we cannot query another database's
+        // tables through the current connection.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = PostgresAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_tables(None, schema).await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");

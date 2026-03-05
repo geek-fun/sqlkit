@@ -119,7 +119,9 @@ const treeNodes = computed<TreeNode[]>(() => {
 })
 
 const tablesAndViews = computed(() => {
-  const currentDb = props.selectedDatabase || activeConnection.value?.database
+  const currentDb = props.selectedDatabase
+    || connectionStore.getCurrentDatabase(connectionId.value || '')
+    || activeConnection.value?.database
   if (!currentDb || !connectionId.value || !databaseStore.metadata[connectionId.value]) {
     return { tables: [], views: [] }
   }
@@ -260,7 +262,9 @@ async function refreshTree() {
   databaseStore.clearMetadata(connectionId.value)
   await databaseStore.fetchDatabases(connectionId.value)
 
-  const connectedDb = connection.database
+  const connectedDb = props.selectedDatabase
+    || connectionStore.getCurrentDatabase(connectionId.value)
+    || connection.database
   if (connectedDb) {
     await databaseStore.fetchSchemas(connectionId.value, connectedDb)
 
@@ -293,9 +297,13 @@ watch(connectionId, async (newId) => {
 
   await databaseStore.fetchDatabases(newId)
 
-  const connectedDb = connection.database
+  const connectedDb = connection.database || connectionStore.getCurrentDatabase(newId)
   if (connectedDb) {
     await loadDatabaseData(newId, connectedDb)
+  }
+  // Auto-select the initial database in the parent if none is selected yet.
+  if (!props.selectedDatabase && connectedDb) {
+    emit('update:selectedDatabase', connectedDb)
   }
 }, { immediate: true })
 
@@ -306,15 +314,28 @@ watch(() => activeConnection.value?.isConnected, async (isConnected) => {
 
   await databaseStore.fetchDatabases(connectionId.value)
 
-  const connectedDb = activeConnection.value?.database
+  const connectedDb = activeConnection.value?.database || connectionStore.getCurrentDatabase(connectionId.value)
   if (connectedDb) {
     await loadDatabaseData(connectionId.value, connectedDb)
   }
+  // Auto-select the initial database in the parent if none is selected yet.
+  if (!props.selectedDatabase && connectedDb) {
+    emit('update:selectedDatabase', connectedDb)
+  }
 })
 
-watch(() => props.selectedDatabase, async (newDb) => {
-  if (!newDb || !connectionId.value) {
+watch(() => props.selectedDatabase, async (newDb, oldDb) => {
+  if (!newDb || !connectionId.value || newDb === oldDb) {
     return
+  }
+
+  // Force-clear stale cached schemas/tables for the newly selected database
+  // so we always get fresh data rather than showing previously loaded results.
+  const meta = databaseStore.metadata[connectionId.value]
+  if (meta) {
+    delete meta.schemas[newDb]
+    const staleKeys = Object.keys(meta.tables).filter(k => k === newDb || k.startsWith(`${newDb}.`))
+    staleKeys.forEach(k => delete meta.tables[k])
   }
 
   await loadDatabaseData(connectionId.value, newDb)
@@ -387,8 +408,8 @@ const getIcon = (type: IconType) => iconMap[type] || iconMap.column
       </div>
     </div>
 
-    <!-- Database selector (only show if no database specified in connection) -->
-    <div v-if="activeConnection && !activeConnection.database" class="px-2 py-1 border-b">
+    <!-- Database selector: always visible so the user can switch databases -->
+    <div v-if="activeConnection?.isConnected" class="px-2 py-1 border-b">
       <Select :model-value="props.selectedDatabase" @update:model-value="(val) => emit('update:selectedDatabase', val)">
         <SelectTrigger class="text-xs h-7">
           <SelectValue :placeholder="t('components.databaseBrowser.selectDatabase')" />

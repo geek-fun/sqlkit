@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { saveQueryFile } from '@/datasources'
-import { useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
+import { ConnectionStatus, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -56,66 +56,81 @@ const editorContent = computed({
   },
 })
 
-// Initialize on mount
+// Initialize on mount — restore previously selected connection & database from store
 onMounted(async () => {
-  // Set active connection from route if provided
-  if (route.query.connectionId) {
-    selectedConnectionId.value = route.query.connectionId as string
-    // Connection will be established by the watch
-  }
-  else if (connectionStore.activeConnectionId) {
-    selectedConnectionId.value = connectionStore.activeConnectionId
-    // If already connected, just sync the UI
-    const connId = connectionStore.activeConnectionId
-    const connection = connectionStore.getConnectionById(connId)
+  // Route query param takes priority (e.g. deep-link from ConnectionsPage)
+  const routeConnId = route.query.connectionId as string | undefined
+  const connId = routeConnId || connectionStore.activeConnectionId
 
-    // Create initial tab if none exists
-    if (tabStore.tabs.length === 0) {
-      tabStore.createTab(connId, connection?.database || undefined)
-    }
+  if (connId) {
+    selectedConnectionId.value = connId
 
-    // Set selectedDatabase from connection
-    if (connection?.database) {
-      selectedDatabase.value = connection.database
-    }
-
-    // Fetch databases for active connection
-    await databaseStore.fetchDatabases(connId)
-  }
-})
-
-// Watch for connection changes
-watch(selectedConnectionId, async (newConnId, oldConnId) => {
-  if (newConnId && newConnId !== oldConnId) {
-    try {
-      // Establish the connection first
-      await connectionStore.connect(newConnId)
-
-      // Set as active connection
-      connectionStore.setActiveConnection(newConnId)
-
-      // Fetch databases for the connection
-      await databaseStore.fetchDatabases(newConnId)
-
-      // Set selectedDatabase from connection
-      const connection = connectionStore.getConnectionById(newConnId)
-      if (connection?.database) {
-        selectedDatabase.value = connection.database
+    // If already connected, just restore UI state — no need to reconnect
+    const isConnected = connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
+    if (isConnected) {
+      const currentDb = connectionStore.getCurrentDatabase(connId)
+      if (currentDb) {
+        selectedDatabase.value = currentDb
       }
 
-      // Create new tab for the connection if no tabs exist
       if (tabStore.tabs.length === 0) {
-        tabStore.createTab(newConnId, connection?.database || undefined)
+        tabStore.createTab(connId, currentDb || undefined)
       }
+
+      await databaseStore.fetchDatabases(connId)
     }
-    catch (error) {
-      console.error('Failed to connect:', error)
-      // Optionally show error to user
-    }
+    // If not connected yet (e.g. first visit via route param), the watch will connect
   }
 })
 
-// Watch for database changes (removed since we handle it at connection level now)
+// Watch for connection changes — connect only when not already connected
+watch(selectedConnectionId, async (newConnId, oldConnId) => {
+  if (!newConnId || newConnId === oldConnId) {
+    return
+  }
+
+  const alreadyConnected = connectionStore.getConnectionStatus(newConnId) === ConnectionStatus.CONNECTED
+
+  if (alreadyConnected) {
+    // Already connected — just restore UI state and make it active
+    connectionStore.setActiveConnection(newConnId)
+    const currentDb = connectionStore.getCurrentDatabase(newConnId)
+    if (currentDb) {
+      selectedDatabase.value = currentDb
+    }
+    if (tabStore.tabs.length === 0) {
+      tabStore.createTab(newConnId, currentDb || undefined)
+    }
+    await databaseStore.fetchDatabases(newConnId)
+    return
+  }
+
+  try {
+    await connectionStore.connect(newConnId)
+    connectionStore.setActiveConnection(newConnId)
+    await databaseStore.fetchDatabases(newConnId)
+
+    const currentDb = connectionStore.getCurrentDatabase(newConnId)
+    if (currentDb) {
+      selectedDatabase.value = currentDb
+    }
+
+    if (tabStore.tabs.length === 0) {
+      tabStore.createTab(newConnId, connectionStore.getCurrentDatabase(newConnId) || undefined)
+    }
+  }
+  catch (error) {
+    console.error('Failed to connect:', error)
+  }
+})
+
+// Persist the selected database back to the store so it survives navigation
+watch(selectedDatabase, (db) => {
+  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  if (connId && db) {
+    connectionStore.setCurrentDatabase(connId, db)
+  }
+})
 
 interface ExecuteQueryDetails { query: string, cursorPosition?: CursorPosition, selection?: Selection }
 

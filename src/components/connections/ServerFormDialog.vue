@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { DatabaseType } from '@/store'
+import { DatabaseType, resolveDatabase } from '@/store'
 
 const props = defineProps<{
   open: boolean
@@ -135,7 +135,7 @@ async function handleTestConnection() {
       port: formData.value.port,
       username: formData.value.username || '',
       password: formData.value.password || undefined,
-      database: formData.value.database || undefined,
+      database: resolveDatabase(formData.value.type, formData.value.database) ?? undefined,
       ssl_mode: formData.value.ssl ? 'require' : 'disable',
     }
 

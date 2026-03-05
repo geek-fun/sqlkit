@@ -24,6 +24,23 @@ const dbTypeFromBackend: Record<string, DatabaseType> = {
   SQLite: DatabaseType.SQLITE,
 }
 
+/**
+ * Returns the well-known default database for each engine when the user has
+ * not configured one. Without this, PostgreSQL would try to connect to a
+ * database named after the username (which usually doesn't exist), and SQL
+ * Server would use its own default which may be restricted.
+ */
+const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
+  [DatabaseType.POSTGRESQL]: 'postgres',
+  [DatabaseType.SQLSERVER]: 'master',
+}
+
+function resolveDatabase(type: DatabaseType, database?: string): string | null {
+  return database || defaultDatabaseFor[type] || null
+}
+
+export { resolveDatabase }
+
 export enum ConnectionStatus {
   DISCONNECTED = 'disconnected',
   CONNECTING = 'connecting',
@@ -60,6 +77,8 @@ interface ConnectionStoreState {
   connections: ServerConnection[]
   activeConnectionId: string | null
   connectionStatus: Record<string, ConnectionStatus>
+  /** Tracks the actual database in use per connection (may differ from configured connection.database when no db was specified and backend applied a default). */
+  currentDatabases: Record<string, string>
 }
 
 export const useConnectionStore = defineStore('connectionStore', {
@@ -67,6 +86,7 @@ export const useConnectionStore = defineStore('connectionStore', {
     connections: [],
     activeConnectionId: null,
     connectionStatus: {},
+    currentDatabases: {},
   }),
   getters: {
     activeConnection: (state): ServerConnection | undefined =>
@@ -86,6 +106,9 @@ export const useConnectionStore = defineStore('connectionStore', {
     },
     getConnectionStatus: state => (id: string): ConnectionStatus =>
       state.connectionStatus[id] ?? ConnectionStatus.DISCONNECTED,
+    /** Returns the currently active database for a connection: backend-resolved default or configured value. */
+    getCurrentDatabase: state => (id: string): string =>
+      state.currentDatabases[id] ?? state.connections.find(c => c.id === id)?.database ?? '',
   },
   actions: {
     async fetchConnections() {
@@ -168,7 +191,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           port: connection.port,
           username: connection.username || '',
           password: connection.password || null,
-          database: connection.database || null,
+          database: resolveDatabase(connection.type, connection.database),
           ssl_mode: connection.ssl ? 'require' : 'disable',
         }
 
@@ -198,7 +221,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           port: connection.port,
           username: connection.username || '',
           password: connection.password || null,
-          database: connection.database || null,
+          database: resolveDatabase(connection.type, connection.database),
           ssl_mode: connection.ssl ? 'require' : 'disable',
         }
 
@@ -208,6 +231,11 @@ export const useConnectionStore = defineStore('connectionStore', {
         connection.lastUsed = new Date()
         this.connectionStatus[connectionId] = ConnectionStatus.CONNECTED
         this.activeConnectionId = connectionId
+        // Persist the actual connected database (may be the resolved default).
+        const resolvedDb = result.current_database || resolveDatabase(connection.type, connection.database)
+        if (resolvedDb) {
+          this.currentDatabases[connectionId] = resolvedDb
+        }
         return result
       }
       catch (error) {
@@ -226,6 +254,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           connection.isConnected = false
         }
         this.connectionStatus[connectionId] = ConnectionStatus.DISCONNECTED
+        delete this.currentDatabases[connectionId]
         if (this.activeConnectionId === connectionId) {
           this.activeConnectionId = null
         }
@@ -234,6 +263,11 @@ export const useConnectionStore = defineStore('connectionStore', {
 
     setActiveConnection(connectionId: string | null) {
       this.activeConnectionId = connectionId
+    },
+
+    /** Persist the user-selected database for a connection so it survives navigation. */
+    setCurrentDatabase(connectionId: string, database: string) {
+      this.currentDatabases[connectionId] = database
     },
   },
 })

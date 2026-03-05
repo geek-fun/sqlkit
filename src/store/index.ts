@@ -1,6 +1,6 @@
 export { LanguageType, ThemeType, useAppStore } from './appStore'
 export type { EditorConfig, QueryConfig } from './appStore'
-export { ConnectionStatus, DatabaseType, useConnectionStore } from './connectionStore'
+export { ConnectionStatus, DatabaseType, resolveDatabase, useConnectionStore } from './connectionStore'
 export type { ServerConnection, SSHTunnelConfig } from './connectionStore'
 export { useDatabaseStore } from './databaseStore'
 export type { DatabaseMetadata, TableInfo } from './databaseStore'

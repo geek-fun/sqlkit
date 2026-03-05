@@ -511,6 +511,18 @@ impl DatabaseAdapter for SqlServerAdapter {
     }
 
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
+        // If a different database is requested, create a temporary connection to it.
+        // SQL Server connections are per-database context, so we reconnect to query another DB.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = SqlServerAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_schemas(None).await;
+            }
+        }
+
         // SQL Server supports schemas within databases
         let query = r#"
             SELECT name
@@ -524,13 +536,6 @@ impl DatabaseAdapter for SqlServerAdapter {
 
         let client = self.get_client().await?;
         let mut client = client.lock().await;
-
-        // If a different database is specified, we would need to switch context
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list schemas from a different database without reconnecting".to_string(),
-            ));
-        }
 
         let stream = client
             .simple_query(query)
@@ -558,10 +563,16 @@ impl DatabaseAdapter for SqlServerAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list tables from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        // SQL Server connections are per-database context, so we reconnect to query another DB.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = SqlServerAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_tables(None, schema).await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("dbo");
