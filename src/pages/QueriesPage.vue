@@ -33,14 +33,6 @@ const sidebarWidth = ref(250)
 const isResizingSidebar = ref(false)
 const selectedDatabase = ref<string>('')
 
-interface ActiveTableView {
-  table: TableInfo
-  database: string
-  schema?: string
-}
-
-const activeTableView = ref<ActiveTableView | null>(null)
-
 // Available connections
 const availableConnections = computed(() => connectionStore.connections)
 
@@ -182,7 +174,6 @@ function handleNewTab() {
 
 function handleTabSelect(tabId: string) {
   tabStore.setActiveTab(tabId)
-  activeTableView.value = null
 }
 
 function handleTabClose(tabId: string) {
@@ -246,7 +237,10 @@ function handleExportData(_table: TableInfo, _database: string, _schema?: string
 }
 
 function handleSelectTable(table: TableInfo, database: string, schema?: string) {
-  activeTableView.value = { table, database, schema }
+  const connId = getConnectionId()
+  if (!connId)
+    return
+  tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
 function startSidebarResize(_e: MouseEvent) {
@@ -386,17 +380,18 @@ async function handleDownloadQuery() {
             @new="handleNewTab"
           />
 
-          <!-- Data Table View (shown when a table is selected in the sidebar) -->
+          <!-- Data Table View (shown when the active tab is a table-view tab) -->
           <DataTableView
-            v-if="activeTableView"
-            :connection-id="getConnectionId() || ''"
-            :database="activeTableView.database"
-            :schema="activeTableView.schema"
-            :table-name="activeTableView.table.name"
+            v-if="activeTab?.tableView"
+            :key="activeTab.id"
+            :connection-id="activeTab.connectionId"
+            :database="activeTab.tableView.database"
+            :schema="activeTab.tableView.schema"
+            :table-name="activeTab.tableView.tableName"
             class="flex-1"
           />
 
-          <!-- Query editor area (shown when no table is selected) -->
+          <!-- Query editor area (shown for normal query tabs) -->
           <template v-else>
             <!-- Toolbar -->
             <div class="px-2 py-1 border-b bg-muted/30 flex gap-2 items-center">

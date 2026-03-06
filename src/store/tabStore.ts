@@ -11,6 +11,13 @@ export interface QueryResult {
   executionTimeMs?: number
 }
 
+/** Metadata for a table-view tab (opened by clicking a table in the sidebar). */
+export interface TableViewMeta {
+  tableName: string
+  database: string
+  schema?: string
+}
+
 export interface QueryTab {
   id: string
   name: string
@@ -23,6 +30,8 @@ export interface QueryTab {
   results?: QueryResult
   error?: ApiError | string
   executionTime?: number
+  /** When set, this tab renders a DataTableView instead of the SQL editor. */
+  tableView?: TableViewMeta
 }
 
 interface TabStoreState {
@@ -61,6 +70,35 @@ export const useTabStore = defineStore('tabs', {
         database,
         isExecuting: false,
         hasUnsavedChanges: false,
+      }
+      this.tabs.push(tab)
+      this.activeTabId = tab.id
+      return tab
+    },
+
+    /** Open a table-view tab for the given table, or switch to one that is already open. */
+    openTableViewTab(connectionId: string, database: string, tableName: string, schema?: string): QueryTab {
+      const existing = this.tabs.find(
+        t => t.tableView
+          && t.tableView.tableName === tableName
+          && t.tableView.database === database
+          && (t.tableView.schema ?? null) === (schema ?? null)
+          && t.connectionId === connectionId,
+      )
+      if (existing) {
+        this.activeTabId = existing.id
+        return existing
+      }
+
+      const tab: QueryTab = {
+        id: generateId(),
+        name: tableName,
+        content: '',
+        connectionId,
+        database,
+        isExecuting: false,
+        hasUnsavedChanges: false,
+        tableView: { tableName, database, schema },
       }
       this.tabs.push(tab)
       this.activeTabId = tab.id
