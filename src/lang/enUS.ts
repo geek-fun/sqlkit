@@ -270,9 +270,27 @@ export const enUS = {
       rows: 'rows',
       page: 'Page {page} of {total}',
       rowsPerPage: 'Rows per page:',
+      actions: 'Actions',
+      editRow: 'Edit row',
+      deleteRow: 'Delete row',
       notifications: {
         csvExported: 'CSV exported',
         exportFailed: 'Export failed',
+        rowDeleted: 'Row deleted',
+        deleteFailed: 'Failed to delete row',
+        rowUpdated: 'Row updated',
+        updateFailed: 'Failed to update row',
+      },
+      deleteDialog: {
+        title: 'Delete Row',
+        message: 'Are you sure you want to delete this row? This action cannot be undone.',
+        confirm: 'Delete',
+      },
+      editDialog: {
+        title: 'Edit Row',
+      },
+      validation: {
+        required: 'This field is required',
       },
     },
     queryTabs: {

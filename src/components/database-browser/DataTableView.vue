@@ -3,8 +3,24 @@ import { invoke } from '@tauri-apps/api/core'
 import { save as showSaveDialog } from '@tauri-apps/plugin-dialog'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   Select,
   SelectContent,
@@ -61,21 +77,49 @@ const error = ref<string | null>(null)
 const executionTimeMs = ref<number | null>(null)
 const columnInfoList = ref<ColumnTypeInfo[]>([])
 
+// --- Delete state ---
+const deleteDialogOpen = ref(false)
+const deletingRow = ref<Record<string, unknown> | null>(null)
+const isDeleting = ref(false)
+
+// --- Edit state ---
+const editDialogOpen = ref(false)
+const editingRow = ref<Record<string, unknown> | null>(null)
+// editForm: col -> { value: string, setNull: boolean }
+const editForm = ref<Record<string, { value: string, setNull: boolean }>>({})
+const editErrors = ref<Record<string, string>>({})
+const isSaving = ref(false)
+
 const visibleColumns = computed(() =>
-  data.value ? data.value.columns.filter(c => !hiddenColumns.value.has(c)) : [],
+  data.value ? data.value.columns.filter((c: string) => !hiddenColumns.value.has(c)) : [],
 )
 
-const columnTypeMap = computed(() => {
-  const map: Record<string, string> = {}
-  columnInfoList.value.forEach((c) => { map[c.name] = c.data_type })
-  return map
-})
+const columnTypeMap = computed(() =>
+  Object.fromEntries(columnInfoList.value.map(c => [c.name, c.data_type])),
+)
 
-const columnIsPK = computed(() => {
-  const map: Record<string, boolean> = {}
-  columnInfoList.value.forEach((c) => { map[c.name] = c.is_primary_key })
-  return map
-})
+const columnIsPK = computed(() =>
+  Object.fromEntries(columnInfoList.value.map(c => [c.name, c.is_primary_key])),
+)
+
+const columnNullable = computed(() =>
+  Object.fromEntries(columnInfoList.value.map(c => [c.name, c.nullable])),
+)
+
+/** PK columns (in order they appear in the result set) */
+const pkColumns = computed(() =>
+  (data.value?.columns ?? []).filter((c: string) => columnIsPK.value[c]),
+)
+
+/** Extract pk values from a row as { col: rawValue } for backend consumption */
+const extractPkValues = (row: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(pkColumns.value.map((col: string) => [col, row[col] ?? null]))
+
+/** Display summary of pk values for a row */
+const formatPkSummary = (row: Record<string, unknown>): string =>
+  pkColumns.value.length > 0
+    ? pkColumns.value.map((col: string) => `${col}: ${formatTableValue(row[col])}`).join(', ')
+    : Object.entries(row).slice(0, 2).map(([k, v]) => `${k}: ${formatTableValue(v)}`).join(', ')
 
 const totalPages = computed(() => computeTotalPages(totalCount.value, rowsPerPage.value))
 
@@ -238,6 +282,136 @@ async function exportCSV() {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
+  }
+}
+
+// --- Delete handlers ---
+
+function openDeleteDialog(row: Record<string, unknown>) {
+  deletingRow.value = row
+  deleteDialogOpen.value = true
+}
+
+async function confirmDelete() {
+  if (!deletingRow.value)
+    return
+  isDeleting.value = true
+  try {
+    await invoke('delete_table_row', {
+      connectionId: props.connectionId,
+      table: props.tableName,
+      schema: props.schema ?? null,
+      pkValues: extractPkValues(deletingRow.value),
+    })
+    toast.success(t('components.dataTableView.notifications.rowDeleted'))
+    deleteDialogOpen.value = false
+    deletingRow.value = null
+    await refresh()
+  }
+  catch (err) {
+    toast.error(t('components.dataTableView.notifications.deleteFailed'), {
+      description: err instanceof Error ? err.message : String(err),
+    })
+  }
+  finally {
+    isDeleting.value = false
+  }
+}
+
+// --- Edit handlers ---
+
+function rawValueToString(v: unknown): string {
+  if (v === null || v === undefined)
+    return ''
+  if (typeof v === 'object')
+    return JSON.stringify(v)
+  return String(v)
+}
+
+function openEditDialog(row: Record<string, unknown>) {
+  editingRow.value = row
+  editErrors.value = {}
+  const cols = data.value?.columns ?? []
+  editForm.value = Object.fromEntries(
+    cols.map((col: string) => [
+      col,
+      {
+        value: rawValueToString(row[col]),
+        setNull: row[col] === null || row[col] === undefined,
+      },
+    ]),
+  )
+  editDialogOpen.value = true
+}
+
+function validateEditForm(): boolean {
+  const errors: Record<string, string> = {}
+  for (const col of (data.value?.columns ?? [])) {
+    const field = editForm.value[col]
+    if (!field)
+      continue
+    // Non-nullable columns must not be set to NULL or left empty
+    if (!columnNullable.value[col] && (field.setNull || field.value.trim() === '')) {
+      errors[col] = t('components.dataTableView.validation.required')
+    }
+  }
+  editErrors.value = errors
+  return Object.keys(errors).length === 0
+}
+
+/** Convert a string-form edit value to an appropriate JSON-compatible type for the backend. */
+function coerceEditValue(col: string, value: string): unknown {
+  const type = (columnTypeMap.value[col] ?? '').toLowerCase()
+  if (type.includes('int') || type.includes('serial') || type.includes('numeric') || type.includes('decimal') || type.includes('float') || type.includes('double') || type.includes('real') || type.includes('money')) {
+    const n = Number(value)
+    if (!Number.isNaN(n))
+      return n
+  }
+  if (type === 'bool' || type === 'boolean') {
+    if (value.toLowerCase() === 'true')
+      return true
+    if (value.toLowerCase() === 'false')
+      return false
+  }
+  return value
+}
+
+async function confirmEdit() {
+  if (!editingRow.value)
+    return
+  if (!validateEditForm())
+    return
+
+  isSaving.value = true
+  try {
+    // Build the updates object: col -> JSON-compatible typed value
+    const updates: Record<string, unknown> = {}
+    for (const col of (data.value?.columns ?? [])) {
+      const field = editForm.value[col]
+      if (!field)
+        continue
+      updates[col] = field.setNull ? null : coerceEditValue(col, field.value)
+    }
+
+    await invoke('update_table_row', {
+      connectionId: props.connectionId,
+      table: props.tableName,
+      schema: props.schema ?? null,
+      pkValues: extractPkValues(editingRow.value),
+      updates,
+    })
+    toast.success(t('components.dataTableView.notifications.rowUpdated'))
+    editDialogOpen.value = false
+    editingRow.value = null
+    await refresh()
+  }
+  catch (err) {
+    toast.error(t('components.dataTableView.notifications.updateFailed'), {
+      description: err instanceof Error ? err.message : String(err),
+    })
+  }
+  finally {
+    isSaving.value = false
   }
 }
 
@@ -482,6 +656,10 @@ watch(
                 <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
               </div>
             </th>
+            <!-- Actions header — sticky right, excluded from CSV / column visibility -->
+            <th class="data-table-header data-table-actions-col text-center">
+              {{ t('components.dataTableView.actions') }}
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -501,6 +679,38 @@ watch(
               :title="formatValue(row[col])"
             >
               {{ formatValue(row[col]) }}
+            </td>
+            <!-- Actions cell — sticky right -->
+            <td class="data-table-actions-col px-2 py-1">
+              <div class="flex gap-0.5 items-center justify-center">
+                <!-- Edit button -->
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="h-6 w-6 opacity-60 hover:opacity-100"
+                  :title="t('components.dataTableView.editRow')"
+                  @click.stop="openEditDialog(row)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                    <path d="m15 5 4 4" />
+                  </svg>
+                </Button>
+                <!-- Delete button -->
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="h-6 w-6 opacity-60 hover:text-destructive hover:opacity-100"
+                  :title="t('components.dataTableView.deleteRow')"
+                  @click.stop="openDeleteDialog(row)"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 6h18" />
+                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                  </svg>
+                </Button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -623,6 +833,119 @@ watch(
         </div>
       </div>
     </div>
+
+    <!-- ── Delete confirmation dialog ── -->
+    <AlertDialog v-model:open="deleteDialogOpen">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ t('components.dataTableView.deleteDialog.title') }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t('components.dataTableView.deleteDialog.message') }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        <!-- PK summary so user knows exactly which row will be deleted -->
+        <div v-if="deletingRow" class="rounded-md bg-muted px-3 py-2 text-xs font-mono text-muted-foreground break-all">
+          {{ formatPkSummary(deletingRow) }}
+        </div>
+
+        <AlertDialogFooter>
+          <AlertDialogCancel :disabled="isDeleting">
+            {{ t('common.buttons.cancel') }}
+          </AlertDialogCancel>
+          <AlertDialogAction
+            class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            :disabled="isDeleting"
+            @click.prevent="confirmDelete"
+          >
+            <svg v-if="isDeleting" class="mr-1.5 h-3 w-3 animate-spin inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            {{ t('components.dataTableView.deleteDialog.confirm') }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <!-- ── Edit row dialog ── -->
+    <Dialog v-model:open="editDialogOpen">
+      <DialogContent class="max-w-lg max-h-[80vh] flex flex-col gap-0 p-0">
+        <div class="px-6 pt-5 pb-3 border-b">
+          <DialogTitle>{{ t('components.dataTableView.editDialog.title') }}</DialogTitle>
+        </div>
+
+        <!-- Scrollable form area -->
+        <div class="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+          <div
+            v-for="col in (data?.columns ?? [])"
+            :key="col"
+            class="space-y-1"
+          >
+            <div class="flex items-center gap-2">
+              <Label :for="`edit-field-${col}`" class="text-xs font-medium flex items-center gap-1">
+                <svg
+                  v-if="columnIsPK[col]"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="9"
+                  height="9"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-amber-500 flex-shrink-0"
+                >
+                  <circle cx="7.5" cy="15.5" r="5.5" />
+                  <path d="m21 2-9.6 9.6" />
+                  <path d="m15.5 7.5 3 3L22 7l-3-3" />
+                </svg>
+                {{ col }}
+                <span v-if="columnTypeMap[col]" class="text-muted-foreground font-normal font-mono text-[10px]">{{ columnTypeMap[col] }}</span>
+              </Label>
+              <div class="flex-1" />
+              <!-- Set to NULL toggle -->
+              <label class="flex gap-1 items-center cursor-pointer text-xs text-muted-foreground select-none">
+                <input
+                  type="checkbox"
+                  class="h-3 w-3 cursor-pointer"
+                  :checked="editForm[col]?.setNull"
+                  @change="editForm[col] = { ...editForm[col], setNull: !editForm[col]?.setNull, value: editForm[col]?.value ?? '' }"
+                >
+                NULL
+              </label>
+            </div>
+            <Input
+              :id="`edit-field-${col}`"
+              :model-value="editForm[col]?.setNull ? '' : (editForm[col]?.value ?? '')"
+              :disabled="editForm[col]?.setNull"
+              :placeholder="editForm[col]?.setNull ? 'NULL' : ''"
+              class="text-xs h-7 font-mono"
+              :class="{ 'border-destructive': editErrors[col] }"
+              @update:model-value="(v) => editForm[col] = { ...editForm[col], value: String(v), setNull: editForm[col]?.setNull ?? false }"
+            />
+            <p v-if="editErrors[col]" class="text-xs text-destructive">
+              {{ editErrors[col] }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Footer actions -->
+        <div class="px-6 py-3 border-t flex justify-end gap-2">
+          <Button variant="outline" size="sm" :disabled="isSaving" @click="editDialogOpen = false">
+            {{ t('common.buttons.cancel') }}
+          </Button>
+          <Button size="sm" :disabled="isSaving" @click="confirmEdit">
+            <svg v-if="isSaving" class="mr-1.5 h-3 w-3 animate-spin inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            {{ t('common.buttons.save') }}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>
 
@@ -641,6 +964,22 @@ watch(
   font-weight: 500;
   max-width: 200px;
   min-width: 80px;
+}
+
+/* Sticky actions column — right-pinned, never scrolls away */
+.data-table-actions-col {
+  position: sticky;
+  right: 0;
+  background-color: hsl(var(--muted));
+  z-index: 11;
+  min-width: 72px;
+  width: 72px;
+  white-space: nowrap;
+}
+
+/* In body rows the actions cell background should match the row hover state */
+tr:hover .data-table-actions-col {
+  background-color: hsl(var(--muted) / 0.5);
 }
 
 .col-header-cell {

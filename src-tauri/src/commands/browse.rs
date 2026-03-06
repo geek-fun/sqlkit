@@ -5,6 +5,8 @@
 
 use crate::database::{DatabaseAdapter, PostgresAdapter, SqlServerAdapter, ColumnInfo, QueryResult, TableInfo};
 use crate::state::{ActiveConnection, AppState};
+use serde_json::Value as JsonValue;
+use std::collections::HashMap;
 use tauri::State;
 
 /// Quote identifier for safe SQL interpolation.
@@ -529,6 +531,178 @@ pub async fn get_table_count(
     .map_err(|e| format!("Failed to get table count: {}", e))?;
 
     extract_count(result)
+}
+
+/// Convert a JSON value to a SQL literal for safe embedding in UPDATE/DELETE queries.
+///
+/// # Security Note
+///
+/// Column names (`key`) are quoted via `quote_identifier`; only values are serialised
+/// here — they are embedded as properly-quoted SQL literals (not via user-supplied SQL
+/// strings), so the risk of injection is limited. This is intentional in SQLKit, which
+/// is a desktop application where the user is already authenticated to the target DB.
+fn json_value_to_sql_literal(val: &JsonValue) -> String {
+    match val {
+        JsonValue::Null => "NULL".to_string(),
+        JsonValue::Bool(b) => if *b { "TRUE".to_string() } else { "FALSE".to_string() },
+        JsonValue::Number(n) => n.to_string(),
+        JsonValue::String(s) => format!("'{}'", s.replace('\'', "''")),
+        JsonValue::Array(_) | JsonValue::Object(_) => {
+            let json_str = val.to_string().replace('\'', "''");
+            format!("'{}'", json_str)
+        }
+    }
+}
+
+/// Build a WHERE clause from a map of primary-key column → value pairs.
+fn build_pk_where(pk_values: &HashMap<String, JsonValue>, db_type: &str) -> String {
+    pk_values
+        .iter()
+        .map(|(col, val)| {
+            let quoted_col = quote_identifier(col, db_type);
+            if val.is_null() {
+                format!("{} IS NULL", quoted_col)
+            } else {
+                format!("{} = {}", quoted_col, json_value_to_sql_literal(val))
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" AND ")
+}
+
+/// Update a single row in a table identified by its primary key values.
+///
+/// # Arguments
+///
+/// * `connection_id` - ID of the active connection
+/// * `table` - Table name
+/// * `schema` - Optional schema name
+/// * `pk_values` - Map of primary-key column name → current value (used to identify the row)
+/// * `updates` - Map of column name → new value to write
+/// * `state` - Application state
+#[tauri::command]
+pub async fn update_table_row(
+    connection_id: String,
+    table: String,
+    schema: Option<String>,
+    pk_values: HashMap<String, JsonValue>,
+    updates: HashMap<String, JsonValue>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if updates.is_empty() {
+        return Ok(());
+    }
+
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    let build_update_sql = |db_type: &str| -> Result<String, String> {
+        if pk_values.is_empty() {
+            return Err("Cannot update row: no primary key values provided".to_string());
+        }
+        let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
+        let set_clause = updates
+            .iter()
+            .map(|(col, val)| {
+                format!(
+                    "{} = {}",
+                    quote_identifier(col, db_type),
+                    json_value_to_sql_literal(val)
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let where_clause = build_pk_where(&pk_values, db_type);
+        Ok(format!(
+            "UPDATE {} SET {} WHERE {}",
+            qualified, set_clause, where_clause
+        ))
+    };
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("postgres")?;
+            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("mysql")?;
+            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("sqlserver")?;
+            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("sqlite")?;
+            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
+        }
+    }
+
+    Ok(())
+}
+
+/// Delete a single row from a table identified by its primary key values.
+///
+/// # Arguments
+///
+/// * `connection_id` - ID of the active connection
+/// * `table` - Table name
+/// * `schema` - Optional schema name
+/// * `pk_values` - Map of primary-key column name → value (used to identify the row)
+/// * `state` - Application state
+#[tauri::command]
+pub async fn delete_table_row(
+    connection_id: String,
+    table: String,
+    schema: Option<String>,
+    pk_values: HashMap<String, JsonValue>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    if pk_values.is_empty() {
+        return Err("Cannot delete row: no primary key values provided".to_string());
+    }
+
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    let build_delete_sql = |db_type: &str| -> String {
+        let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
+        let where_clause = build_pk_where(&pk_values, db_type);
+        format!("DELETE FROM {} WHERE {}", qualified, where_clause)
+    };
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("postgres");
+            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("mysql");
+            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("sqlserver");
+            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("sqlite");
+            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+    }
+
+    Ok(())
 }
 
 /// Extract a COUNT(*) value from a single-cell query result.
