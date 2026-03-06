@@ -29,6 +29,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(app_state)
         .manage(store.clone())
         .setup(move |app| {
@@ -63,6 +64,7 @@ pub fn run() {
             commands::list_databases,
             commands::list_schemas,
             commands::list_tables,
+            commands::list_columns,
             commands::get_table_info,
             commands::get_table_data,
             commands::get_table_count,
@@ -71,6 +73,7 @@ pub fn run() {
             commands::load_query_file,
             commands::list_saved_queries,
             commands::delete_query_file,
+            commands::write_text_file,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

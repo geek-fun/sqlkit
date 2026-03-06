@@ -185,5 +185,20 @@ pub async fn delete_query_file(
     fs::remove_file(path)
         .map_err(|e| format!("Failed to delete file: {}", e))?;
     
-    Ok("File deleted successfully".to_string())
+Ok("File deleted successfully".to_string())
+}
+
+/// Write arbitrary text content to an absolute file path.
+///
+/// Used by the frontend after the native save dialog resolves a path.
+#[tauri::command]
+pub async fn write_text_file(path: String, content: String) -> Result<(), String> {
+    let target = Path::new(&path);
+    if let Some(parent) = target.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create directory: {}", e))?;
+        }
+    }
+    fs::write(target, content).map_err(|e| format!("Failed to write file: {}", e))
 }

@@ -17,7 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { saveQueryFile } from '@/datasources'
+import { toast } from '@/composables/useNotifications'
+import { saveQueryFile, saveQueryFileAs } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
 const { t } = useI18n()
@@ -285,10 +286,41 @@ async function handleSaveQuery() {
 
     if (result.success && result.file_path) {
       tabStore.markTabSaved(activeTab.value.id, result.file_path)
+      toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
+    }
+    else {
+      toast.error(t('pages.queries.notifications.saveFailed'), { description: result.message })
     }
   }
   catch (error) {
-    console.error('Failed to save query:', error)
+    toast.error(t('pages.queries.notifications.saveFailed'), { description: error instanceof Error ? error.message : String(error) })
+  }
+}
+
+async function handleDownloadQuery() {
+  if (!activeTab.value || !activeTab.value.content.trim()) {
+    return
+  }
+
+  try {
+    const result = await saveQueryFileAs(
+      activeTab.value.content,
+      `${activeTab.value.name}.sql`,
+    )
+    if (!result) {
+      // user cancelled
+      return
+    }
+    if (result.success && result.file_path) {
+      tabStore.markTabSaved(activeTab.value.id, result.file_path)
+      toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
+    }
+    else {
+      toast.error(t('pages.queries.notifications.saveFailed'), { description: result.message })
+    }
+  }
+  catch (error) {
+    toast.error(t('pages.queries.notifications.saveFailed'), { description: error instanceof Error ? error.message : String(error) })
   }
 }
 </script>
@@ -414,6 +446,30 @@ async function handleSaveQuery() {
               </TooltipProvider>
 
               <div class="flex-1" />
+
+              <!-- Download / Save As -->
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="p-0 h-7 w-7"
+                      :disabled="!activeTab || !activeTab.content.trim()"
+                      @click="handleDownloadQuery"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" x2="12" y1="15" y2="3" />
+                      </svg>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{{ t('pages.queries.shortcuts.saveAs') }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
               <!-- Status info -->
               <div v-if="activeTab" class="text-xs text-muted-foreground flex gap-2 items-center">

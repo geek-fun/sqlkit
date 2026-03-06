@@ -14,6 +14,7 @@ export const zhCN = {
       saveChanges: '保存更改',
       createConnection: '创建连接',
       testConnection: '测试连接',
+      dismiss: '关闭',
     },
     status: {
       connected: '已连接',
@@ -138,6 +139,7 @@ export const zhCN = {
         execute: '执行查询 (Ctrl+Enter)',
         explain: '解释查询 (F6)',
         save: '保存 (Ctrl+S)',
+        saveAs: '另存为 .sql 文件',
         comment: '切换注释 (Ctrl+/)',
       },
       status: {
@@ -146,6 +148,10 @@ export const zhCN = {
         rows: '行数',
         time: '耗时',
         executing: '执行中...',
+      },
+      notifications: {
+        querySaved: '查询已保存',
+        saveFailed: '保存失败',
       },
     },
     dataStudio: {
@@ -264,6 +270,10 @@ export const zhCN = {
       rows: '行',
       page: '第 {page} 页，共 {total} 页',
       rowsPerPage: '每页行数：',
+      notifications: {
+        csvExported: 'CSV 已导出',
+        exportFailed: '导出失败',
+      },
     },
     queryTabs: {
       unsaved: '未保存的更改',

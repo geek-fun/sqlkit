@@ -3,7 +3,7 @@
 //! This module provides Tauri commands for browsing database metadata,
 //! including databases, schemas, tables, columns, and table data.
 
-use crate::database::{DatabaseAdapter, QueryResult, TableInfo};
+use crate::database::{DatabaseAdapter, PostgresAdapter, SqlServerAdapter, ColumnInfo, QueryResult, TableInfo};
 use crate::state::{ActiveConnection, AppState};
 use tauri::State;
 
@@ -298,6 +298,61 @@ pub async fn get_table_info(
     Ok(table_info)
 }
 
+/// List columns for a table, including name and data type.
+#[tauri::command]
+pub async fn list_columns(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    table_name: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ColumnInfo>, String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    let columns = match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            if Some(database.as_str()) != adapter.config.database.as_deref() {
+                let mut temp_config = adapter.config.clone();
+                drop(adapter);
+                temp_config.database = Some(database.clone());
+                let mut temp = PostgresAdapter::new(temp_config);
+                temp.connect().await.map_err(|e| format!("Failed to connect: {}", e))?;
+                temp.list_columns(None, schema.as_deref(), &table_name).await
+            } else {
+                adapter.list_columns(None, schema.as_deref(), &table_name).await
+            }
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_columns(Some(&database), None, &table_name).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            if Some(database.as_str()) != adapter.config.database.as_deref() {
+                let mut temp_config = adapter.config.clone();
+                drop(adapter);
+                temp_config.database = Some(database.clone());
+                let mut temp = SqlServerAdapter::new(temp_config);
+                temp.connect().await.map_err(|e| format!("Failed to connect: {}", e))?;
+                temp.list_columns(None, schema.as_deref(), &table_name).await
+            } else {
+                adapter.list_columns(None, schema.as_deref(), &table_name).await
+            }
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_columns(None, None, &table_name).await
+        }
+    }
+    .map_err(|e| format!("Failed to list columns: {}", e))?;
+
+    Ok(columns)
+}
+
 /// Get table data with pagination and optional WHERE-clause filter.
 ///
 /// # Arguments
@@ -316,6 +371,7 @@ pub async fn get_table_info(
 #[tauri::command]
 pub async fn get_table_data(
     connection_id: String,
+    database: Option<String>,
     table: String,
     schema: Option<String>,
     filter: Option<String>,
@@ -341,6 +397,17 @@ pub async fn get_table_data(
             let adapter = adapter.lock().await;
             let qualified = build_qualified_table(schema.as_deref(), &table, "postgres");
             let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "postgres");
+            // If a different database is requested, create a temporary connection to it.
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = PostgresAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&query).await.map_err(|e| format!("Failed to get table data: {}", e));
+                }
+            }
             adapter.execute_query(&query).await
         }
         ActiveConnection::MySQL(adapter) => {
@@ -353,6 +420,17 @@ pub async fn get_table_data(
             let adapter = adapter.lock().await;
             let qualified = build_qualified_table(schema.as_deref(), &table, "sqlserver");
             let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlserver");
+            // If a different database is requested, create a temporary connection to it.
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = SqlServerAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&query).await.map_err(|e| format!("Failed to get table data: {}", e));
+                }
+            }
             adapter.execute_query(&query).await
         }
         ActiveConnection::SQLite(adapter) => {
@@ -384,6 +462,7 @@ pub async fn get_table_data(
 #[tauri::command]
 pub async fn get_table_count(
     connection_id: String,
+    database: Option<String>,
     table: String,
     schema: Option<String>,
     filter: Option<String>,
@@ -404,6 +483,17 @@ pub async fn get_table_count(
             let adapter = adapter.lock().await;
             let qualified = build_qualified_table(schema.as_deref(), &table, "postgres");
             let query = build_count_query(&qualified, filter_ref);
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = PostgresAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    let r = temp.execute_query(&query).await.map_err(|e| format!("Failed to get table count: {}", e))?;
+                    return extract_count(r);
+                }
+            }
             adapter.execute_query(&query).await
         }
         ActiveConnection::MySQL(adapter) => {
@@ -416,6 +506,17 @@ pub async fn get_table_count(
             let adapter = adapter.lock().await;
             let qualified = build_qualified_table(schema.as_deref(), &table, "sqlserver");
             let query = build_count_query(&qualified, filter_ref);
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = SqlServerAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    let r = temp.execute_query(&query).await.map_err(|e| format!("Failed to get table count: {}", e))?;
+                    return extract_count(r);
+                }
+            }
             adapter.execute_query(&query).await
         }
         ActiveConnection::SQLite(adapter) => {
@@ -427,9 +528,12 @@ pub async fn get_table_count(
     }
     .map_err(|e| format!("Failed to get table count: {}", e))?;
 
-    // Extract COUNT(*) value from the first cell of the first row.
-    // Returns an error if the count cannot be parsed (e.g. unexpected result format).
-    let count = result
+    extract_count(result)
+}
+
+/// Extract a COUNT(*) value from a single-cell query result.
+fn extract_count(result: QueryResult) -> Result<u64, String> {
+    result
         .rows
         .first()
         .and_then(|row| row.values().next())
@@ -438,9 +542,7 @@ pub async fn get_table_count(
             crate::database::types::QueryValue::String(s) => s.parse::<u64>().ok(),
             _ => None,
         })
-        .ok_or_else(|| "Failed to extract row count from query result".to_string())?;
-
-    Ok(count)
+        .ok_or_else(|| "Failed to extract row count from query result".to_string())
 }
 
 // Tests for browse commands are temporarily disabled.

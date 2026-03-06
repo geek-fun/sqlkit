@@ -215,7 +215,7 @@ impl SqlServerPool {
 
 /// SQL Server database adapter.
 pub struct SqlServerAdapter {
-    config: ConnectionConfig,
+    pub(crate) config: ConnectionConfig,
     pool: Option<Arc<SqlServerPool>>,
     client: Option<Arc<tokio::sync::Mutex<Client<Compat<TcpStream>>>>>,
 }

@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { invoke } from '@tauri-apps/api/core'
+import { save as showSaveDialog } from '@tauri-apps/plugin-dialog'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { invoke } from '@tauri-apps/api/core'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -11,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from '@/composables/useNotifications'
 import {
   computeOffset,
   computeTotalPages,
@@ -24,6 +26,13 @@ interface TableDataResult {
   rows: Record<string, unknown>[]
   rows_affected?: number
   execution_time_ms?: number
+}
+
+interface ColumnTypeInfo {
+  name: string
+  data_type: string
+  is_primary_key: boolean
+  nullable: boolean
 }
 
 const props = defineProps<{
@@ -50,14 +59,44 @@ const totalCount = ref(0)
 const loading = ref(false)
 const error = ref<string | null>(null)
 const executionTimeMs = ref<number | null>(null)
+const columnInfoList = ref<ColumnTypeInfo[]>([])
 
 const visibleColumns = computed(() =>
   data.value ? data.value.columns.filter(c => !hiddenColumns.value.has(c)) : [],
 )
 
+const columnTypeMap = computed(() => {
+  const map: Record<string, string> = {}
+  columnInfoList.value.forEach((c) => { map[c.name] = c.data_type })
+  return map
+})
+
+const columnIsPK = computed(() => {
+  const map: Record<string, boolean> = {}
+  columnInfoList.value.forEach((c) => { map[c.name] = c.is_primary_key })
+  return map
+})
+
 const totalPages = computed(() => computeTotalPages(totalCount.value, rowsPerPage.value))
 
 const offset = computed(() => computeOffset(currentPage.value, rowsPerPage.value))
+
+// Compact page number list with ellipsis (e.g. 1 … 4 5 6 … 20)
+const pageNumbers = computed<(number | '...')[]>(() => {
+  const total = totalPages.value
+  const cur = currentPage.value
+  if (total <= 7)
+    return Array.from({ length: total }, (_, i) => i + 1)
+  const pages: (number | '...')[] = [1]
+  if (cur > 3)
+    pages.push('...')
+  for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++)
+    pages.push(i)
+  if (cur < total - 2)
+    pages.push('...')
+  pages.push(total)
+  return pages
+})
 
 const formattedTime = computed(() => {
   if (executionTimeMs.value === null)
@@ -74,6 +113,7 @@ async function fetchData() {
   try {
     const result = await invoke<TableDataResult>('get_table_data', {
       connectionId: props.connectionId,
+      database: props.database || null,
       table: props.tableName,
       schema: props.schema ?? null,
       filter: appliedFilter.value.trim() || null,
@@ -96,6 +136,7 @@ async function fetchCount() {
   try {
     const count = await invoke<number>('get_table_count', {
       connectionId: props.connectionId,
+      database: props.database || null,
       table: props.tableName,
       schema: props.schema ?? null,
       filter: appliedFilter.value.trim() || null,
@@ -109,6 +150,24 @@ async function fetchCount() {
 
 async function refresh() {
   await Promise.all([fetchData(), fetchCount()])
+}
+
+async function fetchColumnInfo() {
+  if (!props.database || !props.tableName) {
+    columnInfoList.value = []
+    return
+  }
+  try {
+    columnInfoList.value = await invoke<ColumnTypeInfo[]>('list_columns', {
+      connectionId: props.connectionId,
+      database: props.database,
+      schema: props.schema ?? null,
+      tableName: props.tableName,
+    })
+  }
+  catch {
+    columnInfoList.value = []
+  }
 }
 
 function applyFilter() {
@@ -147,26 +206,48 @@ function toggleColumn(col: string) {
     : new Set([...hiddenColumns.value, col])
 }
 
-function exportCSV() {
+async function exportCSV() {
   if (!data.value)
     return
 
   const csv = rowsToCsv(data.value.rows, visibleColumns.value)
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${props.tableName}.csv`
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
-  URL.revokeObjectURL(url)
+  const defaultName = `${props.tableName}.csv`
+
+  try {
+    const selectedPath = await showSaveDialog({
+      filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      defaultPath: defaultName,
+    })
+    if (!selectedPath)
+      return
+
+    const filePath = selectedPath.endsWith('.csv') ? selectedPath : `${selectedPath}.csv`
+    await invoke('write_text_file', { path: filePath, content: csv })
+    toast.success(t('components.dataTableView.notifications.csvExported'), { description: filePath })
+  }
+  catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    toast.error(t('components.dataTableView.notifications.exportFailed'), { description: msg })
+    // fallback to browser download
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = defaultName
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }
 }
 
 const formatValue = formatTableValue
 const isNullValue = isTableNullValue
 
-onMounted(refresh)
+onMounted(() => {
+  fetchColumnInfo()
+  refresh()
+})
 
 watch(
   () => [props.connectionId, props.tableName, props.schema] as const,
@@ -175,6 +256,7 @@ watch(
     appliedFilter.value = ''
     filterInput.value = ''
     hiddenColumns.value = new Set()
+    fetchColumnInfo()
     refresh()
   },
 )
@@ -183,7 +265,7 @@ watch(
 <template>
   <div class="data-table-view flex flex-col h-full" @click="showColumnMenu = false">
     <!-- Filter / Toolbar bar -->
-    <div class="border-b flex items-center gap-1.5 px-3 py-1.5 bg-muted/20">
+    <div class="px-3 py-1.5 border-b bg-muted/20 flex gap-1.5 items-center">
       <!-- Filter icon -->
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -204,7 +286,7 @@ watch(
       <Input
         v-model="filterInput"
         :placeholder="t('components.dataTableView.filterPlaceholder')"
-        class="flex-1 h-7 text-xs font-mono"
+        class="text-xs font-mono flex-1 h-7"
         @keydown.enter="applyFilter"
       />
 
@@ -213,7 +295,7 @@ watch(
         v-if="filterInput || appliedFilter"
         variant="ghost"
         size="icon"
-        class="h-7 w-7 flex-shrink-0"
+        class="flex-shrink-0 h-7 w-7"
         :title="t('components.dataTableView.clearFilter')"
         @click.stop="clearFilter"
       >
@@ -227,7 +309,7 @@ watch(
       <Button
         variant="ghost"
         size="icon"
-        class="h-7 w-7 flex-shrink-0"
+        class="flex-shrink-0 h-7 w-7"
         :disabled="loading"
         :title="t('components.dataTableView.refresh')"
         @click.stop="refresh"
@@ -241,7 +323,7 @@ watch(
       </Button>
 
       <!-- Column visibility dropdown -->
-      <div class="relative flex-shrink-0">
+      <div class="flex-shrink-0 relative">
         <Button
           variant="ghost"
           size="icon"
@@ -258,17 +340,17 @@ watch(
 
         <div
           v-if="showColumnMenu && data && data.columns.length > 0"
-          class="text-popover-foreground border rounded-md bg-popover shadow-md absolute right-0 top-full z-50 mt-1 min-w-36 max-h-64 overflow-auto"
+          class="text-popover-foreground mt-1 border rounded-md bg-popover max-h-64 min-w-36 shadow-md right-0 top-full absolute z-50 overflow-auto"
           @click.stop
         >
-          <div class="p-1 text-xs font-semibold text-muted-foreground px-2 py-1.5 border-b">
+          <div class="text-xs text-muted-foreground font-semibold p-1 px-2 py-1.5 border-b">
             {{ t('components.dataTableView.columns') }}
           </div>
           <div class="p-1">
             <button
               v-for="col in data.columns"
               :key="col"
-              class="w-full text-sm px-2 py-1 rounded flex items-center gap-2 cursor-pointer hover:bg-accent text-left"
+              class="text-sm px-2 py-1 text-left rounded flex gap-2 w-full cursor-pointer items-center hover:bg-accent"
               @click="toggleColumn(col)"
             >
               <svg
@@ -286,7 +368,7 @@ watch(
               >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
-              <span v-else class="inline-block w-3 flex-shrink-0" />
+              <span v-else class="flex-shrink-0 w-3 inline-block" />
               <span class="truncate">{{ col }}</span>
             </button>
           </div>
@@ -297,7 +379,7 @@ watch(
       <Button
         variant="ghost"
         size="icon"
-        class="h-7 w-7 flex-shrink-0"
+        class="flex-shrink-0 h-7 w-7"
         :disabled="!data || data.rows.length === 0"
         :title="t('components.dataTableView.exportCsv')"
         @click.stop="exportCSV"
@@ -312,7 +394,7 @@ watch(
       <!-- Apply Filters button -->
       <Button
         size="sm"
-        class="h-7 text-xs flex-shrink-0"
+        class="text-xs flex-shrink-0 h-7"
         @click.stop="applyFilter"
       >
         {{ t('components.dataTableView.applyFilters') }}
@@ -320,11 +402,11 @@ watch(
     </div>
 
     <!-- Table area -->
-    <div class="flex-1 overflow-auto relative">
+    <div class="flex-1 relative overflow-auto">
       <!-- Loading overlay -->
       <div
         v-if="loading"
-        class="absolute inset-0 bg-background/60 flex items-center justify-center z-10"
+        class="bg-background/60 flex items-center inset-0 justify-center absolute z-10"
       >
         <div class="text-center">
           <svg
@@ -346,16 +428,16 @@ watch(
       <div v-else-if="error" class="p-4">
         <div class="p-4 border border-red-200 rounded-md bg-red-50 dark:border-red-800 dark:bg-red-900/20">
           <div class="flex gap-3 items-start">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600 mt-0.5 flex-shrink-0 dark:text-red-400">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" x2="12" y1="8" y2="12" />
               <line x1="12" x2="12.01" y1="16" y2="16" />
             </svg>
             <div>
-              <p class="text-sm font-medium text-red-800 dark:text-red-200">
+              <p class="text-sm text-red-800 font-medium dark:text-red-200">
                 {{ t('components.dataTableView.error') }}
               </p>
-              <p class="text-sm text-red-700 dark:text-red-300 mt-1">
+              <p class="text-sm text-red-700 mt-1 dark:text-red-300">
                 {{ error }}
               </p>
             </div>
@@ -378,7 +460,27 @@ watch(
               :key="col"
               class="data-table-header text-left"
             >
-              {{ col }}
+              <div class="col-header-cell" :title="columnTypeMap[col] ? `${col} · ${columnTypeMap[col]}` : col">
+                <svg
+                  v-if="columnIsPK[col]"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-amber-500 flex-shrink-0"
+                >
+                  <circle cx="7.5" cy="15.5" r="5.5" />
+                  <path d="m21 2-9.6 9.6" />
+                  <path d="m15.5 7.5 3 3L22 7l-3-3" />
+                </svg>
+                <span class="col-name truncate">{{ col }}</span>
+                <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
+              </div>
             </th>
           </tr>
         </thead>
@@ -388,13 +490,13 @@ watch(
             :key="i"
             class="border-b hover:bg-muted/50"
           >
-            <td class="px-3 py-1.5 text-xs text-muted-foreground text-center w-10">
+            <td class="text-xs text-muted-foreground px-3 py-1.5 text-center w-10">
               {{ offset + i + 1 }}
             </td>
             <td
               v-for="col in visibleColumns"
               :key="`${i}-${col}`"
-              class="px-3 py-1.5 text-sm max-w-xs truncate"
+              class="text-sm px-3 py-1.5 max-w-xs truncate"
               :class="{ 'italic text-muted-foreground': isNullValue(row[col]) }"
               :title="formatValue(row[col])"
             >
@@ -439,104 +541,86 @@ watch(
     </div>
 
     <!-- Status bar + pagination -->
-    <div class="border-t flex items-center justify-between px-3 py-1 text-xs text-muted-foreground bg-muted/20">
-      <!-- Left: row count + timing -->
-      <div class="flex gap-4 items-center">
-        <span v-if="totalCount > 0">
-          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline mr-1">
-            <path d="M12 3v18" />
-            <rect width="18" height="18" x="3" y="3" rx="2" />
-            <path d="M3 9h18" />
-            <path d="M3 15h18" />
-          </svg>
-          {{ totalCount.toLocaleString() }} {{ t('components.dataTableView.rows') }}
+    <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex flex-wrap gap-3 items-center">
+      <!-- Left: stats -->
+      <div class="flex flex-shrink-0 gap-3 items-center">
+        <span v-if="totalCount > 0" class="tabular-nums">
+          {{ totalCount.toLocaleString() }} rows
         </span>
-        <span v-if="formattedTime">
-          <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="inline mr-1">
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-          </svg>
-          {{ formattedTime }}
-        </span>
+        <span v-if="formattedTime" class="text-muted-foreground/70">{{ formattedTime }}</span>
       </div>
 
-      <!-- Right: pagination controls -->
-      <div class="flex items-center gap-1">
-        <!-- First page -->
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6"
-          :disabled="currentPage === 1 || loading"
-          @click="goToPage(1)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m11 17-5-5 5-5" />
-            <path d="m18 17-5-5 5-5" />
-          </svg>
-        </Button>
+      <div class="flex-1" />
 
-        <!-- Prev page -->
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6"
-          :disabled="currentPage === 1 || loading"
-          @click="goToPage(currentPage - 1)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m15 18-6-6 6-6" />
-          </svg>
-        </Button>
+      <!-- Right: pagination + rows per page grouped -->
+      <div class="flex flex-shrink-0 gap-2 items-center">
+        <!-- Page navigation -->
+        <div v-if="data" class="flex gap-0.5 items-center">
+          <!-- Prev -->
+          <button
+            class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="currentPage === 1 || loading"
+            @click="goToPage(currentPage - 1)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m15 18-6-6 6-6" />
+            </svg>
+          </button>
 
-        <span class="px-1">{{ t('components.dataTableView.page', { page: currentPage, total: totalPages }) }}</span>
+          <template v-for="(p, idx) in pageNumbers" :key="idx">
+            <span
+              v-if="p === '...'"
+              class="text-xs text-muted-foreground inline-flex h-6 w-6 items-center justify-center"
+            >…</span>
+            <button
+              v-else
+              class="text-xs font-medium px-1.5 rounded inline-flex h-6 min-w-6 transition-colors items-center justify-center"
+              :class="p === currentPage
+                ? 'bg-primary text-primary-foreground'
+                : 'hover:bg-accent'"
+              :disabled="loading"
+              @click="goToPage(p as number)"
+            >
+              {{ p }}
+            </button>
+          </template>
 
-        <!-- Next page -->
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6"
-          :disabled="currentPage >= totalPages || loading"
-          @click="goToPage(currentPage + 1)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m9 18 6-6-6-6" />
-          </svg>
-        </Button>
+          <!-- Next -->
+          <button
+            class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
+            :disabled="currentPage >= totalPages || loading"
+            @click="goToPage(currentPage + 1)"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m9 18 6-6-6-6" />
+            </svg>
+          </button>
+        </div>
 
-        <!-- Last page -->
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6"
-          :disabled="currentPage >= totalPages || loading"
-          @click="goToPage(totalPages)"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="m13 17 5-5-5-5" />
-            <path d="m6 17 5-5-5-5" />
-          </svg>
-        </Button>
+        <!-- Divider -->
+        <div v-if="data" class="bg-border h-3.5 w-px" />
 
         <!-- Rows per page -->
-        <span class="ml-2">{{ t('components.dataTableView.rowsPerPage') }}</span>
-        <Select
-          :model-value="String(rowsPerPage)"
-          @update:model-value="changeRowsPerPage"
-        >
-          <SelectTrigger class="h-6 text-xs w-20 ml-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem
-              v-for="n in ROWS_PER_PAGE_OPTIONS"
-              :key="n"
-              :value="String(n)"
-            >
-              {{ n }}
-            </SelectItem>
-          </SelectContent>
-        </Select>
+        <div class="flex gap-1.5 items-center">
+          <span class="text-muted-foreground/70">Rows</span>
+          <Select
+            :model-value="String(rowsPerPage)"
+            @update:model-value="changeRowsPerPage"
+          >
+            <SelectTrigger class="text-xs h-6 w-16">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem
+                v-for="n in ROWS_PER_PAGE_OPTIONS"
+                :key="n"
+                :value="String(n)"
+              >
+                {{ n }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
     </div>
   </div>
@@ -555,6 +639,36 @@ watch(
   padding: 0.375rem 0.75rem;
   font-size: 0.75rem;
   font-weight: 500;
+  max-width: 200px;
+  min-width: 80px;
+}
+
+.col-header-cell {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 180px;
+  overflow: hidden;
+}
+
+.col-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
+  flex: 1;
+}
+
+.col-type {
+  font-size: 10px;
+  font-weight: 400;
+  font-family: monospace;
+  color: hsl(var(--muted-foreground));
+  white-space: nowrap;
+  opacity: 0.8;
+  flex-shrink: 0;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 </style>

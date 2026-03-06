@@ -14,6 +14,7 @@ export const enUS = {
       saveChanges: 'Save Changes',
       createConnection: 'Create Connection',
       testConnection: 'Test Connection',
+      dismiss: 'Dismiss',
     },
     status: {
       connected: 'Connected',
@@ -138,6 +139,7 @@ export const enUS = {
         execute: 'Execute query (Ctrl+Enter)',
         explain: 'Explain query (F6)',
         save: 'Save (Ctrl+S)',
+        saveAs: 'Save As .sql file',
         comment: 'Toggle comment (Ctrl+/)',
       },
       status: {
@@ -146,6 +148,10 @@ export const enUS = {
         rows: 'Rows',
         time: 'Time',
         executing: 'Executing...',
+      },
+      notifications: {
+        querySaved: 'Query saved',
+        saveFailed: 'Save failed',
       },
     },
     dataStudio: {
@@ -264,6 +270,10 @@ export const enUS = {
       rows: 'rows',
       page: 'Page {page} of {total}',
       rowsPerPage: 'Rows per page:',
+      notifications: {
+        csvExported: 'CSV exported',
+        exportFailed: 'Export failed',
+      },
     },
     queryTabs: {
       unsaved: 'Unsaved changes',
