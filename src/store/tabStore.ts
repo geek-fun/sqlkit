@@ -2,6 +2,8 @@ import type { ApiError, ApiResponse } from '@/types/api'
 import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { isApiError, isApiSuccess } from '@/types/api'
+import { useConnectionStore } from './connectionStore'
+import { useHistoryStore } from './historyStore'
 
 export interface QueryResult {
   columns: string[]
@@ -161,6 +163,9 @@ export const useTabStore = defineStore('tabs', {
       tab.error = undefined
 
       const startTime = Date.now()
+      const connectionStore = useConnectionStore()
+      const connection = connectionStore.getConnectionById(tab.connectionId)
+      const historyStore = useHistoryStore()
 
       try {
         const response = await invoke<ApiResponse<QueryResult>>('execute_query', {
@@ -168,16 +173,47 @@ export const useTabStore = defineStore('tabs', {
           sql,
         })
 
+        const executionTime = Date.now() - startTime
+
         if (isApiSuccess(response)) {
           tab.results = response.data
-          tab.executionTime = Date.now() - startTime
+          tab.executionTime = executionTime
+          historyStore.addEntry({
+            sql,
+            connectionId: tab.connectionId,
+            connectionName: connection?.name ?? tab.connectionId,
+            database: tab.database,
+            timestamp: Date.now(),
+            executionTime,
+            status: 'success',
+          })
         }
         else if (isApiError(response)) {
           tab.error = response.error
+          historyStore.addEntry({
+            sql,
+            connectionId: tab.connectionId,
+            connectionName: connection?.name ?? tab.connectionId,
+            database: tab.database,
+            timestamp: Date.now(),
+            executionTime,
+            status: 'error',
+            errorMessage: response.error.message,
+          })
         }
       }
       catch (error) {
         tab.error = String(error)
+        historyStore.addEntry({
+          sql,
+          connectionId: tab.connectionId,
+          connectionName: connection?.name ?? tab.connectionId,
+          database: tab.database,
+          timestamp: Date.now(),
+          executionTime: Date.now() - startTime,
+          status: 'error',
+          errorMessage: String(error),
+        })
       }
       finally {
         tab.isExecuting = false
