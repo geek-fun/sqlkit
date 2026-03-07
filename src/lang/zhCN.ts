@@ -14,6 +14,7 @@ export const zhCN = {
       saveChanges: '保存更改',
       createConnection: '创建连接',
       testConnection: '测试连接',
+      dismiss: '关闭',
     },
     status: {
       connected: '已连接',
@@ -138,6 +139,7 @@ export const zhCN = {
         execute: '执行查询 (Ctrl+Enter)',
         explain: '解释查询 (F6)',
         save: '保存 (Ctrl+S)',
+        saveAs: '另存为 .sql 文件',
         comment: '切换注释 (Ctrl+/)',
       },
       status: {
@@ -146,6 +148,10 @@ export const zhCN = {
         rows: '行数',
         time: '耗时',
         executing: '执行中...',
+      },
+      notifications: {
+        querySaved: '查询已保存',
+        saveFailed: '保存失败',
       },
     },
     dataStudio: {
@@ -250,6 +256,42 @@ export const zhCN = {
       noData: '无返回数据',
       commandCompleted: '命令执行完成',
       noResults: '执行查询以查看结果',
+    },
+    dataTableView: {
+      filterPlaceholder: '过滤（SQL WHERE 子句，例如 age > 18 AND status = \'active\'）',
+      clearFilter: '清除过滤',
+      refresh: '刷新',
+      columns: '列',
+      exportCsv: '导出当前页 (CSV)',
+      applyFilters: '应用过滤',
+      loading: '正在加载表数据...',
+      error: '加载表数据失败',
+      noRows: '未找到行',
+      rows: '行',
+      page: '第 {page} 页，共 {total} 页',
+      rowsPerPage: '每页行数：',
+      actions: '操作',
+      editRow: '编辑行',
+      deleteRow: '删除行',
+      notifications: {
+        csvExported: 'CSV 已导出',
+        exportFailed: '导出失败',
+        rowDeleted: '行已删除',
+        deleteFailed: '删除行失败',
+        rowUpdated: '行已更新',
+        updateFailed: '更新行失败',
+      },
+      deleteDialog: {
+        title: '删除行',
+        message: '确定要删除这行吗？此操作无法撤销。',
+        confirm: '删除',
+      },
+      editDialog: {
+        title: '编辑行',
+      },
+      validation: {
+        required: '此字段为必填项',
+      },
     },
     queryTabs: {
       unsaved: '未保存的更改',

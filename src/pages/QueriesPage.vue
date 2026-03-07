@@ -5,7 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { extractStatementAtCursor } from '@/common/sqlParser'
-import { DatabaseBrowser, QueryResultPanel, QueryTabs } from '@/components/database-browser'
+import { DatabaseBrowser, DataTableView, QueryResultPanel, QueryTabs } from '@/components/database-browser'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { saveQueryFile } from '@/datasources'
+import { toast } from '@/composables/useNotifications'
+import { saveQueryFile, saveQueryFileAs } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
 const { t } = useI18n()
@@ -235,6 +236,13 @@ function handleExportData(_table: TableInfo, _database: string, _schema?: string
   // TODO: Implement export data functionality
 }
 
+function handleSelectTable(table: TableInfo, database: string, schema?: string) {
+  const connId = getConnectionId()
+  if (!connId)
+    return
+  tabStore.openTableViewTab(connId, database, table.name, schema)
+}
+
 function startSidebarResize(_e: MouseEvent) {
   isResizingSidebar.value = true
   document.addEventListener('mousemove', handleSidebarResize)
@@ -272,10 +280,41 @@ async function handleSaveQuery() {
 
     if (result.success && result.file_path) {
       tabStore.markTabSaved(activeTab.value.id, result.file_path)
+      toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
+    }
+    else {
+      toast.error(t('pages.queries.notifications.saveFailed'), { description: result.message })
     }
   }
   catch (error) {
-    console.error('Failed to save query:', error)
+    toast.error(t('pages.queries.notifications.saveFailed'), { description: error instanceof Error ? error.message : String(error) })
+  }
+}
+
+async function handleDownloadQuery() {
+  if (!activeTab.value || !activeTab.value.content.trim()) {
+    return
+  }
+
+  try {
+    const result = await saveQueryFileAs(
+      activeTab.value.content,
+      `${activeTab.value.name}.sql`,
+    )
+    if (!result) {
+      // user cancelled
+      return
+    }
+    if (result.success && result.file_path) {
+      tabStore.markTabSaved(activeTab.value.id, result.file_path)
+      toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
+    }
+    else {
+      toast.error(t('pages.queries.notifications.saveFailed'), { description: result.message })
+    }
+  }
+  catch (error) {
+    toast.error(t('pages.queries.notifications.saveFailed'), { description: error instanceof Error ? error.message : String(error) })
   }
 }
 </script>
@@ -315,6 +354,7 @@ async function handleSaveQuery() {
             v-model:selected-database="selectedDatabase"
             :connection-id="selectedConnectionId"
             class="flex-1"
+            @select-table="handleSelectTable"
             @create-script="handleCreateScript"
             @select-top-n="handleSelectTopN"
             @view-structure="handleViewStructure"
@@ -340,101 +380,139 @@ async function handleSaveQuery() {
             @new="handleNewTab"
           />
 
-          <!-- Toolbar -->
-          <div class="px-2 py-1 border-b bg-muted/30 flex gap-2 items-center">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    class="gap-1 h-7"
-                    :disabled="!activeTab"
-                    @click="executeQuery"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <polygon points="6 3 20 12 6 21 6 3" />
-                    </svg>
-                    {{ t('pages.queries.editor.execute') }}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ t('pages.queries.shortcuts.execute') }}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <!-- Data Table View (shown when the active tab is a table-view tab) -->
+          <DataTableView
+            v-if="activeTab?.tableView"
+            :key="activeTab.id"
+            :connection-id="activeTab.connectionId"
+            :database="activeTab.tableView.database"
+            :schema="activeTab.tableView.schema"
+            :table-name="activeTab.tableView.tableName"
+            class="flex-1"
+          />
 
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    class="gap-1 h-7"
-                    :disabled="!activeTab"
-                    @click="handleExplainQuery"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M12 20h9" />
-                      <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" />
-                    </svg>
-                    {{ t('pages.queries.editor.explain') }}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ t('pages.queries.shortcuts.explain') }}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+          <!-- Query editor area (shown for normal query tabs) -->
+          <template v-else>
+            <!-- Toolbar -->
+            <div class="px-2 py-1 border-b bg-muted/30 flex gap-2 items-center">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="gap-1 h-7"
+                      :disabled="!activeTab"
+                      @click="executeQuery"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polygon points="6 3 20 12 6 21 6 3" />
+                      </svg>
+                      {{ t('pages.queries.editor.execute') }}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{{ t('pages.queries.shortcuts.execute') }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-            <div class="flex-1" />
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="gap-1 h-7"
+                      :disabled="!activeTab"
+                      @click="handleExplainQuery"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" />
+                      </svg>
+                      {{ t('pages.queries.editor.explain') }}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{{ t('pages.queries.shortcuts.explain') }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
 
-            <!-- Status info -->
-            <div v-if="activeTab" class="text-xs text-muted-foreground flex gap-2 items-center">
-              <span v-if="activeConnection">{{ activeConnection.name }}</span>
-              <span v-if="activeConnection?.database">/ {{ activeConnection.database }}</span>
-            </div>
-          </div>
+              <div class="flex-1" />
 
-          <!-- Editor -->
-          <div class="flex-1 overflow-hidden">
-            <SQLEditor
-              v-if="activeTab"
-              v-model="editorContent"
-              height="100%"
-              dialect="sql"
-              :is-executing="activeTab.isExecuting"
-              :font-size="appStore.editorConfig.fontSize"
-              :tab-size="appStore.editorConfig.tabSize"
-              :word-wrap="appStore.editorConfig.wordWrap"
-              :minimap="appStore.editorConfig.showMinimap"
-              :show-line-numbers="appStore.editorConfig.showLineNumbers"
-              @execute="(details) => executeQuery(details)"
-              @save="handleSaveQuery"
-            />
-            <div v-else class="text-muted-foreground flex h-full items-center justify-center">
-              <div class="text-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 opacity-50">
-                  <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                  <polyline points="14 2 14 8 20 8" />
-                </svg>
-                <p>{{ t('pages.queries.noTab') }}</p>
-                <Button variant="outline" size="sm" class="mt-2" @click="handleNewTab">
-                  {{ t('pages.queries.newTab') }}
-                </Button>
+              <!-- Download / Save As -->
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="p-0 h-7 w-7"
+                      :disabled="!activeTab || !activeTab.content.trim()"
+                      @click="handleDownloadQuery"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" x2="12" y1="15" y2="3" />
+                      </svg>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{{ t('pages.queries.shortcuts.saveAs') }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <!-- Status info -->
+              <div v-if="activeTab" class="text-xs text-muted-foreground flex gap-2 items-center">
+                <span v-if="activeConnection">{{ activeConnection.name }}</span>
+                <span v-if="activeConnection?.database">/ {{ activeConnection.database }}</span>
               </div>
             </div>
-          </div>
 
-          <!-- Result Panel -->
-          <QueryResultPanel
-            v-if="showResultPanel"
-            :results="activeTab?.results"
-            :error="activeTab?.error"
-            :is-executing="activeTab?.isExecuting"
-            :execution-time="activeTab?.executionTime"
-            @close="closeResultPanel"
-          />
+            <!-- Editor -->
+            <div class="flex-1 overflow-hidden">
+              <SQLEditor
+                v-if="activeTab"
+                v-model="editorContent"
+                height="100%"
+                dialect="sql"
+                :is-executing="activeTab.isExecuting"
+                :font-size="appStore.editorConfig.fontSize"
+                :tab-size="appStore.editorConfig.tabSize"
+                :word-wrap="appStore.editorConfig.wordWrap"
+                :minimap="appStore.editorConfig.showMinimap"
+                :show-line-numbers="appStore.editorConfig.showLineNumbers"
+                @execute="(details) => executeQuery(details)"
+                @save="handleSaveQuery"
+              />
+              <div v-else class="text-muted-foreground flex h-full items-center justify-center">
+                <div class="text-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 opacity-50">
+                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                    <polyline points="14 2 14 8 20 8" />
+                  </svg>
+                  <p>{{ t('pages.queries.noTab') }}</p>
+                  <Button variant="outline" size="sm" class="mt-2" @click="handleNewTab">
+                    {{ t('pages.queries.newTab') }}
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Result Panel -->
+            <QueryResultPanel
+              v-if="showResultPanel"
+              :results="activeTab?.results"
+              :error="activeTab?.error"
+              :is-executing="activeTab?.isExecuting"
+              :execution-time="activeTab?.executionTime"
+              @close="closeResultPanel"
+            />
+          </template>
         </div>
       </div>
 

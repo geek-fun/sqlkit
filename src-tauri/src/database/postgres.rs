@@ -13,13 +13,14 @@ use crate::database::{
     },
 };
 use async_trait::async_trait;
+use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
 use deadpool_postgres::{Config as DeadpoolConfig, Pool, PoolConfig as DeadpoolPoolConfig, Runtime};
 use native_tls::TlsConnector;
 use postgres_native_tls::MakeTlsConnector;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio_postgres::{types::Type, Client, NoTls, Row};
+use tokio_postgres::{types::{Kind, Type}, Client, NoTls, Row};
 
 /// Convert PostgreSQL error to DbError with detailed information
 fn postgres_error_to_db_error(error: tokio_postgres::Error) -> DbError {
@@ -134,7 +135,7 @@ impl ConnectionPool for PostgresPool {
 
 /// PostgreSQL database adapter.
 pub struct PostgresAdapter {
-    config: ConnectionConfig,
+    pub(crate) config: ConnectionConfig,
     pool: Option<Arc<PostgresPool>>,
 }
 
@@ -287,24 +288,129 @@ impl PostgresAdapter {
                     None => Ok(QueryValue::Null),
                 }
             }
-            Type::TIMESTAMP | Type::TIMESTAMPTZ | Type::DATE | Type::TIME | Type::TIMETZ => {
-                let val: Option<String> = row
+            Type::TIMESTAMP => {
+                let val: Option<NaiveDateTime> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
                 match val {
-                    Some(v) => Ok(QueryValue::DateTime(v)),
+                    Some(v) => Ok(QueryValue::DateTime(v.format("%Y-%m-%d %H:%M:%S%.f").to_string())),
                     None => Ok(QueryValue::Null),
                 }
             }
-            // Handle array types by converting to string representation
-            _ if col_type.name().ends_with("[]") => {
-                let val: Option<String> = row
+            Type::TIMESTAMPTZ => {
+                let val: Option<DateTime<FixedOffset>> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
                 match val {
-                    Some(v) => Ok(QueryValue::String(v)),
+                    Some(v) => Ok(QueryValue::DateTime(v.format("%Y-%m-%d %H:%M:%S %z").to_string())),
                     None => Ok(QueryValue::Null),
                 }
+            }
+            Type::DATE => {
+                let val: Option<NaiveDate> = row
+                    .try_get(idx)
+                    .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                match val {
+                    Some(v) => Ok(QueryValue::DateTime(v.to_string())),
+                    None => Ok(QueryValue::Null),
+                }
+            }
+            Type::TIME | Type::TIMETZ => {
+                let val: Option<NaiveTime> = row
+                    .try_get(idx)
+                    .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                match val {
+                    Some(v) => Ok(QueryValue::DateTime(v.to_string())),
+                    None => Ok(QueryValue::Null),
+                }
+            }
+            // Handle array types (kind = Array) — decode element-by-element
+            _ if matches!(col_type.kind(), Kind::Array(_)) => {
+                let inner = if let Kind::Array(t) = col_type.kind() { t } else { unreachable!() };
+                let formatted = match *inner {
+                    // text-like arrays
+                    Type::TEXT | Type::VARCHAR | Type::BPCHAR | Type::NAME | Type::CHAR => {
+                        let v: Option<Vec<Option<String>>> = row
+                            .try_get(idx)
+                            .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                        match v {
+                            None => return Ok(QueryValue::Null),
+                            Some(items) => items
+                                .iter()
+                                .map(|x| x.as_deref().unwrap_or("NULL").to_string())
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        }
+                    }
+                    // integer arrays
+                    Type::INT2 | Type::INT4 => {
+                        let v: Option<Vec<Option<i32>>> = row
+                            .try_get(idx)
+                            .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                        match v {
+                            None => return Ok(QueryValue::Null),
+                            Some(items) => items
+                                .iter()
+                                .map(|x| x.map(|n| n.to_string()).unwrap_or_else(|| "NULL".to_string()))
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        }
+                    }
+                    Type::INT8 => {
+                        let v: Option<Vec<Option<i64>>> = row
+                            .try_get(idx)
+                            .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                        match v {
+                            None => return Ok(QueryValue::Null),
+                            Some(items) => items
+                                .iter()
+                                .map(|x| x.map(|n| n.to_string()).unwrap_or_else(|| "NULL".to_string()))
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        }
+                    }
+                    // float arrays
+                    Type::FLOAT4 | Type::FLOAT8 => {
+                        let v: Option<Vec<Option<f64>>> = row
+                            .try_get(idx)
+                            .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                        match v {
+                            None => return Ok(QueryValue::Null),
+                            Some(items) => items
+                                .iter()
+                                .map(|x| x.map(|n| n.to_string()).unwrap_or_else(|| "NULL".to_string()))
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        }
+                    }
+                    // bool arrays
+                    Type::BOOL => {
+                        let v: Option<Vec<Option<bool>>> = row
+                            .try_get(idx)
+                            .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                        match v {
+                            None => return Ok(QueryValue::Null),
+                            Some(items) => items
+                                .iter()
+                                .map(|x| x.map(|b| b.to_string()).unwrap_or_else(|| "NULL".to_string()))
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        }
+                    }
+                    // fallback: try text array
+                    _ => {
+                        let v: Option<Vec<Option<String>>> = row.try_get(idx).unwrap_or(None);
+                        match v {
+                            None => return Ok(QueryValue::Null),
+                            Some(items) => items
+                                .iter()
+                                .map(|x| x.as_deref().unwrap_or("NULL").to_string())
+                                .collect::<Vec<_>>()
+                                .join(", "),
+                        }
+                    }
+                };
+                Ok(QueryValue::String(format!("[{}]", formatted)))
             }
             // Default to string representation
             _ => {

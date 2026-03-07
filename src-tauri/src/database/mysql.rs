@@ -121,7 +121,7 @@ impl ConnectionPool for MySQLPool {
 
 /// MySQL database adapter.
 pub struct MySQLAdapter {
-    config: ConnectionConfig,
+    pub(crate) config: ConnectionConfig,
     pool: Option<Arc<MySQLPool>>,
     // Store the raw pool for internal use
     raw_pool: Option<Pool>,

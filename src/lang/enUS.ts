@@ -14,6 +14,7 @@ export const enUS = {
       saveChanges: 'Save Changes',
       createConnection: 'Create Connection',
       testConnection: 'Test Connection',
+      dismiss: 'Dismiss',
     },
     status: {
       connected: 'Connected',
@@ -138,6 +139,7 @@ export const enUS = {
         execute: 'Execute query (Ctrl+Enter)',
         explain: 'Explain query (F6)',
         save: 'Save (Ctrl+S)',
+        saveAs: 'Save As .sql file',
         comment: 'Toggle comment (Ctrl+/)',
       },
       status: {
@@ -146,6 +148,10 @@ export const enUS = {
         rows: 'Rows',
         time: 'Time',
         executing: 'Executing...',
+      },
+      notifications: {
+        querySaved: 'Query saved',
+        saveFailed: 'Save failed',
       },
     },
     dataStudio: {
@@ -250,6 +256,42 @@ export const enUS = {
       noData: 'No data returned',
       commandCompleted: 'Command completed',
       noResults: 'Execute a query to see results',
+    },
+    dataTableView: {
+      filterPlaceholder: 'Filter (SQL WHERE clause, e.g. age > 18 AND status = \'active\')',
+      clearFilter: 'Clear filter',
+      refresh: 'Refresh',
+      columns: 'Columns',
+      exportCsv: 'Export Current Page (CSV)',
+      applyFilters: 'Apply Filters',
+      loading: 'Loading table data...',
+      error: 'Failed to load table data',
+      noRows: 'No rows found',
+      rows: 'rows',
+      page: 'Page {page} of {total}',
+      rowsPerPage: 'Rows per page:',
+      actions: 'Actions',
+      editRow: 'Edit row',
+      deleteRow: 'Delete row',
+      notifications: {
+        csvExported: 'CSV exported',
+        exportFailed: 'Export failed',
+        rowDeleted: 'Row deleted',
+        deleteFailed: 'Failed to delete row',
+        rowUpdated: 'Row updated',
+        updateFailed: 'Failed to update row',
+      },
+      deleteDialog: {
+        title: 'Delete Row',
+        message: 'Are you sure you want to delete this row? This action cannot be undone.',
+        confirm: 'Delete',
+      },
+      editDialog: {
+        title: 'Edit Row',
+      },
+      validation: {
+        required: 'This field is required',
+      },
     },
     queryTabs: {
       unsaved: 'Unsaved changes',
