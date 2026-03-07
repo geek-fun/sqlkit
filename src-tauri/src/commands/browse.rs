@@ -3,7 +3,7 @@
 //! This module provides Tauri commands for browsing database metadata,
 //! including databases, schemas, tables, columns, and table data.
 
-use crate::database::{DatabaseAdapter, PostgresAdapter, SqlServerAdapter, ColumnInfo, QueryResult, TableInfo};
+use crate::database::{DatabaseAdapter, PostgresAdapter, MySQLAdapter, SqlServerAdapter, ColumnInfo, QueryResult, TableInfo};
 use crate::state::{ActiveConnection, AppState};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -583,6 +583,7 @@ fn build_pk_where(pk_values: &HashMap<String, JsonValue>, db_type: &str) -> Stri
 #[tauri::command]
 pub async fn update_table_row(
     connection_id: String,
+    database: Option<String>,
     table: String,
     schema: Option<String>,
     pk_values: HashMap<String, JsonValue>,
@@ -625,16 +626,46 @@ pub async fn update_table_row(
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_update_sql("postgres")?;
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = PostgresAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to update row: {}", e));
+                }
+            }
             adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_update_sql("mysql")?;
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = MySQLAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to update row: {}", e));
+                }
+            }
             adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_update_sql("sqlserver")?;
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = SqlServerAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to update row: {}", e));
+                }
+            }
             adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
         }
         ActiveConnection::SQLite(adapter) => {
@@ -659,6 +690,7 @@ pub async fn update_table_row(
 #[tauri::command]
 pub async fn delete_table_row(
     connection_id: String,
+    database: Option<String>,
     table: String,
     schema: Option<String>,
     pk_values: HashMap<String, JsonValue>,
@@ -683,16 +715,46 @@ pub async fn delete_table_row(
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_delete_sql("postgres");
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = PostgresAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to delete row: {}", e));
+                }
+            }
             adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_delete_sql("mysql");
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = MySQLAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to delete row: {}", e));
+                }
+            }
             adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_delete_sql("sqlserver");
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = SqlServerAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to delete row: {}", e));
+                }
+            }
             adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
         }
         ActiveConnection::SQLite(adapter) => {
