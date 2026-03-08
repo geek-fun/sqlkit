@@ -50,21 +50,12 @@ type ClearMode = 'all' | 'nonFavorites'
 const clearDialogOpen = ref(false)
 const clearMode = ref<ClearMode>('all')
 
-const displayedEntries = computed(() => {
-  const search = searchQuery.value.toLowerCase()
-  const status = statusFilter.value
-  const entries = historyStore.entries
-  const favorites = entries.filter(e => e.isFavorite).sort((a, b) => b.timestamp - a.timestamp)
-  const rest = entries.filter(e => !e.isFavorite).sort((a, b) => b.timestamp - a.timestamp)
-  return [...favorites, ...rest].filter((entry) => {
-    const matchesSearch = !search
-      || entry.sql.toLowerCase().includes(search)
-      || entry.connectionName.toLowerCase().includes(search)
-      || (entry.database ?? '').toLowerCase().includes(search)
-    const matchesStatus = status === 'all' || entry.status === status
-    return matchesSearch && matchesStatus
-  })
-})
+const displayedEntries = computed(() =>
+  historyStore.filteredEntries(
+    searchQuery.value,
+    statusFilter.value === 'all' ? '' : statusFilter.value,
+  ),
+)
 
 const clearDialogMessage = computed(() =>
   clearMode.value === 'all'
@@ -150,7 +141,7 @@ function handleToggleFavorite(id: string) {
           <Button
             variant="outline"
             size="sm"
-            :disabled="displayedEntries.length === 0"
+            :disabled="!historyStore.entries.some(entry => !entry.isFavorite)"
             @click="openClearDialog('nonFavorites')"
           >
             {{ t('pages.history.clearNonFavorites') }}
@@ -390,7 +381,9 @@ function handleToggleFavorite(id: string) {
     <AlertDialog v-model:open="clearDialogOpen">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('pages.history.clearAll') }}</AlertDialogTitle>
+          <AlertDialogTitle>
+            {{ clearMode === 'all' ? t('pages.history.clearAll') : t('pages.history.clearNonFavorites') }}
+          </AlertDialogTitle>
           <AlertDialogDescription>
             {{ clearDialogMessage }}
           </AlertDialogDescription>
