@@ -4,7 +4,7 @@
 //! and getting query execution plans.
 
 use crate::api_response::{ApiResponse, db_error_to_api_error};
-use crate::database::{DatabaseAdapter, QueryResult};
+use crate::database::{ConnectionConfig, DatabaseAdapter, PostgresAdapter, MySQLAdapter, SqlServerAdapter, QueryResult};
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -20,12 +20,40 @@ pub struct QueryPlan {
     pub details: Option<String>,
 }
 
+/// Connect a temporary adapter, execute a query, then disconnect.
+///
+/// The caller must **not** hold `state.connections` when calling this function,
+/// because `connect` and `execute_query` involve network I/O.
+/// Always calls `disconnect()` after execution to ensure proper resource cleanup.
+async fn execute_with_temp_adapter<A>(
+    mut temp: A,
+    sql: &str,
+) -> Result<ApiResponse<QueryResult>, String>
+where
+    A: DatabaseAdapter,
+{
+    temp.connect()
+        .await
+        .map_err(|e| format!("Failed to connect to database: {}", e))?;
+    let result = temp
+        .execute_query(sql)
+        .await
+        .map(ApiResponse::success)
+        .or_else(|e| Ok(ApiResponse::error(db_error_to_api_error(&e))));
+    if let Err(e) = temp.disconnect().await {
+        eprintln!("Warning: failed to disconnect temporary adapter after query: {}", e);
+    }
+    result
+}
+
 /// Execute a SQL query.
 ///
 /// # Arguments
 ///
 /// * `connection_id` - ID of the active connection
 /// * `sql` - SQL query to execute
+/// * `database` - Optional target database to execute the query against (creates a
+///   temporary connection if different from the active connection's database)
 /// * `state` - Application state
 ///
 /// # Returns
@@ -35,15 +63,82 @@ pub struct QueryPlan {
 pub async fn execute_query(
     connection_id: String,
     sql: String,
+    database: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<ApiResponse<QueryResult>, String> {
-    let connections = state.connections.lock().await;
+    // If a target database is specified we may need a temporary adapter.
+    // We hold the connections lock only long enough to clone the config, then
+    // release it before doing any network I/O.
+    if let Some(ref db) = database {
+        enum TempKind {
+            Postgres(ConnectionConfig),
+            MySQL(ConnectionConfig),
+            SQLServer(ConnectionConfig),
+        }
 
+        let temp_kind: Option<TempKind> = {
+            let connections = state.connections.lock().await;
+            let connection = connections
+                .get(&connection_id)
+                .ok_or_else(|| "No active connection found".to_string())?;
+
+            match connection {
+                ActiveConnection::Postgres(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempKind::Postgres(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::MySQL(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempKind::MySQL(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::SQLServer(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempKind::SQLServer(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::SQLite(_) => None,
+            }
+            // connections lock is dropped here, before any network I/O
+        };
+
+        if let Some(kind) = temp_kind {
+            return match kind {
+                TempKind::Postgres(cfg) => {
+                    execute_with_temp_adapter(PostgresAdapter::new(cfg), &sql).await
+                }
+                TempKind::MySQL(cfg) => {
+                    execute_with_temp_adapter(MySQLAdapter::new(cfg), &sql).await
+                }
+                TempKind::SQLServer(cfg) => {
+                    execute_with_temp_adapter(SqlServerAdapter::new(cfg), &sql).await
+                }
+            };
+        }
+    }
+
+    // Common path: use the already-connected adapter
+    let connections = state.connections.lock().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| "No active connection found".to_string())?;
 
-    // Execute query based on connection type
     let result = match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
@@ -225,19 +320,19 @@ mod tests {
 
         // Create a test table
         let create_sql = "CREATE TABLE test (id INTEGER, name TEXT)";
-        let result = execute_query(conn_id.clone(), create_sql.to_string(), State::from(&state))
+        let result = execute_query(conn_id.clone(), create_sql.to_string(), None, State::from(&state))
             .await;
         assert!(result.is_ok());
 
         // Insert data
         let insert_sql = "INSERT INTO test VALUES (1, 'Alice'), (2, 'Bob')";
-        let result = execute_query(conn_id.clone(), insert_sql.to_string(), State::from(&state))
+        let result = execute_query(conn_id.clone(), insert_sql.to_string(), None, State::from(&state))
             .await;
         assert!(result.is_ok());
 
         // Query data
         let select_sql = "SELECT * FROM test";
-        let result = execute_query(conn_id.clone(), select_sql.to_string(), State::from(&state))
+        let result = execute_query(conn_id.clone(), select_sql.to_string(), None, State::from(&state))
             .await;
         assert!(result.is_ok());
         let query_result = result.unwrap();
@@ -250,6 +345,7 @@ mod tests {
         let result = execute_query(
             "invalid".to_string(),
             "SELECT 1".to_string(),
+            None,
             State::from(&state),
         )
         .await;
@@ -265,6 +361,7 @@ mod tests {
         execute_query(
             conn_id.clone(),
             "CREATE TABLE test (id INTEGER, name TEXT)".to_string(),
+            None,
             State::from(&state),
         )
         .await
