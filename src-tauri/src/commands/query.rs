@@ -4,7 +4,7 @@
 //! and getting query execution plans.
 
 use crate::api_response::{ApiResponse, db_error_to_api_error};
-use crate::database::{DatabaseAdapter, QueryResult};
+use crate::database::{DatabaseAdapter, PostgresAdapter, MySQLAdapter, SqlServerAdapter, QueryResult};
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -35,6 +35,7 @@ pub struct QueryPlan {
 pub async fn execute_query(
     connection_id: String,
     sql: String,
+    database: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<ApiResponse<QueryResult>, String> {
     let connections = state.connections.lock().await;
@@ -47,14 +48,50 @@ pub async fn execute_query(
     let result = match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = PostgresAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&sql).await
+                        .map(ApiResponse::success)
+                        .or_else(|e| Ok(ApiResponse::error(db_error_to_api_error(&e))));
+                }
+            }
             adapter.execute_query(&sql).await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = MySQLAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&sql).await
+                        .map(ApiResponse::success)
+                        .or_else(|e| Ok(ApiResponse::error(db_error_to_api_error(&e))));
+                }
+            }
             adapter.execute_query(&sql).await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
+            if let Some(ref db) = database {
+                if Some(db.as_str()) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(db.clone());
+                    let mut temp = SqlServerAdapter::new(temp_config);
+                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp.execute_query(&sql).await
+                        .map(ApiResponse::success)
+                        .or_else(|e| Ok(ApiResponse::error(db_error_to_api_error(&e))));
+                }
+            }
             adapter.execute_query(&sql).await
         }
         ActiveConnection::SQLite(adapter) => {
@@ -225,19 +262,19 @@ mod tests {
 
         // Create a test table
         let create_sql = "CREATE TABLE test (id INTEGER, name TEXT)";
-        let result = execute_query(conn_id.clone(), create_sql.to_string(), State::from(&state))
+        let result = execute_query(conn_id.clone(), create_sql.to_string(), None, State::from(&state))
             .await;
         assert!(result.is_ok());
 
         // Insert data
         let insert_sql = "INSERT INTO test VALUES (1, 'Alice'), (2, 'Bob')";
-        let result = execute_query(conn_id.clone(), insert_sql.to_string(), State::from(&state))
+        let result = execute_query(conn_id.clone(), insert_sql.to_string(), None, State::from(&state))
             .await;
         assert!(result.is_ok());
 
         // Query data
         let select_sql = "SELECT * FROM test";
-        let result = execute_query(conn_id.clone(), select_sql.to_string(), State::from(&state))
+        let result = execute_query(conn_id.clone(), select_sql.to_string(), None, State::from(&state))
             .await;
         assert!(result.is_ok());
         let query_result = result.unwrap();
@@ -250,6 +287,7 @@ mod tests {
         let result = execute_query(
             "invalid".to_string(),
             "SELECT 1".to_string(),
+            None,
             State::from(&state),
         )
         .await;
@@ -265,6 +303,7 @@ mod tests {
         execute_query(
             conn_id.clone(),
             "CREATE TABLE test (id INTEGER, name TEXT)".to_string(),
+            None,
             State::from(&state),
         )
         .await

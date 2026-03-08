@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -13,7 +12,7 @@ const menuItems = [
   { id: 'history', label: 'History', icon: 'history', path: '/history' },
 ]
 
-const isActive = (path: string) => computed(() => route.path === path)
+const isActive = (path: string) => route.path === path
 </script>
 
 <template>
@@ -39,7 +38,7 @@ const isActive = (path: string) => computed(() => route.path === path)
             <TooltipTrigger as-child>
               <button
                 class="mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center relative" :class="[
-                  isActive(item.path).value
+                  isActive(item.path)
                     ? 'bg-secondary text-primary border border-border shadow-sm'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                 ]"

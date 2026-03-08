@@ -171,6 +171,7 @@ export const useTabStore = defineStore('tabs', {
         const response = await invoke<ApiResponse<QueryResult>>('execute_query', {
           connectionId: tab.connectionId,
           sql,
+          database: tab.database ?? null,
         })
 
         const executionTime = Date.now() - startTime
@@ -189,7 +190,20 @@ export const useTabStore = defineStore('tabs', {
           })
         }
         else if (isApiError(response)) {
-          tab.error = response.error
+          const err = response.error
+          if (tab.database && err.details) {
+            const firstBreak = err.details.indexOf('\n')
+            if (firstBreak !== -1) {
+              err.details = `${err.details.slice(0, firstBreak)} in database: "${tab.database}"${err.details.slice(firstBreak)}`
+            }
+            else {
+              err.details = `${err.details} in database: "${tab.database}"`
+            }
+          }
+          else if (tab.database) {
+            err.details = `in database: "${tab.database}"`
+          }
+          tab.error = err
           historyStore.addEntry({
             sql,
             connectionId: tab.connectionId,

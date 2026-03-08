@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { HistoryEntryStatus } from '@/store'
+import type { HistoryEntry, HistoryEntryStatus } from '@/store'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -44,15 +44,27 @@ const tabStore = useTabStore()
 const connectionStore = useConnectionStore()
 
 const searchQuery = ref('')
-const statusFilter = ref<HistoryEntryStatus | ''>('')
+const statusFilter = ref<HistoryEntryStatus | 'all'>('all')
 
 type ClearMode = 'all' | 'nonFavorites'
 const clearDialogOpen = ref(false)
 const clearMode = ref<ClearMode>('all')
 
-const displayedEntries = computed(() =>
-  historyStore.filteredEntries(searchQuery.value, statusFilter.value),
-)
+const displayedEntries = computed(() => {
+  const search = searchQuery.value.toLowerCase()
+  const status = statusFilter.value
+  const entries = historyStore.entries
+  const favorites = entries.filter(e => e.isFavorite).sort((a, b) => b.timestamp - a.timestamp)
+  const rest = entries.filter(e => !e.isFavorite).sort((a, b) => b.timestamp - a.timestamp)
+  return [...favorites, ...rest].filter((entry) => {
+    const matchesSearch = !search
+      || entry.sql.toLowerCase().includes(search)
+      || entry.connectionName.toLowerCase().includes(search)
+      || (entry.database ?? '').toLowerCase().includes(search)
+    const matchesStatus = status === 'all' || entry.status === status
+    return matchesSearch && matchesStatus
+  })
+})
 
 const clearDialogMessage = computed(() =>
   clearMode.value === 'all'
@@ -93,20 +105,23 @@ function confirmClear() {
   toast.success(t('pages.history.notifications.cleared'))
 }
 
-async function handleRerun(sql: string) {
-  const activeConnectionId = connectionStore.activeConnectionId
-  if (!activeConnectionId) {
+async function handleRerun(entry: HistoryEntry) {
+  let connectionId = entry.connectionId
+  // Fall back to active connection if the original one no longer exists
+  if (!connectionStore.getConnectionById(connectionId)) {
+    connectionId = connectionStore.activeConnectionId || ''
+  }
+  if (!connectionId) {
     await router.push('/queries')
     return
   }
-  const database = connectionStore.getCurrentDatabase(activeConnectionId) || undefined
-  const tab = tabStore.createTab(activeConnectionId, database)
-  tabStore.updateTabContent(tab.id, sql)
-  const createdTab = tabStore.tabs.find(tab2 => tab2.id === tab.id)
+  const database = entry.database
+  const tab = tabStore.createTab(connectionId, database)
+  tabStore.updateTabContent(tab.id, entry.sql)
+  const createdTab = tabStore.tabs.find(t => t.id === tab.id)
   if (createdTab)
     createdTab.hasUnsavedChanges = false
   await router.push('/queries')
-  toast.success(t('pages.history.notifications.rerun'))
 }
 
 function handleDelete(id: string) {
@@ -163,15 +178,15 @@ function handleToggleFavorite(id: string) {
           <div class="flex gap-3 items-center">
             <Input
               v-model="searchQuery"
-              class="max-w-xs"
+              class="flex-[3]"
               :placeholder="t('pages.history.search')"
             />
             <Select v-model="statusFilter">
-              <SelectTrigger class="w-36">
+              <SelectTrigger class="flex-[1]">
                 <SelectValue :placeholder="t('pages.history.filterAll')" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">
+                <SelectItem value="all">
                   {{ t('pages.history.filterAll') }}
                 </SelectItem>
                 <SelectItem value="success">
@@ -224,7 +239,7 @@ function handleToggleFavorite(id: string) {
                         <Tooltip>
                           <TooltipTrigger as-child>
                             <button
-                              class="rounded flex h-6 w-6 transition-colors items-center justify-center hover:text-yellow-500"
+                              class="rounded flex h-6 w-6 cursor-pointer transition-colors items-center justify-center hover:text-yellow-500"
                               :class="entry.isFavorite ? 'text-yellow-500' : 'text-muted-foreground'"
                               @click="handleToggleFavorite(entry.id)"
                             >
@@ -301,7 +316,7 @@ function handleToggleFavorite(id: string) {
                                 variant="ghost"
                                 size="icon"
                                 class="h-7 w-7"
-                                @click="handleRerun(entry.sql)"
+                                @click="handleRerun(entry)"
                               >
                                 <svg
                                   xmlns="http://www.w3.org/2000/svg"

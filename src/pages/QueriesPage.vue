@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { CursorPosition, Selection } from '@/common/sqlParser'
 import type { TableInfo } from '@/store/databaseStore'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import { extractStatementAtCursor } from '@/common/sqlParser'
@@ -32,6 +32,7 @@ const showResultPanel = ref(false)
 const sidebarWidth = ref(250)
 const isResizingSidebar = ref(false)
 const selectedDatabase = ref<string>('')
+const queryTabsRef = ref<InstanceType<typeof QueryTabs>>()
 
 // Available connections
 const availableConnections = computed(() => connectionStore.connections)
@@ -126,11 +127,22 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
   }
 })
 
-// Persist the selected database back to the store so it survives navigation
+// Persist the selected database back to the store and sync the active tab
 watch(selectedDatabase, (db) => {
   const connId = selectedConnectionId.value || connectionStore.activeConnectionId
   if (connId && db) {
     connectionStore.setCurrentDatabase(connId, db)
+  }
+  // Keep the active tab's database in sync so queries run against the selected DB
+  if (db && activeTab.value) {
+    activeTab.value.database = db
+  }
+})
+
+// When the active tab changes, sync selectedDatabase to reflect that tab's DB
+watch(activeTab, (tab) => {
+  if (tab?.database && tab.database !== selectedDatabase.value) {
+    selectedDatabase.value = tab.database
   }
 })
 
@@ -183,6 +195,20 @@ function handleTabClose(tabId: string) {
 function handleTabCloseForce(tabId: string) {
   tabStore.closeTab(tabId)
 }
+
+function handleGlobalKeydown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
+    const tab = tabStore.activeTab
+    if (tab) {
+      e.preventDefault()
+      e.stopPropagation()
+      queryTabsRef.value?.triggerClose(tab.id)
+    }
+  }
+}
+
+onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
+onUnmounted(() => window.removeEventListener('keydown', handleGlobalKeydown))
 
 function handleCreateScript(table: TableInfo, database: string, schema?: string) {
   const schemaPrefix = schema ? `"${schema}".` : ''
@@ -372,6 +398,7 @@ async function handleDownloadQuery() {
         <div class="flex flex-1 flex-col overflow-hidden">
           <!-- Tabs -->
           <QueryTabs
+            ref="queryTabsRef"
             :tabs="tabStore.tabs"
             :active-tab-id="tabStore.activeTabId"
             @select="handleTabSelect"

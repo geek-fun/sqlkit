@@ -64,6 +64,21 @@ function cancelClose() {
   showCloseDialog.value = false
 }
 
+function triggerClose(tabId: string) {
+  const tab = props.tabs.find(t => t.id === tabId)
+  if (!tab)
+    return
+  if (tab.hasUnsavedChanges) {
+    tabToClose.value = tab
+    showCloseDialog.value = true
+  }
+  else {
+    emit('close', tab.id)
+  }
+}
+
+defineExpose({ triggerClose })
+
 function handleNewTab() {
   emit('new')
 }
