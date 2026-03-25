@@ -24,7 +24,8 @@ export async function saveQueryFile(content: string, filePath?: string, fileName
   })
 }
 
-/** * Show OS "Save As" dialog, ensure .sql extension, then write the file.
+/**
+ * Show OS "Save As" dialog, ensure .sql extension, then write the file.
  * Returns SaveResult, or null if the user cancelled.
  */
 export async function saveQueryFileAs(content: string, suggestedName: string = 'query.sql'): Promise<SaveResult | null> {
@@ -41,7 +42,8 @@ export async function saveQueryFileAs(content: string, suggestedName: string = '
   return invoke<SaveResult>('save_query_file', { content, filePath })
 }
 
-/** * Load a SQL query from a file
+/**
+  Load a SQL query from a file
  */
 export async function loadQueryFile(filePath: string): Promise<LoadResult> {
   return invoke<LoadResult>('load_query_file', {

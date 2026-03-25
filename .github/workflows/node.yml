@@ -30,7 +30,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: npm
       - name: install dependencies (ubuntu only)
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -53,7 +53,7 @@ jobs:
 
       - run: npm run build
         env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
+          NODE_OPTIONS: --max-old-space-size=4096
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

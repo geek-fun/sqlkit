@@ -14,24 +14,24 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: 'macOS'
-            os: 'macos-latest'
-            args: '--target universal-apple-darwin'
-            target: 'aarch64-apple-darwin,x86_64-apple-darwin'
-            artifact-name: 'universal-apple-darwin'
-            node-version: '24.x'
-          - name: 'Windows'
-            os: 'windows-latest'
-            args: '--target x86_64-pc-windows-msvc'
-            target: 'x86_64-pc-windows-msvc'
-            artifact-name: 'x86_64-pc-windows-msvc'
-            node-version: '24.x'
-          - name: 'Linux'
-            os: 'ubuntu-latest'
-            args: '--target x86_64-unknown-linux-gnu'
-            target: 'x86_64-unknown-linux-gnu'
-            artifact-name: 'x86_64-unknown-linux-gnu'
-            node-version: '24.x'
+          - name: macOS
+            os: macos-latest
+            args: --target universal-apple-darwin
+            target: aarch64-apple-darwin,x86_64-apple-darwin
+            artifact-name: universal-apple-darwin
+            node-version: 24.x
+          - name: Windows
+            os: windows-latest
+            args: --target x86_64-pc-windows-msvc
+            target: x86_64-pc-windows-msvc
+            artifact-name: x86_64-pc-windows-msvc
+            node-version: 24.x
+          - name: Linux
+            os: ubuntu-latest
+            args: --target x86_64-unknown-linux-gnu
+            target: x86_64-unknown-linux-gnu
+            artifact-name: x86_64-unknown-linux-gnu
+            node-version: 24.x
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -45,7 +45,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
+          cache: npm
       - name: install dependencies (ubuntu only)
         if: matrix.os == 'ubuntu-latest'
         run: |
@@ -67,7 +67,7 @@ jobs:
           fail_ci_if_error: false
       - run: npm run build
         env:
-          NODE_OPTIONS: '--max-old-space-size=4096'
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Import Apple Developer Certificate
         if: matrix.os == 'macos-latest'
@@ -105,7 +105,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          NODE_OPTIONS: '--max-old-space-size=4096'
+          NODE_OPTIONS: --max-old-space-size=4096
         with:
           args: ${{ matrix.args }}
 
