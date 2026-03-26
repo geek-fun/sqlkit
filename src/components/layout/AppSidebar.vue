@@ -159,7 +159,7 @@ const isActive = (path: string) => route.path === path
             <TooltipTrigger as-child>
               <button
                 class="mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center" :class="[
-                  isActive('/settings').value
+                  isActive('/settings')
                     ? 'bg-secondary text-primary border border-border shadow-sm'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                 ]"
