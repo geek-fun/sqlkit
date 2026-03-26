@@ -10,19 +10,23 @@ concurrency:
 
 jobs:
   build:
+    name: ${{ matrix.name }}
     permissions:
       contents: write
     strategy:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
+          - name: macOS
+            platform: macos-latest
             args: --target universal-apple-darwin
             target: aarch64-apple-darwin,x86_64-apple-darwin
-          - platform: windows-latest
+          - name: Windows
+            platform: windows-latest
             args:
             target:
-          - platform: ubuntu-22.04
+          - name: Linux
+            platform: ubuntu-22.04
             args:
             target:
 
