@@ -22,18 +22,51 @@ Runs on pull requests to `master` branch:
 
 Runs on push to `master` branch:
 - Builds platform-specific installers
-- Creates GitHub release with auto-generated changelog
-- Uploads artifacts to GitHub Releases
+- Creates GitHub release automatically
+- Uploads all artifacts (DMG, EXE, AppImage, DEB)
+- Generates updater manifests (`latest.json`)
+
+---
+
+## How It Works
+
+The simplified workflow uses `tauri-action` which handles everything automatically:
+
+```yaml
+- uses: tauri-apps/tauri-action@v0
+  env:
+    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+    APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+    APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+    APPLE_ID: ${{ secrets.APPLE_ID }}
+    APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+    APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+    TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+  with:
+    tagName: v__VERSION__
+    releaseName: SqlKit v__VERSION__
+    releaseBody: See the assets to download this version and install.
+    releaseDraft: true
+    prerelease: false
+```
+
+**tauri-action automatically:**
+- ✅ Creates GitHub release
+- ✅ Collects all artifacts (DMG, EXE, AppImage, DEB)
+- ✅ Generates `latest.json` for updater
+- ✅ Creates `.sig` files for signing
+- ✅ Imports certificates and handles keychain (macOS)
+- ✅ Notarizes with Apple (macOS)
 
 ---
 
 ## macOS Code Signing Options
 
-Code signing on macOS is required to prevent "unverified developer" warnings. There are three approaches:
+### Option 1: No Signing (Development)
 
-### Option 1: Ad-Hoc Signing (Simplest)
-
-No Apple Developer certificate required. Good for early development and testing.
+Skip signing entirely for early development.
 
 **Configuration in `tauri.conf.json`:**
 
@@ -47,114 +80,24 @@ No Apple Developer certificate required. Good for early development and testing.
 }
 ```
 
-**Pros:**
-- No secrets management
-- No Apple Developer account required
-- Simplest setup
-
-**Cons:**
-- Users see "unverified developer" warning
-- Users must whitelist app in Privacy & Security settings
-- Not suitable for production distribution
-
-**Required GitHub Secrets:** None
+**Result:** Users see "unverified developer" warning.
 
 ---
 
-### Option 2: Dedicated GitHub Action (Recommended)
+### Option 2: Full Code Signing (Production)
 
-Uses `apple-actions/import-codesign-certs` for cleaner certificate management.
-
-**Workflow configuration:**
-
-```yaml
-- name: Import Apple Certificate
-  if: matrix.os == 'macos-latest'
-  uses: apple-actions/import-codesign-certs@v3
-  with:
-    p12-file-base64: ${{ secrets.APPLE_CERTIFICATE }}
-    p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-
-- uses: tauri-apps/tauri-action@v0
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    APPLE_ID: ${{ secrets.APPLE_ID }}
-    APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-    APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-```
-
-**Required GitHub Secrets:**
+Set these GitHub secrets for full signing and notarization:
 
 | Secret | Description |
 |--------|-------------|
 | `APPLE_CERTIFICATE` | Base64-encoded `.p12` certificate file |
 | `APPLE_CERTIFICATE_PASSWORD` | Password for the `.p12` file |
+| `APPLE_SIGNING_IDENTITY` | Certificate identity (e.g., `Developer ID Application: Your Name (TEAM_ID)`) |
 | `APPLE_ID` | Your Apple ID email address |
 | `APPLE_ID_PASSWORD` | App-specific password from Apple ID |
 | `APPLE_TEAM_ID` | Your Apple Team ID |
 
-**Pros:**
-- Cleaner than manual script
-- Same security as full approach
-- Automatically handles keychain setup
-
-**Cons:**
-- Requires paid Apple Developer account ($99/year)
-- Requires certificate setup
-
----
-
-### Option 3: Manual Certificate Import (Current)
-
-Uses shell commands to import certificate into a temporary keychain.
-
-**Workflow configuration:**
-
-```yaml
-- name: Import Apple Developer Certificate
-  if: matrix.os == 'macos-latest'
-  env:
-    APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-    APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-    KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
-  run: |
-    echo $APPLE_CERTIFICATE | base64 --decode > certificate.p12
-    security create-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-    security default-keychain -s build.keychain
-    security unlock-keychain -p "$KEYCHAIN_PASSWORD" build.keychain
-    security set-keychain-settings -t 3600 -u build.keychain
-    security import certificate.p12 -k build.keychain -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
-    security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" build.keychain
-    security find-identity -v -p codesigning build.keychain
-
-- name: Verify Certificate
-  if: matrix.os == 'macos-latest'
-  run: |
-    CERT_INFO=$(security find-identity -v -p codesigning build.keychain | grep "Developer ID Application")
-    CERT_ID=$(echo "$CERT_INFO" | awk -F'"' '{print $2}')
-    echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
-
-- uses: tauri-apps/tauri-action@v0
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    APPLE_ID: ${{ secrets.APPLE_ID }}
-    APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-    APPLE_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
-    APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-    APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-    APPLE_SIGNING_IDENTITY: ${{ env.CERT_ID }}
-```
-
-**Required GitHub Secrets:**
-
-| Secret | Description |
-|--------|-------------|
-| `APPLE_CERTIFICATE` | Base64-encoded `.p12` certificate file |
-| `APPLE_CERTIFICATE_PASSWORD` | Password for the `.p12` file |
-| `KEYCHAIN_PASSWORD` | Password for temporary keychain |
-| `APPLE_ID` | Your Apple ID email address |
-| `APPLE_ID_PASSWORD` | App-specific password from Apple ID |
-| `APPLE_TEAM_ID` | Your Apple Team ID |
+**Result:** Fully signed and notarized app, no warnings.
 
 ---
 
@@ -188,29 +131,40 @@ openssl base64 -A -in certificate.p12 -out certificate-base64.txt
 
 Copy the contents of `certificate-base64.txt` to `APPLE_CERTIFICATE` secret.
 
+### 6. Get Signing Identity
+
+Run this command to get your signing identity:
+
+```bash
+security find-identity -v -p codesigning
+```
+
+The output looks like: `Developer ID Application: Your Name (TEAM_ID)`
+
+Add this to `APPLE_SIGNING_IDENTITY` secret.
+
 ---
 
 ## Windows Code Signing (Optional)
 
-Windows code signing requires a code signing certificate from a trusted CA.
-
-**Required GitHub Secrets:**
+Windows code signing requires Azure Key Vault:
 
 | Secret | Description |
 |--------|-------------|
-| `WINDOWS_CERTIFICATE` | Base64-encoded certificate file |
-| `WINDOWS_CERTIFICATE_PASSWORD` | Certificate password |
-
-The `tauri-action` will automatically use these for Windows builds.
+| `AZURE_CLIENT_ID` | Azure client ID |
+| `AZURE_CLIENT_SECRET` | Azure client secret |
+| `AZURE_TENANT_ID` | Azure tenant ID |
+| `AZURE_KEY_VAULT_URL` | Azure Key Vault URL |
+| `AZURE_KEY_VAULT_CERTIFICATE` | Certificate name in Key Vault |
 
 ---
 
 ## Linux Distribution
 
-No code signing required for Linux. The workflow generates:
+No code signing required. The workflow generates:
 
-- **AppImage**: Portable executable
-- **DEB**: Debian/Ubuntu package
+- **AppImage**: `SqlKit_VERSION_amd64.AppImage`
+- **DEB**: `sql-kit_VERSION_amd64.deb`
 
 ---
 
@@ -234,7 +188,7 @@ For auto-updates, configure in `tauri.conf.json`:
 }
 ```
 
-**Required GitHub Secrets for Updater:**
+**Required GitHub Secrets:**
 
 | Secret | Description |
 |--------|-------------|
@@ -249,13 +203,18 @@ npm run tauri signer generate -- -w ~/.tauri/sqlkit.key
 
 ---
 
-## Current Implementation
+## Artifact Names
 
-SQLKit currently uses **Option 3 (Manual Certificate Import)** with full code signing and notarization support.
+Built artifacts follow Tauri conventions:
 
-To switch to a simpler approach:
-1. For development: Use Option 1 (Ad-Hoc)
-2. For production: Use Option 2 (Dedicated Action)
+| Platform | Artifact Name |
+|----------|---------------|
+| macOS DMG | `SqlKit_VERSION_aarch64.dmg`, `SqlKit_VERSION_x64.dmg` |
+| macOS App | `SqlKit_aarch64.app.tar.gz`, `SqlKit_x64.app.tar.gz` |
+| Windows | `SqlKit_VERSION_x64-setup.exe` |
+| Linux AppImage | `SqlKit_VERSION_amd64.AppImage` |
+| Linux DEB | `sql-kit_VERSION_amd64.deb` |
+| Updater Manifest | `latest.json` |
 
 ---
 
