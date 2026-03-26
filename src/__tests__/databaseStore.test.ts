@@ -90,7 +90,7 @@ describe('databaseStore', () => {
 
   describe('fetchDatabases', () => {
     it('should fetch and store databases', async () => {
-      invoke.mockResolvedValue({ databases: [{ name: 'db1' }, { name: 'db2' }] })
+      invoke.mockResolvedValue(['db1', 'db2'])
 
       const store = useDatabaseStore()
       await store.fetchDatabases('conn-1')
@@ -101,7 +101,7 @@ describe('databaseStore', () => {
     })
 
     it('should update existing metadata', async () => {
-      invoke.mockResolvedValue({ databases: [{ name: 'db3' }] })
+      invoke.mockResolvedValue(['db3'])
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
@@ -119,18 +119,20 @@ describe('databaseStore', () => {
     })
 
     it('should set loading to false even on error', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
       invoke.mockRejectedValue(new Error('Connection error'))
 
       const store = useDatabaseStore()
+      await store.fetchDatabases('conn-1')
 
-      await expect(store.fetchDatabases('conn-1')).rejects.toThrow('Connection error')
       expect(store.loading).toBe(false)
+      consoleSpy.mockRestore()
     })
   })
 
   describe('fetchSchemas', () => {
     it('should fetch and store schemas', async () => {
-      invoke.mockResolvedValue({ schemas: [{ name: 'public' }, { name: 'private' }] })
+      invoke.mockResolvedValue(['public', 'private'])
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
@@ -156,7 +158,7 @@ describe('databaseStore', () => {
         { name: 'users', schema: 'public', rowCount: 100 },
         { name: 'orders', schema: 'public', rowCount: 500 },
       ]
-      invoke.mockResolvedValue({ tables: mockTables })
+      invoke.mockResolvedValue(mockTables)
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
@@ -177,7 +179,7 @@ describe('databaseStore', () => {
     })
 
     it('should use database only as key when no schema', async () => {
-      invoke.mockResolvedValue({ tables: [{ name: 'users' }] })
+      invoke.mockResolvedValue([{ name: 'users' }])
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
