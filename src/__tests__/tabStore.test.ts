@@ -256,7 +256,10 @@ describe('tabStore', () => {
         rows: [{ id: 1, name: 'Test' }],
         rowCount: 1,
       }
-      invoke.mockResolvedValue(mockResult)
+      invoke.mockResolvedValue({
+        status: 'success',
+        data: mockResult,
+      })
 
       const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
@@ -268,6 +271,7 @@ describe('tabStore', () => {
       expect(invoke).toHaveBeenCalledWith('execute_query', {
         connectionId: 'conn-1',
         sql: 'SELECT * FROM users',
+        database: null,
       })
       expect(store.tabs[0].results).toEqual(mockResult)
       expect(store.tabs[0].isExecuting).toBe(false)

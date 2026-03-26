@@ -2,18 +2,20 @@ import type { ServerConnection } from '../store/connectionStore'
 import { createPinia, setActivePinia } from 'pinia'
 import { DatabaseType, useConnectionStore } from '../store/connectionStore'
 
-// Mock the storeApi
-jest.mock('../datasources', () => ({
-  storeApi: {
-    get: jest.fn(),
-    set: jest.fn(),
-    getSecret: jest.fn(),
-    setSecret: jest.fn(),
+jest.mock('../datasources/connectionApi', () => ({
+  connectionApi: {
+    list: jest.fn(),
+    save: jest.fn(),
+    delete: jest.fn(),
+    test: jest.fn(),
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    getStatus: jest.fn(),
   },
 }))
 
 // eslint-disable-next-line ts/no-require-imports
-const { storeApi } = require('../datasources')
+const { connectionApi } = require('../datasources/connectionApi')
 
 describe('connectionStore', () => {
   beforeEach(() => {
@@ -31,6 +33,19 @@ describe('connectionStore', () => {
     password: 'secret',
     database: 'testdb',
     ssl: true,
+    ...overrides,
+  })
+
+  const createMockBackendConnection = (overrides = {}) => ({
+    id: 'test-uuid-123',
+    name: 'Test Connection',
+    db_type: 'PostgreSQL',
+    host: 'localhost',
+    port: 5432,
+    username: 'admin',
+    password: 'secret',
+    database: 'testdb',
+    ssl_mode: 'require',
     ...overrides,
   })
 
@@ -92,30 +107,33 @@ describe('connectionStore', () => {
   })
 
   describe('fetchConnections', () => {
-    it('should fetch connections from store', async () => {
-      const mockConnections = [createMockConnection()]
-      storeApi.get.mockResolvedValue(mockConnections)
+    it('should fetch connections from API', async () => {
+      const mockBackendConnections = [createMockBackendConnection()]
+      connectionApi.list.mockResolvedValue(mockBackendConnections)
 
       const store = useConnectionStore()
       await store.fetchConnections()
 
-      expect(storeApi.get).toHaveBeenCalledWith('connections', [])
-      expect(store.connections).toEqual(mockConnections)
+      expect(connectionApi.list).toHaveBeenCalled()
+      expect(store.connections).toHaveLength(1)
+      expect(store.connections[0].name).toBe('Test Connection')
     })
 
     it('should set empty array on error', async () => {
-      storeApi.get.mockRejectedValue(new Error('Network error'))
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+      connectionApi.list.mockRejectedValue(new Error('Network error'))
 
       const store = useConnectionStore()
       await store.fetchConnections()
 
       expect(store.connections).toEqual([])
+      consoleSpy.mockRestore()
     })
   })
 
   describe('saveConnection', () => {
     it('should add new connection', async () => {
-      storeApi.set.mockResolvedValue(undefined)
+      connectionApi.save.mockResolvedValue('new-uuid-123')
 
       const store = useConnectionStore()
       const conn = createMockConnection({ id: undefined })
@@ -125,11 +143,11 @@ describe('connectionStore', () => {
       expect(result.message).toBe('Connection saved successfully')
       expect(store.connections).toHaveLength(1)
       expect(store.connections[0].id).toBeDefined()
-      expect(storeApi.set).toHaveBeenCalled()
+      expect(connectionApi.save).toHaveBeenCalled()
     })
 
     it('should update existing connection', async () => {
-      storeApi.set.mockResolvedValue(undefined)
+      connectionApi.save.mockResolvedValue('existing-uuid-123')
 
       const store = useConnectionStore()
       const existingConn = createMockConnection({ id: 'existing-uuid-123', name: 'Old Name' })
@@ -144,7 +162,7 @@ describe('connectionStore', () => {
     })
 
     it('should return error on failure', async () => {
-      storeApi.set.mockRejectedValue(new Error('Save failed'))
+      connectionApi.save.mockRejectedValue(new Error('Save failed'))
 
       const store = useConnectionStore()
       const conn = createMockConnection()
@@ -157,7 +175,7 @@ describe('connectionStore', () => {
 
   describe('removeConnection', () => {
     it('should remove connection', async () => {
-      storeApi.set.mockResolvedValue(undefined)
+      connectionApi.delete.mockResolvedValue(undefined)
 
       const store = useConnectionStore()
       const conn1 = createMockConnection({ id: 'conn-1' })
@@ -168,17 +186,32 @@ describe('connectionStore', () => {
 
       expect(store.connections).toHaveLength(1)
       expect(store.connections[0].id).toBe('conn-2')
-      expect(storeApi.set).toHaveBeenCalled()
+      expect(connectionApi.delete).toHaveBeenCalledWith('conn-1')
     })
   })
 
   describe('testConnection', () => {
-    it('should return true (placeholder)', async () => {
+    it('should return true when connection succeeds', async () => {
+      connectionApi.test.mockResolvedValue({ is_connected: true })
+
       const store = useConnectionStore()
       const conn = createMockConnection()
       const result = await store.testConnection(conn)
 
       expect(result).toBe(true)
+      expect(connectionApi.test).toHaveBeenCalled()
+    })
+
+    it('should return false on error', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {})
+      connectionApi.test.mockRejectedValue(new Error('Connection failed'))
+
+      const store = useConnectionStore()
+      const conn = createMockConnection()
+      const result = await store.testConnection(conn)
+
+      expect(result).toBe(false)
+      consoleSpy.mockRestore()
     })
   })
 })
