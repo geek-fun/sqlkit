@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  publish-tauri:
+  build:
     permissions:
       contents: write
     strategy:
@@ -17,10 +17,7 @@ jobs:
       matrix:
         include:
           - platform: macos-latest
-            args: --target aarch64-apple-darwin
-            target: aarch64-apple-darwin,x86_64-apple-darwin
-          - platform: macos-latest
-            args: --target x86_64-apple-darwin
+            args: --target universal-apple-darwin
             target: aarch64-apple-darwin,x86_64-apple-darwin
           - platform: windows-latest
             args:
@@ -33,7 +30,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust stable
+      - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
