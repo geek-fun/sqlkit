@@ -1,25 +1,10 @@
 //! Connection lifecycle management commands.
-//!
-//! This module provides Tauri commands for managing active database connections,
-//! including connecting, disconnecting, and checking connection status.
 
 use crate::database::{ConnectionStatus, DatabaseAdapter};
 use crate::state::{ActiveConnection, AppState};
 use tauri::State;
 
 /// Connect to a server using the provided configuration.
-///
-/// Creates a new connection using the provided server configuration and stores it
-/// in the application state for future queries.
-///
-/// # Arguments
-///
-/// * `config` - Server configuration to connect to
-/// * `state` - Application state
-///
-/// # Returns
-///
-/// Connection status indicating success or failure.
 #[tauri::command]
 pub async fn connect_server(
     config: crate::state::ServerConfig,
@@ -28,18 +13,15 @@ pub async fn connect_server(
     let id = config.id.clone();
     let conn_config = config.to_connection_config()?;
 
-    // Use helper function to create and connect adapter
     let connection = crate::commands::helpers::create_and_connect_adapter(
         &config.db_type,
         conn_config,
     )
     .await?;
 
-    // Store connection
     let mut connections = state.connections.lock().await;
     connections.insert(id.clone(), connection.clone());
     
-    // Get connection status with server metadata by calling test_connection
     let status = match &connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
@@ -64,25 +46,14 @@ pub async fn connect_server(
 }
 
 /// Disconnect from a server.
-///
-/// Removes the active connection from the application state and explicitly
-/// disconnects from the database to ensure proper cleanup of resources,
-/// including closing connections, releasing locks, and cleaning up transactions.
-///
-/// # Arguments
-///
-/// * `id` - ID of the server to disconnect from
-/// * `state` - Application state
 #[tauri::command]
 pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result<(), String> {
     let mut connections = state.connections.lock().await;
 
-    // Remove and explicitly disconnect
     let connection = connections
         .remove(&id)
         .ok_or_else(|| format!("No active connection found for server '{}'", id))?;
     
-    // Call disconnect on the adapter to ensure proper cleanup
     let disconnect_result = match connection {
         ActiveConnection::Postgres(adapter) => {
             let mut adapter = adapter.lock().await;
@@ -102,7 +73,6 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
         }
     };
     
-    // Log disconnect errors but don't fail the command since connection is already removed
     if let Err(e) = disconnect_result {
         eprintln!("Warning: Error during disconnect cleanup for '{}': {}", id, e);
     }
@@ -111,15 +81,6 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
 }
 
 /// Get the connection status for a server.
-///
-/// # Arguments
-///
-/// * `id` - ID of the server to check
-/// * `state` - Application state
-///
-/// # Returns
-///
-/// Connection status indicating if the server is connected.
 #[tauri::command]
 pub async fn get_connection_status(
     id: String,

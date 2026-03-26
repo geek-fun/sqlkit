@@ -24,20 +24,13 @@ const dbTypeFromBackend: Record<string, DatabaseType> = {
   SQLite: DatabaseType.SQLITE,
 }
 
-/**
- * Returns the well-known default database for each engine when the user has
- * not configured one. Without this, PostgreSQL would try to connect to a
- * database named after the username (which usually doesn't exist), and SQL
- * Server would use its own default which may be restricted.
- */
 const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
   [DatabaseType.POSTGRESQL]: 'postgres',
   [DatabaseType.SQLSERVER]: 'master',
 }
 
-function resolveDatabase(type: DatabaseType, database?: string): string | null {
-  return database || defaultDatabaseFor[type] || null
-}
+const resolveDatabase = (type: DatabaseType, database?: string): string | null =>
+  database || defaultDatabaseFor[type] || null
 
 export { resolveDatabase }
 
@@ -48,7 +41,7 @@ export enum ConnectionStatus {
   ERROR = 'error',
 }
 
-export interface SSHTunnelConfig {
+export type SSHTunnelConfig = {
   enabled: boolean
   host: string
   port: number
@@ -58,7 +51,7 @@ export interface SSHTunnelConfig {
   privateKey?: string
 }
 
-export interface ServerConnection {
+export type ServerConnection = {
   id?: string
   name: string
   type: DatabaseType
@@ -73,11 +66,10 @@ export interface ServerConnection {
   lastUsed?: Date
 }
 
-interface ConnectionStoreState {
+type ConnectionStoreState = {
   connections: ServerConnection[]
   activeConnectionId: string | null
   connectionStatus: Record<string, ConnectionStatus>
-  /** Tracks the actual database in use per connection (may differ from configured connection.database when no db was specified and backend applied a default). */
   currentDatabases: Record<string, string>
 }
 

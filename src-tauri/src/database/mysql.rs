@@ -22,32 +22,34 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-/// Convert MySQL error to DbError with detailed information
+/// Convert MySQL error to DbError with detailed information for query errors.
 fn mysql_error_to_db_error(error: mysql_async::Error) -> DbError {
-    let mut error_parts = Vec::new();
-    
-    // Add the main error message
-    error_parts.push(error.to_string());
-    
-    // Try to extract server-specific error details
     if let mysql_async::Error::Server(server_error) = &error {
-        let mut details = Vec::new();
-        
-        // MySQL error code
-        details.push(format!("Error Code: {}", server_error.code));
-        
-        // SQL state
-        details.push(format!("SQL State: {}", server_error.state));
-        
-        // Error message (usually already included but MySQL provides it separately)
-        details.push(format!("Message: {}", server_error.message));
-        
-        if !details.is_empty() {
-            error_parts.push(details.join("\n"));
-        }
+        let mut details = vec![server_error.message.clone()];
+        details.push(format!("[Error Code: {}]", server_error.code));
+        details.push(format!("[SQL State: {}]", server_error.state));
+        DbError::QueryExecution(details.join(" "))
+    } else {
+        DbError::QueryExecution(error.to_string())
     }
-    
-    DbError::QueryExecution(error_parts.join("\n"))
+}
+
+/// Convert MySQL connection error to DbError with detailed information.
+/// Handles authentication failures and connection errors specifically.
+fn mysql_connection_error_to_db_error(error: mysql_async::Error) -> DbError {
+    if let mysql_async::Error::Server(server_error) = &error {
+        // MySQL access denied errors: error code 1045 (28000)
+        // MySQL unknown database errors: error code 1049 (42000)
+        let is_auth_error = server_error.code == 1045 || server_error.state.starts_with("28");
+        
+        if is_auth_error {
+            DbError::Authentication(format!("{} - {}", server_error.message, server_error.state))
+        } else {
+            DbError::Connection(format!("{} [Error Code: {}]", server_error.message, server_error.code))
+        }
+    } else {
+        DbError::Connection(error.to_string())
+    }
 }
 
 /// Configuration key for query timeout in milliseconds.
@@ -289,22 +291,17 @@ impl DatabaseAdapter for MySQLAdapter {
 
     async fn connect(&mut self) -> DbResult<()> {
         let opts = self.build_connection_opts()?;
-
-        // Create the connection pool
         let pool = Pool::new(opts);
 
-        // Test the connection
         let mut conn = pool
             .get_conn()
             .await
-            .map_err(|e| DbError::Connection(format!("Failed to connect: {}", e)))?;
+            .map_err(mysql_connection_error_to_db_error)?;
 
-        // Verify connection works
         conn.query_drop("SELECT 1")
             .await
-            .map_err(|e| DbError::Connection(format!("Connection test failed: {}", e)))?;
+            .map_err(mysql_connection_error_to_db_error)?;
 
-        // Return connection to pool
         drop(conn);
 
         self.raw_pool = Some(pool.clone());

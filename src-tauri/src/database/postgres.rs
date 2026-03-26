@@ -70,6 +70,43 @@ fn postgres_error_to_db_error(error: tokio_postgres::Error) -> DbError {
     }
 }
 
+/// Convert deadpool pool error to DbError with detailed PostgreSQL error extraction.
+/// 
+/// Deadpool wraps the underlying tokio_postgres error with generic messages like
+/// "Error occurred while creating a new object: db error" which hide authentication
+/// failures. This function extracts the actual PostgreSQL error message.
+fn deadpool_pool_error_to_db_error(error: deadpool_postgres::PoolError) -> DbError {
+    use deadpool_postgres::PoolError;
+    
+    match error {
+        PoolError::Timeout(timeout_type) => {
+            DbError::Timeout(format!("Connection timeout: {:?}", timeout_type))
+        }
+        PoolError::Backend(pg_err) => {
+            if let Some(db_error) = pg_err.as_db_error() {
+                let code = db_error.code().code();
+                let message = db_error.message();
+                
+                // SQLSTATE 28xxx = authentication errors, 3Dxxx = invalid catalog name
+                if code.starts_with("28") || code.starts_with("3D") {
+                    let mut details = vec![message.to_string()];
+                    if let Some(detail) = db_error.detail() {
+                        details.push(detail.to_string());
+                    }
+                    DbError::Authentication(details.join(" - "))
+                } else {
+                    DbError::Connection(format!("{} [SQLSTATE: {}]", message, code))
+                }
+            } else {
+                DbError::Connection(pg_err.to_string())
+            }
+        }
+        PoolError::Closed => DbError::Connection("Connection pool is closed".to_string()),
+        PoolError::NoRuntimeSpecified => DbError::Configuration("No runtime specified for pool".to_string()),
+        PoolError::PostCreateHook(hook_err) => DbError::Connection(format!("Post-create hook error: {:?}", hook_err)),
+    }
+}
+
 /// PostgreSQL connection pool wrapper.
 pub struct PostgresPool {
     pool: Pool,
@@ -473,11 +510,7 @@ impl DatabaseAdapter for PostgresAdapter {
             }
         };
 
-        // Test the connection
-        let _client = pool
-            .get()
-            .await
-            .map_err(|e| DbError::Connection(format!("Failed to connect: {}", e)))?;
+        let _client = pool.get().await.map_err(deadpool_pool_error_to_db_error)?;
 
         self.pool = Some(Arc::new(PostgresPool { pool }));
 

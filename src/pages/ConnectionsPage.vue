@@ -54,17 +54,17 @@ onMounted(async () => {
   await connectionStore.fetchConnections()
 })
 
-function handleAddConnection() {
+const handleAddConnection = () => {
   editingConnection.value = null
   isFormDialogOpen.value = true
 }
 
-function handleEditConnection(connection: ServerConnection) {
+const handleEditConnection = (connection: ServerConnection) => {
   editingConnection.value = connection
   isFormDialogOpen.value = true
 }
 
-async function handleConnect(connection: ServerConnection) {
+const handleConnect = async (connection: ServerConnection) => {
   connectError.value = null
   if (!connection.id) {
     return
@@ -73,7 +73,6 @@ async function handleConnect(connection: ServerConnection) {
   const status = connectionStore.getConnectionStatus(connection.id)
 
   if (status === ConnectionStatus.CONNECTED) {
-    // Disconnect if already connected
     try {
       await connectionStore.disconnect(connection.id)
     }
@@ -82,10 +81,8 @@ async function handleConnect(connection: ServerConnection) {
     }
   }
   else {
-    // Connect and navigate to query editor
     try {
       await connectionStore.connect(connection.id)
-      // Navigate to queries page with connection ID
       router.push({
         name: 'queries',
         query: { connectionId: connection.id },
@@ -97,12 +94,12 @@ async function handleConnect(connection: ServerConnection) {
   }
 }
 
-function handleDeleteConnection(connection: ServerConnection) {
+const handleDeleteConnection = (connection: ServerConnection) => {
   connectionToDelete.value = connection
   deleteDialogOpen.value = true
 }
 
-async function confirmDelete() {
+const confirmDelete = async () => {
   if (connectionToDelete.value) {
     await connectionStore.removeConnection(connectionToDelete.value)
     connectionToDelete.value = null
@@ -110,7 +107,7 @@ async function confirmDelete() {
   }
 }
 
-function handleDuplicateConnection(connection: ServerConnection) {
+const handleDuplicateConnection = (connection: ServerConnection) => {
   editingConnection.value = {
     ...connection,
     id: undefined,
@@ -119,15 +116,14 @@ function handleDuplicateConnection(connection: ServerConnection) {
   isFormDialogOpen.value = true
 }
 
-async function handleSaveConnection(connection: ServerConnection) {
+const handleSaveConnection = async (connection: ServerConnection) => {
   const result = await connectionStore.saveConnection(connection)
   if (!result.success) {
-    // Show error notification (could be enhanced with a toast component)
     console.error('Failed to save connection:', result.message)
   }
 }
 
-function getConnectionStatus(connectionId: string | undefined): ConnectionStatus {
+const getConnectionStatus = (connectionId: string | undefined): ConnectionStatus => {
   if (!connectionId) {
     return ConnectionStatus.DISCONNECTED
   }

@@ -2,7 +2,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { useConnectionStore } from './connectionStore'
 
-export interface TableInfo {
+export type TableInfo = {
   name: string
   schema?: string
   table_type?: string
@@ -10,14 +10,14 @@ export interface TableInfo {
   size?: string
 }
 
-export interface DatabaseMetadata {
+export type DatabaseMetadata = {
   databases: string[]
   schemas: Record<string, string[]>
   tables: Record<string, TableInfo[]>
   lastRefresh: string
 }
 
-interface DatabaseStoreState {
+type DatabaseStoreState = {
   metadata: Record<string, DatabaseMetadata>
   selectedDatabase: string | null
   selectedSchema: string | null

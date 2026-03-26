@@ -4,15 +4,14 @@ export type Theme = 'dark' | 'light' | 'system'
 
 const THEME_STORAGE_KEY = 'sqlkit-theme'
 
-export function useTheme() {
+export const useTheme = () => {
   const theme = ref<Theme>('system')
   const isDark = ref(false)
   let mediaQuery: MediaQueryList | null = null
   let handleChange: (() => void) | null = null
 
-  const getSystemTheme = (): 'dark' | 'light' => {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-  }
+  const getSystemTheme = (): 'dark' | 'light' =>
+    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 
   const applyTheme = (newTheme: Theme) => {
     const root = document.documentElement
@@ -52,7 +51,6 @@ export function useTheme() {
   }
 
   onMounted(() => {
-    // Load theme from localStorage or default to system
     let savedTheme: Theme | null = null
     try {
       savedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null
@@ -63,7 +61,6 @@ export function useTheme() {
     theme.value = savedTheme || 'system'
     applyTheme(theme.value)
 
-    // Listen for system theme changes
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     handleChange = () => {
       if (theme.value === 'system') {
@@ -74,7 +71,6 @@ export function useTheme() {
   })
 
   onBeforeUnmount(() => {
-    // Cleanup event listener
     if (mediaQuery && handleChange) {
       mediaQuery.removeEventListener('change', handleChange)
     }

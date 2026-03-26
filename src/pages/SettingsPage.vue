@@ -36,7 +36,7 @@ const languageOptions = [
   { value: 'enUS', label: () => t('pages.settings.appearance.languages.enUS') },
 ]
 
-function handleLanguageChange(value: string) {
+const handleLanguageChange = (value: string) => {
   localStorage.setItem('lang', value)
   appStore.setLanguageType(LANG_TYPE_MAP[value] ?? LanguageType.AUTO)
   locale.value = value === 'auto'
@@ -44,11 +44,10 @@ function handleLanguageChange(value: string) {
     : value
 }
 
-// --- Editor Config ---
 const fontSizeInput = ref(String(appStore.editorConfig.fontSize))
 const fontSizeError = ref('')
 
-function handleFontSizeChange(val: string | number) {
+const handleFontSizeChange = (val: string | number) => {
   fontSizeInput.value = String(val)
   const num = Number(val)
   if (!Number.isInteger(num) || num < 8 || num > 32) {
@@ -65,7 +64,7 @@ const fontFamilyInput = ref(appStore.editorConfig.fontFamily)
 const tabSizeInput = ref(String(appStore.editorConfig.tabSize))
 const tabSizeError = ref('')
 
-function handleTabSizeChange(val: string | number) {
+const handleTabSizeChange = (val: string | number) => {
   tabSizeInput.value = String(val)
   const num = Number(val)
   if (!Number.isInteger(num) || num < 1 || num > 8) {
@@ -85,11 +84,10 @@ const toggleWordWrap = () => appStore.setEditorConfig({ wordWrap: !appStore.edit
 const toggleLineNumbers = () => appStore.setEditorConfig({ showLineNumbers: !appStore.editorConfig.showLineNumbers })
 const toggleMinimap = () => appStore.setEditorConfig({ showMinimap: !appStore.editorConfig.showMinimap })
 
-// --- Query Config ---
 const defaultLimitInput = ref(String(appStore.queryConfig.defaultLimit))
 const defaultLimitError = ref('')
 
-function handleDefaultLimitChange(val: string | number) {
+const handleDefaultLimitChange = (val: string | number) => {
   defaultLimitInput.value = String(val)
   const num = Number(val)
   if (!Number.isInteger(num) || num < 10 || num > 10000) {
@@ -104,7 +102,7 @@ function handleDefaultLimitChange(val: string | number) {
 const queryTimeoutInput = ref(String(Math.round(appStore.queryConfig.queryTimeout / 1000)))
 const queryTimeoutError = ref('')
 
-function handleQueryTimeoutChange(val: string | number) {
+const handleQueryTimeoutChange = (val: string | number) => {
   queryTimeoutInput.value = String(val)
   const num = Number(val)
   if (!Number.isInteger(num) || num < 1 || num > 300) {

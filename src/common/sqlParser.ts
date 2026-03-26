@@ -1,29 +1,20 @@
-/**
- * SQL parsing utilities for extracting statements at cursor position
- */
-
-export interface CursorPosition {
+export type CursorPosition = {
   lineNumber: number
   column: number
 }
 
-export interface Selection {
+export type Selection = {
   startLineNumber: number
   startColumn: number
   endLineNumber: number
   endColumn: number
 }
 
-/**
- * Extract the SQL statement at the cursor position
- * Statements are separated by semicolons
- */
-export function extractStatementAtCursor(
+export const extractStatementAtCursor = (
   sql: string,
   cursorPosition?: CursorPosition,
   selection?: Selection,
-): string {
-  // If there's a selection, return the selected text
+): string => {
   if (selection) {
     const lines = sql.split('\n')
     const selectedLines = lines.slice(
@@ -41,7 +32,6 @@ export function extractStatementAtCursor(
       )
     }
 
-    // Multi-line selection
     const firstLine = selectedLines[0].substring(selection.startColumn - 1)
     const lastLine = selectedLines[selectedLines.length - 1].substring(
       0,
@@ -52,38 +42,23 @@ export function extractStatementAtCursor(
     return [firstLine, ...middleLines, lastLine].join('\n')
   }
 
-  // If no cursor position or no semicolons, return entire SQL
   if (!cursorPosition || !sql.includes(';')) {
     return sql.trim()
   }
 
-  // Find the offset in the full text based on cursor position
   const lines = sql.split('\n')
-  let offset = 0
-  for (let i = 0; i < cursorPosition.lineNumber - 1; i++) {
-    offset += lines[i].length + 1 // +1 for newline
-  }
-  offset += cursorPosition.column - 1
+  const offset = lines
+    .slice(0, cursorPosition.lineNumber - 1)
+    .reduce((acc, line) => acc + line.length + 1, cursorPosition.column - 1)
 
-  // Find statement boundaries
-  let start = 0
-  let end = sql.length
+  const beforeCursor = sql.substring(0, offset)
+  const afterCursor = sql.substring(offset)
+  
+  const lastSemicolon = beforeCursor.lastIndexOf(';')
+  const nextSemicolon = afterCursor.indexOf(';')
 
-  // Find the previous semicolon
-  for (let i = offset - 1; i >= 0; i--) {
-    if (sql[i] === ';') {
-      start = i + 1
-      break
-    }
-  }
-
-  // Find the next semicolon
-  for (let i = offset; i < sql.length; i++) {
-    if (sql[i] === ';') {
-      end = i
-      break
-    }
-  }
+  const start = lastSemicolon === -1 ? 0 : lastSemicolon + 1
+  const end = nextSemicolon === -1 ? sql.length : offset + nextSemicolon
 
   const statement = sql.substring(start, end).trim()
   return statement || sql.trim()

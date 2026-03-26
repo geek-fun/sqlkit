@@ -177,11 +177,11 @@ const SQL_FUNCTIONS = [
   'LOG',
 ]
 
-export function useMonacoEditor(
+export const useMonacoEditor = (
   containerRef: Ref<HTMLElement | null>,
   initialValue: Ref<string>,
   options: MonacoEditorOptions = {},
-) {
+) => {
   let editor: monaco.editor.IStandaloneCodeEditor | null = null
   let completionProvider: monaco.IDisposable | null = null
   const { isDark } = useTheme()

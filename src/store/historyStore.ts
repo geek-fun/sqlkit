@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 
 export type HistoryEntryStatus = 'success' | 'error'
 
-export interface HistoryEntry {
+export type HistoryEntry = {
   id: string
   sql: string
   connectionId: string
@@ -15,7 +15,7 @@ export interface HistoryEntry {
   isFavorite: boolean
 }
 
-interface HistoryStoreState {
+type HistoryStoreState = {
   entries: HistoryEntry[]
   maxEntries: number
 }

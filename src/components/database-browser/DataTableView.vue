@@ -37,14 +37,14 @@ import {
   rowsToCsv,
 } from './dataTableHelpers'
 
-interface TableDataResult {
+type TableDataResult = {
   columns: string[]
   rows: Record<string, unknown>[]
   rows_affected?: number
   execution_time_ms?: number
 }
 
-interface ColumnTypeInfo {
+type ColumnTypeInfo = {
   name: string
   data_type: string
   is_primary_key: boolean
@@ -111,37 +111,34 @@ const pkColumns = computed(() =>
   (data.value?.columns ?? []).filter((c: string) => columnIsPK.value[c]),
 )
 
-/** Extract pk values from a row as { col: rawValue } for backend consumption */
-function extractPkValues(row: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(pkColumns.value.map((col: string) => [col, row[col] ?? null]))
-}
+const extractPkValues = (row: Record<string, unknown>): Record<string, unknown> =>
+  Object.fromEntries(pkColumns.value.map((col: string) => [col, row[col] ?? null]))
 
-/** Display summary of pk values for a row */
-function formatPkSummary(row: Record<string, unknown>): string {
-  return pkColumns.value.length > 0
+const formatPkSummary = (row: Record<string, unknown>): string =>
+  pkColumns.value.length > 0
     ? pkColumns.value.map((col: string) => `${col}: ${formatTableValue(row[col])}`).join(', ')
     : Object.entries(row).slice(0, 2).map(([k, v]) => `${k}: ${formatTableValue(v)}`).join(', ')
-}
 
 const totalPages = computed(() => computeTotalPages(totalCount.value, rowsPerPage.value))
 
 const offset = computed(() => computeOffset(currentPage.value, rowsPerPage.value))
 
-// Compact page number list with ellipsis (e.g. 1 … 4 5 6 … 20)
 const pageNumbers = computed<(number | '...')[]>(() => {
   const total = totalPages.value
   const cur = currentPage.value
   if (total <= 7)
     return Array.from({ length: total }, (_, i) => i + 1)
-  const pages: (number | '...')[] = [1]
-  if (cur > 3)
-    pages.push('...')
-  for (let i = Math.max(2, cur - 1); i <= Math.min(total - 1, cur + 1); i++)
-    pages.push(i)
-  if (cur < total - 2)
-    pages.push('...')
-  pages.push(total)
-  return pages
+  const middlePages = Array.from(
+    { length: Math.min(total - 1, cur + 1) - Math.max(2, cur - 1) + 1 },
+    (_, i) => Math.max(2, cur - 1) + i,
+  )
+  return [
+    1,
+    ...(cur > 3 ? ['...' as const] : []),
+    ...middlePages,
+    ...(cur < total - 2 ? ['...' as const] : []),
+    total,
+  ]
 })
 
 const formattedTime = computed(() => {
@@ -152,7 +149,7 @@ const formattedTime = computed(() => {
     : `${(executionTimeMs.value / 1000).toFixed(2)}s`
 })
 
-async function fetchData() {
+const fetchData = async () => {
   loading.value = true
   error.value = null
 
@@ -178,7 +175,7 @@ async function fetchData() {
   }
 }
 
-async function fetchCount() {
+const fetchCount = async () => {
   try {
     const count = await invoke<number>('get_table_count', {
       connectionId: props.connectionId,
@@ -194,11 +191,11 @@ async function fetchCount() {
   }
 }
 
-async function refresh() {
+const refresh = async () => {
   await Promise.all([fetchData(), fetchCount()])
 }
 
-async function fetchColumnInfo() {
+const fetchColumnInfo = async () => {
   if (!props.database || !props.tableName) {
     columnInfoList.value = []
     return
@@ -216,13 +213,13 @@ async function fetchColumnInfo() {
   }
 }
 
-function applyFilter() {
+const applyFilter = () => {
   appliedFilter.value = filterInput.value.trim()
   currentPage.value = 1
   refresh()
 }
 
-function clearFilter() {
+const clearFilter = () => {
   filterInput.value = ''
   if (appliedFilter.value !== '') {
     appliedFilter.value = ''
@@ -231,28 +228,26 @@ function clearFilter() {
   }
 }
 
-function goToPage(page: number) {
+const goToPage = (page: number) => {
   if (page < 1 || page > totalPages.value)
     return
   currentPage.value = page
-  // Only fetch the new page of data; the total count does not change on page navigation.
-  // The count is refreshed when a filter is applied via applyFilter() or refresh().
   fetchData()
 }
 
-function changeRowsPerPage(val: string) {
+const changeRowsPerPage = (val: string) => {
   rowsPerPage.value = Number(val) as RowsPerPage
   currentPage.value = 1
   fetchData()
 }
 
-function toggleColumn(col: string) {
+const toggleColumn = (col: string) => {
   hiddenColumns.value = hiddenColumns.value.has(col)
     ? new Set([...hiddenColumns.value].filter(c => c !== col))
     : new Set([...hiddenColumns.value, col])
 }
 
-async function exportCSV() {
+const exportCSV = async () => {
   if (!data.value)
     return
 
@@ -274,7 +269,6 @@ async function exportCSV() {
   catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     toast.error(t('components.dataTableView.notifications.exportFailed'), { description: msg })
-    // fallback to browser download
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -287,14 +281,12 @@ async function exportCSV() {
   }
 }
 
-// --- Delete handlers ---
-
-function openDeleteDialog(row: Record<string, unknown>) {
+const openDeleteDialog = (row: Record<string, unknown>) => {
   deletingRow.value = row
   deleteDialogOpen.value = true
 }
 
-async function confirmDelete() {
+const confirmDelete = async () => {
   if (!deletingRow.value)
     return
   isDeleting.value = true
@@ -321,9 +313,7 @@ async function confirmDelete() {
   }
 }
 
-// --- Edit handlers ---
-
-function rawValueToString(v: unknown): string {
+const rawValueToString = (v: unknown): string => {
   if (v === null || v === undefined)
     return ''
   if (typeof v === 'object')
@@ -331,7 +321,7 @@ function rawValueToString(v: unknown): string {
   return String(v)
 }
 
-function openEditDialog(row: Record<string, unknown>) {
+const openEditDialog = (row: Record<string, unknown>) => {
   editingRow.value = row
   editErrors.value = {}
   const cols = data.value?.columns ?? []
@@ -347,23 +337,21 @@ function openEditDialog(row: Record<string, unknown>) {
   editDialogOpen.value = true
 }
 
-function validateEditForm(): boolean {
-  const errors: Record<string, string> = {}
-  for (const col of (data.value?.columns ?? [])) {
-    const field = editForm.value[col]
-    if (!field)
-      continue
-    // Non-nullable columns must not be set to NULL or left empty
-    if (!columnNullable.value[col] && (field.setNull || field.value.trim() === '')) {
-      errors[col] = t('components.dataTableView.validation.required')
-    }
-  }
+const validateEditForm = (): boolean => {
+  const columns = data.value?.columns ?? []
+  const errors = Object.fromEntries(
+    columns
+      .filter((col: string) => {
+        const field = editForm.value[col]
+        return field && !columnNullable.value[col] && (field.setNull || field.value.trim() === '')
+      })
+      .map((col: string) => [col, t('components.dataTableView.validation.required')]),
+  )
   editErrors.value = errors
   return Object.keys(errors).length === 0
 }
 
-/** Convert a string-form edit value to an appropriate JSON-compatible type for the backend. */
-function coerceEditValue(col: string, value: string): unknown {
+const coerceEditValue = (col: string, value: string): unknown => {
   const type = (columnTypeMap.value[col] ?? '').toLowerCase()
   if (type.includes('int') || type.includes('serial') || type.includes('numeric') || type.includes('decimal') || type.includes('float') || type.includes('double') || type.includes('real') || type.includes('money')) {
     const n = Number(value)
@@ -379,7 +367,7 @@ function coerceEditValue(col: string, value: string): unknown {
   return value
 }
 
-async function confirmEdit() {
+const confirmEdit = async () => {
   if (!editingRow.value)
     return
   if (!validateEditForm())
@@ -387,14 +375,15 @@ async function confirmEdit() {
 
   isSaving.value = true
   try {
-    // Build the updates object: col -> JSON-compatible typed value
-    const updates: Record<string, unknown> = {}
-    for (const col of (data.value?.columns ?? [])) {
-      const field = editForm.value[col]
-      if (!field)
-        continue
-      updates[col] = field.setNull ? null : coerceEditValue(col, field.value)
-    }
+    const columns = data.value?.columns ?? []
+    const updates = Object.fromEntries(
+      columns
+        .map((col: string) => {
+          const field = editForm.value[col]
+          return field ? [col, field.setNull ? null : coerceEditValue(col, field.value)] : null
+        })
+        .filter((entry): entry is [string, unknown] => entry !== null),
+    )
 
     await invoke('update_table_row', {
       connectionId: props.connectionId,

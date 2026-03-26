@@ -146,9 +146,9 @@ watch(activeTab, (tab) => {
   }
 })
 
-interface ExecuteQueryDetails { query: string, cursorPosition?: CursorPosition, selection?: Selection }
+type ExecuteQueryDetails = { query: string, cursorPosition?: CursorPosition, selection?: Selection }
 
-async function executeQuery(details?: ExecuteQueryDetails) {
+const executeQuery = async (details?: ExecuteQueryDetails) => {
   if (!activeTab.value) {
     return
   }
@@ -170,33 +170,41 @@ async function executeQuery(details?: ExecuteQueryDetails) {
   await tabStore.executeQuery(activeTab.value.id, sqlToExecute)
 }
 
-async function handleExplainQuery() {
+const handleExplainQuery = async () => {
   // TODO: Implement explain query
 }
 
 const getConnectionId = () => selectedConnectionId.value || connectionStore.activeConnectionId
 
-function handleNewTab() {
-  const connId = getConnectionId() || ''
+const isConnectionActive = (connId: string | null | undefined): boolean =>
+  connId !== null && connId !== undefined && connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
+
+const getActiveConnectionId = (): string | null => {
+  const connId = getConnectionId()
+  return isConnectionActive(connId) ? connId : null
+}
+
+const handleNewTab = () => {
+  const connId = getActiveConnectionId() || ''
   const db = connId
     ? (selectedDatabase.value || connectionStore.getCurrentDatabase(connId) || connectionStore.getConnectionById(connId)?.database || undefined)
     : undefined
   tabStore.createTab(connId, db)
 }
 
-function handleTabSelect(tabId: string) {
+const handleTabSelect = (tabId: string) => {
   tabStore.setActiveTab(tabId)
 }
 
-function handleTabClose(tabId: string) {
+const handleTabClose = (tabId: string) => {
   tabStore.closeTab(tabId)
 }
 
-function handleTabCloseForce(tabId: string) {
+const handleTabCloseForce = (tabId: string) => {
   tabStore.closeTab(tabId)
 }
 
-function handleGlobalKeydown(e: KeyboardEvent) {
+const handleGlobalKeydown = (e: KeyboardEvent) => {
   if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
     const tab = tabStore.activeTab
     if (tab) {
@@ -210,7 +218,7 @@ function handleGlobalKeydown(e: KeyboardEvent) {
 onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
 onUnmounted(() => window.removeEventListener('keydown', handleGlobalKeydown))
 
-function handleCreateScript(table: TableInfo, database: string, schema?: string) {
+const handleCreateScript = (table: TableInfo, database: string, schema?: string) => {
   const schemaPrefix = schema ? `"${schema}".` : ''
   const script = `-- CREATE TABLE script for ${table.name}
 -- TODO: Generate actual CREATE TABLE from server
@@ -218,7 +226,7 @@ CREATE TABLE ${schemaPrefix}"${table.name}" (
   -- columns will be generated here
 );`
 
-  const connId = getConnectionId()
+  const connId = getActiveConnectionId()
   if (connId) {
     const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, script)
@@ -226,11 +234,11 @@ CREATE TABLE ${schemaPrefix}"${table.name}" (
   }
 }
 
-function handleSelectTopN(table: TableInfo, database: string, schema?: string, n = 100) {
+const handleSelectTopN = (table: TableInfo, database: string, schema?: string, n = 100) => {
   const schemaPrefix = schema ? `"${schema}".` : ''
   const query = `SELECT * FROM ${schemaPrefix}"${table.name}" LIMIT ${n};`
 
-  const connId = getConnectionId()
+  const connId = getActiveConnectionId()
   if (connId) {
     const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, query)
@@ -241,7 +249,7 @@ function handleSelectTopN(table: TableInfo, database: string, schema?: string, n
   }
 }
 
-function handleViewStructure(table: TableInfo, database: string, schema?: string) {
+const handleViewStructure = (table: TableInfo, database: string, schema?: string) => {
   const query = `-- Table structure for ${table.name}
 -- Database: ${database}${schema ? `\n-- Schema: ${schema}` : ''}
 
@@ -250,7 +258,7 @@ SELECT column_name, data_type, is_nullable, column_default
 FROM information_schema.columns
 WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` : ''};`
 
-  const connId = getConnectionId()
+  const connId = getActiveConnectionId()
   if (connId) {
     const tab = tabStore.createTab(connId, database)
     tabStore.updateTabContent(tab.id, query)
@@ -258,41 +266,41 @@ WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` :
   }
 }
 
-function handleExportData(_table: TableInfo, _database: string, _schema?: string) {
+const handleExportData = (_table: TableInfo, _database: string, _schema?: string) => {
   // TODO: Implement export data functionality
 }
 
-function handleSelectTable(table: TableInfo, database: string, schema?: string) {
-  const connId = getConnectionId()
+const handleSelectTable = (table: TableInfo, database: string, schema?: string) => {
+  const connId = getActiveConnectionId()
   if (!connId)
     return
   tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
-function startSidebarResize(_e: MouseEvent) {
+const startSidebarResize = (_e: MouseEvent) => {
   isResizingSidebar.value = true
   document.addEventListener('mousemove', handleSidebarResize)
   document.addEventListener('mouseup', stopSidebarResize)
 }
 
-function handleSidebarResize(e: MouseEvent) {
+const handleSidebarResize = (e: MouseEvent) => {
   if (!isResizingSidebar.value)
     return
   const newWidth = Math.max(200, Math.min(400, e.clientX))
   sidebarWidth.value = newWidth
 }
 
-function stopSidebarResize() {
+const stopSidebarResize = () => {
   isResizingSidebar.value = false
   document.removeEventListener('mousemove', handleSidebarResize)
   document.removeEventListener('mouseup', stopSidebarResize)
 }
 
-function closeResultPanel() {
+const closeResultPanel = () => {
   showResultPanel.value = false
 }
 
-async function handleSaveQuery() {
+const handleSaveQuery = async () => {
   if (!activeTab.value || !activeTab.value.content.trim()) {
     return
   }
@@ -317,7 +325,7 @@ async function handleSaveQuery() {
   }
 }
 
-async function handleDownloadQuery() {
+const handleDownloadQuery = async () => {
   if (!activeTab.value || !activeTab.value.content.trim()) {
     return
   }
@@ -328,7 +336,6 @@ async function handleDownloadQuery() {
       `${activeTab.value.name}.sql`,
     )
     if (!result) {
-      // user cancelled
       return
     }
     if (result.success && result.file_path) {
