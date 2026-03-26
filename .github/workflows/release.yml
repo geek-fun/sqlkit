@@ -26,7 +26,7 @@ jobs:
             args:
             target:
           - name: Linux
-            platform: ubuntu-22.04
+            platform: ubuntu-latest
             args:
             target:
 
@@ -46,7 +46,7 @@ jobs:
           cache: npm
 
       - name: Install Linux dependencies
-        if: matrix.platform == 'ubuntu-22.04'
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libssl-dev
