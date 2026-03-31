@@ -1,15 +1,19 @@
 import { createPinia, setActivePinia } from 'pinia'
 import { useTabStore } from '@/store/tabStore'
 
-// Mock the Tauri invoke API
 jest.mock('@tauri-apps/api/core', () => ({
   invoke: jest.fn(),
 }))
 
-// eslint-disable-next-line ts/no-require-imports
 const { invoke } = require('@tauri-apps/api/core')
 
-// Mock crypto.randomUUID
+jest.mock('@/datasources', () => ({
+  storeApi: {
+    get: jest.fn().mockResolvedValue([]),
+    set: jest.fn(),
+  },
+}))
+
 Object.defineProperty(globalThis, 'crypto', {
   value: {
     randomUUID: jest.fn(() => 'mock-uuid-123'),
@@ -20,7 +24,8 @@ describe('tabStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     jest.clearAllMocks()
-    ;(crypto.randomUUID as jest.Mock).mockReturnValue(`uuid-${Date.now()}`)
+    let counter = 0
+    ;(crypto.randomUUID as jest.Mock).mockImplementation(() => `uuid-${++counter}`)
   })
 
   describe('initial state', () => {
@@ -72,6 +77,84 @@ describe('tabStore', () => {
     })
   })
 
+  describe('openTableViewTab', () => {
+    it('creates new table view tab', () => {
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      const store = useTabStore()
+
+      const tab = store.openTableViewTab('conn-1', 'mydb', 'users', 'public')
+
+      expect(tab.name).toBe('users')
+      expect(tab.tableView).toEqual({ tableName: 'users', database: 'mydb', schema: 'public' })
+      expect(tab.connectionId).toBe('conn-1')
+      expect(tab.database).toBe('mydb')
+      expect(store.activeTabId).toBe('tab-1')
+    })
+
+    it('switches to existing table view tab', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
+      store.openTableViewTab('conn-1', 'mydb', 'users', 'public')
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
+      store.createTab('conn-1')
+
+      const tab = store.openTableViewTab('conn-1', 'mydb', 'users', 'public')
+
+      expect(store.tabs).toHaveLength(2)
+      expect(store.activeTabId).toBe('tab-1')
+      expect(tab.id).toBe('tab-1')
+    })
+
+    it('creates separate tabs for different tables', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
+      store.openTableViewTab('conn-1', 'mydb', 'users')
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
+      store.openTableViewTab('conn-1', 'mydb', 'orders')
+
+      expect(store.tabs).toHaveLength(2)
+    })
+
+    it('creates separate tabs for same table in different schemas', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
+      store.openTableViewTab('conn-1', 'mydb', 'users', 'public')
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
+      store.openTableViewTab('conn-1', 'mydb', 'users', 'private')
+
+      expect(store.tabs).toHaveLength(2)
+    })
+
+    it('creates separate tabs for same table in different databases', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
+      store.openTableViewTab('conn-1', 'db1', 'users')
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
+      store.openTableViewTab('conn-1', 'db2', 'users')
+
+      expect(store.tabs).toHaveLength(2)
+    })
+
+    it('creates separate tabs for same table on different connections', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
+      store.openTableViewTab('conn-1', 'mydb', 'users')
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
+      store.openTableViewTab('conn-2', 'mydb', 'users')
+
+      expect(store.tabs).toHaveLength(2)
+    })
+
+    it('handles table view without schema', () => {
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      const store = useTabStore()
+
+      const tab = store.openTableViewTab('conn-1', 'mydb', 'users')
+
+      expect(tab.tableView?.schema).toBeUndefined()
+    })
+  })
+
   describe('closeTab', () => {
     it('should remove tab from tabs', () => {
       const store = useTabStore()
@@ -115,6 +198,21 @@ describe('tabStore', () => {
       store.closeTab('non-existent')
 
       expect(store.tabs).toHaveLength(0)
+    })
+
+    it('sets next tab active when closing first tab if it is active', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
+      store.createTab('conn-1')
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
+      store.createTab('conn-1')
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-3')
+      store.createTab('conn-1')
+      store.setActiveTab('tab-1')
+
+      store.closeTab('tab-1')
+
+      expect(store.activeTabId).toBe('tab-2')
     })
   })
 
@@ -230,6 +328,37 @@ describe('tabStore', () => {
 
       expect(store.tabs[0].hasUnsavedChanges).toBe(false)
     })
+
+    it('should update filePath when provided', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      store.createTab('conn-1')
+
+      store.markTabSaved('tab-1', '/path/to/my-query.sql')
+
+      expect(store.tabs[0].filePath).toBe('/path/to/my-query.sql')
+      expect(store.tabs[0].name).toBe('my-query')
+    })
+
+    it('should remove .sql extension from name', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      store.createTab('conn-1')
+
+      store.markTabSaved('tab-1', '/path/to/query.sql')
+
+      expect(store.tabs[0].name).toBe('query')
+    })
+
+    it('handles path without slashes', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      store.createTab('conn-1')
+
+      store.markTabSaved('tab-1', 'query.sql')
+
+      expect(store.tabs[0].name).toBe('query')
+    })
   })
 
   describe('clearResults', () => {
@@ -298,6 +427,61 @@ describe('tabStore', () => {
       await store.executeQuery('non-existent')
 
       expect(invoke).not.toHaveBeenCalled()
+    })
+
+    it('should not execute empty SQL', async () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      store.createTab('conn-1')
+      store.updateTabContent('tab-1', '   ')
+
+      await store.executeQuery('tab-1')
+
+      expect(invoke).not.toHaveBeenCalled()
+    })
+
+    it('should use provided SQL instead of tab content', async () => {
+      invoke.mockResolvedValue({ status: 'success', data: { columns: [], rows: [], rowCount: 0 } })
+
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      store.createTab('conn-1')
+      store.updateTabContent('tab-1', 'SELECT * FROM users')
+
+      await store.executeQuery('tab-1', 'SELECT 1')
+
+      expect(invoke).toHaveBeenCalledWith('execute_query', expect.objectContaining({
+        sql: 'SELECT 1',
+      }))
+    })
+
+    it('should clear previous error before execution', async () => {
+      invoke.mockResolvedValue({ status: 'success', data: { columns: [], rows: [], rowCount: 0 } })
+
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      store.createTab('conn-1')
+      store.tabs[0].error = 'Previous error'
+      store.updateTabContent('tab-1', 'SELECT 1')
+
+      await store.executeQuery('tab-1')
+
+      expect(store.tabs[0].error).toBeUndefined()
+    })
+
+    it('passes database to execute_query', async () => {
+      invoke.mockResolvedValue({ status: 'success', data: { columns: [], rows: [], rowCount: 0 } })
+
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      store.createTab('conn-1', 'mydb')
+      store.updateTabContent('tab-1', 'SELECT 1')
+
+      await store.executeQuery('tab-1')
+
+      expect(invoke).toHaveBeenCalledWith('execute_query', expect.objectContaining({
+        database: 'mydb',
+      }))
     })
   })
 
