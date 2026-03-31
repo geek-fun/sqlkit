@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { connectionApi } from '../datasources'
+import type { SslConfig } from '@/types/connection'
+import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
 
 export enum DatabaseType {
   MYSQL = 'MYSQL',
@@ -61,7 +63,7 @@ export interface ServerConnection {
   username?: string
   password?: string
   database?: string
-  ssl: boolean
+  ssl: SslConfig
   sshTunnel?: SSHTunnelConfig
   isConnected?: boolean
   lastUsed?: Date
@@ -117,7 +119,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           username: conn.username,
           password: conn.password || undefined,
           database: conn.database || undefined,
-          ssl: conn.ssl_mode === 'require',
+          ssl: sslModeFromBackend(conn.ssl_mode),
           isConnected: false,
         }))
       }
@@ -140,7 +142,11 @@ export const useConnectionStore = defineStore('connectionStore', {
           username: connection.username || '',
           password: connection.password || null,
           database: connection.database || null,
-          ssl_mode: connection.ssl ? 'require' : 'disable',
+          ssl_mode: sslModeToBackend(connection.ssl),
+          ssl_ca_cert: connection.ssl.caCertPath || null,
+          ssl_client_cert: connection.ssl.clientCertPath || null,
+          ssl_client_key: connection.ssl.clientKeyPath || null,
+          trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
         }
 
         await connectionApi.save(serverConfig)
@@ -150,11 +156,15 @@ export const useConnectionStore = defineStore('connectionStore', {
         if (connection.id) {
           const index = this.connections.findIndex(c => c.id === connection.id)
           if (index !== -1) {
-            this.connections[index] = newConnection
+            this.connections = [
+              ...this.connections.slice(0, index),
+              newConnection,
+              ...this.connections.slice(index + 1),
+            ]
           }
         }
         else {
-          this.connections.push(newConnection)
+          this.connections = [...this.connections, newConnection]
         }
 
         return { success: true, message: 'Connection saved successfully' }
@@ -185,7 +195,11 @@ export const useConnectionStore = defineStore('connectionStore', {
           username: connection.username || '',
           password: connection.password || null,
           database: resolveDatabase(connection.type, connection.database),
-          ssl_mode: connection.ssl ? 'require' : 'disable',
+          ssl_mode: sslModeToBackend(connection.ssl),
+          ssl_ca_cert: connection.ssl.caCertPath || null,
+          ssl_client_cert: connection.ssl.clientCertPath || null,
+          ssl_client_key: connection.ssl.clientKeyPath || null,
+          trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
         }
 
         const result = await connectionApi.test(serverConfig)
@@ -215,7 +229,11 @@ export const useConnectionStore = defineStore('connectionStore', {
           username: connection.username || '',
           password: connection.password || null,
           database: resolveDatabase(connection.type, connection.database),
-          ssl_mode: connection.ssl ? 'require' : 'disable',
+          ssl_mode: sslModeToBackend(connection.ssl),
+          ssl_ca_cert: connection.ssl.caCertPath || null,
+          ssl_client_cert: connection.ssl.clientCertPath || null,
+          ssl_client_key: connection.ssl.clientKeyPath || null,
+          trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
         }
 
         const result = await connectionApi.connect(serverConfig)

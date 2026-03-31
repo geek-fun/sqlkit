@@ -15,9 +15,10 @@ use crate::database::{
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
 use deadpool_postgres::{Config as DeadpoolConfig, Pool, PoolConfig as DeadpoolPoolConfig, Runtime};
-use native_tls::TlsConnector;
+use native_tls::{Certificate, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
 use std::collections::HashMap;
+use std::fs;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_postgres::{types::{Kind, Type}, Client, NoTls, Row};
@@ -214,6 +215,26 @@ impl PostgresAdapter {
         }
 
         parts.join(" ")
+    }
+
+    fn build_tls_connector(&self, skip_verification: bool) -> DbResult<TlsConnector> {
+        let mut builder = TlsConnector::builder();
+        
+        if skip_verification {
+            builder.danger_accept_invalid_certs(true);
+            builder.danger_accept_invalid_hostnames(true);
+        }
+
+        if let Some(ref ca_cert_path) = self.config.ssl_ca_cert {
+            let cert_data = fs::read(ca_cert_path)
+                .map_err(|e| DbError::Connection(format!("Failed to read CA certificate: {}", e)))?;
+            let cert = Certificate::from_pem(&cert_data)
+                .map_err(|e| DbError::Connection(format!("Failed to parse CA certificate: {}", e)))?;
+            builder.add_root_certificate(cert);
+        }
+
+        builder.build()
+            .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))
     }
 
     /// Convert a tokio_postgres Row to QueryRow.
@@ -485,24 +506,14 @@ impl DatabaseAdapter for PostgresAdapter {
                     .map_err(|e| DbError::Connection(format!("Failed to create pool: {}", e)))?
             }
             SslMode::Prefer | SslMode::Require => {
-                // For Prefer and Require modes, we don't verify certificates but still use SSL
-                let tls_connector = TlsConnector::builder()
-                    .danger_accept_invalid_certs(true)
-                    .build()
-                    .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))?;
-
+                let tls_connector = self.build_tls_connector(true)?;
                 let tls = MakeTlsConnector::new(tls_connector);
                 pg_config
                     .create_pool(Some(Runtime::Tokio1), tls)
                     .map_err(|e| DbError::Connection(format!("Failed to create pool: {}", e)))?
             }
             SslMode::VerifyCA | SslMode::VerifyFull => {
-                // For VerifyCA and VerifyFull modes, verify certificates
-                let tls_connector = TlsConnector::builder()
-                    .danger_accept_invalid_certs(false)
-                    .build()
-                    .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))?;
-
+                let tls_connector = self.build_tls_connector(false)?;
                 let tls = MakeTlsConnector::new(tls_connector);
                 pg_config
                     .create_pool(Some(Runtime::Tokio1), tls)

@@ -15,6 +15,7 @@ export const enUS = {
       createConnection: 'Create Connection',
       testConnection: 'Test Connection',
       dismiss: 'Dismiss',
+      browse: 'Browse',
     },
     status: {
       connected: 'Connected',
@@ -24,6 +25,30 @@ export const enUS = {
       testing: 'Testing connection...',
       success: 'Connection successful!',
       failed: 'Connection failed',
+    },
+  },
+  ssl: {
+    mode: {
+      label: 'SSL/TLS Mode',
+      placeholder: 'Select SSL mode',
+      disable: 'Disable SSL',
+      prefer: 'Prefer SSL (try encryption)',
+      require: 'Require SSL (always encrypt)',
+      verifyca: 'Verify CA (verify certificate)',
+      verifyfull: 'Verify Full (verify all)',
+    },
+    certSettings: {
+      title: 'Certificate Settings',
+      caCert: 'CA Certificate',
+      caCertPlaceholder: 'Path to CA certificate',
+      clientCert: 'Client Certificate',
+      clientCertPlaceholder: 'Path to client certificate',
+      clientKey: 'Client Private Key',
+      clientKeyPlaceholder: 'Path to client private key',
+    },
+    sqlServer: {
+      trustServerCert: 'Trust server certificate',
+      trustServerCertHint: 'Accept self-signed certificates',
     },
   },
   pages: {
@@ -330,6 +355,9 @@ export const enUS = {
       applyFilters: 'Apply Filters',
       loading: 'Loading table data...',
       error: 'Failed to load table data',
+      connectionLost: 'Connection lost. The database connection was closed.',
+      reconnecting: 'Reconnecting...',
+      reconnect: 'Reconnect',
       noRows: 'No rows found',
       rows: 'rows',
       page: 'Page {page} of {total}',

@@ -159,29 +159,17 @@ impl SqlServerPool {
             SslMode::Prefer => {
                 tiberius_config.encryption(EncryptionLevel::Off);
             }
-            SslMode::Require | SslMode::VerifyCA | SslMode::VerifyFull => {
+            SslMode::Require => {
                 tiberius_config.encryption(EncryptionLevel::Required);
-                
-                // For VerifyCA and VerifyFull, we want to validate certificates
-                // Tiberius with rustls backend handles this
-                if config.ssl_mode == SslMode::Disable {
-                    tiberius_config.trust_cert();
-                }
+                tiberius_config.trust_cert();
+            }
+            SslMode::VerifyCA | SslMode::VerifyFull => {
+                tiberius_config.encryption(EncryptionLevel::Required);
             }
         }
 
-        // Set connection timeout
-        // Note: In tiberius 0.12, connection timeout is not configurable via Config
-        // The timeout is handled at the TCP level when establishing the connection
-        // You can set TCP connect timeout using tokio::time::timeout when calling Client::connect
-
         // Trust server certificate if specified
-        if config
-            .options
-            .get("trust_server_certificate")
-            .and_then(|v| v.parse::<bool>().ok())
-            .unwrap_or(false)
-        {
+        if config.trust_server_certificate {
             tiberius_config.trust_cert();
         }
 

@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { DatabaseType, resolveDatabase } from '@/store'
+import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
+import SslConfigSection from './ssl/SslConfigSection.vue'
 
 const props = defineProps<{
   open: boolean
@@ -51,7 +53,7 @@ const defaultConnection: ServerConnection = {
   username: '',
   password: '',
   database: '',
-  ssl: false,
+  ssl: { mode: DEFAULT_SSL_MODE },
 }
 
 const formData = ref<ServerConnection>({ ...defaultConnection })
@@ -111,6 +113,12 @@ function validateForm(): boolean {
     if (!formData.value.port || formData.value.port <= 0) {
       errors.port = t('components.serverForm.errors.portInvalid')
     }
+
+    const dbTypeBackend = mapDatabaseTypeToBackend(formData.value.type)
+    const sslErrors = validateSslConfig(formData.value.ssl, dbTypeBackend)
+    sslErrors.forEach((err) => {
+      errors[`ssl.${err.field}`] = err.message
+    })
   }
 
   formErrors.value = errors
@@ -126,7 +134,6 @@ async function handleTestConnection() {
   testError.value = ''
 
   try {
-    // Prepare config for Tauri backend
     const config = {
       id: formData.value.id || crypto.randomUUID(),
       name: formData.value.name,
@@ -136,7 +143,11 @@ async function handleTestConnection() {
       username: formData.value.username || '',
       password: formData.value.password || undefined,
       database: resolveDatabase(formData.value.type, formData.value.database) ?? undefined,
-      ssl_mode: formData.value.ssl ? 'require' : 'disable',
+      ssl_mode: sslModeToBackend(formData.value.ssl),
+      ssl_ca_cert: formData.value.ssl.caCertPath || null,
+      ssl_client_cert: formData.value.ssl.clientCertPath || null,
+      ssl_client_key: formData.value.ssl.clientKeyPath || null,
+      trust_server_certificate: formData.value.ssl.trustServerCertificate ?? null,
     }
 
     const result = await invoke<{ is_connected: boolean, server_version?: string }>('test_connection', { config })
@@ -297,18 +308,13 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
           </div>
         </div>
 
-        <!-- SSL Toggle (not for SQLite) -->
-        <div v-if="!isSqlite" class="flex items-center space-x-2">
-          <input
-            id="ssl"
-            v-model="formData.ssl"
-            type="checkbox"
-            class="text-primary border-input rounded h-4 w-4 focus:ring-ring"
-          >
-          <Label for="ssl" class="cursor-pointer">
-            {{ t('components.serverForm.labels.ssl') }}
-          </Label>
-        </div>
+        <!-- SSL Configuration (not for SQLite) -->
+        <SslConfigSection
+          v-if="!isSqlite"
+          v-model="formData.ssl"
+          :db-type="formData.type"
+          :errors="formErrors"
+        />
 
         <!-- Test Connection Status -->
         <div

@@ -10,6 +10,10 @@ export interface ServerConfig {
   password?: string | null
   database?: string | null
   ssl_mode?: string | null
+  ssl_ca_cert?: string | null
+  ssl_client_cert?: string | null
+  ssl_client_key?: string | null
+  trust_server_certificate?: boolean | null
 }
 
 export interface ConnectionStatus {

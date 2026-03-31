@@ -30,6 +30,4 @@ export const toast = {
   info: (title: string, opts?: { description?: string }) => add('info', title, opts?.description),
 }
 
-export function useNotifications() {
-  return { toasts, dismiss }
-}
+export const useNotifications = () => ({ toasts, dismiss })

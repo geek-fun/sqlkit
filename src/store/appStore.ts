@@ -6,6 +6,10 @@ export enum ThemeType {
   LIGHT = 'light',
 }
 
+// System theme change listener state (managed outside Pinia for lifecycle control)
+let systemThemeMediaQuery: MediaQueryList | null = null
+let systemThemeHandler: ((e: MediaQueryListEvent) => void) | null = null
+
 export enum LanguageType {
   AUTO = 'auto',
   ZH_CN = 'zhCN',
@@ -65,24 +69,56 @@ export const useAppStore = defineStore('app', {
     autoSave: (state): boolean => state.queryConfig.autoSave,
   },
   actions: {
-    setThemeType(themeType: ThemeType) {
-      const uiThemeType = themeType === ThemeType.AUTO
-        ? window.matchMedia('(prefers-color-scheme: light)').matches
-          ? ThemeType.LIGHT
-          : ThemeType.DARK
-        : themeType
+    applyUiTheme(uiThemeType: Exclude<ThemeType, ThemeType.AUTO>) {
       document.documentElement.setAttribute('theme', uiThemeType)
-
-      // Also update the dark class for UnoCSS dark mode support
       if (uiThemeType === ThemeType.DARK) {
         document.documentElement.classList.add('dark')
       }
       else {
         document.documentElement.classList.remove('dark')
       }
-
       this.uiThemeType = uiThemeType
+    },
+
+    updateSystemThemeWatcher() {
+      if (systemThemeHandler && systemThemeMediaQuery) {
+        systemThemeMediaQuery.removeEventListener('change', systemThemeHandler)
+        systemThemeHandler = null
+        systemThemeMediaQuery = null
+      }
+
+      if (this.themeType === ThemeType.AUTO) {
+        systemThemeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
+        systemThemeHandler = (e: MediaQueryListEvent) => {
+          const uiThemeType = e.matches ? ThemeType.DARK : ThemeType.LIGHT
+          this.applyUiTheme(uiThemeType)
+        }
+        systemThemeMediaQuery.addEventListener('change', systemThemeHandler)
+      }
+    },
+
+    /**
+     * Cleanup theme listener when store is destroyed
+     * Call this on app unmount to prevent memory leaks
+     */
+    cleanup() {
+      if (systemThemeHandler && systemThemeMediaQuery) {
+        systemThemeMediaQuery.removeEventListener('change', systemThemeHandler)
+        systemThemeHandler = null
+        systemThemeMediaQuery = null
+      }
+    },
+
+    setThemeType(themeType: ThemeType) {
+      const uiThemeType = themeType === ThemeType.AUTO
+        ? window.matchMedia('(prefers-color-scheme: dark)').matches
+          ? ThemeType.DARK
+          : ThemeType.LIGHT
+        : themeType
+
       this.themeType = themeType
+      this.applyUiTheme(uiThemeType)
+      this.updateSystemThemeWatcher()
     },
     setLanguageType(languageType: LanguageType) {
       this.languageType = languageType

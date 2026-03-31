@@ -73,7 +73,7 @@ impl Default for PoolConfig {
             max_connections: 10,
             connection_timeout: Duration::from_secs(30),
             max_lifetime: Duration::from_secs(1800), // 30 minutes
-            idle_timeout: Duration::from_secs(600),   // 10 minutes
+            idle_timeout: Duration::from_secs(600),  // 10 minutes
         }
     }
 }
@@ -96,6 +96,18 @@ pub struct ConnectionConfig {
     /// SSL/TLS mode.
     #[serde(default)]
     pub ssl_mode: SslMode,
+    /// Path to CA certificate file.
+    #[serde(default)]
+    pub ssl_ca_cert: Option<String>,
+    /// Path to client certificate file.
+    #[serde(default)]
+    pub ssl_client_cert: Option<String>,
+    /// Path to client private key file.
+    #[serde(default)]
+    pub ssl_client_key: Option<String>,
+    /// Trust server certificate (SQL Server specific).
+    #[serde(default)]
+    pub trust_server_certificate: bool,
     /// Additional connection options.
     #[serde(default)]
     pub options: std::collections::HashMap<String, String>,
@@ -120,6 +132,10 @@ impl ConnectionConfig {
             username: username.into(),
             password: None,
             ssl_mode: SslMode::default(),
+            ssl_ca_cert: None,
+            ssl_client_cert: None,
+            ssl_client_key: None,
+            trust_server_certificate: false,
             options: std::collections::HashMap::new(),
             pool_config: PoolConfig::default(),
         }

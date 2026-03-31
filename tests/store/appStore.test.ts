@@ -2,7 +2,12 @@ import { createPinia, setActivePinia } from 'pinia'
 import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
 
 // Mock window and document for Node.js environment
-const mockMatchMedia = jest.fn().mockReturnValue({ matches: false })
+const mockMediaQuery = {
+  matches: false,
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
+}
+const mockMatchMedia = jest.fn().mockReturnValue(mockMediaQuery)
 const mockSetAttribute = jest.fn()
 const mockClassList = {
   add: jest.fn(),
@@ -96,8 +101,17 @@ describe('appStore', () => {
       expect(mockClassList.add).toHaveBeenCalledWith('dark')
     })
 
+    it('should set theme to AUTO and detect system preference (dark)', () => {
+      mockMatchMedia.mockReturnValue({ ...mockMediaQuery, matches: true })
+      const store = useAppStore()
+      store.setThemeType(ThemeType.AUTO)
+
+      expect(store.themeType).toBe(ThemeType.AUTO)
+      expect(store.uiThemeType).toBe(ThemeType.DARK)
+    })
+
     it('should set theme to AUTO and detect system preference (light)', () => {
-      mockMatchMedia.mockReturnValue({ matches: true }) // prefers light
+      mockMatchMedia.mockReturnValue({ ...mockMediaQuery, matches: false })
       const store = useAppStore()
       store.setThemeType(ThemeType.AUTO)
 
@@ -105,13 +119,21 @@ describe('appStore', () => {
       expect(store.uiThemeType).toBe(ThemeType.LIGHT)
     })
 
-    it('should set theme to AUTO and detect system preference (dark)', () => {
-      mockMatchMedia.mockReturnValue({ matches: false }) // prefers dark
+    it('should cleanup theme listener on cleanup()', () => {
+      mockMatchMedia.mockReturnValue({ ...mockMediaQuery, matches: true })
       const store = useAppStore()
       store.setThemeType(ThemeType.AUTO)
 
-      expect(store.themeType).toBe(ThemeType.AUTO)
-      expect(store.uiThemeType).toBe(ThemeType.DARK)
+      store.cleanup()
+
+      expect(mockMediaQuery.removeEventListener).toHaveBeenCalledWith('change', expect.any(Function))
+    })
+
+    it('should not error on cleanup() when no listener registered', () => {
+      const store = useAppStore()
+      store.setThemeType(ThemeType.LIGHT)
+
+      expect(() => store.cleanup()).not.toThrow()
     })
   })
 

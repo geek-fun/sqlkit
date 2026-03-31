@@ -87,12 +87,12 @@ state.tabs = tabs
 
 **Module Boundaries**: Each module should export only via its `index.ts`; avoid deep imports.
 ```typescript
-import { Button } from '@/components/ui/button'
-import { Button } from '@/components/ui/button/Button.vue'
-
 // ✅ Correct
+import { Button } from '@/components/ui/button'
 import { useTabStore } from '@/store/tabStore'
+
 // ❌ Avoid
+import { Button } from '@/components/ui/button/Button.vue'
 import { useTabStore } from '../store/tabStore'
 ```
 
