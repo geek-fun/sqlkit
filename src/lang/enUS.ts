@@ -105,6 +105,23 @@ export const enUS = {
         autoSave: 'Auto Save',
         autoSaveHelp: 'Automatically save query changes',
       },
+      updates: {
+        title: 'Updates',
+        description: 'Check for application updates',
+        checkForUpdates: 'Check for Updates',
+        checkForUpdatesHelp: 'Manually check for new versions',
+        check: 'Check Now',
+        checking: 'Checking...',
+        downloading: 'Downloading...',
+        installing: 'Installing...',
+        updateAvailable: 'Update Available',
+        upToDate: 'You have the latest version',
+        checkFailed: 'Failed to check for updates',
+        downloadFailed: 'Failed to download update',
+        installFailed: 'Failed to install update',
+        installed: 'Update installed. Restarting...',
+        newVersion: 'Version {version} is available',
+      },
     },
     history: {
       title: 'History',
@@ -197,12 +214,22 @@ export const enUS = {
     },
   },
   components: {
-    serverForm: {
-      title: {
-        edit: 'Edit Connection',
-        new: 'New Connection',
-      },
-      description: {
+    updater: {
+      updateAvailable: 'Update Available',
+      newVersion: 'Version {version} is available',
+      download: 'Download',
+      install: 'Install',
+      later: 'Later',
+      downloading: 'Downloading update...',
+      installing: 'Installing update...',
+      installed: 'Update installed',
+      restart: 'Restart now',
+      upToDate: 'You have the latest version',
+      checkFailed: 'Failed to check for updates',
+      downloadFailed: 'Failed to download update',
+      installFailed: 'Failed to install update',
+    },
+    description: {
         edit: 'Update your database connection settings.',
         new: 'Configure a new database connection.',
       },
