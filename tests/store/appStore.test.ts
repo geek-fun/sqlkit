@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { LanguageType, ThemeType, useAppStore } from '../store/appStore'
+import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
 
 // Mock window and document for Node.js environment
 const mockMatchMedia = jest.fn().mockReturnValue({ matches: false })

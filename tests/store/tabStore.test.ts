@@ -1,5 +1,5 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { useTabStore } from '../store/tabStore'
+import { useTabStore } from '@/store/tabStore'
 
 // Mock the Tauri invoke API
 jest.mock('@tauri-apps/api/core', () => ({

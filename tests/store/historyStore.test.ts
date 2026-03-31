@@ -1,6 +1,6 @@
-import type { HistoryEntry } from '../store/historyStore'
+import type { HistoryEntry } from '@/store/historyStore'
 import { createPinia, setActivePinia } from 'pinia'
-import { useHistoryStore } from '../store/historyStore'
+import { useHistoryStore } from '@/store/historyStore'
 
 // Mock crypto.randomUUID
 Object.defineProperty(globalThis, 'crypto', {

@@ -1,6 +1,6 @@
 import { createPinia, setActivePinia } from 'pinia'
-import { useConnectionStore } from '../store/connectionStore'
-import { useDatabaseStore } from '../store/databaseStore'
+import { useConnectionStore } from '@/store/connectionStore'
+import { useDatabaseStore } from '@/store/databaseStore'
 
 // Mock the Tauri invoke API
 jest.mock('@tauri-apps/api/core', () => ({
@@ -11,7 +11,7 @@ jest.mock('@tauri-apps/api/core', () => ({
 const { invoke } = require('@tauri-apps/api/core')
 
 // Mock the storeApi for connectionStore
-jest.mock('../datasources', () => ({
+jest.mock('@/datasources', () => ({
   storeApi: {
     get: jest.fn().mockResolvedValue([]),
     set: jest.fn(),

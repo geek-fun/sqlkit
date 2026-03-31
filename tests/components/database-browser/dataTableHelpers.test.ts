@@ -4,7 +4,7 @@ import {
   formatTableValue,
   isTableNullValue,
   rowsToCsv,
-} from '../components/database-browser/dataTableHelpers'
+} from '@/components/database-browser/dataTableHelpers'
 
 describe('dataTableHelpers', () => {
   describe('formatTableValue', () => {

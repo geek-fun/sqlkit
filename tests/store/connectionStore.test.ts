@@ -1,8 +1,8 @@
-import type { ServerConnection } from '../store/connectionStore'
+import type { ServerConnection } from '@/store/connectionStore'
 import { createPinia, setActivePinia } from 'pinia'
-import { DatabaseType, useConnectionStore } from '../store/connectionStore'
+import { DatabaseType, useConnectionStore } from '@/store/connectionStore'
 
-jest.mock('../datasources/connectionApi', () => ({
+jest.mock('@/datasources/connectionApi', () => ({
   connectionApi: {
     list: jest.fn(),
     save: jest.fn(),
@@ -15,7 +15,7 @@ jest.mock('../datasources/connectionApi', () => ({
 }))
 
 // eslint-disable-next-line ts/no-require-imports
-const { connectionApi } = require('../datasources/connectionApi')
+const { connectionApi } = require('@/datasources/connectionApi')
 
 describe('connectionStore', () => {
   beforeEach(() => {

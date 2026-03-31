@@ -1,4 +1,4 @@
-import { pureObject } from '../common'
+import { pureObject } from '@/common'
 
 describe('pureObject', () => {
   it('should convert a simple object to a plain object', () => {
