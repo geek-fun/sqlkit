@@ -195,6 +195,23 @@ jest.mock('@tauri-apps/api/core', () => ({
 
 **Rust**: Unit tests in same file with `#[cfg(test)]`, integration tests in `src-tauri/tests/`.
 
+## Git & Commits
+
+**CRITICAL**: NEVER commit changes unless the user explicitly asks you to.
+
+- ❌ Do NOT commit after every change
+- ❌ Do NOT commit to "save progress"
+- ❌ Do NOT commit without explicit request like "commit this" or "create a commit"
+- ✅ Wait for user to explicitly request a commit
+- ✅ When asked to commit, use descriptive messages
+
+**When user requests a commit**:
+```bash
+git add .
+git commit -m "feat: description of changes"
+git push
+```
+
 ## Common Tasks
 
 **Adding a Tauri Command**:

@@ -2,12 +2,12 @@
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
 import { useAppUpdater } from '@/composables/useAppUpdater'
+import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
 
 const LANG_TYPE_MAP: Record<string, LanguageType> = {
   auto: LanguageType.AUTO,
@@ -17,7 +17,7 @@ const LANG_TYPE_MAP: Record<string, LanguageType> = {
 
 const appStore = useAppStore()
 const { t, locale } = useI18n()
-const { checkForUpdates, downloadAndInstall, isChecking, isDownloading, isInstalling, updateAvailable } = useAppUpdater()
+const { checkForUpdates, downloadAndInstall: _dl, isChecking, isDownloading, isInstalling, updateAvailable } = useAppUpdater()
 
 // --- Theme ---
 const currentTheme = computed(() => appStore.themeType)
@@ -31,15 +31,15 @@ const themeOptions = [
 const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)
 
 // --- Language ---
-const currentLanguage = computed(() => appStore.languageType as string)
+const _currentLanguage = computed(() => appStore.languageType as string)
 
-const languageOptions = [
+const _languageOptions = [
   { value: 'auto', label: () => t('pages.settings.appearance.languages.auto') },
   { value: 'zhCN', label: () => t('pages.settings.appearance.languages.zhCN') },
   { value: 'enUS', label: () => t('pages.settings.appearance.languages.enUS') },
 ]
 
-function handleLanguageChange(value: string) {
+function _handleLanguageChange(value: string) {
   localStorage.setItem('lang', value)
   appStore.setLanguageType(LANG_TYPE_MAP[value] ?? LanguageType.AUTO)
   locale.value = value === 'auto'
@@ -120,16 +120,9 @@ function handleQueryTimeoutChange(val: string | number) {
 const autoSave = computed(() => appStore.queryConfig.autoSave)
 const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave)
 
-const handleCheckUpdates = async () => {
-  const update = await checkForUpdates(true)
-  if (update) {
-    const confirmed = window.confirm(
-      `New version ${update.version} available!\n\n${update.notes || ''}\n\nDownload and install now? App will restart automatically.`,
-    )
-    if (confirmed) {
-      await downloadAndInstall()
-    }
-  }
+async function handleCheckUpdates() {
+  await checkForUpdates(true)
+  // The composable handles showing notifications and update info
 }
 </script>
 
@@ -240,46 +233,47 @@ const handleCheckUpdates = async () => {
                     <p class="text-sm font-medium text-center">
                       {{ opt.label() }}
                     </p>
-                </button>
-              </div>
-
-              <!-- Check for Updates -->
-              <div class="flex items-center justify-between">
-                <div class="space-y-1">
-                  <Label>{{ t('pages.settings.updates.checkForUpdates') }}</Label>
-                  <p class="text-xs text-muted-foreground">
-                    {{ t('pages.settings.updates.checkForUpdatesHelp') }}
-                  </p>
+                  </button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  :disabled="isChecking || isDownloading || isInstalling"
-                  @click="handleCheckUpdates"
-                >
-                  <svg
-                    v-if="isChecking || isDownloading || isInstalling"
-                    class="mr-2 h-4 w-4 animate-spin"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24"
+
+                <!-- Check for Updates -->
+                <div class="flex items-center justify-between">
+                  <div class="space-y-1">
+                    <Label>{{ t('pages.settings.updates.checkForUpdates') }}</Label>
+                    <p class="text-xs text-muted-foreground">
+                      {{ t('pages.settings.updates.checkForUpdatesHelp') }}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    :disabled="isChecking || isDownloading || isInstalling"
+                    @click="handleCheckUpdates"
                   >
-                    <circle
-                      class="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      stroke-width="4"
-                    />
-                    <path
-                      class="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                    />
-                  </svg>
-                  {{ isChecking ? t('pages.settings.updates.checking') : isDownloading ? t('pages.settings.updates.downloading') : isInstalling ? t('pages.settings.updates.installing') : updateAvailable ? t('pages.settings.updates.updateAvailable') : t('pages.settings.updates.check') }}
-                </Button>
+                    <svg
+                      v-if="isChecking || isDownloading || isInstalling"
+                      class="mr-2 h-4 w-4 animate-spin"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        class="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        stroke-width="4"
+                      />
+                      <path
+                        class="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                      />
+                    </svg>
+                    {{ isChecking ? t('pages.settings.updates.checking') : isDownloading ? t('pages.settings.updates.downloading') : isInstalling ? t('pages.settings.updates.installing') : updateAvailable ? t('pages.settings.updates.updateAvailable') : t('pages.settings.updates.check') }}
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

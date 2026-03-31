@@ -1,10 +1,11 @@
-import { check, type Update } from '@tauri-apps/plugin-updater'
+import type { Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
-import { toast } from './useNotifications'
+import { check } from '@tauri-apps/plugin-updater'
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { toast } from './useNotifications'
 
-export const useAppUpdater = () => {
+export function useAppUpdater() {
   const { t } = useI18n()
   const updateAvailable = ref(false)
   const updateInfo = ref<Update | null>(null)
