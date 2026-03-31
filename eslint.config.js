@@ -28,5 +28,6 @@ export default antfu({
   rules: {
     'no-console': 'warn',
     'unused-imports/no-unused-vars': 'warn',
+    'style/eol-last': ['error', 'always'],
   },
 })
