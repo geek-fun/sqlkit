@@ -30,7 +30,14 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15",
+      "exceptionDomain": "",
+      "signingIdentity": "Developer ID Application: Lisheng Zi",
+      "providerShortName": null,
+      "entitlements": null
+    }
   },
   "plugins": {
     "updater": {
