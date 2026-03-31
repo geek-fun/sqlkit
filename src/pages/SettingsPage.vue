@@ -7,16 +7,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAppUpdater } from '@/composables/useAppUpdater'
-import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
-
-const LANG_TYPE_MAP: Record<string, LanguageType> = {
-  auto: LanguageType.AUTO,
-  enUS: LanguageType.EN_US,
-  zhCN: LanguageType.ZH_CN,
-}
+import { ThemeType, useAppStore } from '@/store/appStore'
 
 const appStore = useAppStore()
-const { t, locale } = useI18n()
+const { t, locale: _locale } = useI18n()
 const { checkForUpdates, downloadAndInstall: _dl, isChecking, isDownloading, isInstalling, updateAvailable } = useAppUpdater()
 
 // --- Theme ---
@@ -31,21 +25,7 @@ const themeOptions = [
 const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)
 
 // --- Language ---
-const _currentLanguage = computed(() => appStore.languageType as string)
-
-const _languageOptions = [
-  { value: 'auto', label: () => t('pages.settings.appearance.languages.auto') },
-  { value: 'zhCN', label: () => t('pages.settings.appearance.languages.zhCN') },
-  { value: 'enUS', label: () => t('pages.settings.appearance.languages.enUS') },
-]
-
-function _handleLanguageChange(value: string) {
-  localStorage.setItem('lang', value)
-  appStore.setLanguageType(LANG_TYPE_MAP[value] ?? LanguageType.AUTO)
-  locale.value = value === 'auto'
-    ? (navigator.language === 'zh-CN' ? 'zhCN' : 'enUS')
-    : value
-}
+// Note: Language change functionality removed - using i18n locale directly
 
 const fontSizeInput = ref(String(appStore.editorConfig.fontSize))
 const fontSizeError = ref('')
