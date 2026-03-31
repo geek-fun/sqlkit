@@ -229,7 +229,12 @@ export const enUS = {
       downloadFailed: 'Failed to download update',
       installFailed: 'Failed to install update',
     },
-    description: {
+    serverForm: {
+      title: {
+        edit: 'Edit Connection',
+        new: 'New Connection',
+      },
+      description: {
         edit: 'Update your database connection settings.',
         new: 'Configure a new database connection.',
       },
