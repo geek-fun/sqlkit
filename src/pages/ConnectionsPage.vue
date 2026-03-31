@@ -54,17 +54,17 @@ onMounted(async () => {
   await connectionStore.fetchConnections()
 })
 
-const handleAddConnection = () => {
+function handleAddConnection() {
   editingConnection.value = null
   isFormDialogOpen.value = true
 }
 
-const handleEditConnection = (connection: ServerConnection) => {
+function handleEditConnection(connection: ServerConnection) {
   editingConnection.value = connection
   isFormDialogOpen.value = true
 }
 
-const handleConnect = async (connection: ServerConnection) => {
+async function handleConnect(connection: ServerConnection) {
   connectError.value = null
   if (!connection.id) {
     return
@@ -94,12 +94,12 @@ const handleConnect = async (connection: ServerConnection) => {
   }
 }
 
-const handleDeleteConnection = (connection: ServerConnection) => {
+function handleDeleteConnection(connection: ServerConnection) {
   connectionToDelete.value = connection
   deleteDialogOpen.value = true
 }
 
-const confirmDelete = async () => {
+async function confirmDelete() {
   if (connectionToDelete.value) {
     await connectionStore.removeConnection(connectionToDelete.value)
     connectionToDelete.value = null
@@ -107,7 +107,7 @@ const confirmDelete = async () => {
   }
 }
 
-const handleDuplicateConnection = (connection: ServerConnection) => {
+function handleDuplicateConnection(connection: ServerConnection) {
   editingConnection.value = {
     ...connection,
     id: undefined,
@@ -116,14 +116,14 @@ const handleDuplicateConnection = (connection: ServerConnection) => {
   isFormDialogOpen.value = true
 }
 
-const handleSaveConnection = async (connection: ServerConnection) => {
+async function handleSaveConnection(connection: ServerConnection) {
   const result = await connectionStore.saveConnection(connection)
   if (!result.success) {
     console.error('Failed to save connection:', result.message)
   }
 }
 
-const getConnectionStatus = (connectionId: string | undefined): ConnectionStatus => {
+function getConnectionStatus(connectionId: string | undefined): ConnectionStatus {
   if (!connectionId) {
     return ConnectionStatus.DISCONNECTED
   }

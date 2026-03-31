@@ -1,5 +1,6 @@
 import type { ServerConnection } from '@/store/connectionStore'
 import { createPinia, setActivePinia } from 'pinia'
+import { connectionApi } from '@/datasources/connectionApi'
 import { ConnectionStatus, DatabaseType, resolveDatabase, useConnectionStore } from '@/store/connectionStore'
 
 jest.mock('@/datasources/connectionApi', () => ({
@@ -13,8 +14,6 @@ jest.mock('@/datasources/connectionApi', () => ({
     getStatus: jest.fn(),
   },
 }))
-
-const { connectionApi } = require('@/datasources/connectionApi')
 
 describe('connectionStore', () => {
   beforeEach(() => {
@@ -385,7 +384,9 @@ describe('connectionStore', () => {
 
       it('sets CONNECTING status during connection', async () => {
         let resolveConnect: ((value: unknown) => void) | undefined
-        connectionApi.connect.mockImplementation(() => new Promise(resolve => { resolveConnect = resolve }))
+        connectionApi.connect.mockImplementation(() => new Promise((resolve) => {
+          resolveConnect = resolve
+        }))
 
         const store = useConnectionStore()
         store.connections = [

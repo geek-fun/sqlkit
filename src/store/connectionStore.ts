@@ -29,8 +29,9 @@ const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
   [DatabaseType.SQLSERVER]: 'master',
 }
 
-const resolveDatabase = (type: DatabaseType, database?: string): string | null =>
-  database || defaultDatabaseFor[type] || null
+function resolveDatabase(type: DatabaseType, database?: string): string | null {
+  return database || defaultDatabaseFor[type] || null
+}
 
 export { resolveDatabase }
 
@@ -41,7 +42,7 @@ export enum ConnectionStatus {
   ERROR = 'error',
 }
 
-export type SSHTunnelConfig = {
+export interface SSHTunnelConfig {
   enabled: boolean
   host: string
   port: number
@@ -51,7 +52,7 @@ export type SSHTunnelConfig = {
   privateKey?: string
 }
 
-export type ServerConnection = {
+export interface ServerConnection {
   id?: string
   name: string
   type: DatabaseType
@@ -66,7 +67,7 @@ export type ServerConnection = {
   lastUsed?: Date
 }
 
-type ConnectionStoreState = {
+interface ConnectionStoreState {
   connections: ServerConnection[]
   activeConnectionId: string | null
   connectionStatus: Record<string, ConnectionStatus>

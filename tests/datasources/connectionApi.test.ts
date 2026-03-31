@@ -5,7 +5,7 @@ jest.mock('@tauri-apps/api/core', () => ({
   invoke: jest.fn(),
 }))
 
-const { invoke } = require('@tauri-apps/api/core')
+const invoke = jest.requireMock('@tauri-apps/api/core').invoke as jest.Mock
 
 describe('connectionApi', () => {
   beforeEach(() => {

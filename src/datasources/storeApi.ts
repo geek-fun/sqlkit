@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 
-export type QueryHistoryItem = {
+export interface QueryHistoryItem {
   id: number
   query: string
   database: string

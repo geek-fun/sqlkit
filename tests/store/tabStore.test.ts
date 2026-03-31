@@ -5,14 +5,14 @@ jest.mock('@tauri-apps/api/core', () => ({
   invoke: jest.fn(),
 }))
 
-const { invoke } = require('@tauri-apps/api/core')
-
 jest.mock('@/datasources', () => ({
   storeApi: {
     get: jest.fn().mockResolvedValue([]),
     set: jest.fn(),
   },
 }))
+
+const invoke = jest.requireMock('@tauri-apps/api/core').invoke as jest.Mock
 
 Object.defineProperty(globalThis, 'crypto', {
   value: {

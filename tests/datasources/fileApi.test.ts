@@ -8,8 +8,8 @@ jest.mock('@tauri-apps/plugin-dialog', () => ({
   save: jest.fn(),
 }))
 
-const { invoke } = require('@tauri-apps/api/core')
-const { save: showSaveDialog } = require('@tauri-apps/plugin-dialog')
+const invoke = jest.requireMock('@tauri-apps/api/core').invoke as jest.Mock
+const showSaveDialog = jest.requireMock('@tauri-apps/plugin-dialog').save as jest.Mock
 
 describe('fileApi', () => {
   beforeEach(() => {
@@ -59,7 +59,7 @@ describe('fileApi', () => {
         message: 'File saved',
       })
 
-      const result = await saveQueryFile('SELECT 1', undefined, 'myquery')
+      const _result = await saveQueryFile('SELECT 1', undefined, 'myquery')
 
       expect(invoke).toHaveBeenCalledWith('save_query_file', {
         content: 'SELECT 1',
@@ -124,7 +124,7 @@ describe('fileApi', () => {
       showSaveDialog.mockResolvedValue('/path/myfile')
       invoke.mockResolvedValue({ success: true, message: 'Saved' })
 
-      const result = await saveQueryFileAs('SELECT 1')
+      const _result = await saveQueryFileAs('SELECT 1')
 
       expect(invoke).toHaveBeenCalledWith('save_query_file', {
         content: 'SELECT 1',

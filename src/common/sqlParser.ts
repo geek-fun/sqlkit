@@ -1,20 +1,16 @@
-export type CursorPosition = {
+export interface CursorPosition {
   lineNumber: number
   column: number
 }
 
-export type Selection = {
+export interface Selection {
   startLineNumber: number
   startColumn: number
   endLineNumber: number
   endColumn: number
 }
 
-export const extractStatementAtCursor = (
-  sql: string,
-  cursorPosition?: CursorPosition,
-  selection?: Selection,
-): string => {
+export function extractStatementAtCursor(sql: string, cursorPosition?: CursorPosition, selection?: Selection): string {
   if (selection) {
     const lines = sql.split('\n')
     const selectedLines = lines.slice(
@@ -53,7 +49,7 @@ export const extractStatementAtCursor = (
 
   const beforeCursor = sql.substring(0, offset)
   const afterCursor = sql.substring(offset)
-  
+
   const lastSemicolon = beforeCursor.lastIndexOf(';')
   const nextSemicolon = afterCursor.indexOf(';')
 

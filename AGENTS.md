@@ -87,13 +87,13 @@ state.tabs = tabs
 
 **Module Boundaries**: Each module should export only via its `index.ts`; avoid deep imports.
 ```typescript
+import { Button } from '@/components/ui/button'
+import { Button } from '@/components/ui/button/Button.vue'
+
 // ✅ Correct
 import { useTabStore } from '@/store/tabStore'
-import { Button } from '@/components/ui/button'
-
 // ❌ Avoid
 import { useTabStore } from '../store/tabStore'
-import { Button } from '@/components/ui/button/Button.vue'
 ```
 
 **Export Discipline**: Only export functions/types/constants that are used outside the module.
@@ -179,6 +179,7 @@ const result = await invoke<QueryResult>('execute_query', {
 ```vue
 <script setup lang="ts">
 import { ref } from 'vue'
+
 const count = ref(0)
 </script>
 ```

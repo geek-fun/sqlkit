@@ -4,7 +4,7 @@ export type Theme = 'dark' | 'light' | 'system'
 
 const THEME_STORAGE_KEY = 'sqlkit-theme'
 
-export const useTheme = () => {
+export function useTheme() {
   const theme = ref<Theme>('system')
   const isDark = ref(false)
   let mediaQuery: MediaQueryList | null = null

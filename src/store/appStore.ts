@@ -12,7 +12,7 @@ export enum LanguageType {
   EN_US = 'enUS',
 }
 
-export type EditorConfig = {
+export interface EditorConfig {
   fontSize: number
   fontWeight: string
   fontFamily: string
@@ -22,13 +22,13 @@ export type EditorConfig = {
   showMinimap: boolean
 }
 
-export type QueryConfig = {
+export interface QueryConfig {
   defaultLimit: number
   queryTimeout: number
   autoSave: boolean
 }
 
-type AppStoreState = {
+interface AppStoreState {
   themeType: ThemeType
   languageType: LanguageType
   uiThemeType: Exclude<ThemeType, ThemeType.AUTO>

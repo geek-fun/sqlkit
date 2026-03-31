@@ -1,17 +1,17 @@
-export type ApiSuccessResponse<T> = {
+export interface ApiSuccessResponse<T> {
   status: 'success'
   data: T
   message?: string
 }
 
-export type ApiErrorResponse = {
+export interface ApiErrorResponse {
   status: 'error'
   error: ApiError
 }
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse
 
-export type ApiError = {
+export interface ApiError {
   code: string
   message: string
   details?: string
@@ -43,13 +43,15 @@ export const ErrorCodes = {
   INVALID_CONFIGURATION: 'INVALID_CONFIGURATION',
 } as const
 
-export const isApiError = <T>(response: ApiResponse<T>): response is ApiErrorResponse =>
-  response.status === 'error'
+export function isApiError<T>(response: ApiResponse<T>): response is ApiErrorResponse {
+  return response.status === 'error'
+}
 
-export const isApiSuccess = <T>(response: ApiResponse<T>): response is ApiSuccessResponse<T> =>
-  response.status === 'success'
+export function isApiSuccess<T>(response: ApiResponse<T>): response is ApiSuccessResponse<T> {
+  return response.status === 'success'
+}
 
-export const unwrapApiResponse = <T>(response: ApiResponse<T>): T => {
+export function unwrapApiResponse<T>(response: ApiResponse<T>): T {
   if (isApiError(response)) {
     throw new ApiErrorException(response.error)
   }
@@ -102,7 +104,7 @@ export class ApiErrorException extends Error {
   }
 }
 
-export const formatApiError = (error: ApiError, t: (key: string) => string): string => {
+export function formatApiError(error: ApiError, t: (key: string) => string): string {
   const parts: string[] = []
 
   const titleKey = `errors.codes.${error.code}`
@@ -122,7 +124,7 @@ export const formatApiError = (error: ApiError, t: (key: string) => string): str
   return parts.join('\n\n')
 }
 
-export const getErrorTitle = (error: ApiError, t: (key: string) => string): string => {
+export function getErrorTitle(error: ApiError, t: (key: string) => string): string {
   const titleKey = `errors.titles.${error.code}`
   const translated = t(titleKey)
   return translated !== titleKey ? translated : error.message

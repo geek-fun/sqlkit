@@ -37,14 +37,14 @@ import {
   rowsToCsv,
 } from './dataTableHelpers'
 
-type TableDataResult = {
+interface TableDataResult {
   columns: string[]
   rows: Record<string, unknown>[]
   rows_affected?: number
   execution_time_ms?: number
 }
 
-type ColumnTypeInfo = {
+interface ColumnTypeInfo {
   name: string
   data_type: string
   is_primary_key: boolean
@@ -111,13 +111,15 @@ const pkColumns = computed(() =>
   (data.value?.columns ?? []).filter((c: string) => columnIsPK.value[c]),
 )
 
-const extractPkValues = (row: Record<string, unknown>): Record<string, unknown> =>
-  Object.fromEntries(pkColumns.value.map((col: string) => [col, row[col] ?? null]))
+function extractPkValues(row: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(pkColumns.value.map((col: string) => [col, row[col] ?? null]))
+}
 
-const formatPkSummary = (row: Record<string, unknown>): string =>
-  pkColumns.value.length > 0
+function formatPkSummary(row: Record<string, unknown>): string {
+  return pkColumns.value.length > 0
     ? pkColumns.value.map((col: string) => `${col}: ${formatTableValue(row[col])}`).join(', ')
     : Object.entries(row).slice(0, 2).map(([k, v]) => `${k}: ${formatTableValue(v)}`).join(', ')
+}
 
 const totalPages = computed(() => computeTotalPages(totalCount.value, rowsPerPage.value))
 
@@ -149,7 +151,7 @@ const formattedTime = computed(() => {
     : `${(executionTimeMs.value / 1000).toFixed(2)}s`
 })
 
-const fetchData = async () => {
+async function fetchData() {
   loading.value = true
   error.value = null
 
@@ -175,7 +177,7 @@ const fetchData = async () => {
   }
 }
 
-const fetchCount = async () => {
+async function fetchCount() {
   try {
     const count = await invoke<number>('get_table_count', {
       connectionId: props.connectionId,
@@ -191,11 +193,11 @@ const fetchCount = async () => {
   }
 }
 
-const refresh = async () => {
+async function refresh() {
   await Promise.all([fetchData(), fetchCount()])
 }
 
-const fetchColumnInfo = async () => {
+async function fetchColumnInfo() {
   if (!props.database || !props.tableName) {
     columnInfoList.value = []
     return
@@ -213,13 +215,13 @@ const fetchColumnInfo = async () => {
   }
 }
 
-const applyFilter = () => {
+function applyFilter() {
   appliedFilter.value = filterInput.value.trim()
   currentPage.value = 1
   refresh()
 }
 
-const clearFilter = () => {
+function clearFilter() {
   filterInput.value = ''
   if (appliedFilter.value !== '') {
     appliedFilter.value = ''
@@ -228,26 +230,26 @@ const clearFilter = () => {
   }
 }
 
-const goToPage = (page: number) => {
+function goToPage(page: number) {
   if (page < 1 || page > totalPages.value)
     return
   currentPage.value = page
   fetchData()
 }
 
-const changeRowsPerPage = (val: string) => {
+function changeRowsPerPage(val: string) {
   rowsPerPage.value = Number(val) as RowsPerPage
   currentPage.value = 1
   fetchData()
 }
 
-const toggleColumn = (col: string) => {
+function toggleColumn(col: string) {
   hiddenColumns.value = hiddenColumns.value.has(col)
     ? new Set([...hiddenColumns.value].filter(c => c !== col))
     : new Set([...hiddenColumns.value, col])
 }
 
-const exportCSV = async () => {
+async function exportCSV() {
   if (!data.value)
     return
 
@@ -281,12 +283,12 @@ const exportCSV = async () => {
   }
 }
 
-const openDeleteDialog = (row: Record<string, unknown>) => {
+function openDeleteDialog(row: Record<string, unknown>) {
   deletingRow.value = row
   deleteDialogOpen.value = true
 }
 
-const confirmDelete = async () => {
+async function confirmDelete() {
   if (!deletingRow.value)
     return
   isDeleting.value = true
@@ -313,7 +315,7 @@ const confirmDelete = async () => {
   }
 }
 
-const rawValueToString = (v: unknown): string => {
+function rawValueToString(v: unknown): string {
   if (v === null || v === undefined)
     return ''
   if (typeof v === 'object')
@@ -321,7 +323,7 @@ const rawValueToString = (v: unknown): string => {
   return String(v)
 }
 
-const openEditDialog = (row: Record<string, unknown>) => {
+function openEditDialog(row: Record<string, unknown>) {
   editingRow.value = row
   editErrors.value = {}
   const cols = data.value?.columns ?? []
@@ -337,7 +339,7 @@ const openEditDialog = (row: Record<string, unknown>) => {
   editDialogOpen.value = true
 }
 
-const validateEditForm = (): boolean => {
+function validateEditForm(): boolean {
   const columns = data.value?.columns ?? []
   const errors = Object.fromEntries(
     columns
@@ -351,7 +353,7 @@ const validateEditForm = (): boolean => {
   return Object.keys(errors).length === 0
 }
 
-const coerceEditValue = (col: string, value: string): unknown => {
+function coerceEditValue(col: string, value: string): unknown {
   const type = (columnTypeMap.value[col] ?? '').toLowerCase()
   if (type.includes('int') || type.includes('serial') || type.includes('numeric') || type.includes('decimal') || type.includes('float') || type.includes('double') || type.includes('real') || type.includes('money')) {
     const n = Number(value)
@@ -367,7 +369,7 @@ const coerceEditValue = (col: string, value: string): unknown => {
   return value
 }
 
-const confirmEdit = async () => {
+async function confirmEdit() {
   if (!editingRow.value)
     return
   if (!validateEditForm())

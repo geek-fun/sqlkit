@@ -63,10 +63,11 @@ const clearDialogMessage = computed(() =>
     : t('pages.history.clearNonFavoritesConfirm'),
 )
 
-const formatTimestamp = (timestamp: number): string =>
-  new Date(timestamp).toLocaleString()
+function formatTimestamp(timestamp: number): string {
+  return new Date(timestamp).toLocaleString()
+}
 
-const formatDuration = (ms?: number): string => {
+function formatDuration(ms?: number): string {
   if (ms === undefined)
     return '-'
   if (ms < 1000)
@@ -74,17 +75,17 @@ const formatDuration = (ms?: number): string => {
   return `${(ms / 1000).toFixed(2)}s`
 }
 
-const truncateSql = (sql: string, maxLength = 80): string => {
+function truncateSql(sql: string, maxLength = 80): string {
   const single = sql.replace(/\s+/g, ' ').trim()
   return single.length > maxLength ? `${single.slice(0, maxLength)}…` : single
 }
 
-const openClearDialog = (mode: ClearMode) => {
+function openClearDialog(mode: ClearMode) {
   clearMode.value = mode
   clearDialogOpen.value = true
 }
 
-const confirmClear = () => {
+function confirmClear() {
   if (clearMode.value === 'all') {
     historyStore.clearAll()
   }
@@ -95,7 +96,7 @@ const confirmClear = () => {
   toast.success(t('pages.history.notifications.cleared'))
 }
 
-const handleRerun = async (entry: HistoryEntry) => {
+async function handleRerun(entry: HistoryEntry) {
   let connectionId = entry.connectionId
   if (!connectionStore.getConnectionById(connectionId)) {
     connectionId = connectionStore.activeConnectionId || ''
@@ -113,12 +114,12 @@ const handleRerun = async (entry: HistoryEntry) => {
   await router.push('/queries')
 }
 
-const handleDelete = (id: string) => {
+function handleDelete(id: string) {
   historyStore.deleteEntry(id)
   toast.success(t('pages.history.notifications.deleted'))
 }
 
-const handleToggleFavorite = (id: string) => {
+function handleToggleFavorite(id: string) {
   historyStore.toggleFavorite(id)
 }
 </script>

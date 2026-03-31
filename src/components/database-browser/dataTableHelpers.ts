@@ -1,4 +1,4 @@
-export const formatTableValue = (v: unknown): string => {
+export function formatTableValue(v: unknown): string {
   if (v === null || v === undefined)
     return 'NULL'
   if (typeof v === 'object')
@@ -8,7 +8,7 @@ export const formatTableValue = (v: unknown): string => {
 
 export const isTableNullValue = (v: unknown): boolean => v === null || v === undefined
 
-export const rowsToCsv = (rows: Record<string, unknown>[], columns: string[]): string => {
+export function rowsToCsv(rows: Record<string, unknown>[], columns: string[]): string {
   const escape = (s: string) => `"${s.replace(/"/g, '""')}"`
   const header = columns.map(escape).join(',')
   const lines = rows.map(row =>
@@ -23,8 +23,10 @@ export const rowsToCsv = (rows: Record<string, unknown>[], columns: string[]): s
   return [header, ...lines].join('\n')
 }
 
-export const computeTotalPages = (totalCount: number, rowsPerPage: number): number =>
-  totalCount > 0 ? Math.ceil(totalCount / rowsPerPage) : 1
+export function computeTotalPages(totalCount: number, rowsPerPage: number): number {
+  return totalCount > 0 ? Math.ceil(totalCount / rowsPerPage) : 1
+}
 
-export const computeOffset = (page: number, rowsPerPage: number): number =>
-  (page - 1) * rowsPerPage
+export function computeOffset(page: number, rowsPerPage: number): number {
+  return (page - 1) * rowsPerPage
+}

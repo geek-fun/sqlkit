@@ -146,9 +146,9 @@ watch(activeTab, (tab) => {
   }
 })
 
-type ExecuteQueryDetails = { query: string, cursorPosition?: CursorPosition, selection?: Selection }
+interface ExecuteQueryDetails { query: string, cursorPosition?: CursorPosition, selection?: Selection }
 
-const executeQuery = async (details?: ExecuteQueryDetails) => {
+async function executeQuery(details?: ExecuteQueryDetails) {
   if (!activeTab.value) {
     return
   }
@@ -170,21 +170,22 @@ const executeQuery = async (details?: ExecuteQueryDetails) => {
   await tabStore.executeQuery(activeTab.value.id, sqlToExecute)
 }
 
-const handleExplainQuery = async () => {
+async function handleExplainQuery() {
   // TODO: Implement explain query
 }
 
 const getConnectionId = () => selectedConnectionId.value || connectionStore.activeConnectionId
 
-const isConnectionActive = (connId: string | null | undefined): boolean =>
-  connId !== null && connId !== undefined && connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
+function isConnectionActive(connId: string | null | undefined): boolean {
+  return connId !== null && connId !== undefined && connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
+}
 
-const getActiveConnectionId = (): string | null => {
+function getActiveConnectionId(): string | null {
   const connId = getConnectionId()
   return isConnectionActive(connId) ? connId : null
 }
 
-const handleNewTab = () => {
+function handleNewTab() {
   const connId = getActiveConnectionId() || ''
   const db = connId
     ? (selectedDatabase.value || connectionStore.getCurrentDatabase(connId) || connectionStore.getConnectionById(connId)?.database || undefined)
@@ -192,19 +193,19 @@ const handleNewTab = () => {
   tabStore.createTab(connId, db)
 }
 
-const handleTabSelect = (tabId: string) => {
+function handleTabSelect(tabId: string) {
   tabStore.setActiveTab(tabId)
 }
 
-const handleTabClose = (tabId: string) => {
+function handleTabClose(tabId: string) {
   tabStore.closeTab(tabId)
 }
 
-const handleTabCloseForce = (tabId: string) => {
+function handleTabCloseForce(tabId: string) {
   tabStore.closeTab(tabId)
 }
 
-const handleGlobalKeydown = (e: KeyboardEvent) => {
+function handleGlobalKeydown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'w') {
     const tab = tabStore.activeTab
     if (tab) {
@@ -218,7 +219,7 @@ const handleGlobalKeydown = (e: KeyboardEvent) => {
 onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
 onUnmounted(() => window.removeEventListener('keydown', handleGlobalKeydown))
 
-const handleCreateScript = (table: TableInfo, database: string, schema?: string) => {
+function handleCreateScript(table: TableInfo, database: string, schema?: string) {
   const schemaPrefix = schema ? `"${schema}".` : ''
   const script = `-- CREATE TABLE script for ${table.name}
 -- TODO: Generate actual CREATE TABLE from server
@@ -234,7 +235,7 @@ CREATE TABLE ${schemaPrefix}"${table.name}" (
   }
 }
 
-const handleSelectTopN = (table: TableInfo, database: string, schema?: string, n = 100) => {
+function handleSelectTopN(table: TableInfo, database: string, schema?: string, n = 100) {
   const schemaPrefix = schema ? `"${schema}".` : ''
   const query = `SELECT * FROM ${schemaPrefix}"${table.name}" LIMIT ${n};`
 
@@ -249,7 +250,7 @@ const handleSelectTopN = (table: TableInfo, database: string, schema?: string, n
   }
 }
 
-const handleViewStructure = (table: TableInfo, database: string, schema?: string) => {
+function handleViewStructure(table: TableInfo, database: string, schema?: string) {
   const query = `-- Table structure for ${table.name}
 -- Database: ${database}${schema ? `\n-- Schema: ${schema}` : ''}
 
@@ -266,41 +267,41 @@ WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` :
   }
 }
 
-const handleExportData = (_table: TableInfo, _database: string, _schema?: string) => {
+function handleExportData(_table: TableInfo, _database: string, _schema?: string) {
   // TODO: Implement export data functionality
 }
 
-const handleSelectTable = (table: TableInfo, database: string, schema?: string) => {
+function handleSelectTable(table: TableInfo, database: string, schema?: string) {
   const connId = getActiveConnectionId()
   if (!connId)
     return
   tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
-const startSidebarResize = (_e: MouseEvent) => {
+function startSidebarResize(_e: MouseEvent) {
   isResizingSidebar.value = true
   document.addEventListener('mousemove', handleSidebarResize)
   document.addEventListener('mouseup', stopSidebarResize)
 }
 
-const handleSidebarResize = (e: MouseEvent) => {
+function handleSidebarResize(e: MouseEvent) {
   if (!isResizingSidebar.value)
     return
   const newWidth = Math.max(200, Math.min(400, e.clientX))
   sidebarWidth.value = newWidth
 }
 
-const stopSidebarResize = () => {
+function stopSidebarResize() {
   isResizingSidebar.value = false
   document.removeEventListener('mousemove', handleSidebarResize)
   document.removeEventListener('mouseup', stopSidebarResize)
 }
 
-const closeResultPanel = () => {
+function closeResultPanel() {
   showResultPanel.value = false
 }
 
-const handleSaveQuery = async () => {
+async function handleSaveQuery() {
   if (!activeTab.value || !activeTab.value.content.trim()) {
     return
   }
@@ -325,7 +326,7 @@ const handleSaveQuery = async () => {
   }
 }
 
-const handleDownloadQuery = async () => {
+async function handleDownloadQuery() {
   if (!activeTab.value || !activeTab.value.content.trim()) {
     return
   }
