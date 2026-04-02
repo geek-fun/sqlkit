@@ -1,7 +1,7 @@
-import { defineStore } from 'pinia'
-import { connectionApi } from '../datasources'
 import type { SslConfig } from '@/types/connection'
+import { defineStore } from 'pinia'
 import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
+import { connectionApi } from '../datasources'
 
 export enum DatabaseType {
   MYSQL = 'MYSQL',

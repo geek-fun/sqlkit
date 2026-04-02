@@ -43,7 +43,8 @@ const showSqlServerOptions = computed(() =>
 
 const sslErrors = computed(() => {
   const errors: Record<string, string> = {}
-  if (!props.errors) return errors
+  if (!props.errors)
+    return errors
   Object.entries(props.errors).forEach(([key, value]) => {
     if (key.startsWith('ssl.')) {
       errors[key.replace('ssl.', '')] = value

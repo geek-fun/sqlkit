@@ -4,7 +4,7 @@
 
 export type SslMode = 'disable' | 'prefer' | 'require' | 'verify-ca' | 'verify-full'
 
-export type SslConfig = {
+export interface SslConfig {
   mode: SslMode
   caCertPath?: string
   clientCertPath?: string
@@ -12,7 +12,7 @@ export type SslConfig = {
   trustServerCertificate?: boolean
 }
 
-export type SslValidationError = {
+export interface SslValidationError {
   field: string
   message: string
 }
@@ -53,21 +53,24 @@ const normalizeDbType = (dbType: string): string => dbType.toLowerCase()
 /**
  * Check if database type supports SSL
  */
-export const isSslSupported = (dbType: string): boolean =>
-  SSL_SUPPORTED_DATABASES.includes(normalizeDbType(dbType))
+export function isSslSupported(dbType: string): boolean {
+  return SSL_SUPPORTED_DATABASES.includes(normalizeDbType(dbType))
+}
 
 /**
  * Check if database type needs certificate fields
  */
-export const needsCertFields = (dbType: string, sslMode: SslMode): boolean =>
-  CERT_FIELD_DATABASES.includes(normalizeDbType(dbType))
+export function needsCertFields(dbType: string, sslMode: SslMode): boolean {
+  return CERT_FIELD_DATABASES.includes(normalizeDbType(dbType))
     && (sslMode === 'verify-ca' || sslMode === 'verify-full')
+}
 
 /**
  * Check if database type needs SQL Server specific options
  */
-export const needsSqlServerOptions = (dbType: string, sslMode: SslMode): boolean =>
-  normalizeDbType(dbType) === 'sqlserver' && sslMode !== 'disable'
+export function needsSqlServerOptions(dbType: string, sslMode: SslMode): boolean {
+  return normalizeDbType(dbType) === 'sqlserver' && sslMode !== 'disable'
+}
 
 /**
  * Convert legacy boolean SSL to new SslConfig
@@ -96,13 +99,11 @@ export function sslModeFromBackend(sslMode: string | null | undefined): SslConfi
   return { mode: 'disable' }
 }
 
-export const isValidSslMode = (mode: unknown): mode is SslMode =>
-  typeof mode === 'string' && SSL_MODES.includes(mode as SslMode)
+export function isValidSslMode(mode: unknown): mode is SslMode {
+  return typeof mode === 'string' && SSL_MODES.includes(mode as SslMode)
+}
 
-export const validateSslConfig = (
-  sslConfig: SslConfig,
-  dbType: string,
-): SslValidationError[] => {
+export function validateSslConfig(sslConfig: SslConfig, dbType: string): SslValidationError[] {
   const errors: SslValidationError[] = []
 
   if (!isValidSslMode(sslConfig.mode)) {
@@ -135,14 +136,16 @@ export const validateSslConfig = (
   return errors
 }
 
-const isValidCertPath = (path: string): boolean => {
-  if (!path || !path.trim()) return false
-  if (path.includes('..')) return false
-  if (path.length > 4096) return false
+function isValidCertPath(path: string): boolean {
+  if (!path || !path.trim())
+    return false
+  if (path.includes('..'))
+    return false
+  if (path.length > 4096)
+    return false
   return true
 }
 
-export const hasSslValidationErrors = (
-  sslConfig: SslConfig,
-  dbType: string,
-): boolean => validateSslConfig(sslConfig, dbType).length > 0
+export function hasSslValidationErrors(sslConfig: SslConfig, dbType: string): boolean {
+  return validateSslConfig(sslConfig, dbType).length > 0
+}

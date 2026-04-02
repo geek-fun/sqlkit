@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select'
 import { SSL_MODE_LABELS, SSL_MODES } from '@/types/connection'
 
-const props = defineProps<{
+defineProps<{
   error?: string
 }>()
 

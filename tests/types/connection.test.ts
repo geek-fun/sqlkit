@@ -1,3 +1,4 @@
+import type { SslConfig } from '@/types/connection'
 import {
   hasSslValidationErrors,
   isValidSslMode,
@@ -7,7 +8,6 @@ import {
   sslModeToBackend,
   validateSslConfig,
 } from '@/types/connection'
-import type { SslConfig } from '@/types/connection'
 
 describe('connection types', () => {
   describe('isValidSslMode', () => {

@@ -620,7 +620,7 @@ watch(
     <!-- Table area -->
     <div class="flex-1 relative overflow-auto">
       <!-- Connection error state -->
-      <div v-if="connectionError" class="p-4 h-full flex items-center justify-center">
+      <div v-if="connectionError" class="p-4 flex h-full items-center justify-center">
         <div class="text-center max-w-md">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground mx-auto mb-4">
             <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
@@ -646,7 +646,7 @@ watch(
       </div>
 
       <!-- Reconnecting state -->
-      <div v-else-if="isReconnecting" class="p-4 h-full flex items-center justify-center">
+      <div v-else-if="isReconnecting" class="p-4 flex h-full items-center justify-center">
         <div class="text-center">
           <svg class="text-primary mx-auto mb-2 h-8 w-8 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
