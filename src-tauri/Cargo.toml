@@ -37,7 +37,7 @@ tokio-postgres = { version = "0.7", features = [
 postgres-native-tls = "0.5"
 native-tls = "0.2"
 deadpool-postgres = "0.14"
-mysql_async = "0.34"
+mysql_async = { version = "0.34", features = [ "native-tls-tls" ] }
 tokio-native-tls = "0.3"
 tiberius = { version = "0.12", default-features = false, features = [
   "sql-browser-tokio",

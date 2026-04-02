@@ -17,7 +17,6 @@ use mysql_async::{
     prelude::*,
     Conn, OptsBuilder, Pool, PoolConstraints, PoolOpts, Row, SslOpts, Value,
 };
-use native_tls::TlsConnector;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -157,31 +156,20 @@ impl MySQLAdapter {
         // Configure SSL/TLS
         match self.config.ssl_mode {
             SslMode::Disable => {
-                // No SSL
                 opts = opts.ssl_opts(None);
             }
             SslMode::Prefer | SslMode::Require => {
-                // WARNING: Using SSL without certificate verification in Prefer/Require modes.
-                // This protects against passive eavesdropping but not active man-in-the-middle attacks.
-                // For production environments, use VerifyCA or VerifyFull modes instead.
-                let _tls_connector = TlsConnector::builder()
-                    .danger_accept_invalid_certs(true)
-                    .build()
-                    .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))?;
-
-                // Note: with_connector removed in newer mysql_async versions
-                // SSL is now handled automatically when ssl_opts is set
                 let ssl_opts = SslOpts::default();
                 opts = opts.ssl_opts(Some(ssl_opts));
             }
             SslMode::VerifyCA | SslMode::VerifyFull => {
-                // Use SSL with certificate verification for secure production environments
-                let _tls_connector = TlsConnector::builder()
-                    .danger_accept_invalid_certs(false)
-                    .build()
-                    .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))?;
+                let mut ssl_opts = SslOpts::default();
 
-                let ssl_opts = SslOpts::default();
+                if let Some(ref ca_cert) = self.config.ssl_ca_cert {
+                    let ca_path: std::path::PathBuf = ca_cert.into();
+                    ssl_opts = ssl_opts.with_root_certs(vec![ca_path.into()]);
+                }
+
                 opts = opts.ssl_opts(Some(ssl_opts));
             }
         }

@@ -252,6 +252,28 @@ describe('connectionStore', () => {
 
         expect(store.connections[0].type).toBe(DatabaseType.POSTGRESQL)
       })
+
+      it('maps ssl_mode from backend to SslConfig', async () => {
+        connectionApi.list.mockResolvedValue([
+          { id: '1', name: 'Test', db_type: 'PostgreSQL', host: 'localhost', port: 5432, ssl_mode: 'prefer' },
+        ])
+
+        const store = useConnectionStore()
+        await store.fetchConnections()
+
+        expect(store.connections[0].ssl).toEqual({ mode: 'prefer' })
+      })
+
+      it('handles null ssl_mode from backend', async () => {
+        connectionApi.list.mockResolvedValue([
+          { id: '1', name: 'Test', db_type: 'PostgreSQL', host: 'localhost', port: 5432, ssl_mode: null },
+        ])
+
+        const store = useConnectionStore()
+        await store.fetchConnections()
+
+        expect(store.connections[0].ssl).toEqual({ mode: 'disable' })
+      })
     })
 
     describe('saveConnection', () => {

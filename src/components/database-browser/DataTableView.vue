@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { toast } from '@/composables/useNotifications'
+import { ConnectionStatus, useConnectionStore } from '@/store'
 import {
   computeOffset,
   computeTotalPages,
@@ -76,6 +77,11 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const executionTimeMs = ref<number | null>(null)
 const columnInfoList = ref<ColumnTypeInfo[]>([])
+
+// --- Connection state ---
+const connectionStore = useConnectionStore()
+const isReconnecting = ref(false)
+const connectionError = ref<string | null>(null)
 
 // --- Delete state ---
 const deleteDialogOpen = ref(false)
@@ -193,8 +199,41 @@ async function fetchCount() {
   }
 }
 
+/** Check if connection is active and reconnect if needed */
+async function ensureConnection(): Promise<boolean> {
+  const status = connectionStore.getConnectionStatus(props.connectionId)
+
+  if (status === ConnectionStatus.CONNECTED) {
+    return true
+  }
+
+  // Try to reconnect
+  isReconnecting.value = true
+  connectionError.value = null
+
+  try {
+    await connectionStore.connect(props.connectionId)
+    isReconnecting.value = false
+    return true
+  }
+  catch (err) {
+    isReconnecting.value = false
+    connectionError.value = err instanceof Error ? err.message : String(err)
+    return false
+  }
+}
+
 async function refresh() {
   await Promise.all([fetchData(), fetchCount()])
+}
+
+async function handleRetry() {
+  connectionError.value = null
+  const connected = await ensureConnection()
+  if (connected) {
+    fetchColumnInfo()
+    refresh()
+  }
 }
 
 async function fetchColumnInfo() {
@@ -413,20 +452,28 @@ async function confirmEdit() {
 const formatValue = formatTableValue
 const isNullValue = isTableNullValue
 
-onMounted(() => {
-  fetchColumnInfo()
-  refresh()
+onMounted(async () => {
+  const connected = await ensureConnection()
+  if (connected) {
+    fetchColumnInfo()
+    refresh()
+  }
 })
 
 watch(
   () => [props.connectionId, props.tableName, props.schema] as const,
-  () => {
+  async () => {
     currentPage.value = 1
     appliedFilter.value = ''
     filterInput.value = ''
     hiddenColumns.value = new Set()
-    fetchColumnInfo()
-    refresh()
+    connectionError.value = null
+
+    const connected = await ensureConnection()
+    if (connected) {
+      fetchColumnInfo()
+      refresh()
+    }
   },
 )
 </script>
@@ -572,6 +619,45 @@ watch(
 
     <!-- Table area -->
     <div class="flex-1 relative overflow-auto">
+      <!-- Connection error state -->
+      <div v-if="connectionError" class="p-4 flex h-full items-center justify-center">
+        <div class="text-center max-w-md">
+          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground mx-auto mb-4">
+            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+            <polyline points="10 17 15 12 10 7" />
+            <line x1="15" x2="3" y1="12" y2="12" />
+          </svg>
+          <p class="text-sm text-muted-foreground mb-2">
+            {{ t('components.dataTableView.connectionLost') }}
+          </p>
+          <p class="text-xs text-muted-foreground/70 mb-4">
+            {{ connectionError }}
+          </p>
+          <Button size="sm" @click="handleRetry">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M8 16H3v5" />
+            </svg>
+            {{ t('components.dataTableView.reconnect') }}
+          </Button>
+        </div>
+      </div>
+
+      <!-- Reconnecting state -->
+      <div v-else-if="isReconnecting" class="p-4 flex h-full items-center justify-center">
+        <div class="text-center">
+          <svg class="text-primary mx-auto mb-2 h-8 w-8 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+          <p class="text-sm text-muted-foreground">
+            {{ t('components.dataTableView.reconnecting') }}
+          </p>
+        </div>
+      </div>
+
       <!-- Loading overlay -->
       <div
         v-if="loading"

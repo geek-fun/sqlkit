@@ -69,7 +69,7 @@ export class ApiErrorException extends Error {
       return formatApiError(this.apiError, t)
     }
 
-    const parts = [this.apiError.message]
+    const parts: string[] = [this.apiError.message]
 
     if (this.apiError.details) {
       parts.push(this.apiError.details)

@@ -71,7 +71,7 @@ export const useTabStore = defineStore('tabs', {
         isExecuting: false,
         hasUnsavedChanges: false,
       }
-      this.tabs.push(tab)
+      this.tabs = [...this.tabs, tab]
       this.activeTabId = tab.id
       return tab
     },
@@ -100,7 +100,7 @@ export const useTabStore = defineStore('tabs', {
         hasUnsavedChanges: false,
         tableView: { tableName, database, schema },
       }
-      this.tabs.push(tab)
+      this.tabs = [...this.tabs, tab]
       this.activeTabId = tab.id
       return tab
     },
@@ -110,7 +110,7 @@ export const useTabStore = defineStore('tabs', {
       if (index === -1)
         return
 
-      this.tabs.splice(index, 1)
+      this.tabs = [...this.tabs.slice(0, index), ...this.tabs.slice(index + 1)]
 
       if (this.activeTabId === tabId) {
         this.activeTabId = this.tabs[Math.max(0, index - 1)]?.id ?? null

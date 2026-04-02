@@ -24,6 +24,7 @@ export default antfu({
     '**/node_modules/**',
     '**/.tauri/**',
     'AGENTS.md',
+    'docs/**',
   ],
   rules: {
     'no-console': 'warn',

@@ -15,6 +15,7 @@ export const zhCN = {
       createConnection: '创建连接',
       testConnection: '测试连接',
       dismiss: '关闭',
+      browse: '浏览',
     },
     status: {
       connected: '已连接',
@@ -24,6 +25,30 @@ export const zhCN = {
       testing: '正在测试连接...',
       success: '连接成功！',
       failed: '连接失败',
+    },
+  },
+  ssl: {
+    mode: {
+      label: 'SSL/TLS 模式',
+      placeholder: '选择 SSL 模式',
+      disable: '禁用 SSL',
+      prefer: '优先 SSL（尝试加密）',
+      require: '强制 SSL（始终加密）',
+      verifyca: '验证 CA（验证证书）',
+      verifyfull: '完全验证（验证所有）',
+    },
+    certSettings: {
+      title: '证书设置',
+      caCert: 'CA 证书',
+      caCertPlaceholder: 'CA 证书路径',
+      clientCert: '客户端证书',
+      clientCertPlaceholder: '客户端证书路径',
+      clientKey: '客户端私钥',
+      clientKeyPlaceholder: '客户端私钥路径',
+    },
+    sqlServer: {
+      trustServerCert: '信任服务器证书',
+      trustServerCertHint: '接受自签名证书',
     },
   },
   pages: {
@@ -298,6 +323,9 @@ export const zhCN = {
       applyFilters: '应用过滤',
       loading: '正在加载表数据...',
       error: '加载表数据失败',
+      connectionLost: '连接已断开。数据库连接已关闭。',
+      reconnecting: '正在重新连接...',
+      reconnect: '重新连接',
       noRows: '未找到行',
       rows: '行',
       page: '第 {page} 页，共 {total} 页',
