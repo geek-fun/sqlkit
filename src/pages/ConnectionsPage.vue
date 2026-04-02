@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { ServerCard, ServerFormDialog } from '@/components/connections'
+import ConnectingModal from '@/components/connections/ConnectingModal.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import {
   AlertDialog,
@@ -20,6 +21,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { ConnectionStatus, useConnectionStore } from '@/store'
 
+const MIN_LOADING_TIME = 1500
+
 const { t } = useI18n()
 const router = useRouter()
 const connectionStore = useConnectionStore()
@@ -31,6 +34,8 @@ const editingConnection = ref<ServerConnection | null>(null)
 const deleteDialogOpen = ref(false)
 const connectionToDelete = ref<ServerConnection | null>(null)
 const connectError = ref<string | null>(null)
+const connectionCancelled = ref(false)
+const connectingModal = ref<InstanceType<typeof ConnectingModal> | null>(null)
 
 const filteredConnections = computed(() => {
   if (!searchQuery.value.trim()) {
@@ -64,6 +69,69 @@ function handleEditConnection(connection: ServerConnection) {
   isFormDialogOpen.value = true
 }
 
+async function establishConnection(connection: ServerConnection, navigateOnSuccess = true) {
+  if (!connection.id) {
+    return
+  }
+
+  connectionCancelled.value = false
+
+  connectingModal.value?.show(
+    connection.name,
+    () => {
+      connectionCancelled.value = true
+    },
+    () => establishConnection(connection, navigateOnSuccess),
+  )
+
+  const startTime = Date.now()
+
+  try {
+    await connectionStore.connect(connection.id)
+
+    if (connectionCancelled.value) {
+      return
+    }
+
+    const elapsed = Date.now() - startTime
+    const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsed)
+    if (remainingTime > 0) {
+      await new Promise(resolve => setTimeout(resolve, remainingTime))
+    }
+
+    if (connectionCancelled.value) {
+      return
+    }
+
+    connectingModal.value?.hide()
+
+    if (navigateOnSuccess) {
+      router.push({
+        name: 'queries',
+        query: { connectionId: connection.id },
+      })
+    }
+  }
+  catch (err) {
+    if (connectionCancelled.value) {
+      return
+    }
+
+    const elapsed = Date.now() - startTime
+    const remainingTime = Math.max(0, MIN_LOADING_TIME - elapsed)
+    if (remainingTime > 0) {
+      await new Promise(resolve => setTimeout(resolve, remainingTime))
+    }
+
+    if (connectionCancelled.value) {
+      return
+    }
+
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    connectingModal.value?.showError(errorMessage)
+  }
+}
+
 async function handleConnect(connection: ServerConnection) {
   connectError.value = null
   if (!connection.id) {
@@ -81,16 +149,26 @@ async function handleConnect(connection: ServerConnection) {
     }
   }
   else {
-    try {
-      await connectionStore.connect(connection.id)
-      router.push({
-        name: 'queries',
-        query: { connectionId: connection.id },
-      })
-    }
-    catch (error) {
-      connectError.value = error instanceof Error ? error.message : String(error)
-    }
+    await establishConnection(connection, true)
+  }
+}
+
+async function handleDoubleClick(connection: ServerConnection) {
+  connectError.value = null
+  if (!connection.id) {
+    return
+  }
+
+  const status = connectionStore.getConnectionStatus(connection.id)
+
+  if (status === ConnectionStatus.CONNECTED) {
+    router.push({
+      name: 'queries',
+      query: { connectionId: connection.id },
+    })
+  }
+  else {
+    await establishConnection(connection, true)
   }
 }
 
@@ -385,6 +463,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
               :connection="connection"
               :connection-status="getConnectionStatus(connection.id)"
               @connect="handleConnect"
+              @dblclick="handleDoubleClick"
               @edit="handleEditConnection"
               @delete="handleDeleteConnection"
               @duplicate="handleDuplicateConnection"
@@ -504,5 +583,8 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <!-- Connecting Modal -->
+    <ConnectingModal ref="connectingModal" />
   </AppLayout>
 </template>

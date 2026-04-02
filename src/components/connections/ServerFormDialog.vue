@@ -14,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { DatabaseType, resolveDatabase } from '@/store'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import SslConfigSection from './ssl/SslConfigSection.vue'
@@ -29,6 +30,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const { getDatabaseIcon } = useDatabaseIcon()
 
 const isOpen = computed({
   get: () => props.open,
@@ -229,19 +231,34 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
             </SelectTrigger>
             <SelectContent>
               <SelectItem :value="DatabaseType.POSTGRESQL">
-                {{ t('components.serverForm.databaseTypes.postgresql') }}
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.POSTGRESQL)" alt="PostgreSQL" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.postgresql') }}
+                </div>
               </SelectItem>
               <SelectItem :value="DatabaseType.SQLSERVER">
-                {{ t('components.serverForm.databaseTypes.sqlserver') }}
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.SQLSERVER)" alt="SQL Server" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.sqlserver') }}
+                </div>
               </SelectItem>
               <SelectItem :value="DatabaseType.MYSQL">
-                {{ t('components.serverForm.databaseTypes.mysql') }}
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.MYSQL)" alt="MySQL" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.mysql') }}
+                </div>
               </SelectItem>
               <SelectItem :value="DatabaseType.MARIADB">
-                {{ t('components.serverForm.databaseTypes.mariadb') }}
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.MARIADB)" alt="MariaDB" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.mariadb') }}
+                </div>
               </SelectItem>
               <SelectItem :value="DatabaseType.SQLITE">
-                {{ t('components.serverForm.databaseTypes.sqlite') }}
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.SQLITE)" alt="SQLite" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.sqlite') }}
+                </div>
               </SelectItem>
             </SelectContent>
           </Select>

@@ -16,6 +16,7 @@ export const enUS = {
       testConnection: 'Test Connection',
       dismiss: 'Dismiss',
       browse: 'Browse',
+      retry: 'Retry',
     },
     status: {
       connected: 'Connected',
@@ -284,11 +285,11 @@ export const enUS = {
         password: '••••••••',
       },
       databaseTypes: {
-        postgresql: '🐘 PostgreSQL',
-        sqlserver: '🔷 SQL Server',
-        mysql: '🐬 MySQL',
-        mariadb: '🦭 MariaDB',
-        sqlite: '📦 SQLite',
+        postgresql: 'PostgreSQL',
+        sqlserver: 'SQL Server',
+        mysql: 'MySQL',
+        mariadb: 'MariaDB',
+        sqlite: 'SQLite',
       },
       errors: {
         nameRequired: 'Connection name is required',
@@ -304,6 +305,11 @@ export const enUS = {
         duplicate: 'Duplicate',
         delete: 'Delete',
       },
+    },
+    connectingModal: {
+      connecting: 'Connecting to {name}...',
+      connectingSubtext: 'Please wait while establishing the connection',
+      connectionError: 'Connection Error',
     },
     databaseBrowser: {
       title: 'Database Browser',

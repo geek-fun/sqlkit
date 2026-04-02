@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { ConnectionStatus, DatabaseType } from '@/store'
 
 const props = defineProps<{
@@ -22,28 +23,14 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'connect', connection: ServerConnection): void
+  (e: 'dblclick', connection: ServerConnection): void
   (e: 'edit', connection: ServerConnection): void
   (e: 'delete', connection: ServerConnection): void
   (e: 'duplicate', connection: ServerConnection): void
 }>()
 
 const { t } = useI18n()
-
-const databaseTypeColors: Record<DatabaseType, string> = {
-  [DatabaseType.POSTGRESQL]: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  [DatabaseType.MYSQL]: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-  [DatabaseType.MARIADB]: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  [DatabaseType.SQLITE]: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  [DatabaseType.SQLSERVER]: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-}
-
-const databaseIcons: Record<DatabaseType, string> = {
-  [DatabaseType.POSTGRESQL]: '🐘',
-  [DatabaseType.MYSQL]: '🐬',
-  [DatabaseType.MARIADB]: '🦭',
-  [DatabaseType.SQLITE]: '📦',
-  [DatabaseType.SQLSERVER]: '🔷',
-}
+const { getDatabaseIcon, getDatabaseColor } = useDatabaseIcon()
 
 const statusColor = computed(() => {
   switch (props.connectionStatus) {
@@ -82,13 +69,14 @@ const connectionUrl = computed(() => {
 })
 
 const handleConnect = () => emit('connect', props.connection)
+const handleDoubleClick = () => emit('dblclick', props.connection)
 const handleEdit = () => emit('edit', props.connection)
 const handleDelete = () => emit('delete', props.connection)
 const handleDuplicate = () => emit('duplicate', props.connection)
 </script>
 
 <template>
-  <Card class="transition-shadow relative overflow-hidden hover:shadow-md">
+  <Card class="cursor-pointer transition-shadow relative overflow-hidden hover:shadow-md" @dblclick="handleDoubleClick">
     <!-- Status indicator dot -->
     <TooltipProvider>
       <Tooltip>
@@ -105,13 +93,17 @@ const handleDuplicate = () => emit('duplicate', props.connection)
     </TooltipProvider>
 
     <div class="p-4 space-y-3">
-      <!-- Database type badge icon -->
+      <!-- Database type icon -->
       <div class="flex items-start justify-between">
         <div
-          class="text-xl rounded-lg flex h-10 w-10 items-center justify-center"
-          :class="databaseTypeColors[connection.type]"
+          class="p-1.5 rounded-lg flex h-10 w-10 items-center justify-center"
+          :class="getDatabaseColor(connection.type)"
         >
-          {{ databaseIcons[connection.type] }}
+          <img
+            :src="getDatabaseIcon(connection.type)"
+            :alt="connection.type"
+            class="h-full w-full object-contain"
+          >
         </div>
       </div>
 

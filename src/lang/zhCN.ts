@@ -16,6 +16,7 @@ export const zhCN = {
       testConnection: '测试连接',
       dismiss: '关闭',
       browse: '浏览',
+      retry: '重试',
     },
     status: {
       connected: '已连接',
@@ -252,11 +253,11 @@ export const zhCN = {
         password: '••••••••',
       },
       databaseTypes: {
-        postgresql: '🐘 PostgreSQL',
-        sqlserver: '🔷 SQL Server',
-        mysql: '🐬 MySQL',
-        mariadb: '🦭 MariaDB',
-        sqlite: '📦 SQLite',
+        postgresql: 'PostgreSQL',
+        sqlserver: 'SQL Server',
+        mysql: 'MySQL',
+        mariadb: 'MariaDB',
+        sqlite: 'SQLite',
       },
       errors: {
         nameRequired: '连接名称是必填项',
@@ -272,6 +273,11 @@ export const zhCN = {
         duplicate: '复制',
         delete: '删除',
       },
+    },
+    connectingModal: {
+      connecting: '正在连接 {name}...',
+      connectingSubtext: '正在建立连接，请稍候',
+      connectionError: '连接错误',
     },
     databaseBrowser: {
       title: '数据库浏览器',
