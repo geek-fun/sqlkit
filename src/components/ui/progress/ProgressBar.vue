@@ -1,5 +1,5 @@
 <script setup lang="ts">
-interface Props {
+type Props = {
   visible?: boolean
   indeterminate?: boolean
 }

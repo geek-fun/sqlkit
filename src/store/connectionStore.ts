@@ -44,7 +44,7 @@ export enum ConnectionStatus {
   ERROR = 'error',
 }
 
-export interface SSHTunnelConfig {
+export type SSHTunnelConfig = {
   enabled: boolean
   host: string
   port: number
@@ -54,7 +54,7 @@ export interface SSHTunnelConfig {
   privateKey?: string
 }
 
-export interface ServerConnection {
+export type ServerConnection = {
   id?: string
   name: string
   type: DatabaseType
@@ -69,7 +69,7 @@ export interface ServerConnection {
   lastUsed?: Date
 }
 
-interface ConnectionStoreState {
+type ConnectionStoreState = {
   connections: ServerConnection[]
   activeConnectionId: string | null
   connectionStatus: Record<string, ConnectionStatus>

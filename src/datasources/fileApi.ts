@@ -1,13 +1,13 @@
 import { invoke } from '@tauri-apps/api/core'
 import { save as showSaveDialog } from '@tauri-apps/plugin-dialog'
 
-export interface SaveResult {
+export type SaveResult = {
   success: boolean
   file_path?: string
   message: string
 }
 
-export interface LoadResult {
+export type LoadResult = {
   success: boolean
   content?: string
   message: string

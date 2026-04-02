@@ -2,7 +2,7 @@ import { ref } from 'vue'
 
 type ToastType = 'success' | 'error' | 'info'
 
-interface Toast {
+type Toast = {
   id: number
   type: ToastType
   title: string

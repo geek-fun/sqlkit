@@ -3,14 +3,35 @@
 //! This module provides Tauri commands for browsing database metadata,
 //! including databases, schemas, tables, columns, and table data.
 
-use crate::database::{DatabaseAdapter, PostgresAdapter, MySQLAdapter, SqlServerAdapter, ColumnInfo, QueryResult, TableInfo};
+use crate::database::{
+    ColumnInfo, DatabaseAdapter, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter,
+    TableInfo,
+};
 use crate::state::{ActiveConnection, AppState};
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use tauri::State;
 
+/// Parameters for table data queries.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TableDataQuery {
+    /// Database name (optional, uses connection default if not specified).
+    pub database: Option<String>,
+    /// Table name.
+    pub table: String,
+    /// Schema name (optional).
+    pub schema: Option<String>,
+    /// SQL WHERE clause filter (optional).
+    pub filter: Option<String>,
+    /// Row limit (defaults to 100).
+    pub limit: Option<u32>,
+    /// Row offset for pagination (defaults to 0).
+    pub offset: Option<u32>,
+}
+
 /// Quote identifier for safe SQL interpolation.
-/// 
+///
 /// This function quotes identifiers according to the database type to prevent
 /// SQL injection when building queries with table/column names.
 fn quote_identifier(identifier: &str, db_type: &str) -> String {
@@ -90,9 +111,7 @@ pub async fn list_databases(
     connection_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    let connections = state
-        .connections
-        .lock().await;
+    let connections = state.connections.lock().await;
 
     let connection = connections
         .get(&connection_id)
@@ -101,18 +120,15 @@ pub async fn list_databases(
     // Get databases based on connection type
     let databases = match connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
         ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
         ActiveConnection::SQLite(_) => {
@@ -142,9 +158,7 @@ pub async fn list_schemas(
     database: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    let connections = state
-        .connections
-        .lock().await;
+    let connections = state.connections.lock().await;
 
     let connection = connections
         .get(&connection_id)
@@ -153,8 +167,7 @@ pub async fn list_schemas(
     // Get schemas based on connection type
     let schemas = match connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter.list_schemas(Some(&database)).await
         }
         ActiveConnection::MySQL(_) => {
@@ -162,8 +175,7 @@ pub async fn list_schemas(
             return Ok(vec![database]);
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter.list_schemas(Some(&database)).await
         }
         ActiveConnection::SQLite(_) => {
@@ -195,9 +207,7 @@ pub async fn list_tables(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<TableInfo>, String> {
-    let connections = state
-        .connections
-        .lock().await;
+    let connections = state.connections.lock().await;
 
     let connection = connections
         .get(&connection_id)
@@ -206,29 +216,25 @@ pub async fn list_tables(
     // Get tables based on connection type
     let tables = match connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter
                 .list_tables(Some(&database), schema.as_deref())
                 .await
         }
         ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter
                 .list_tables(Some(&database), schema.as_deref())
                 .await
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter
                 .list_tables(Some(&database), schema.as_deref())
                 .await
         }
         ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter.list_tables(None, None).await
         }
     }
@@ -258,9 +264,7 @@ pub async fn get_table_info(
     table_name: String,
     state: State<'_, AppState>,
 ) -> Result<TableInfo, String> {
-    let connections = state
-        .connections
-        .lock().await;
+    let connections = state.connections.lock().await;
 
     let connection = connections
         .get(&connection_id)
@@ -269,29 +273,25 @@ pub async fn get_table_info(
     // Get table info based on connection type
     let table_info = match connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter
                 .get_table_info(Some(&database), schema.as_deref(), &table_name)
                 .await
         }
         ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter
                 .get_table_info(Some(&database), None, &table_name)
                 .await
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter
                 .get_table_info(Some(&database), schema.as_deref(), &table_name)
                 .await
         }
         ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter
-                .lock().await;
+            let adapter = adapter.lock().await;
             adapter.get_table_info(None, None, &table_name).await
         }
     }
@@ -322,15 +322,22 @@ pub async fn list_columns(
                 drop(adapter);
                 temp_config.database = Some(database.clone());
                 let mut temp = PostgresAdapter::new(temp_config);
-                temp.connect().await.map_err(|e| format!("Failed to connect: {}", e))?;
-                temp.list_columns(None, schema.as_deref(), &table_name).await
+                temp.connect()
+                    .await
+                    .map_err(|e| format!("Failed to connect: {}", e))?;
+                temp.list_columns(None, schema.as_deref(), &table_name)
+                    .await
             } else {
-                adapter.list_columns(None, schema.as_deref(), &table_name).await
+                adapter
+                    .list_columns(None, schema.as_deref(), &table_name)
+                    .await
             }
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_columns(Some(&database), None, &table_name).await
+            adapter
+                .list_columns(Some(&database), None, &table_name)
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
@@ -339,10 +346,15 @@ pub async fn list_columns(
                 drop(adapter);
                 temp_config.database = Some(database.clone());
                 let mut temp = SqlServerAdapter::new(temp_config);
-                temp.connect().await.map_err(|e| format!("Failed to connect: {}", e))?;
-                temp.list_columns(None, schema.as_deref(), &table_name).await
+                temp.connect()
+                    .await
+                    .map_err(|e| format!("Failed to connect: {}", e))?;
+                temp.list_columns(None, schema.as_deref(), &table_name)
+                    .await
             } else {
-                adapter.list_columns(None, schema.as_deref(), &table_name).await
+                adapter
+                    .list_columns(None, schema.as_deref(), &table_name)
+                    .await
             }
         }
         ActiveConnection::SQLite(adapter) => {
@@ -360,11 +372,7 @@ pub async fn list_columns(
 /// # Arguments
 ///
 /// * `connection_id` - ID of the active connection
-/// * `table` - Table name
-/// * `schema` - Optional schema (or database for MySQL)
-/// * `filter` - Optional SQL WHERE clause expression
-/// * `limit` - Row limit per page (defaults to 100)
-/// * `offset` - Row offset for pagination (defaults to 0)
+/// * `query` - Table data query parameters
 /// * `state` - Application state
 ///
 /// # Returns
@@ -373,74 +381,83 @@ pub async fn list_columns(
 #[tauri::command]
 pub async fn get_table_data(
     connection_id: String,
-    database: Option<String>,
-    table: String,
-    schema: Option<String>,
-    filter: Option<String>,
-    limit: Option<u32>,
-    offset: Option<u32>,
+    query: TableDataQuery,
     state: State<'_, AppState>,
 ) -> Result<QueryResult, String> {
-    let connections = state
-        .connections
-        .lock().await;
+    let connections = state.connections.lock().await;
 
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
 
-    let limit_val = limit.unwrap_or(100);
-    let offset_val = offset.unwrap_or(0);
-    let filter_ref = filter.as_deref();
+    let limit_val = query.limit.unwrap_or(100);
+    let offset_val = query.offset.unwrap_or(0);
+    let filter_ref = query.filter.as_deref();
 
     // Execute query based on connection type with proper identifier quoting
     let result = match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "postgres");
-            let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "postgres");
+            let qualified =
+                build_qualified_table(query.schema.as_deref(), &query.table, "postgres");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "postgres");
             // If a different database is requested, create a temporary connection to it.
-            if let Some(ref db) = database {
+            if let Some(ref db) = query.database {
                 if Some(db.as_str()) != adapter.config.database.as_deref() {
                     let mut temp_config = adapter.config.clone();
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = PostgresAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp.execute_query(&query).await.map_err(|e| format!("Failed to get table data: {}", e));
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp
+                        .execute_query(&sql)
+                        .await
+                        .map_err(|e| format!("Failed to get table data: {}", e));
                 }
             }
-            adapter.execute_query(&query).await
+            adapter.execute_query(&sql).await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "mysql");
-            let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "mysql");
-            adapter.execute_query(&query).await
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "mysql");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "mysql");
+            adapter.execute_query(&sql).await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlserver");
-            let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlserver");
+            let qualified =
+                build_qualified_table(query.schema.as_deref(), &query.table, "sqlserver");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlserver");
             // If a different database is requested, create a temporary connection to it.
-            if let Some(ref db) = database {
+            if let Some(ref db) = query.database {
                 if Some(db.as_str()) != adapter.config.database.as_deref() {
                     let mut temp_config = adapter.config.clone();
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = SqlServerAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp.execute_query(&query).await.map_err(|e| format!("Failed to get table data: {}", e));
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp
+                        .execute_query(&sql)
+                        .await
+                        .map_err(|e| format!("Failed to get table data: {}", e));
                 }
             }
-            adapter.execute_query(&query).await
+            adapter.execute_query(&sql).await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
             // SQLite has no schemas
-            let qualified = build_qualified_table(None, &table, "sqlite");
-            let query = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
-            adapter.execute_query(&query).await
+            let qualified = build_qualified_table(None, &query.table, "sqlite");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
+            adapter.execute_query(&sql).await
         }
     }
     .map_err(|e| format!("Failed to get table data: {}", e))?;
@@ -470,9 +487,7 @@ pub async fn get_table_count(
     filter: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<u64, String> {
-    let connections = state
-        .connections
-        .lock().await;
+    let connections = state.connections.lock().await;
 
     let connection = connections
         .get(&connection_id)
@@ -491,8 +506,13 @@ pub async fn get_table_count(
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = PostgresAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    let r = temp.execute_query(&query).await.map_err(|e| format!("Failed to get table count: {}", e))?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    let r = temp
+                        .execute_query(&query)
+                        .await
+                        .map_err(|e| format!("Failed to get table count: {}", e))?;
                     return extract_count(r);
                 }
             }
@@ -514,8 +534,13 @@ pub async fn get_table_count(
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = SqlServerAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    let r = temp.execute_query(&query).await.map_err(|e| format!("Failed to get table count: {}", e))?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    let r = temp
+                        .execute_query(&query)
+                        .await
+                        .map_err(|e| format!("Failed to get table count: {}", e))?;
                     return extract_count(r);
                 }
             }
@@ -544,7 +569,13 @@ pub async fn get_table_count(
 fn json_value_to_sql_literal(val: &JsonValue) -> String {
     match val {
         JsonValue::Null => "NULL".to_string(),
-        JsonValue::Bool(b) => if *b { "TRUE".to_string() } else { "FALSE".to_string() },
+        JsonValue::Bool(b) => {
+            if *b {
+                "TRUE".to_string()
+            } else {
+                "FALSE".to_string()
+            }
+        }
         JsonValue::Number(n) => n.to_string(),
         JsonValue::String(s) => format!("'{}'", s.replace('\'', "''")),
         JsonValue::Array(_) | JsonValue::Object(_) => {
@@ -632,11 +663,20 @@ pub async fn update_table_row(
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = PostgresAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to update row: {}", e));
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp
+                        .execute_query(&sql)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| format!("Failed to update row: {}", e));
                 }
             }
-            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
@@ -647,11 +687,20 @@ pub async fn update_table_row(
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = MySQLAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to update row: {}", e));
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp
+                        .execute_query(&sql)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| format!("Failed to update row: {}", e));
                 }
             }
-            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
@@ -662,16 +711,28 @@ pub async fn update_table_row(
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = SqlServerAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to update row: {}", e));
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp
+                        .execute_query(&sql)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| format!("Failed to update row: {}", e));
                 }
             }
-            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_update_sql("sqlite")?;
-            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to update row: {}", e))?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
         }
     }
 
@@ -721,11 +782,20 @@ pub async fn delete_table_row(
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = PostgresAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to delete row: {}", e));
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp
+                        .execute_query(&sql)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| format!("Failed to delete row: {}", e));
                 }
             }
-            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
@@ -736,11 +806,20 @@ pub async fn delete_table_row(
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = MySQLAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to delete row: {}", e));
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp
+                        .execute_query(&sql)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| format!("Failed to delete row: {}", e));
                 }
             }
-            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
@@ -751,16 +830,28 @@ pub async fn delete_table_row(
                     drop(adapter);
                     temp_config.database = Some(db.clone());
                     let mut temp = SqlServerAdapter::new(temp_config);
-                    temp.connect().await.map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp.execute_query(&sql).await.map(|_| ()).map_err(|e| format!("Failed to delete row: {}", e));
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
+                    return temp
+                        .execute_query(&sql)
+                        .await
+                        .map(|_| ())
+                        .map_err(|e| format!("Failed to delete row: {}", e));
                 }
             }
-            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_delete_sql("sqlite");
-            adapter.execute_query(&sql).await.map_err(|e| format!("Failed to delete row: {}", e))?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
     }
 
@@ -783,148 +874,88 @@ fn extract_count(result: QueryResult) -> Result<u64, String> {
 
 // Tests for browse commands are temporarily disabled.
 // TODO: Convert to integration tests with full Tauri context support.
-// When re-enabling, remove the #[ignore] attribute or convert to integration tests.
+// The tests below require a Tauri State which cannot be created in unit tests.
+// Integration tests should be added in src-tauri/tests/ directory.
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::commands::connection::connect_server;
-    use crate::commands::query::execute_query;
-    use crate::state::{AppState, ServerConfig};
 
-    fn create_test_state() -> AppState {
-        AppState::new()
+    #[test]
+    fn test_quote_identifier() {
+        assert_eq!(quote_identifier("table", "postgres"), "\"table\"");
+        assert_eq!(quote_identifier("table", "mysql"), "`table`");
+        assert_eq!(quote_identifier("table", "sqlserver"), "[table]");
+        assert_eq!(quote_identifier("table", "sqlite"), "\"table\"");
     }
 
-    async fn setup_connection(state: &AppState) -> String {
-        let server = ServerConfig::new(
-            "Test Server".to_string(),
-            "sqlite".to_string(),
-            ":memory:".to_string(),
-            0,
-            "".to_string(),
+    #[test]
+    fn test_quote_identifier_with_special_chars() {
+        assert_eq!(quote_identifier("ta\"ble", "postgres"), "\"ta\"\"ble\"");
+        assert_eq!(quote_identifier("ta`ble", "mysql"), "`ta``ble`");
+        assert_eq!(quote_identifier("ta]ble", "sqlserver"), "[ta]]ble]");
+    }
+
+    #[test]
+    fn test_build_qualified_table() {
+        assert_eq!(
+            build_qualified_table(Some("schema"), "table", "postgres"),
+            "\"schema\".\"table\""
         );
-        let server_id = server.id.clone();
-
-        // Save server
-        {
-            let mut config = state.config.blocking_lock();
-            config.servers.insert(server_id.clone(), server);
-        }
-
-        // Connect
-        connect_server(server_id.clone(), State::from(state))
-            .await
-            .unwrap();
-
-        server_id
+        assert_eq!(
+            build_qualified_table(None, "table", "postgres"),
+            "\"table\""
+        );
     }
 
-    #[tokio::test]
-    #[ignore] // Requires Tauri context - convert to integration test
-    async fn test_list_databases() {
-        let state = create_test_state();
-        let conn_id = setup_connection(&state).await;
+    #[test]
+    fn test_build_paginated_select() {
+        let query = build_paginated_select("\"table\"", None, 10, 0, "postgres");
+        assert!(query.contains("LIMIT 10"));
+        assert!(query.contains("OFFSET 0"));
 
-        let result = list_databases(conn_id, State::from(&state)).await;
-        assert!(result.is_ok());
-        let databases = result.unwrap();
-        assert!(databases.contains(&"main".to_string()));
+        let query_with_filter =
+            build_paginated_select("\"table\"", Some("id = 1"), 10, 5, "postgres");
+        assert!(query_with_filter.contains("WHERE id = 1"));
+        assert!(query_with_filter.contains("OFFSET 5"));
     }
 
-    #[tokio::test]
-    #[ignore] // Requires Tauri context - convert to integration test
-    async fn test_list_schemas() {
-        let state = create_test_state();
-        let conn_id = setup_connection(&state).await;
+    #[test]
+    fn test_build_count_query() {
+        let query = build_count_query("\"table\"", None);
+        assert_eq!(query, "SELECT COUNT(*) FROM \"table\"");
 
-        let result = list_schemas(conn_id, "main".to_string(), State::from(&state)).await;
-        assert!(result.is_ok());
+        let query_with_filter = build_count_query("\"table\"", Some("id = 1"));
+        assert_eq!(
+            query_with_filter,
+            "SELECT COUNT(*) FROM \"table\" WHERE id = 1"
+        );
     }
 
-    #[tokio::test]
-    #[ignore] // Requires Tauri context - convert to integration test
-    async fn test_list_tables() {
-        let state = create_test_state();
-        let conn_id = setup_connection(&state).await;
+    #[test]
+    fn test_json_value_to_sql_literal() {
+        use serde_json::json;
 
-        // Create a test table
-        execute_query(
-            conn_id.clone(),
-            "CREATE TABLE test (id INTEGER, name TEXT)".to_string(),
-            State::from(&state),
-        )
-        .await
-        .unwrap();
-
-        let result = list_tables(conn_id, "main".to_string(), None, State::from(&state)).await;
-        assert!(result.is_ok());
-        let tables = result.unwrap();
-        assert!(tables.iter().any(|t| t.name == "test"));
+        assert_eq!(json_value_to_sql_literal(&json!(null)), "NULL");
+        assert_eq!(json_value_to_sql_literal(&json!(true)), "TRUE");
+        assert_eq!(json_value_to_sql_literal(&json!(false)), "FALSE");
+        assert_eq!(json_value_to_sql_literal(&json!(42)), "42");
+        assert_eq!(json_value_to_sql_literal(&json!("hello")), "'hello'");
+        assert_eq!(json_value_to_sql_literal(&json!("it's")), "'it''s'");
     }
 
-    #[tokio::test]
-    #[ignore] // Requires Tauri context - convert to integration test
-    async fn test_get_table_info() {
-        let state = create_test_state();
-        let conn_id = setup_connection(&state).await;
+    #[test]
+    fn test_build_pk_where() {
+        use serde_json::json;
+        use std::collections::HashMap;
 
-        // Create a test table
-        execute_query(
-            conn_id.clone(),
-            "CREATE TABLE test (id INTEGER PRIMARY KEY, name TEXT NOT NULL)".to_string(),
-            State::from(&state),
-        )
-        .await
-        .unwrap();
+        let mut pk_values = HashMap::new();
+        pk_values.insert("id".to_string(), json!(1));
+        pk_values.insert("name".to_string(), json!("test"));
 
-        let result = get_table_info(
-            conn_id,
-            "main".to_string(),
-            None,
-            "test".to_string(),
-            State::from(&state),
-        )
-        .await;
-        assert!(result.is_ok());
-        let table_info = result.unwrap();
-        assert_eq!(table_info.name, "test");
-        assert_eq!(table_info.columns.len(), 2);
-    }
-
-    #[tokio::test]
-    #[ignore] // Requires Tauri context - convert to integration test
-    async fn test_get_table_data() {
-        let state = create_test_state();
-        let conn_id = setup_connection(&state).await;
-
-        // Create and populate test table
-        execute_query(
-            conn_id.clone(),
-            "CREATE TABLE test (id INTEGER, name TEXT)".to_string(),
-            State::from(&state),
-        )
-        .await
-        .unwrap();
-        execute_query(
-            conn_id.clone(),
-            "INSERT INTO test VALUES (1, 'Alice'), (2, 'Bob'), (3, 'Charlie')".to_string(),
-            State::from(&state),
-        )
-        .await
-        .unwrap();
-
-        // Get all data
-        let result = get_table_data(conn_id.clone(), "test".to_string(), None, State::from(&state))
-            .await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.rows.len(), 3);
-
-        // Get limited data
-        let result =
-            get_table_data(conn_id.clone(), "test".to_string(), Some(2), State::from(&state)).await;
-        assert!(result.is_ok());
-        let data = result.unwrap();
-        assert_eq!(data.rows.len(), 2);
+        let where_clause = build_pk_where(&pk_values, "postgres");
+        // Order may vary, so just check both parts are present
+        assert!(where_clause.contains("\"id\" = 1"));
+        assert!(where_clause.contains("\"name\" = 'test'"));
+        assert!(where_clause.contains(" AND "));
     }
 }

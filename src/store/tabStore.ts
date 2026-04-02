@@ -5,7 +5,7 @@ import { isApiError, isApiSuccess } from '@/types/api'
 import { useConnectionStore } from './connectionStore'
 import { useHistoryStore } from './historyStore'
 
-export interface QueryResult {
+export type QueryResult = {
   columns: string[]
   rows: Record<string, unknown>[]
   rowCount: number
@@ -13,13 +13,13 @@ export interface QueryResult {
   executionTimeMs?: number
 }
 
-export interface TableViewMeta {
+export type TableViewMeta = {
   tableName: string
   database: string
   schema?: string
 }
 
-export interface QueryTab {
+export type QueryTab = {
   id: string
   name: string
   content: string
@@ -34,7 +34,7 @@ export interface QueryTab {
   tableView?: TableViewMeta
 }
 
-interface TabStoreState {
+type TabStoreState = {
   tabs: QueryTab[]
   activeTabId: string | null
 }

@@ -56,13 +56,7 @@ pub struct ServerConfig {
 
 impl ServerConfig {
     /// Create a new server configuration.
-    pub fn new(
-        name: String,
-        db_type: String,
-        host: String,
-        port: u16,
-        username: String,
-    ) -> Self {
+    pub fn new(name: String, db_type: String, host: String, port: u16, username: String) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
             name,
@@ -87,12 +81,7 @@ impl ServerConfig {
             _ => return Err(format!("Unsupported database type: {}", self.db_type)),
         };
 
-        let mut config = ConnectionConfig::new(
-            db_type,
-            &self.host,
-            self.port,
-            &self.username,
-        );
+        let mut config = ConnectionConfig::new(db_type, &self.host, self.port, &self.username);
 
         if let Some(ref password) = self.password {
             config = config.with_password(password);
@@ -150,20 +139,20 @@ pub enum ActiveConnection {
     /// share the same PostgreSQL connection pool/adapter instance and perform
     /// concurrent operations by acquiring the async mutex lock when needed.
     Postgres(Arc<Mutex<crate::database::postgres::PostgresAdapter>>),
-    
+
     /// Active MySQL connection backed by a [`MySQLAdapter`](crate::database::mysql::MySQLAdapter).
     ///
     /// Stored inside `Arc<Mutex<_>>` for shared, synchronized access to the
     /// underlying MySQL connection pool/adapter from different Tauri commands.
     MySQL(Arc<Mutex<crate::database::mysql::MySQLAdapter>>),
-    
+
     /// Active SQLite connection backed by a [`SQLiteAdapter`](crate::database::sqlite::SQLiteAdapter).
     ///
     /// The `Arc<Mutex<_>>` wrapper allows safe mutable access to the adapter
     /// even when it is shared across async tasks, which is important because
     /// SQLite connections are often single-threaded and must be coordinated.
     SQLite(Arc<Mutex<crate::database::sqlite::SQLiteAdapter>>),
-    
+
     /// Active SQL Server connection backed by a [`SqlServerAdapter`](crate::database::sqlserver::SqlServerAdapter).
     ///
     /// As with the other variants, `Arc<Mutex<_>>` enables concurrent commands

@@ -14,14 +14,19 @@ use crate::database::{
 };
 use async_trait::async_trait;
 use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
-use deadpool_postgres::{Config as DeadpoolConfig, Pool, PoolConfig as DeadpoolPoolConfig, Runtime};
+use deadpool_postgres::{
+    Config as DeadpoolConfig, Pool, PoolConfig as DeadpoolPoolConfig, Runtime,
+};
 use native_tls::{Certificate, TlsConnector};
 use postgres_native_tls::MakeTlsConnector;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio_postgres::{types::{Kind, Type}, Client, NoTls, Row};
+use tokio_postgres::{
+    types::{Kind, Type},
+    Client, NoTls, Row,
+};
 
 /// Convert PostgreSQL error to DbError with detailed information
 fn postgres_error_to_db_error(error: tokio_postgres::Error) -> DbError {
@@ -29,41 +34,41 @@ fn postgres_error_to_db_error(error: tokio_postgres::Error) -> DbError {
     // by creating a formatted string that our api_response parser can understand
     if let Some(db_error) = error.as_db_error() {
         let mut error_details = Vec::new();
-        
+
         // Main error message
         error_details.push(db_error.message().to_string());
-        
+
         // Add structured fields
         error_details.push(format!("[SQLSTATE: {}]", db_error.code().code()));
-        
+
         if let Some(detail) = db_error.detail() {
             error_details.push(format!("[Detail] {}", detail));
         }
-        
+
         if let Some(hint) = db_error.hint() {
             error_details.push(format!("[Hint] {}", hint));
         }
-        
+
         if let Some(schema) = db_error.schema() {
             error_details.push(format!("[Schema: {}]", schema));
         }
-        
+
         if let Some(table) = db_error.table() {
             error_details.push(format!("[Table: {}]", table));
         }
-        
+
         if let Some(column) = db_error.column() {
             error_details.push(format!("[Column: {}]", column));
         }
-        
+
         if let Some(constraint) = db_error.constraint() {
             error_details.push(format!("[Constraint: {}]", constraint));
         }
-        
+
         if let Some(position) = db_error.position() {
             error_details.push(format!("[Position: {:?}]", position));
         }
-        
+
         DbError::QueryExecution(error_details.join("\n"))
     } else {
         // For non-database errors, just use the error message
@@ -72,13 +77,13 @@ fn postgres_error_to_db_error(error: tokio_postgres::Error) -> DbError {
 }
 
 /// Convert deadpool pool error to DbError with detailed PostgreSQL error extraction.
-/// 
+///
 /// Deadpool wraps the underlying tokio_postgres error with generic messages like
 /// "Error occurred while creating a new object: db error" which hide authentication
 /// failures. This function extracts the actual PostgreSQL error message.
 fn deadpool_pool_error_to_db_error(error: deadpool_postgres::PoolError) -> DbError {
     use deadpool_postgres::PoolError;
-    
+
     match error {
         PoolError::Timeout(timeout_type) => {
             DbError::Timeout(format!("Connection timeout: {:?}", timeout_type))
@@ -87,7 +92,7 @@ fn deadpool_pool_error_to_db_error(error: deadpool_postgres::PoolError) -> DbErr
             if let Some(db_error) = pg_err.as_db_error() {
                 let code = db_error.code().code();
                 let message = db_error.message();
-                
+
                 // SQLSTATE 28xxx = authentication errors, 3Dxxx = invalid catalog name
                 if code.starts_with("28") || code.starts_with("3D") {
                     let mut details = vec![message.to_string()];
@@ -103,8 +108,12 @@ fn deadpool_pool_error_to_db_error(error: deadpool_postgres::PoolError) -> DbErr
             }
         }
         PoolError::Closed => DbError::Connection("Connection pool is closed".to_string()),
-        PoolError::NoRuntimeSpecified => DbError::Configuration("No runtime specified for pool".to_string()),
-        PoolError::PostCreateHook(hook_err) => DbError::Connection(format!("Post-create hook error: {:?}", hook_err)),
+        PoolError::NoRuntimeSpecified => {
+            DbError::Configuration("No runtime specified for pool".to_string())
+        }
+        PoolError::PostCreateHook(hook_err) => {
+            DbError::Connection(format!("Post-create hook error: {:?}", hook_err))
+        }
     }
 }
 
@@ -139,15 +148,15 @@ impl ConnectionPool for PostgresPool {
     }
 
     fn active_connections(&self) -> usize {
-        self.pool.status().size as usize
+        self.pool.status().size
     }
 
     fn idle_connections(&self) -> usize {
-        self.pool.status().available as usize
+        self.pool.status().available
     }
 
     fn max_connections(&self) -> usize {
-        self.pool.status().max_size as usize
+        self.pool.status().max_size
     }
 
     async fn close(&self) -> DbResult<()> {
@@ -219,21 +228,24 @@ impl PostgresAdapter {
 
     fn build_tls_connector(&self, skip_verification: bool) -> DbResult<TlsConnector> {
         let mut builder = TlsConnector::builder();
-        
+
         if skip_verification {
             builder.danger_accept_invalid_certs(true);
             builder.danger_accept_invalid_hostnames(true);
         }
 
         if let Some(ref ca_cert_path) = self.config.ssl_ca_cert {
-            let cert_data = fs::read(ca_cert_path)
-                .map_err(|e| DbError::Connection(format!("Failed to read CA certificate: {}", e)))?;
-            let cert = Certificate::from_pem(&cert_data)
-                .map_err(|e| DbError::Connection(format!("Failed to parse CA certificate: {}", e)))?;
+            let cert_data = fs::read(ca_cert_path).map_err(|e| {
+                DbError::Connection(format!("Failed to read CA certificate: {}", e))
+            })?;
+            let cert = Certificate::from_pem(&cert_data).map_err(|e| {
+                DbError::Connection(format!("Failed to parse CA certificate: {}", e))
+            })?;
             builder.add_root_certificate(cert);
         }
 
-        builder.build()
+        builder
+            .build()
             .map_err(|e| DbError::Connection(format!("Failed to build TLS: {}", e)))
     }
 
@@ -351,7 +363,9 @@ impl PostgresAdapter {
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
                 match val {
-                    Some(v) => Ok(QueryValue::DateTime(v.format("%Y-%m-%d %H:%M:%S%.f").to_string())),
+                    Some(v) => Ok(QueryValue::DateTime(
+                        v.format("%Y-%m-%d %H:%M:%S%.f").to_string(),
+                    )),
                     None => Ok(QueryValue::Null),
                 }
             }
@@ -360,7 +374,9 @@ impl PostgresAdapter {
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
                 match val {
-                    Some(v) => Ok(QueryValue::DateTime(v.format("%Y-%m-%d %H:%M:%S %z").to_string())),
+                    Some(v) => Ok(QueryValue::DateTime(
+                        v.format("%Y-%m-%d %H:%M:%S %z").to_string(),
+                    )),
                     None => Ok(QueryValue::Null),
                 }
             }
@@ -384,7 +400,11 @@ impl PostgresAdapter {
             }
             // Handle array types (kind = Array) — decode element-by-element
             _ if matches!(col_type.kind(), Kind::Array(_)) => {
-                let inner = if let Kind::Array(t) = col_type.kind() { t } else { unreachable!() };
+                let inner = if let Kind::Array(t) = col_type.kind() {
+                    t
+                } else {
+                    unreachable!()
+                };
                 let formatted = match *inner {
                     // text-like arrays
                     Type::TEXT | Type::VARCHAR | Type::BPCHAR | Type::NAME | Type::CHAR => {
@@ -409,7 +429,10 @@ impl PostgresAdapter {
                             None => return Ok(QueryValue::Null),
                             Some(items) => items
                                 .iter()
-                                .map(|x| x.map(|n| n.to_string()).unwrap_or_else(|| "NULL".to_string()))
+                                .map(|x| {
+                                    x.map(|n| n.to_string())
+                                        .unwrap_or_else(|| "NULL".to_string())
+                                })
                                 .collect::<Vec<_>>()
                                 .join(", "),
                         }
@@ -422,7 +445,10 @@ impl PostgresAdapter {
                             None => return Ok(QueryValue::Null),
                             Some(items) => items
                                 .iter()
-                                .map(|x| x.map(|n| n.to_string()).unwrap_or_else(|| "NULL".to_string()))
+                                .map(|x| {
+                                    x.map(|n| n.to_string())
+                                        .unwrap_or_else(|| "NULL".to_string())
+                                })
                                 .collect::<Vec<_>>()
                                 .join(", "),
                         }
@@ -436,7 +462,10 @@ impl PostgresAdapter {
                             None => return Ok(QueryValue::Null),
                             Some(items) => items
                                 .iter()
-                                .map(|x| x.map(|n| n.to_string()).unwrap_or_else(|| "NULL".to_string()))
+                                .map(|x| {
+                                    x.map(|n| n.to_string())
+                                        .unwrap_or_else(|| "NULL".to_string())
+                                })
                                 .collect::<Vec<_>>()
                                 .join(", "),
                         }
@@ -450,7 +479,10 @@ impl PostgresAdapter {
                             None => return Ok(QueryValue::Null),
                             Some(items) => items
                                 .iter()
-                                .map(|x| x.map(|b| b.to_string()).unwrap_or_else(|| "NULL".to_string()))
+                                .map(|x| {
+                                    x.map(|b| b.to_string())
+                                        .unwrap_or_else(|| "NULL".to_string())
+                                })
                                 .collect::<Vec<_>>()
                                 .join(", "),
                         }
@@ -500,11 +532,9 @@ impl DatabaseAdapter for PostgresAdapter {
 
         // Determine TLS configuration
         let pool = match self.config.ssl_mode {
-            SslMode::Disable => {
-                pg_config
-                    .create_pool(Some(Runtime::Tokio1), NoTls)
-                    .map_err(|e| DbError::Connection(format!("Failed to create pool: {}", e)))?
-            }
+            SslMode::Disable => pg_config
+                .create_pool(Some(Runtime::Tokio1), NoTls)
+                .map_err(|e| DbError::Connection(format!("Failed to create pool: {}", e)))?,
             SslMode::Prefer | SslMode::Require => {
                 let tls_connector = self.build_tls_connector(true)?;
                 let tls = MakeTlsConnector::new(tls_connector);
@@ -1068,13 +1098,9 @@ mod tests {
         ];
 
         for (ssl_mode, expected) in test_cases {
-            let config = ConnectionConfig::new(
-                DatabaseType::PostgreSQL,
-                "localhost",
-                5432,
-                "postgres",
-            )
-            .with_ssl_mode(ssl_mode);
+            let config =
+                ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+                    .with_ssl_mode(ssl_mode);
 
             let adapter = PostgresAdapter::new(config);
             let conn_str = adapter.build_connection_string();
@@ -1089,12 +1115,13 @@ mod tests {
 
     #[test]
     fn test_connection_string_with_multiple_options() {
-        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "db.example.com", 5433, "admin")
-            .with_database("production")
-            .with_password("secure_pass")
-            .with_ssl_mode(SslMode::VerifyFull)
-            .with_option("application_name", "sqlkit")
-            .with_option("connect_timeout", "10");
+        let config =
+            ConnectionConfig::new(DatabaseType::PostgreSQL, "db.example.com", 5433, "admin")
+                .with_database("production")
+                .with_password("secure_pass")
+                .with_ssl_mode(SslMode::VerifyFull)
+                .with_option("application_name", "sqlkit")
+                .with_option("connect_timeout", "10");
 
         let adapter = PostgresAdapter::new(config);
         let conn_str = adapter.build_connection_string();

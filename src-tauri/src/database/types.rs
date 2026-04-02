@@ -67,7 +67,7 @@ pub struct ColumnInfo {
 }
 
 /// Represents a query result value.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum QueryValue {
     /// Null value.

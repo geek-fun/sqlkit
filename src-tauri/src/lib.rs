@@ -35,7 +35,11 @@ fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
     let token = params.get("token")?.to_string();
     let username = params.get("username")?.to_string();
     let email = params.get("email")?.to_string();
-    Some(AuthPayload { token, username, email })
+    Some(AuthPayload {
+        token,
+        username,
+        email,
+    })
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

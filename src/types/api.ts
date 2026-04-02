@@ -1,17 +1,17 @@
-export interface ApiSuccessResponse<T> {
+export type ApiSuccessResponse<T> = {
   status: 'success'
   data: T
   message?: string
 }
 
-export interface ApiErrorResponse {
+export type ApiErrorResponse = {
   status: 'error'
   error: ApiError
 }
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse
 
-export interface ApiError {
+export type ApiError = {
   code: string
   message: string
   details?: string

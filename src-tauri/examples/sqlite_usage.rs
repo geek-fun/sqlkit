@@ -35,7 +35,7 @@ async fn file_based_example() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = std::env::temp_dir();
     let db_path = temp_dir.join("example.db");
     let db_path_str = db_path.to_string_lossy().to_string();
-    
+
     // Clean up any existing database
     let _ = fs::remove_file(&db_path);
     let _ = fs::remove_file(db_path.with_extension("db-wal"));
@@ -178,7 +178,7 @@ async fn metadata_example() -> Result<(), Box<dyn std::error::Error>> {
     let temp_dir = std::env::temp_dir();
     let db_path = temp_dir.join("metadata_example.db");
     let db_path_str = db_path.to_string_lossy().to_string();
-    
+
     // Clean up
     let _ = fs::remove_file(&db_path);
     let _ = fs::remove_file(db_path.with_extension("db-wal"));
@@ -248,7 +248,11 @@ async fn metadata_example() -> Result<(), Box<dyn std::error::Error>> {
             "  - {} ({}) {}{}",
             col.name,
             col.data_type,
-            if col.is_primary_key { "PRIMARY KEY " } else { "" },
+            if col.is_primary_key {
+                "PRIMARY KEY "
+            } else {
+                ""
+            },
             if col.nullable { "NULL" } else { "NOT NULL" }
         );
     }
@@ -258,9 +262,7 @@ async fn metadata_example() -> Result<(), Box<dyn std::error::Error>> {
         .execute_query("INSERT INTO customers (name) VALUES ('John Doe'), ('Jane Smith')")
         .await?;
 
-    let table_info = adapter
-        .get_table_info(None, None, "customers")
-        .await?;
+    let table_info = adapter.get_table_info(None, None, "customers").await?;
     println!("\n✓ Table info for 'customers':");
     println!("  - Name: {}", table_info.name);
     println!("  - Type: {}", table_info.table_type);

@@ -6,7 +6,7 @@ import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { formatApiError } from '@/types/api'
 
-interface Props {
+type Props = {
   results?: QueryResult | null
   error?: ApiError | string | null
   isExecuting?: boolean

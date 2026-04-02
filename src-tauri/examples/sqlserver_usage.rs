@@ -14,7 +14,7 @@
 //! ```
 
 use sqlkit_lib::database::{
-    ConnectionConfig, DatabaseAdapter, DatabaseType, SqlServerAdapter, PoolConfig, SslMode,
+    ConnectionConfig, DatabaseAdapter, DatabaseType, PoolConfig, SqlServerAdapter, SslMode,
 };
 use std::env;
 use std::time::Duration;
@@ -61,11 +61,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let status = adapter.test_connection().await?;
     println!(
         "Server version: {}",
-        status.server_version.unwrap_or_else(|| "Unknown".to_string())
+        status
+            .server_version
+            .unwrap_or_else(|| "Unknown".to_string())
     );
     println!(
         "Current database: {}",
-        status.current_database.unwrap_or_else(|| "Unknown".to_string())
+        status
+            .current_database
+            .unwrap_or_else(|| "Unknown".to_string())
     );
     println!(
         "Current user: {}",
@@ -109,7 +113,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example: Create a temporary table and query it
     println!("\n=== Example: Working with temporary tables ===");
-    
+
     // Create table
     adapter
         .execute_query(
@@ -132,17 +136,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ('charlie', 'charlie@example.com')",
         )
         .await?;
-    println!(
-        "Inserted {} rows",
-        insert_result.rows_affected.unwrap_or(0)
-    );
+    println!("Inserted {} rows", insert_result.rows_affected.unwrap_or(0));
 
     // Query data
     let result = adapter
         .execute_query("SELECT * FROM #demo_users ORDER BY id")
         .await?;
     println!("Query returned {} rows:", result.rows.len());
-    println!("Execution time: {}ms", result.execution_time.unwrap_or(0));
+    println!(
+        "Execution time: {}ms",
+        result.execution_time_ms.unwrap_or(0)
+    );
 
     // Display results
     for row in result.rows {
@@ -151,7 +155,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example: Complex types
     println!("\n=== Example: Working with complex types ===");
-    
+
     adapter
         .execute_query(
             "CREATE TABLE #demo_complex (
@@ -162,18 +166,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )",
         )
         .await?;
-    
+
     adapter
         .execute_query(
             r#"INSERT INTO #demo_complex (xml_data, json_data) VALUES 
                 ('<root><name>Test</name></root>', '{"type": "example", "status": "active"}')"#,
         )
         .await?;
-    
-    let complex_result = adapter
-        .execute_query("SELECT * FROM #demo_complex")
-        .await?;
-    
+
+    let complex_result = adapter.execute_query("SELECT * FROM #demo_complex").await?;
+
     println!("Complex types data:");
     for row in complex_result.rows {
         println!("  - XML: {:?}", row.get("xml_data"));

@@ -23,10 +23,10 @@ pub async fn save_connection(
     state: State<'_, crate::commands::store::Store>,
 ) -> Result<String, String> {
     let id = config.id.clone();
-    
+
     // Get store
     let store = state.get_store().await?;
-    
+
     // Get existing connections
     let mut connections: Vec<ServerConfig> = match store.get("connections") {
         Some(value) => {
@@ -49,7 +49,10 @@ pub async fn save_connection(
     }
 
     // Save back to store
-    store.set("connections".to_string(), serde_json::to_value(&connections).map_err(|e| e.to_string())?);
+    store.set(
+        "connections".to_string(),
+        serde_json::to_value(&connections).map_err(|e| e.to_string())?,
+    );
     store
         .save()
         .map_err(|e| format!("Failed to save store: {}", e))?;
@@ -71,7 +74,7 @@ pub async fn list_connections(
     state: State<'_, crate::commands::store::Store>,
 ) -> Result<Vec<ServerConfig>, String> {
     let store = state.get_store().await?;
-    
+
     match store.get("connections") {
         Some(value) => {
             if let Some(arr) = value.as_array() {
@@ -104,7 +107,7 @@ pub async fn delete_connection(
     state: State<'_, crate::commands::store::Store>,
 ) -> Result<(), String> {
     let store = state.get_store().await?;
-    
+
     // Get existing connections
     let mut connections: Vec<ServerConfig> = match store.get("connections") {
         Some(value) => {
@@ -122,13 +125,16 @@ pub async fn delete_connection(
     // Remove the connection
     let initial_len = connections.len();
     connections.retain(|c| c.id != id);
-    
+
     if connections.len() == initial_len {
         return Err(format!("Connection with ID '{}' not found", id));
     }
 
     // Save back to store
-    store.set("connections".to_string(), serde_json::to_value(&connections).map_err(|e| e.to_string())?);
+    store.set(
+        "connections".to_string(),
+        serde_json::to_value(&connections).map_err(|e| e.to_string())?,
+    );
     store
         .save()
         .map_err(|e| format!("Failed to save store: {}", e))?;

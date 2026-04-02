@@ -4,7 +4,7 @@
 
 export type SslMode = 'disable' | 'prefer' | 'require' | 'verify-ca' | 'verify-full'
 
-export interface SslConfig {
+export type SslConfig = {
   mode: SslMode
   caCertPath?: string
   clientCertPath?: string
@@ -12,7 +12,7 @@ export interface SslConfig {
   trustServerCertificate?: boolean
 }
 
-export interface SslValidationError {
+export type SslValidationError = {
   field: string
   message: string
 }

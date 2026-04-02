@@ -29,15 +29,15 @@ fn get_queries_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
         .path()
         .app_data_dir()
         .map_err(|e| format!("Failed to get app data dir: {}", e))?;
-    
+
     let queries_dir = app_data_dir.join("queries");
-    
+
     // Create directory if it doesn't exist
     if !queries_dir.exists() {
         fs::create_dir_all(&queries_dir)
             .map_err(|e| format!("Failed to create queries directory: {}", e))?;
     }
-    
+
     Ok(queries_dir)
 }
 
@@ -67,12 +67,11 @@ pub async fn save_query_file(
         PathBuf::from(path)
     } else {
         let queries_dir = get_queries_dir(&app_handle)?;
-        let name = file_name.unwrap_or_else(|| {
-            format!("query_{}.sql", chrono::Utc::now().timestamp())
-        });
+        let name =
+            file_name.unwrap_or_else(|| format!("query_{}.sql", chrono::Utc::now().timestamp()));
         queries_dir.join(name)
     };
-    
+
     // Ensure parent directory exists
     if let Some(parent) = target_path.parent() {
         if !parent.exists() {
@@ -80,11 +79,10 @@ pub async fn save_query_file(
                 .map_err(|e| format!("Failed to create parent directory: {}", e))?;
         }
     }
-    
+
     // Write file
-    fs::write(&target_path, content)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
-    
+    fs::write(&target_path, content).map_err(|e| format!("Failed to write file: {}", e))?;
+
     Ok(SaveResult {
         success: true,
         file_path: Some(target_path.to_string_lossy().to_string()),
@@ -102,11 +100,9 @@ pub async fn save_query_file(
 ///
 /// LoadResult with the file content
 #[tauri::command]
-pub async fn load_query_file(
-    file_path: String,
-) -> Result<LoadResult, String> {
+pub async fn load_query_file(file_path: String) -> Result<LoadResult, String> {
     let path = Path::new(&file_path);
-    
+
     if !path.exists() {
         return Ok(LoadResult {
             success: false,
@@ -114,10 +110,9 @@ pub async fn load_query_file(
             message: "File not found".to_string(),
         });
     }
-    
-    let content = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read file: {}", e))?;
-    
+
+    let content = fs::read_to_string(path).map_err(|e| format!("Failed to read file: {}", e))?;
+
     Ok(LoadResult {
         success: true,
         content: Some(content),
@@ -135,17 +130,15 @@ pub async fn load_query_file(
 ///
 /// List of file paths
 #[tauri::command]
-pub async fn list_saved_queries(
-    app_handle: AppHandle,
-) -> Result<Vec<String>, String> {
+pub async fn list_saved_queries(app_handle: AppHandle) -> Result<Vec<String>, String> {
     let queries_dir = get_queries_dir(&app_handle)?;
-    
+
     let mut files = Vec::new();
-    
+
     if queries_dir.exists() {
         let entries = fs::read_dir(&queries_dir)
             .map_err(|e| format!("Failed to read queries directory: {}", e))?;
-        
+
         for entry in entries.flatten() {
             if let Ok(file_type) = entry.file_type() {
                 if file_type.is_file() {
@@ -158,7 +151,7 @@ pub async fn list_saved_queries(
             }
         }
     }
-    
+
     files.sort();
     Ok(files)
 }
@@ -173,19 +166,16 @@ pub async fn list_saved_queries(
 ///
 /// Success message
 #[tauri::command]
-pub async fn delete_query_file(
-    file_path: String,
-) -> Result<String, String> {
+pub async fn delete_query_file(file_path: String) -> Result<String, String> {
     let path = Path::new(&file_path);
-    
+
     if !path.exists() {
         return Err("File not found".to_string());
     }
-    
-    fs::remove_file(path)
-        .map_err(|e| format!("Failed to delete file: {}", e))?;
-    
-Ok("File deleted successfully".to_string())
+
+    fs::remove_file(path).map_err(|e| format!("Failed to delete file: {}", e))?;
+
+    Ok("File deleted successfully".to_string())
 }
 
 /// Write arbitrary text content to an absolute file path.
@@ -196,8 +186,7 @@ pub async fn write_text_file(path: String, content: String) -> Result<(), String
     let target = Path::new(&path);
     if let Some(parent) = target.parent() {
         if !parent.exists() {
-            fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create directory: {}", e))?;
+            fs::create_dir_all(parent).map_err(|e| format!("Failed to create directory: {}", e))?;
         }
     }
     fs::write(target, content).map_err(|e| format!("Failed to write file: {}", e))

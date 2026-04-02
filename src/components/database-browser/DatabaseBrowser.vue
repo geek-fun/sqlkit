@@ -20,7 +20,7 @@ export type TreeNodeMetadata = TableInfo & {
 
 export type TreeNodeType = 'connection' | 'database' | 'schema' | 'table' | 'view' | 'column'
 
-export interface TreeNode {
+export type TreeNode = {
   id: string
   name: string
   type: TreeNodeType

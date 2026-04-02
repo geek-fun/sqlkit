@@ -104,8 +104,9 @@ impl SQLitePool {
             .map_err(|e| DbError::Connection(format!("Failed to open database: {}", e)))?
         } else {
             // In-memory database
-            Connection::open_in_memory()
-                .map_err(|e| DbError::Connection(format!("Failed to open in-memory database: {}", e)))?
+            Connection::open_in_memory().map_err(|e| {
+                DbError::Connection(format!("Failed to open in-memory database: {}", e))
+            })?
         };
 
         // Enable Write-Ahead Logging (WAL) mode for better concurrency
@@ -147,13 +148,13 @@ impl ConnectionPool for SQLitePool {
         // Immediately drop the connection to avoid Send issues
         // rusqlite::Connection is not Send because it contains RefCell
         std::mem::drop(connection);
-        
+
         // NOTE: This method is not actually used in SQLite's implementation.
         // Connection return is handled by the custom return_conn() method which
         // expects Arc<Mutex<Connection>> to match our thread-safety requirements.
         // The parameter is dropped immediately to satisfy the trait requirement
         // while avoiding Send trait bounds issues with rusqlite::Connection.
-        
+
         std::future::ready(Ok(())).await
     }
 
@@ -235,7 +236,9 @@ impl SQLiteAdapter {
     /// Returns an error if the table name contains invalid characters.
     fn validate_table_name(table: &str) -> DbResult<()> {
         if table.is_empty() {
-            return Err(DbError::InvalidQuery("Table name cannot be empty".to_string()));
+            return Err(DbError::InvalidQuery(
+                "Table name cannot be empty".to_string(),
+            ));
         }
 
         // Check for valid characters: alphanumeric, underscore, and dot (for schema.table)
@@ -331,7 +334,9 @@ impl SQLiteAdapter {
             for row_result in rows_iter {
                 let row = row_result
                     .map_err(|e| DbError::QueryExecution(format!("Failed to fetch row: {}", e)))?
-                    .map_err(|e| DbError::QueryExecution(format!("Failed to convert row: {}", e)))?;
+                    .map_err(|e| {
+                        DbError::QueryExecution(format!("Failed to convert row: {}", e))
+                    })?;
                 rows.push(row);
             }
 

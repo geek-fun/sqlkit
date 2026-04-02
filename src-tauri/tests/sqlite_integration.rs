@@ -6,11 +6,9 @@
 #![cfg(test)]
 
 use sqlkit_lib::database::{
-    ConnectionConfig, DatabaseAdapter, DatabaseType, PoolConfig, QueryValue, SQLiteAdapter,
-    SslMode,
+    ConnectionConfig, DatabaseAdapter, DatabaseType, PoolConfig, QueryValue, SQLiteAdapter, SslMode,
 };
 use std::fs;
-use std::path::PathBuf;
 use std::time::Duration;
 use tokio::task;
 
@@ -97,10 +95,7 @@ async fn test_connection_in_memory() {
 
     assert!(status.is_connected);
     assert!(status.server_version.is_some());
-    assert_eq!(
-        status.current_database,
-        Some(":memory:".to_string())
-    );
+    assert_eq!(status.current_database, Some(":memory:".to_string()));
 
     adapter.disconnect().await.expect("Failed to disconnect");
 }
@@ -150,13 +145,19 @@ async fn test_create_and_query_table() {
     // Check first row (Alice)
     let alice = &result.rows[0];
     assert!(matches!(alice.get("id"), Some(QueryValue::Int(_))));
-    assert_eq!(alice.get("name"), Some(&QueryValue::String("Alice".to_string())));
+    assert_eq!(
+        alice.get("name"),
+        Some(&QueryValue::String("Alice".to_string()))
+    );
     assert_eq!(alice.get("age"), Some(&QueryValue::Int(30)));
     assert_eq!(alice.get("active"), Some(&QueryValue::Int(1)));
 
     // Check second row (Bob)
     let bob = &result.rows[1];
-    assert_eq!(bob.get("name"), Some(&QueryValue::String("Bob".to_string())));
+    assert_eq!(
+        bob.get("name"),
+        Some(&QueryValue::String("Bob".to_string()))
+    );
     assert_eq!(bob.get("age"), Some(&QueryValue::Int(25)));
 
     adapter.disconnect().await.expect("Failed to disconnect");
@@ -278,7 +279,9 @@ async fn test_get_table_info() {
         .expect("Failed to create table");
 
     adapter
-        .execute_query("INSERT INTO products (name) VALUES ('Product 1'), ('Product 2'), ('Product 3')")
+        .execute_query(
+            "INSERT INTO products (name) VALUES ('Product 1'), ('Product 2'), ('Product 3')",
+        )
         .await
         .expect("Failed to insert data");
 

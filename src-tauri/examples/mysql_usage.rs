@@ -13,7 +13,8 @@
 //! ```
 
 use sqlkit_lib::database::{
-    ConnectionConfig, DatabaseAdapter, DatabaseType, MySQLAdapter, PoolConfig, SslMode,
+    ConnectionConfig, ConnectionPool, DatabaseAdapter, DatabaseType, MySQLAdapter, PoolConfig,
+    SslMode,
 };
 use std::env;
 use std::time::Duration;
@@ -40,7 +41,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         max_connections: 10,
         connection_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(1800), // 30 minutes
-        idle_timeout: Duration::from_secs(600),   // 10 minutes
+        idle_timeout: Duration::from_secs(600),  // 10 minutes
     };
 
     // Create connection configuration
@@ -66,7 +67,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Server Version: {}", status.server_version.unwrap());
     println!(
         "Current Database: {}",
-        status.current_database.unwrap_or_else(|| "None".to_string())
+        status
+            .current_database
+            .unwrap_or_else(|| "None".to_string())
     );
     println!("Current User: {}\n", status.current_user.unwrap());
 

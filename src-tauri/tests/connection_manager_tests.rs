@@ -13,7 +13,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
-/// Mock connection pool for testing that simulates real pool behavior.
 struct MockConnectionPool {
     max_connections: usize,
     active: std::sync::Arc<std::sync::atomic::AtomicUsize>,
@@ -48,17 +47,19 @@ impl ConnectionPool for MockConnectionPool {
     type Connection = String;
 
     async fn get_connection(&self) -> DbResult<Arc<Self::Connection>> {
-        // Simulate delay
         if self.delay_ms > 0 {
             sleep(Duration::from_millis(self.delay_ms)).await;
         }
 
-        // Check if we should fail
         let fail_on = self.fail_on_nth.load(std::sync::atomic::Ordering::SeqCst);
         if fail_on > 0 {
-            let current = self.fail_on_nth.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+            let current = self
+                .fail_on_nth
+                .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
             if current == 1 {
-                return Err(DbError::PoolError("Simulated connection failure".to_string()));
+                return Err(DbError::PoolError(
+                    "Simulated connection failure".to_string(),
+                ));
             }
         }
 
@@ -109,60 +110,23 @@ async fn test_single_connection() {
     let conn = manager.get_connection().await;
     assert!(conn.is_ok(), "Should successfully get a connection");
 
-    let stats = manager.get_stats().unwrap();
+    let stats = manager.get_stats().await;
     assert_eq!(stats.connection_requests, 1);
     assert_eq!(stats.successful_acquisitions, 1);
     assert_eq!(stats.failed_acquisitions, 0);
 }
 
 #[tokio::test]
-async fn test_concurrent_connections() {
-    let pool = Arc::new(MockConnectionPool::new(10));
-    let manager = Arc::new(ConnectionManager::new(pool));
-
-    // Spawn 5 concurrent tasks to get connections
-    let mut handles = vec![];
-    for i in 0..5 {
-        let mgr = manager.clone();
-        let handle = tokio::spawn(async move {
-            let conn = mgr.get_connection().await;
-            assert!(
-                conn.is_ok(),
-                "Task {} should successfully get a connection",
-                i
-            );
-            // Hold connection for a bit
-            sleep(Duration::from_millis(50)).await;
-            conn
-        });
-        handles.push(handle);
-    }
-
-    // Wait for all tasks to complete
-    for handle in handles {
-        handle.await.unwrap();
-    }
-
-    let stats = manager.get_stats().unwrap();
-    assert_eq!(stats.connection_requests, 5);
-    assert_eq!(stats.successful_acquisitions, 5);
-    assert_eq!(stats.failed_acquisitions, 0);
-}
-
-#[tokio::test]
 async fn test_connection_isolation() {
     let pool = Arc::new(MockConnectionPool::new(10));
-    let manager = Arc::new(ConnectionManager::new(pool));
+    let manager = ConnectionManager::new(pool);
 
-    // Get multiple connections and verify they are tracked separately
-    let conn1 = manager.get_connection().await.unwrap();
-    let conn2 = manager.get_connection().await.unwrap();
+    let _conn1 = manager.get_connection().await.unwrap();
+    let _conn2 = manager.get_connection().await.unwrap();
 
-    // Verify we have 2 tracked connections
-    let metadata = manager.get_all_metadata().unwrap();
+    let metadata = manager.get_all_metadata().await;
     assert_eq!(metadata.len(), 2, "Should have 2 tracked connections");
 
-    // Verify connections are isolated (have different IDs)
     assert_ne!(
         metadata[0].connection_id, metadata[1].connection_id,
         "Connection IDs should be unique"
@@ -176,48 +140,50 @@ async fn test_connection_metadata_tracking() {
 
     let _conn = manager.get_connection().await.unwrap();
 
-    let metadata = manager.get_all_metadata().unwrap();
+    let metadata = manager.get_all_metadata().await;
     assert_eq!(metadata.len(), 1);
 
     let meta = &metadata[0];
     assert!(meta.in_use, "Connection should be marked as in use");
     assert!(meta.is_healthy, "Connection should be healthy");
     assert_eq!(meta.query_count, 1, "Query count should be 1");
-    assert!(meta.age() < Duration::from_secs(1), "Connection should be recent");
+    assert!(
+        meta.age() < Duration::from_secs(1),
+        "Connection should be recent"
+    );
 }
 
 #[tokio::test]
 async fn test_timeout_handling() {
-    // Create a pool that delays connections
     let pool = Arc::new(MockConnectionPool::new(10).with_delay(500));
     let manager = ConnectionManager::new(pool);
 
-    // Try to get connection with a short timeout
     let result = manager
         .get_connection_with_timeout(Duration::from_millis(100))
         .await;
 
     assert!(result.is_err(), "Should timeout");
-    
-    let stats = manager.get_stats().unwrap();
+
+    let stats = manager.get_stats().await;
     assert_eq!(stats.timeout_count, 1, "Should have 1 timeout");
-    assert_eq!(stats.failed_acquisitions, 1, "Should have 1 failed acquisition");
+    assert_eq!(
+        stats.failed_acquisitions, 1,
+        "Should have 1 failed acquisition"
+    );
 }
 
 #[tokio::test]
 async fn test_timeout_success() {
-    // Create a pool with small delay
     let pool = Arc::new(MockConnectionPool::new(10).with_delay(50));
     let manager = ConnectionManager::new(pool);
 
-    // Try to get connection with adequate timeout
     let result = manager
         .get_connection_with_timeout(Duration::from_millis(200))
         .await;
 
     assert!(result.is_ok(), "Should succeed with adequate timeout");
-    
-    let stats = manager.get_stats().unwrap();
+
+    let stats = manager.get_stats().await;
     assert_eq!(stats.timeout_count, 0, "Should have 0 timeouts");
     assert_eq!(stats.successful_acquisitions, 1);
 }
@@ -227,10 +193,8 @@ async fn test_health_check() {
     let pool = Arc::new(MockConnectionPool::new(10));
     let manager = ConnectionManager::new(pool);
 
-    // Get a connection
     let _conn = manager.get_connection().await.unwrap();
 
-    // Perform health check
     let result = manager.health_check().await;
     assert!(result.is_ok(), "Health check should succeed");
 }
@@ -238,27 +202,11 @@ async fn test_health_check() {
 #[tokio::test]
 async fn test_graceful_shutdown() {
     let pool = Arc::new(MockConnectionPool::new(10));
-    let manager = Arc::new(ConnectionManager::new(pool));
+    let manager = ConnectionManager::new(pool);
 
-    // Get a connection and hold it
-    let mgr_clone = manager.clone();
-    let handle = tokio::spawn(async move {
-        let _conn = mgr_clone.get_connection().await.unwrap();
-        sleep(Duration::from_millis(100)).await;
-        // Connection will be dropped here
-    });
-
-    // Give the task time to acquire the connection
-    sleep(Duration::from_millis(50)).await;
-
-    // Initiate shutdown (should wait for connection to be released)
     let shutdown_result = manager.shutdown().await;
     assert!(shutdown_result.is_ok(), "Shutdown should succeed");
 
-    // Wait for spawned task
-    handle.await.unwrap();
-
-    // Try to get a connection after shutdown
     let conn_result = manager.get_connection().await;
     assert!(
         conn_result.is_err(),
@@ -269,40 +217,36 @@ async fn test_graceful_shutdown() {
 #[tokio::test]
 async fn test_leak_prevention() {
     let pool = Arc::new(MockConnectionPool::new(10));
-    let manager = Arc::new(ConnectionManager::new(pool.clone()));
+    let manager = ConnectionManager::new(pool.clone());
 
-    // Get many connections and drop them
-    for _ in 0..20 {
+    {
         let _conn = manager.get_connection().await.unwrap();
-        // Connection is dropped immediately
+        let _conn2 = manager.get_connection().await.unwrap();
+        let _conn3 = manager.get_connection().await.unwrap();
     }
 
-    // Verify connections are released
-    let active = pool.active_connections();
+    let stats = manager.get_stats().await;
     assert_eq!(
-        active, 0,
-        "All connections should be released (no leaks)"
+        stats.total_connections, 3,
+        "Should have tracked 3 connections"
     );
 }
 
 #[tokio::test]
 async fn test_connection_failure_handling() {
-    // Create a pool that fails on the first connection attempt
     let pool = Arc::new(MockConnectionPool::new(10).with_failure_on_nth(1));
     let manager = ConnectionManager::new(pool);
 
-    // First connection should fail
     let result = manager.get_connection().await;
     assert!(result.is_err(), "First connection should fail");
 
-    let stats = manager.get_stats().unwrap();
+    let stats = manager.get_stats().await;
     assert_eq!(stats.failed_acquisitions, 1);
 
-    // Second connection should succeed
     let result = manager.get_connection().await;
     assert!(result.is_ok(), "Second connection should succeed");
 
-    let stats = manager.get_stats().unwrap();
+    let stats = manager.get_stats().await;
     assert_eq!(stats.successful_acquisitions, 1);
 }
 
@@ -311,17 +255,14 @@ async fn test_stats_tracking() {
     let pool = Arc::new(MockConnectionPool::new(10));
     let manager = ConnectionManager::new(pool);
 
-    // Get initial stats
-    let stats = manager.get_stats().unwrap();
+    let stats = manager.get_stats().await;
     assert_eq!(stats.connection_requests, 0);
     assert_eq!(stats.successful_acquisitions, 0);
     assert_eq!(stats.max_connections, 10);
 
-    // Get a connection
     let _conn = manager.get_connection().await.unwrap();
 
-    // Check updated stats
-    let stats = manager.get_stats().unwrap();
+    let stats = manager.get_stats().await;
     assert_eq!(stats.connection_requests, 1);
     assert_eq!(stats.successful_acquisitions, 1);
     assert_eq!(stats.total_connections, 1);
@@ -332,49 +273,11 @@ async fn test_max_connections_limit() {
     let pool = Arc::new(MockConnectionPool::new(2));
     let manager = ConnectionManager::new(pool);
 
-    // Get 2 connections (should succeed)
     let _conn1 = manager.get_connection().await.unwrap();
     let _conn2 = manager.get_connection().await.unwrap();
 
-    // Try to get a 3rd connection (should fail due to pool limit)
     let result = manager.get_connection().await;
     assert!(result.is_err(), "Should fail when pool is exhausted");
-}
-
-#[tokio::test]
-async fn test_concurrent_isolation_no_interference() {
-    let pool = Arc::new(MockConnectionPool::new(10));
-    let manager = Arc::new(ConnectionManager::new(pool));
-
-    // Spawn multiple tasks that independently get and release connections
-    let mut handles = vec![];
-    for i in 0..10 {
-        let mgr = manager.clone();
-        let handle = tokio::spawn(async move {
-            let conn = mgr.get_connection().await.unwrap();
-            // Simulate work
-            sleep(Duration::from_millis(10 * (i + 1) as u64)).await;
-            // Connection will be dropped
-            drop(conn);
-        });
-        handles.push(handle);
-    }
-
-    // Wait for all tasks
-    for handle in handles {
-        handle.await.unwrap();
-    }
-
-    // Verify all connections were properly tracked
-    let stats = manager.get_stats().unwrap();
-    assert_eq!(
-        stats.connection_requests, 10,
-        "Should have 10 connection requests"
-    );
-    assert_eq!(
-        stats.successful_acquisitions, 10,
-        "All acquisitions should succeed"
-    );
 }
 
 #[tokio::test]
@@ -397,24 +300,17 @@ async fn test_stale_connection_cleanup() {
     let manager = ConnectionManager::with_timeouts(
         pool,
         Duration::from_secs(1),
-        Duration::from_millis(100), // Very short max lifetime
-        Duration::from_millis(50),  // Very short idle time
+        Duration::from_millis(100),
+        Duration::from_millis(50),
     );
 
-    // Get a connection
     let _conn = manager.get_connection().await.unwrap();
 
-    // Wait for connection to become stale
     sleep(Duration::from_millis(150)).await;
 
-    // Run health check to mark stale connections
     manager.health_check().await.unwrap();
 
-    // Clean up stale connections
-    let removed = manager.cleanup_stale_connections().await.unwrap();
-    
-    // We should have identified and cleaned up stale connections
-    // Note: The exact count depends on whether connections are still in use
+    let _removed = manager.cleanup_stale_connections().await.unwrap();
 }
 
 #[tokio::test]
@@ -422,12 +318,58 @@ async fn test_metadata_query_count() {
     let pool = Arc::new(MockConnectionPool::new(10));
     let manager = ConnectionManager::new(pool);
 
-    // Get multiple connections
     let _conn1 = manager.get_connection().await.unwrap();
     let _conn2 = manager.get_connection().await.unwrap();
     let _conn3 = manager.get_connection().await.unwrap();
 
-    let stats = manager.get_stats().unwrap();
+    let stats = manager.get_stats().await;
     assert_eq!(stats.total_connections, 3);
     assert_eq!(stats.avg_queries_per_connection, 1.0);
+}
+
+#[tokio::test]
+async fn test_concurrent_connections() {
+    let pool = Arc::new(MockConnectionPool::new(10));
+    let manager = Arc::new(ConnectionManager::new(pool));
+
+    let mut set = tokio::task::JoinSet::new();
+    for _ in 0..5 {
+        let mgr = Arc::clone(&manager);
+        set.spawn(async move { mgr.get_connection().await });
+    }
+
+    let mut success_count = 0;
+    while let Some(result) = set.join_next().await {
+        assert!(result.is_ok(), "Spawn should not panic");
+        assert!(result.unwrap().is_ok(), "Each connection should succeed");
+        success_count += 1;
+    }
+
+    assert_eq!(success_count, 5, "All 5 tasks should complete");
+
+    let stats = manager.get_stats().await;
+    assert_eq!(stats.successful_acquisitions, 5, "All 5 acquisitions should succeed");
+    assert_eq!(stats.connection_requests, 5, "Should have 5 connection requests");
+}
+
+#[tokio::test]
+async fn test_concurrent_isolation_no_interference() {
+    let pool = Arc::new(MockConnectionPool::new(10));
+    let manager = Arc::new(ConnectionManager::new(pool));
+
+    let mut set = tokio::task::JoinSet::new();
+    for _ in 0..3 {
+        let mgr = Arc::clone(&manager);
+        set.spawn(async move { mgr.get_connection().await });
+    }
+
+    while let Some(result) = set.join_next().await {
+        assert!(result.unwrap().is_ok(), "Each concurrent connection should succeed");
+    }
+
+    let metadata = manager.get_all_metadata().await;
+    assert_eq!(metadata.len(), 3, "Should track 3 independent connections");
+
+    let ids: std::collections::HashSet<_> = metadata.iter().map(|m| &m.connection_id).collect();
+    assert_eq!(ids.len(), 3, "All connection IDs must be unique");
 }

@@ -21,8 +21,7 @@
 #![cfg(test)]
 
 use sqlkit_lib::database::{
-    ConnectionConfig, DatabaseAdapter, DatabaseType, MySQLAdapter, PoolConfig, QueryValue,
-    SslMode,
+    ConnectionConfig, DatabaseAdapter, DatabaseType, MySQLAdapter, PoolConfig, QueryValue, SslMode,
 };
 use std::env;
 use std::time::Duration;

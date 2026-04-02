@@ -89,10 +89,8 @@ pub fn json_to_query_value(value: &Value) -> Option<QueryValue> {
         Value::Number(n) => {
             if let Some(i) = n.as_i64() {
                 Some(QueryValue::Int(i))
-            } else if let Some(f) = n.as_f64() {
-                Some(QueryValue::Float(f))
             } else {
-                None
+                n.as_f64().map(QueryValue::Float)
             }
         }
         Value::String(s) => {
@@ -100,7 +98,10 @@ pub fn json_to_query_value(value: &Value) -> Option<QueryValue> {
             // Otherwise treat as string
             if let Ok(bytes) = general_purpose::STANDARD.decode(s) {
                 // Check if it's likely binary data (contains non-printable chars)
-                if bytes.iter().any(|&b: &u8| b < 32 && b != b'\n' && b != b'\r' && b != b'\t') {
+                if bytes
+                    .iter()
+                    .any(|&b: &u8| b < 32 && b != b'\n' && b != b'\r' && b != b'\t')
+                {
                     Some(QueryValue::Bytes(bytes))
                 } else {
                     Some(QueryValue::String(s.clone()))
@@ -201,12 +202,30 @@ mod tests {
 
     #[test]
     fn test_parse_string_to_query_value() {
-        assert!(matches!(parse_string_to_query_value("true"), QueryValue::Bool(true)));
-        assert!(matches!(parse_string_to_query_value("false"), QueryValue::Bool(false)));
-        assert!(matches!(parse_string_to_query_value("null"), QueryValue::Null));
-        assert!(matches!(parse_string_to_query_value("42"), QueryValue::Int(42)));
-        assert!(matches!(parse_string_to_query_value("3.14"), QueryValue::Float(_)));
-        assert!(matches!(parse_string_to_query_value("hello"), QueryValue::String(_)));
+        assert!(matches!(
+            parse_string_to_query_value("true"),
+            QueryValue::Bool(true)
+        ));
+        assert!(matches!(
+            parse_string_to_query_value("false"),
+            QueryValue::Bool(false)
+        ));
+        assert!(matches!(
+            parse_string_to_query_value("null"),
+            QueryValue::Null
+        ));
+        assert!(matches!(
+            parse_string_to_query_value("42"),
+            QueryValue::Int(42)
+        ));
+        assert!(matches!(
+            parse_string_to_query_value("3.14"),
+            QueryValue::Float(_)
+        ));
+        assert!(matches!(
+            parse_string_to_query_value("hello"),
+            QueryValue::String(_)
+        ));
     }
 
     #[test]
@@ -218,7 +237,7 @@ mod tests {
 
         let json = convert_query_row_to_json(&row);
         assert!(json.is_object());
-        
+
         let obj = json.as_object().unwrap();
         assert_eq!(obj.get("id").unwrap(), &json!(1));
         assert_eq!(obj.get("name").unwrap(), &json!("Alice"));

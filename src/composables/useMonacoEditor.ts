@@ -13,7 +13,7 @@ globalThis.MonacoEnvironment = {
 
 export type SQLDialect = 'sql' | 'mysql' | 'pgsql' | 'mssql' | 'plsql' | 'sqlite'
 
-export interface MonacoEditorOptions {
+export type MonacoEditorOptions = {
   language?: SQLDialect
   readOnly?: boolean
   minimap?: boolean

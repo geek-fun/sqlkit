@@ -16,7 +16,8 @@
 //! - POSTGRES_DB (default: postgres)
 
 use sqlkit_lib::database::{
-    ConnectionConfig, DatabaseAdapter, DatabaseType, PoolConfig, PostgresAdapter, SslMode,
+    ConnectionConfig, ConnectionPool, DatabaseAdapter, DatabaseType, PoolConfig, PostgresAdapter,
+    SslMode,
 };
 use std::env;
 use std::time::Duration;
@@ -42,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         max_connections: 10,
         connection_timeout: Duration::from_secs(30),
         max_lifetime: Duration::from_secs(1800), // 30 minutes
-        idle_timeout: Duration::from_secs(600),   // 10 minutes
+        idle_timeout: Duration::from_secs(600),  // 10 minutes
     };
 
     // Build connection configuration
@@ -67,9 +68,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Testing connection...");
     let status = adapter.test_connection().await?;
     println!("✓ Connection Status:");
-    println!("  - Server Version: {}", status.server_version.unwrap_or_default());
-    println!("  - Current Database: {}", status.current_database.unwrap_or_default());
-    println!("  - Current User: {}\n", status.current_user.unwrap_or_default());
+    println!(
+        "  - Server Version: {}",
+        status.server_version.unwrap_or_default()
+    );
+    println!(
+        "  - Current Database: {}",
+        status.current_database.unwrap_or_default()
+    );
+    println!(
+        "  - Current User: {}\n",
+        status.current_user.unwrap_or_default()
+    );
 
     // List databases
     println!("Listing databases...");
@@ -112,7 +122,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Execute a simple query
     println!("Executing query: SELECT version()");
     let result = adapter.execute_query("SELECT version() as version").await?;
-    println!("✓ Query executed in {}ms", result.execution_time_ms.unwrap_or(0));
+    println!(
+        "✓ Query executed in {}ms",
+        result.execution_time_ms.unwrap_or(0)
+    );
     if let Some(row) = result.rows.first() {
         if let Some(version) = row.get("version") {
             println!("  PostgreSQL Version: {:?}\n", version);
@@ -124,7 +137,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let result = adapter
         .execute_query("SELECT current_timestamp, current_user")
         .await?;
-    println!("✓ Query executed in {}ms", result.execution_time_ms.unwrap_or(0));
+    println!(
+        "✓ Query executed in {}ms",
+        result.execution_time_ms.unwrap_or(0)
+    );
     println!("  Columns: {:?}", result.columns);
     println!("  Rows: {}\n", result.rows.len());
 
@@ -138,7 +154,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             '{"role": "admin", "active": true}'::jsonb as metadata
     "#;
     let result = adapter.execute_query(query).await?;
-    println!("✓ Complex types query executed in {}ms", result.execution_time_ms.unwrap_or(0));
+    println!(
+        "✓ Complex types query executed in {}ms",
+        result.execution_time_ms.unwrap_or(0)
+    );
     if let Some(row) = result.rows.first() {
         println!("  Result contains: {:?}", row.keys().collect::<Vec<_>>());
     }

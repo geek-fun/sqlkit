@@ -16,9 +16,7 @@ pub enum ApiResponse<T> {
         message: Option<String>,
     },
     /// Error response with details
-    Error {
-        error: ApiError,
-    },
+    Error { error: ApiError },
 }
 
 /// Detailed error information
@@ -49,28 +47,28 @@ pub mod error_codes {
     pub const CONNECTION_TIMEOUT: &str = "CONNECTION_TIMEOUT";
     pub const CONNECTION_REFUSED: &str = "CONNECTION_REFUSED";
     pub const AUTHENTICATION_FAILED: &str = "AUTHENTICATION_FAILED";
-    
+
     // Query errors (2xxx)
     pub const QUERY_SYNTAX_ERROR: &str = "QUERY_SYNTAX_ERROR";
     pub const QUERY_EXECUTION_ERROR: &str = "QUERY_EXECUTION_ERROR";
     pub const QUERY_TIMEOUT: &str = "QUERY_TIMEOUT";
-    
+
     // Resource errors (3xxx)
     pub const DATABASE_NOT_FOUND: &str = "DATABASE_NOT_FOUND";
     pub const TABLE_NOT_FOUND: &str = "TABLE_NOT_FOUND";
     pub const COLUMN_NOT_FOUND: &str = "COLUMN_NOT_FOUND";
-    
+
     // Permission errors (4xxx)
     pub const PERMISSION_DENIED: &str = "PERMISSION_DENIED";
     pub const INSUFFICIENT_PRIVILEGES: &str = "INSUFFICIENT_PRIVILEGES";
-    
+
     // Data errors (5xxx)
     pub const CONSTRAINT_VIOLATION: &str = "CONSTRAINT_VIOLATION";
     pub const FOREIGN_KEY_VIOLATION: &str = "FOREIGN_KEY_VIOLATION";
     pub const UNIQUE_VIOLATION: &str = "UNIQUE_VIOLATION";
     pub const NOT_NULL_VIOLATION: &str = "NOT_NULL_VIOLATION";
     pub const CHECK_VIOLATION: &str = "CHECK_VIOLATION";
-    
+
     // System errors (9xxx)
     pub const INTERNAL_ERROR: &str = "INTERNAL_ERROR";
     pub const UNSUPPORTED_OPERATION: &str = "UNSUPPORTED_OPERATION";
@@ -148,21 +146,20 @@ impl<T> ApiResponse<T> {
 /// Convert database errors to API errors with detailed information
 pub fn db_error_to_api_error(error: &crate::database::DbError) -> ApiError {
     use crate::database::DbError;
-    
+
     match error {
-        DbError::Connection(msg) => {
-            ApiError::new(error_codes::CONNECTION_FAILED, "Failed to connect to database")
-                .with_details(msg)
-                .with_hint("Check your connection settings and ensure the database server is running")
-        }
+        DbError::Connection(msg) => ApiError::new(
+            error_codes::CONNECTION_FAILED,
+            "Failed to connect to database",
+        )
+        .with_details(msg)
+        .with_hint("Check your connection settings and ensure the database server is running"),
         DbError::Authentication(msg) => {
             ApiError::new(error_codes::AUTHENTICATION_FAILED, "Authentication failed")
                 .with_details(msg)
                 .with_hint("Verify your username and password")
         }
-        DbError::QueryExecution(msg) => {
-            parse_query_execution_error(msg)
-        }
+        DbError::QueryExecution(msg) => parse_query_execution_error(msg),
         DbError::InvalidQuery(msg) => {
             ApiError::new(error_codes::QUERY_SYNTAX_ERROR, "Invalid SQL query")
                 .with_details(msg)
@@ -188,14 +185,17 @@ pub fn db_error_to_api_error(error: &crate::database::DbError) -> ApiError {
                 .with_details(msg)
                 .with_hint("Verify the column name matches the table schema")
         }
-        DbError::UnsupportedOperation(msg) => {
-            ApiError::new(error_codes::UNSUPPORTED_OPERATION, "Operation not supported")
-                .with_details(msg)
-        }
+        DbError::UnsupportedOperation(msg) => ApiError::new(
+            error_codes::UNSUPPORTED_OPERATION,
+            "Operation not supported",
+        )
+        .with_details(msg),
         DbError::TypeConversion(msg) => {
             ApiError::new(error_codes::INTERNAL_ERROR, "Data type conversion failed")
                 .with_details(msg)
-                .with_hint("The database returned a value that couldn't be converted to the expected type")
+                .with_hint(
+                    "The database returned a value that couldn't be converted to the expected type",
+                )
         }
         DbError::PoolError(msg) => {
             ApiError::new(error_codes::CONNECTION_FAILED, "Connection pool error")
@@ -203,8 +203,7 @@ pub fn db_error_to_api_error(error: &crate::database::DbError) -> ApiError {
                 .with_hint("Try reconnecting to the database")
         }
         DbError::Serialization(msg) => {
-            ApiError::new(error_codes::INTERNAL_ERROR, "Data serialization error")
-                .with_details(msg)
+            ApiError::new(error_codes::INTERNAL_ERROR, "Data serialization error").with_details(msg)
         }
         DbError::Configuration(msg) => {
             ApiError::new(error_codes::INVALID_CONFIGURATION, "Configuration error")
@@ -212,16 +211,13 @@ pub fn db_error_to_api_error(error: &crate::database::DbError) -> ApiError {
                 .with_hint("Check your database connection settings")
         }
         DbError::DatabaseError(msg) => {
-            ApiError::new(error_codes::INTERNAL_ERROR, "Database error")
-                .with_details(msg)
+            ApiError::new(error_codes::INTERNAL_ERROR, "Database error").with_details(msg)
         }
         DbError::Io(err) => {
-            ApiError::new(error_codes::INTERNAL_ERROR, "I/O error")
-                .with_details(&err.to_string())
+            ApiError::new(error_codes::INTERNAL_ERROR, "I/O error").with_details(err.to_string())
         }
         DbError::Other { message, .. } => {
-            ApiError::new(error_codes::INTERNAL_ERROR, "Database error")
-                .with_details(message)
+            ApiError::new(error_codes::INTERNAL_ERROR, "Database error").with_details(message)
         }
     }
 }
@@ -229,10 +225,10 @@ pub fn db_error_to_api_error(error: &crate::database::DbError) -> ApiError {
 /// Parse query execution errors to provide specific error codes
 fn parse_query_execution_error(msg: &str) -> ApiError {
     let msg_lower = msg.to_lowercase();
-    
+
     // Extract structured information from the error message
     let (main_msg, details, hint) = extract_error_parts(msg);
-    
+
     // Check for constraint violations
     if msg_lower.contains("foreign key") || msg_lower.contains("violates foreign key constraint") {
         return build_api_error(
@@ -240,40 +236,40 @@ fn parse_query_execution_error(msg: &str) -> ApiError {
             "Foreign key constraint violation",
             &main_msg,
             details.as_deref(),
-            hint.or(Some("Ensure referenced records exist in the parent table"))
+            hint.or(Some("Ensure referenced records exist in the parent table")),
         );
     }
-    
+
     if msg_lower.contains("unique") || msg_lower.contains("duplicate key") {
         return build_api_error(
             error_codes::UNIQUE_VIOLATION,
             "Unique constraint violation",
             &main_msg,
             details.as_deref(),
-            hint.or(Some("A record with this value already exists"))
+            hint.or(Some("A record with this value already exists")),
         );
     }
-    
+
     if msg_lower.contains("not null") || msg_lower.contains("null value") {
         return build_api_error(
             error_codes::NOT_NULL_VIOLATION,
             "NOT NULL constraint violation",
             &main_msg,
             details.as_deref(),
-            hint.or(Some("This field requires a value"))
+            hint.or(Some("This field requires a value")),
         );
     }
-    
+
     if msg_lower.contains("check constraint") {
         return build_api_error(
             error_codes::CHECK_VIOLATION,
             "Check constraint violation",
             &main_msg,
             details.as_deref(),
-            hint.or(Some("The value does not satisfy the table constraints"))
+            hint.or(Some("The value does not satisfy the table constraints")),
         );
     }
-    
+
     // Check for permission errors
     if msg_lower.contains("permission denied") || msg_lower.contains("access denied") {
         return build_api_error(
@@ -281,10 +277,12 @@ fn parse_query_execution_error(msg: &str) -> ApiError {
             "Permission denied",
             &main_msg,
             details.as_deref(),
-            hint.or(Some("You don't have sufficient privileges for this operation"))
+            hint.or(Some(
+                "You don't have sufficient privileges for this operation",
+            )),
         );
     }
-    
+
     // Check for syntax errors
     if msg_lower.contains("syntax error") || msg_lower.contains("parse error") {
         return build_api_error(
@@ -292,10 +290,10 @@ fn parse_query_execution_error(msg: &str) -> ApiError {
             "SQL syntax error",
             &main_msg,
             details.as_deref(),
-            hint.or(Some("Check your SQL syntax"))
+            hint.or(Some("Check your SQL syntax")),
         );
     }
-    
+
     // Check for resource not found
     if msg_lower.contains("does not exist") || msg_lower.contains("not found") {
         if msg_lower.contains("table") || msg_lower.contains("relation") {
@@ -304,7 +302,9 @@ fn parse_query_execution_error(msg: &str) -> ApiError {
                 "Table does not exist",
                 &main_msg,
                 details.as_deref(),
-                hint.or(Some("Ensure the table name is correct and exists in the database"))
+                hint.or(Some(
+                    "Ensure the table name is correct and exists in the database",
+                )),
             );
         }
         if msg_lower.contains("column") {
@@ -313,11 +313,11 @@ fn parse_query_execution_error(msg: &str) -> ApiError {
                 "Column does not exist",
                 &main_msg,
                 details.as_deref(),
-                hint.or(Some("Check the column name in your query"))
+                hint.or(Some("Check the column name in your query")),
             );
         }
     }
-    
+
     // Check for duplicate objects (indexes, tables, etc.)
     if msg_lower.contains("already exists") || msg_lower.contains("duplicate") {
         return build_api_error(
@@ -325,41 +325,43 @@ fn parse_query_execution_error(msg: &str) -> ApiError {
             "Object already exists",
             &main_msg,
             details.as_deref(),
-            hint.or(Some("Try dropping the existing object first or use IF NOT EXISTS"))
+            hint.or(Some(
+                "Try dropping the existing object first or use IF NOT EXISTS",
+            )),
         );
     }
-    
+
     // Default query execution error
     build_api_error(
         error_codes::QUERY_EXECUTION_ERROR,
         "Query execution failed",
         &main_msg,
         details.as_deref(),
-        hint
+        hint,
     )
 }
 
 /// Extract structured parts from error message
 fn extract_error_parts(msg: &str) -> (String, Option<String>, Option<&str>) {
     let lines: Vec<&str> = msg.lines().collect();
-    
+
     if lines.is_empty() {
         return (msg.to_string(), None, None);
     }
-    
+
     // First line is the main message
     let main_msg = lines[0].to_string();
-    
+
     // Extract details and hint from subsequent lines
     let mut details_parts: Vec<&str> = Vec::new();
     let mut hint = None;
-    
+
     for &line in &lines[1..] {
         let trimmed = line.trim();
         if trimmed.is_empty() {
             continue;
         }
-        
+
         // Extract hint
         if trimmed.starts_with("[Hint]") {
             hint = Some(trimmed.trim_start_matches("[Hint]").trim());
@@ -368,13 +370,13 @@ fn extract_error_parts(msg: &str) -> (String, Option<String>, Option<&str>) {
             details_parts.push(trimmed);
         }
     }
-    
+
     let details = if details_parts.is_empty() {
         None
     } else {
         Some(details_parts.join("\n"))
     };
-    
+
     (main_msg, details, hint)
 }
 
@@ -384,22 +386,22 @@ fn build_api_error(
     message: &str,
     main_msg: &str,
     details: Option<&str>,
-    hint: Option<&str>
+    hint: Option<&str>,
 ) -> ApiError {
     let mut error = ApiError::new(code, message);
-    
+
     // Combine main error message with any additional details
     let full_details = if let Some(det) = details {
         format!("{}\n\n{}", main_msg, det)
     } else {
         main_msg.to_string()
     };
-    
+
     error = error.with_details(full_details);
-    
+
     if let Some(h) = hint {
         error = error.with_hint(h);
     }
-    
+
     error
 }

@@ -25,10 +25,12 @@ export default antfu({
     '**/.tauri/**',
     'AGENTS.md',
     'docs/**',
+    'src-tauri/gen/**',
   ],
   rules: {
     'no-console': 'warn',
     'unused-imports/no-unused-vars': 'warn',
     'style/eol-last': ['error', 'always'],
+    'ts/consistent-type-definitions': ['error', 'type'],
   },
 })

@@ -1,9 +1,9 @@
-export interface CursorPosition {
+export type CursorPosition = {
   lineNumber: number
   column: number
 }
 
-export interface Selection {
+export type Selection = {
   startLineNumber: number
   startColumn: number
   endLineNumber: number

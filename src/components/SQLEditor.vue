@@ -6,7 +6,7 @@ import { ProgressBar } from '@/components/ui/progress'
 import { useMonacoEditor } from '@/composables/useMonacoEditor'
 import { useTheme } from '@/composables/useTheme'
 
-interface Props {
+type Props = {
   modelValue?: string
   dialect?: SQLDialect
   readOnly?: boolean

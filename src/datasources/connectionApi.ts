@@ -1,6 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 
-export interface ServerConfig {
+export type ServerConfig = {
   id: string
   name: string
   db_type: string
@@ -16,7 +16,7 @@ export interface ServerConfig {
   trust_server_certificate?: boolean | null
 }
 
-export interface ConnectionStatus {
+export type ConnectionStatus = {
   is_connected: boolean
   server_version?: string | null
   current_database?: string | null

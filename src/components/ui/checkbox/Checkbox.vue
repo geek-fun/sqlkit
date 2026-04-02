@@ -3,9 +3,9 @@ import type { CheckboxRootEmits, CheckboxRootProps } from 'radix-vue'
 import { CheckboxRoot, useForwardPropsEmits } from 'radix-vue'
 import { cn } from '@/lib/utils'
 
-interface Props extends CheckboxRootProps {
+type Props = {
   class?: string
-}
+} & CheckboxRootProps
 
 const props = defineProps<Props>()
 const emits = defineEmits<CheckboxRootEmits>()

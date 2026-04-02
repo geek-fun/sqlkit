@@ -21,7 +21,7 @@
 #![cfg(test)]
 
 use sqlkit_lib::database::{
-    ConnectionConfig, DatabaseAdapter, DatabaseType, PostgresAdapter, PoolConfig, QueryValue,
+    ConnectionConfig, DatabaseAdapter, DatabaseType, PoolConfig, PostgresAdapter, QueryValue,
     SslMode,
 };
 use std::env;

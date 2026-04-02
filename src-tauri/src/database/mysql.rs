@@ -14,8 +14,7 @@ use crate::database::{
 };
 use async_trait::async_trait;
 use mysql_async::{
-    prelude::*,
-    Conn, OptsBuilder, Pool, PoolConstraints, PoolOpts, Row, SslOpts, Value,
+    prelude::*, Conn, OptsBuilder, Pool, PoolConstraints, PoolOpts, Row, SslOpts, Value,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -40,11 +39,14 @@ fn mysql_connection_error_to_db_error(error: mysql_async::Error) -> DbError {
         // MySQL access denied errors: error code 1045 (28000)
         // MySQL unknown database errors: error code 1049 (42000)
         let is_auth_error = server_error.code == 1045 || server_error.state.starts_with("28");
-        
+
         if is_auth_error {
             DbError::Authentication(format!("{} - {}", server_error.message, server_error.state))
         } else {
-            DbError::Connection(format!("{} [Error Code: {}]", server_error.message, server_error.code))
+            DbError::Connection(format!(
+                "{} [Error Code: {}]",
+                server_error.message, server_error.code
+            ))
         }
     } else {
         DbError::Connection(error.to_string())
@@ -99,7 +101,9 @@ impl ConnectionPool for MySQLPool {
 
     async fn close(&self) -> DbResult<()> {
         // Disconnect all connections in the pool
-        self.pool            .clone()            .disconnect()
+        self.pool
+            .clone()
+            .disconnect()
             .await
             .map_err(|e| DbError::PoolError(format!("Failed to close pool: {}", e)))?;
         Ok(())
@@ -187,7 +191,7 @@ impl MySQLAdapter {
                 .unwrap(),
             )
             .with_inactive_connection_ttl(self.config.pool_config.idle_timeout);
-            // Note: with_ttl method removed in newer versions
+        // Note: with_ttl method removed in newer versions
 
         opts = opts.pool_opts(pool_opts);
 
@@ -366,9 +370,7 @@ impl DatabaseAdapter for MySQLAdapter {
                     })?
                     .map_err(mysql_error_to_db_error)?
             } else {
-                conn.query(query)
-                    .await
-                    .map_err(mysql_error_to_db_error)?
+                conn.query(query).await.map_err(mysql_error_to_db_error)?
             };
 
             execution_time = start.elapsed().as_millis() as u64;
@@ -418,10 +420,7 @@ impl DatabaseAdapter for MySQLAdapter {
         let mut conn = self.get_conn().await?;
 
         let query = "SHOW DATABASES";
-        let rows: Vec<Row> = conn
-            .query(query)
-            .await
-            .map_err(mysql_error_to_db_error)?;
+        let rows: Vec<Row> = conn.query(query).await.map_err(mysql_error_to_db_error)?;
 
         let databases = rows
             .into_iter()
@@ -506,8 +505,7 @@ impl DatabaseAdapter for MySQLAdapter {
             .or(self.config.database.as_deref())
             .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
 
-        let query = format!(
-            "SELECT 
+        let query = "SELECT 
                 COLUMN_NAME,
                 DATA_TYPE,
                 IS_NULLABLE,
@@ -520,11 +518,10 @@ impl DatabaseAdapter for MySQLAdapter {
                 COLUMN_COMMENT
             FROM INFORMATION_SCHEMA.COLUMNS
             WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
-            ORDER BY ORDINAL_POSITION"
-        );
+            ORDER BY ORDINAL_POSITION";
 
         let rows: Vec<Row> = conn
-            .exec(&query, (db_name, table))
+            .exec(query, (db_name, table))
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
 
@@ -578,19 +575,17 @@ impl DatabaseAdapter for MySQLAdapter {
             .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
 
         // Get basic table information
-        let query = format!(
-            "SELECT 
+        let query = "SELECT 
                 TABLE_NAME,
                 TABLE_TYPE,
                 TABLE_ROWS,
                 DATA_LENGTH + INDEX_LENGTH as size_bytes,
                 TABLE_COMMENT
             FROM INFORMATION_SCHEMA.TABLES
-            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?"
-        );
+            WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?";
 
         let row: Option<Row> = conn
-            .exec_first(&query, (db_name, table))
+            .exec_first(query, (db_name, table))
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
 
@@ -654,7 +649,9 @@ mod tests {
             .with_option("connect_timeout", "10");
 
         let adapter = MySQLAdapter::new(config);
-        let _opts = adapter.build_connection_opts().expect("Failed to build opts");
+        let _opts = adapter
+            .build_connection_opts()
+            .expect("Failed to build opts");
 
         // Verify the options were set correctly - just check that opts built successfully
     }
@@ -688,7 +685,9 @@ mod tests {
             .with_option("connect_timeout", "20");
 
         let adapter = MySQLAdapter::new(config);
-        let _opts = adapter.build_connection_opts().expect("Failed to build opts");
+        let _opts = adapter
+            .build_connection_opts()
+            .expect("Failed to build opts");
 
         // Verify the options were set correctly - just check that opts built successfully
     }
@@ -699,18 +698,22 @@ mod tests {
             .with_password("password");
 
         let adapter = MySQLAdapter::new(config);
-        let _opts = adapter.build_connection_opts().expect("Failed to build opts");
+        let _opts = adapter
+            .build_connection_opts()
+            .expect("Failed to build opts");
 
         // Verify opts build successfully even without database
     }
 
     #[test]
     fn test_connection_opts_without_password() {
-        let config =
-            ConnectionConfig::new(DatabaseType::MySQL, "localhost", 3306, "root").with_database("testdb");
+        let config = ConnectionConfig::new(DatabaseType::MySQL, "localhost", 3306, "root")
+            .with_database("testdb");
 
         let adapter = MySQLAdapter::new(config);
-        let _opts = adapter.build_connection_opts().expect("Failed to build opts");
+        let _opts = adapter
+            .build_connection_opts()
+            .expect("Failed to build opts");
 
         // Verify opts build successfully even without password
     }

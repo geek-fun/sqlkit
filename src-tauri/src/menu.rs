@@ -15,15 +15,13 @@ pub fn create_menu(app: &App) -> Result<(), Error> {
         .build()?;
 
     let file_menu = SubmenuBuilder::new(app, "File")
-        .item(
-            &MenuItem::with_id(
-                app,
-                "new_connection",
-                "New Connection",
-                true,
-                Some("CommandOrControl+N"),
-            )?,
-        )
+        .item(&MenuItem::with_id(
+            app,
+            "new_connection",
+            "New Connection",
+            true,
+            Some("CommandOrControl+N"),
+        )?)
         .separator()
         .close_window()
         .build()?;
@@ -39,25 +37,21 @@ pub fn create_menu(app: &App) -> Result<(), Error> {
         .build()?;
 
     let view_menu = SubmenuBuilder::new(app, "View")
-        .item(
-            &MenuItem::with_id(
-                app,
-                "reload",
-                "Reload",
-                true,
-                Some("CommandOrControl+R"),
-            )?,
-        )
+        .item(&MenuItem::with_id(
+            app,
+            "reload",
+            "Reload",
+            true,
+            Some("CommandOrControl+R"),
+        )?)
         .separator()
-        .item(
-            &MenuItem::with_id(
-                app,
-                "toggle_dev_tools",
-                "Toggle Developer Tools",
-                true,
-                Some("F12"),
-            )?,
-        )
+        .item(&MenuItem::with_id(
+            app,
+            "toggle_dev_tools",
+            "Toggle Developer Tools",
+            true,
+            Some("F12"),
+        )?)
         .build()?;
 
     let window_menu = SubmenuBuilder::new(app, "Window")
@@ -85,7 +79,8 @@ pub fn create_menu(app: &App) -> Result<(), Error> {
                 "reload" => {
                     let _ = window.eval("location.reload()");
                 }
-                "toggle_dev_tools" => {
+                "toggle_dev_tools" =>
+                {
                     #[cfg(debug_assertions)]
                     if window.is_devtools_open() {
                         window.close_devtools();

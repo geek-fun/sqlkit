@@ -1,16 +1,16 @@
-import { defineStore } from "pinia";
+import { defineStore } from 'pinia'
 
 type AccountState = {
-  token: string;
-  username: string;
-  email: string;
-};
+  token: string
+  username: string
+  email: string
+}
 
-export const useAccountStore = defineStore("account", {
+export const useAccountStore = defineStore('account', {
   state: (): AccountState => ({
-    token: "",
-    username: "",
-    email: "",
+    token: '',
+    username: '',
+    email: '',
   }),
   persist: true,
   getters: {
@@ -18,14 +18,14 @@ export const useAccountStore = defineStore("account", {
   },
   actions: {
     setAuth(token: string, username: string, email: string) {
-      this.token = token;
-      this.username = username;
-      this.email = email;
+      this.token = token
+      this.username = username
+      this.email = email
     },
     clearAuth() {
-      this.token = "";
-      this.username = "";
-      this.email = "";
+      this.token = ''
+      this.username = ''
+      this.email = ''
     },
   },
-});
+})

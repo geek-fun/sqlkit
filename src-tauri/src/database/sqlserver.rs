@@ -16,10 +16,10 @@ use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tiberius::{Client, Config, EncryptionLevel, AuthMethod, Row};
+use tiberius::{AuthMethod, Client, Config, EncryptionLevel, Row};
 use tokio::net::TcpStream;
-use uuid;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
+use uuid;
 
 /// SQL Server connection wrapper.
 pub struct SqlServerConnection {
@@ -78,7 +78,7 @@ impl ConnectionPool for SqlServerPool {
     async fn health_check(&self) -> DbResult<()> {
         let client = self.get_client().await?;
         let mut client = client.lock().await;
-        
+
         client
             .simple_query("SELECT 1")
             .await
@@ -104,7 +104,7 @@ impl SqlServerPool {
     /// Get a client from the pool or create a new one.
     async fn get_client(&self) -> DbResult<Arc<tokio::sync::Mutex<Client<Compat<TcpStream>>>>> {
         let mut connections = self.connections.lock().await;
-        
+
         if let Some(conn) = connections.pop() {
             Ok(Arc::new(tokio::sync::Mutex::new(conn.client)))
         } else {
@@ -117,10 +117,10 @@ impl SqlServerPool {
     /// Create a new connection to SQL Server.
     async fn create_connection(config: &ConnectionConfig) -> DbResult<Client<Compat<TcpStream>>> {
         let mut tiberius_config = Config::new();
-        
+
         tiberius_config.host(&config.host);
         tiberius_config.port(config.port);
-        
+
         if let Some(ref database) = config.database {
             tiberius_config.database(database);
         }
@@ -183,11 +183,13 @@ impl SqlServerPool {
 
         let tcp = tokio::time::timeout(
             connect_timeout,
-            TcpStream::connect(tiberius_config.get_addr())
+            TcpStream::connect(tiberius_config.get_addr()),
         )
-            .await
-            .map_err(|_| DbError::Connection(format!("Connection timeout after {:?}", connect_timeout)))?
-            .map_err(|e| DbError::Connection(format!("Failed to connect to SQL Server: {}", e)))?;
+        .await
+        .map_err(|_| {
+            DbError::Connection(format!("Connection timeout after {:?}", connect_timeout))
+        })?
+        .map_err(|e| DbError::Connection(format!("Failed to connect to SQL Server: {}", e)))?;
 
         tcp.set_nodelay(true)
             .map_err(|e| DbError::Connection(format!("Failed to set TCP_NODELAY: {}", e)))?;
@@ -246,12 +248,12 @@ impl SqlServerAdapter {
     fn convert_value(row: &Row, idx: usize) -> DbResult<QueryValue> {
         // Try different types using try_get
         // In tiberius 0.12, ColumnData fields are Option-wrapped
-        
+
         // Try boolean
         if let Ok(Some(v)) = row.try_get::<bool, _>(idx) {
             return Ok(QueryValue::Bool(v));
         }
-        
+
         // Try integers
         if let Ok(Some(v)) = row.try_get::<i16, _>(idx) {
             return Ok(QueryValue::Int(v as i64));
@@ -262,7 +264,7 @@ impl SqlServerAdapter {
         if let Ok(Some(v)) = row.try_get::<i64, _>(idx) {
             return Ok(QueryValue::Int(v));
         }
-        
+
         // Try floats
         if let Ok(Some(v)) = row.try_get::<f32, _>(idx) {
             return Ok(QueryValue::Float(v as f64));
@@ -270,22 +272,22 @@ impl SqlServerAdapter {
         if let Ok(Some(v)) = row.try_get::<f64, _>(idx) {
             return Ok(QueryValue::Float(v));
         }
-        
+
         // Try string
         if let Ok(Some(v)) = row.try_get::<&str, _>(idx) {
             return Ok(QueryValue::String(v.to_string()));
         }
-        
+
         // Try binary
         if let Ok(Some(v)) = row.try_get::<&[u8], _>(idx) {
             return Ok(QueryValue::Bytes(v.to_vec()));
         }
-        
+
         // Try UUID
         if let Ok(Some(v)) = row.try_get::<uuid::Uuid, _>(idx) {
             return Ok(QueryValue::String(v.to_string()));
         }
-        
+
         // Default to null if nothing matches or value is NULL
         Ok(QueryValue::Null)
     }
@@ -304,7 +306,7 @@ impl DatabaseAdapter for SqlServerAdapter {
 
         // Test the connection by getting a client
         let client = pool.get_client().await?;
-        
+
         // Verify connection works with a simple query
         {
             let mut client_guard = client.lock().await;
@@ -406,7 +408,9 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = if let Some(timeout_duration) = timeout {
             tokio::time::timeout(timeout_duration, client.simple_query(query))
                 .await
-                .map_err(|_| DbError::Timeout(format!("Query timed out after {:?}", timeout_duration)))?
+                .map_err(|_| {
+                    DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
+                })?
                 .map_err(|e| DbError::QueryExecution(e.to_string()))?
         } else {
             client
@@ -431,7 +435,7 @@ impl DatabaseAdapter for SqlServerAdapter {
             Ok(QueryResult::affected(affected).with_execution_time(execution_time))
         } else {
             let result_set = &results[0];
-            
+
             if result_set.is_empty() {
                 Ok(QueryResult::new(Vec::new()).with_execution_time(execution_time))
             } else {

@@ -14,6 +14,12 @@ pub struct Store {
     pub app_handle: Arc<Mutex<Option<tauri::AppHandle>>>,
 }
 
+impl Default for Store {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Store {
     pub fn new() -> Self {
         Self {
@@ -29,7 +35,7 @@ impl Store {
     pub async fn get_store(&self) -> Result<Arc<tauri_plugin_store::Store<tauri::Wry>>, String> {
         let app = self.app_handle.lock().await;
         let handle = app.as_ref().ok_or("App handle not initialized")?;
-        
+
         handle
             .store(".store.dat")
             .map_err(|e| format!("Failed to access store: {}", e))
@@ -47,12 +53,12 @@ impl Store {
 ///
 /// The value from the store or null if not found.
 #[tauri::command]
-pub async fn store_get(
-    key: String,
-    state: State<'_, Store>,
-) -> Result<Option<Value>, String> {
+pub async fn store_get(key: String, state: State<'_, Store>) -> Result<Option<Value>, String> {
     let store = state.get_store().await?;
-    Ok(store.get(key).and_then(|v| v.as_object().cloned()).map(|obj| Value::Object(obj)))
+    Ok(store
+        .get(key)
+        .and_then(|v| v.as_object().cloned())
+        .map(Value::Object))
 }
 
 /// Set a value in the store.
@@ -63,11 +69,7 @@ pub async fn store_get(
 /// * `value` - The value to store
 /// * `state` - Store state
 #[tauri::command]
-pub async fn store_set(
-    key: String,
-    value: Value,
-    state: State<'_, Store>,
-) -> Result<(), String> {
+pub async fn store_set(key: String, value: Value, state: State<'_, Store>) -> Result<(), String> {
     let store = state.get_store().await?;
     store.set(key, value);
     store
@@ -83,10 +85,7 @@ pub async fn store_set(
 /// * `key` - The key to delete
 /// * `state` - Store state
 #[tauri::command]
-pub async fn store_delete(
-    key: String,
-    state: State<'_, Store>,
-) -> Result<(), String> {
+pub async fn store_delete(key: String, state: State<'_, Store>) -> Result<(), String> {
     let store = state.get_store().await?;
     store.delete(key);
     store

@@ -28,11 +28,12 @@ pub enum DatabaseType {
 }
 
 /// SSL/TLS mode for connections.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SslMode {
     /// Disable SSL/TLS.
     Disable,
     /// Prefer SSL/TLS but allow unencrypted connections.
+    #[default]
     Prefer,
     /// Require SSL/TLS.
     Require,
@@ -40,12 +41,6 @@ pub enum SslMode {
     VerifyCA,
     /// Verify full certificate chain.
     VerifyFull,
-}
-
-impl Default for SslMode {
-    fn default() -> Self {
-        Self::Prefer
-    }
 }
 
 /// Connection pooling configuration.

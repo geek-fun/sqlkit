@@ -38,14 +38,14 @@ import {
   rowsToCsv,
 } from './dataTableHelpers'
 
-interface TableDataResult {
+type TableDataResult = {
   columns: string[]
   rows: Record<string, unknown>[]
   rows_affected?: number
   execution_time_ms?: number
 }
 
-interface ColumnTypeInfo {
+type ColumnTypeInfo = {
   name: string
   data_type: string
   is_primary_key: boolean
@@ -164,12 +164,14 @@ async function fetchData() {
   try {
     const result = await invoke<TableDataResult>('get_table_data', {
       connectionId: props.connectionId,
-      database: props.database || null,
-      table: props.tableName,
-      schema: props.schema ?? null,
-      filter: appliedFilter.value.trim() || null,
-      limit: rowsPerPage.value,
-      offset: offset.value,
+      query: {
+        database: props.database || null,
+        table: props.tableName,
+        schema: props.schema ?? null,
+        filter: appliedFilter.value.trim() || null,
+        limit: rowsPerPage.value,
+        offset: offset.value,
+      },
     })
     data.value = result
     executionTimeMs.value = result.execution_time_ms ?? null

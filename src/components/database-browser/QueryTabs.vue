@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 
-interface Props {
+type Props = {
   tabs: QueryTab[]
   activeTabId: string | null
 }

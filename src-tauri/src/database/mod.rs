@@ -62,12 +62,12 @@
 pub mod adapter;
 pub mod config;
 pub mod error;
-pub mod pool;
 pub mod manager;
-pub mod postgres;
 pub mod mysql;
-pub mod sqlserver;
+pub mod pool;
+pub mod postgres;
 pub mod sqlite;
+pub mod sqlserver;
 pub mod types;
 
 #[cfg(test)]
@@ -77,12 +77,12 @@ mod tests;
 pub use adapter::DatabaseAdapter;
 pub use config::{ConnectionConfig, DatabaseType, PoolConfig, SslMode};
 pub use error::{DbError, DbResult};
-pub use pool::{ConnectionPool, PoolStats};
 pub use manager::{ConnectionManager, ConnectionMetadata, ManagerStats};
-pub use postgres::{PostgresAdapter, PostgresPool};
 pub use mysql::{MySQLAdapter, MySQLPool};
-pub use sqlserver::{SqlServerAdapter, SqlServerPool};
+pub use pool::{ConnectionPool, PoolStats};
+pub use postgres::{PostgresAdapter, PostgresPool};
 pub use sqlite::{SQLiteAdapter, SQLitePool};
+pub use sqlserver::{SqlServerAdapter, SqlServerPool};
 pub use types::{
     ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
 };
