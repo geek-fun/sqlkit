@@ -497,7 +497,6 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
         <AlertDialogFooter>
           <AlertDialogCancel>{{ t('common.buttons.cancel') }}</AlertDialogCancel>
           <AlertDialogAction
-            class="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             @click="confirmDelete"
           >
             {{ t('common.buttons.delete') }}

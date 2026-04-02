@@ -390,7 +390,6 @@ function handleToggleFavorite(id: string) {
         <AlertDialogFooter>
           <AlertDialogCancel>{{ t('common.buttons.cancel') }}</AlertDialogCancel>
           <AlertDialogAction
-            class="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             @click="confirmClear"
           >
             {{ t('common.buttons.confirm') }}

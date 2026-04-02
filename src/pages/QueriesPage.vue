@@ -365,8 +365,8 @@ async function handleDownloadQuery() {
           <!-- Connection selector -->
           <div class="p-2 border-b">
             <Select v-model="selectedConnectionId">
-              <SelectTrigger class="text-xs h-8">
-                <SelectValue :placeholder="t('pages.queries.selectConnection')" />
+              <SelectTrigger class="text-xs h-8 min-w-0">
+                <SelectValue :placeholder="t('pages.queries.selectConnection')" class="truncate" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -374,9 +374,9 @@ async function handleDownloadQuery() {
                   :key="conn.id"
                   :value="conn.id!"
                 >
-                  <div class="flex gap-2 items-center">
-                    <span class="font-medium">{{ conn.name }}</span>
-                    <span class="text-xs text-muted-foreground">({{ conn.host }})</span>
+                  <div class="flex gap-1 items-center min-w-0">
+                    <span class="font-medium shrink-0">{{ conn.name }}</span>
+                    <span class="text-xs text-muted-foreground truncate">({{ conn.host }})</span>
                   </div>
                 </SelectItem>
               </SelectContent>

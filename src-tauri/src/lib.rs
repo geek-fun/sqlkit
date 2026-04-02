@@ -19,6 +19,25 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[derive(Clone, serde::Serialize)]
+struct AuthPayload {
+    token: String,
+    username: String,
+    email: String,
+}
+
+fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
+    let url = url::Url::parse(url).ok()?;
+    if url.scheme() != "sqlkit" || url.host_str() != Some("auth") {
+        return None;
+    }
+    let params: std::collections::HashMap<_, _> = url.query_pairs().collect();
+    let token = params.get("token")?.to_string();
+    let username = params.get("username")?.to_string();
+    let email = params.get("email")?.to_string();
+    Some(AuthPayload { token, username, email })
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     use state::AppState;
@@ -31,6 +50,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_deep_link::init())
         .manage(app_state)
         .manage(store.clone())
         .setup(move |app| {
@@ -39,6 +59,32 @@ pub fn run() {
                 store.set_app_handle(handle).await;
             });
             menu::create_menu(app)?;
+
+            use tauri::{Emitter, Listener};
+
+            // Handle deep links received while the app is already running
+            let app_handle = app.handle().clone();
+            app.listen("deep-link://new-url", move |event: tauri::Event| {
+                if let Ok(urls) = serde_json::from_str::<Vec<String>>(event.payload()) {
+                    for url in &urls {
+                        if let Some(payload) = parse_auth_from_url(url) {
+                            let _ = app_handle.emit("sqlkit://auth", payload.clone());
+                        }
+                    }
+                }
+            });
+
+            // Handle deep links passed at launch (cold start)
+            use tauri_plugin_deep_link::DeepLinkExt;
+            if let Ok(Some(urls)) = app.deep_link().get_current() {
+                let app_handle = app.handle().clone();
+                for url in &urls {
+                    if let Some(payload) = parse_auth_from_url(url.as_str()) {
+                        let _ = app_handle.emit("sqlkit://auth", payload);
+                    }
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

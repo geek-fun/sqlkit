@@ -202,7 +202,6 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
             {{ t('common.buttons.cancel') }}
           </AlertDialogCancel>
           <AlertDialogAction
-            class="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             @click="confirmClose"
           >
             {{ t('components.queryTabs.closeDialog.discard') }}

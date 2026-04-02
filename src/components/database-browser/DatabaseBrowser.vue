@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useConnectionStore, useDatabaseStore } from '@/store'
+import { ConnectionStatus, useConnectionStore, useDatabaseStore } from '@/store'
 
 export type TreeNodeMetadata = TableInfo & {
   database: string
@@ -64,6 +64,11 @@ const activeConnection = computed(() => {
   return connId ? connectionStore.getConnectionById(connId) : connectionStore.activeConnection
 })
 const connectionId = computed(() => props.connectionId || connectionStore.activeConnectionId)
+const isActiveConnectionConnected = computed(() =>
+  connectionId.value
+    ? connectionStore.getConnectionStatus(connectionId.value) === ConnectionStatus.CONNECTED
+    : false,
+)
 
 function createTableNode(database: string, schema: string | undefined, table: TableInfo, parentId: string): TreeNode {
   return {
@@ -416,7 +421,7 @@ const getIcon = (type: IconType) => iconMap[type] || iconMap.column
     </div>
 
     <!-- Database selector: always visible so the user can switch databases -->
-    <div v-if="activeConnection?.isConnected" class="px-2 py-1 border-b">
+    <div v-if="isActiveConnectionConnected" class="px-2 py-1 border-b">
       <Select :model-value="props.selectedDatabase" @update:model-value="(val) => emit('update:selectedDatabase', val)">
         <SelectTrigger class="text-xs h-7">
           <SelectValue :placeholder="t('components.databaseBrowser.selectDatabase')" />

@@ -52,5 +52,7 @@ rusqlite = { version = "0.32", features = [
 uuid = { version = "1", features = [ "v4" ] }
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-deep-link = "2"
+url = "2"
 base64 = "0.22"
 chrono = "0.4"
