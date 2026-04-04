@@ -134,6 +134,22 @@ impl DatabaseAdapter for PostgresAdapter {
 async fn test_connection() { ... }
 ```
 
+## Cross-Platform Support
+
+SQLKit targets **macOS, Windows, and Linux**. All UI elements must be platform-aware.
+
+**Keyboard Shortcuts**: Use `Ctrl` on Windows/Linux, `⌘` (Cmd) on macOS. Detect platform at runtime:
+```typescript
+const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0
+const cmdKey = isMac ? '⌘' : 'Ctrl+'
+```
+
+**Never hardcode platform-specific modifiers** in UI labels (shortcuts, hints, tooltips). Always use runtime detection.
+
+**File Paths**: Use `path.join()` or `path.sep` for cross-platform path handling. Never assume `/` or `\` as separator.
+
+**Line Endings**: Handle both `\n` (Unix/macOS) and `\r\n` (Windows) when parsing files. Use `\n` when writing.
+
 ## Project Structure
 
 ```

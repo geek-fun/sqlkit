@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ServerConnection } from '@/store'
 import { invoke } from '@tauri-apps/api/core'
+import { open } from '@tauri-apps/plugin-dialog'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
@@ -14,7 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
+import { toast } from '@/composables/useNotifications'
 import { DatabaseType, resolveDatabase } from '@/store'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import SslConfigSection from './ssl/SslConfigSection.vue'
@@ -63,17 +66,88 @@ const testStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
 const testError = ref<string>('')
 const formErrors = ref<Record<string, string>>({})
 
+// SQLite-specific state
+const sqliteTab = ref<'file' | 'in-memory'>('file')
+const recentDatabases = ref<Array<{ path: string, timestamp: number }>>([])
+const savedFilePath = ref<string>('') // Preserve file path when switching to in-memory
+
+// Load recent databases from localStorage
+const RECENT_DB_KEY = 'sqlite_recent_databases'
+const MAX_RECENT_DB = 10
+
+function loadRecentDatabases() {
+  try {
+    const stored = localStorage.getItem(RECENT_DB_KEY)
+    if (stored)
+      recentDatabases.value = JSON.parse(stored)
+  }
+  catch {
+    recentDatabases.value = []
+  }
+}
+
+function saveRecentDatabase(path: string) {
+  const updated = [{ path, timestamp: Date.now() }, ...recentDatabases.value.filter(db => db.path !== path)].slice(0, MAX_RECENT_DB)
+  recentDatabases.value = updated
+  localStorage.setItem(RECENT_DB_KEY, JSON.stringify(updated))
+}
+
+function formatTimeAgo(timestamp: number): string {
+  const seconds = Math.floor((Date.now() - timestamp) / 1000)
+  const minutes = Math.floor(seconds / 60)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+
+  if (days > 0)
+    return t('components.serverForm.sqlite.ago', { time: `${days}d` })
+  if (hours > 0)
+    return t('components.serverForm.sqlite.ago', { time: `${hours}h` })
+  if (minutes > 0)
+    return t('components.serverForm.sqlite.ago', { time: `${minutes}m` })
+  return t('components.serverForm.sqlite.ago', { time: `${seconds}s` })
+}
+
 watch(() => props.open, (open) => {
   if (open) {
     if (props.connection) {
       formData.value = { ...props.connection }
+      // Detect SQLite mode from path
+      if (props.connection.type === DatabaseType.SQLITE) {
+        if (props.connection.host === ':memory:') {
+          sqliteTab.value = 'in-memory'
+        }
+        else {
+          sqliteTab.value = 'file'
+          savedFilePath.value = props.connection.host
+        }
+      }
     }
     else {
       formData.value = { ...defaultConnection }
+      sqliteTab.value = 'file'
+      savedFilePath.value = ''
     }
     testStatus.value = 'idle'
     testError.value = ''
     formErrors.value = {}
+    loadRecentDatabases()
+  }
+})
+
+// Watch for SQLite tab changes to preserve file path
+watch(sqliteTab, (tab) => {
+  if (formData.value.type === DatabaseType.SQLITE) {
+    if (tab === 'in-memory') {
+      // Save current file path before switching to in-memory
+      if (formData.value.host !== ':memory:' && formData.value.host.trim()) {
+        savedFilePath.value = formData.value.host
+      }
+      formData.value.host = ':memory:'
+    }
+    else {
+      // Restore saved file path when switching back to file mode
+      formData.value.host = savedFilePath.value
+    }
   }
 })
 
@@ -93,7 +167,35 @@ function handleDatabaseTypeChange(value: string) {
     formData.value.port = 0
     formData.value.username = ''
     formData.value.password = ''
+    sqliteTab.value = 'file'
+    savedFilePath.value = ''
   }
+}
+
+// SQLite file picker function - handles both open existing and create new
+async function selectDatabaseFile() {
+  try {
+    const selected = await open({
+      multiple: false,
+      filters: [
+        { name: 'SQLite Database', extensions: ['db', 'sqlite', 'sqlite3'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    })
+    if (typeof selected === 'string') {
+      formData.value.host = selected
+    }
+  }
+  catch (error) {
+    toast.error(t('components.serverForm.errors.filePickerFailed'), {
+      description: error instanceof Error ? error.message : String(error),
+    })
+  }
+}
+
+// Handle recent database selection
+function selectRecentDatabase(path: string) {
+  formData.value.host = path
 }
 
 function validateForm(): boolean {
@@ -104,7 +206,7 @@ function validateForm(): boolean {
   }
 
   if (formData.value.type === DatabaseType.SQLITE) {
-    if (!formData.value.host.trim()) {
+    if (formData.value.host !== ':memory:' && !formData.value.host.trim()) {
       errors.host = t('components.serverForm.errors.filePathRequired')
     }
   }
@@ -190,6 +292,11 @@ function handleSave() {
     return
   }
 
+  // Save recent database path for SQLite
+  if (formData.value.type === DatabaseType.SQLITE && formData.value.host !== ':memory:') {
+    saveRecentDatabase(formData.value.host)
+  }
+
   emit('save', { ...formData.value })
   isOpen.value = false
 }
@@ -264,13 +371,99 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
           </Select>
         </div>
 
-        <!-- Host / File path (for SQLite) -->
-        <div class="space-y-2">
-          <Label for="host">{{ isSqlite ? t('components.serverForm.labels.databaseFilePath') : t('components.serverForm.labels.host') }}</Label>
+        <!-- SQLite-specific fields -->
+        <div v-if="isSqlite" class="space-y-4">
+          <!-- SQLite Mode Tabs -->
+          <Tabs
+            v-model="sqliteTab"
+          >
+            <TabsList class="grid grid-cols-2 w-full">
+              <TabsTrigger value="file">
+                {{ t('components.serverForm.sqlite.modes.file') }}
+              </TabsTrigger>
+              <TabsTrigger value="in-memory">
+                {{ t('components.serverForm.sqlite.modes.inMemory') }}
+              </TabsTrigger>
+            </TabsList>
+
+            <!-- File Mode -->
+            <TabsContent value="file" class="space-y-4">
+              <!-- Database File Path -->
+              <div class="space-y-2">
+                <Label for="sqlite-path">{{ t('components.serverForm.labels.databaseFilePath') }}</Label>
+                <div class="flex gap-2 items-center">
+                  <Input
+                    id="sqlite-path"
+                    v-model="formData.host"
+                    :placeholder="t('components.serverForm.placeholders.filePath')"
+                    :class="{ 'border-destructive': formErrors.host }"
+                    readonly
+                    class="flex-1"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    @click="selectDatabaseFile"
+                  >
+                    {{ t('common.buttons.browse') }}
+                  </Button>
+                </div>
+                <p v-if="formErrors.host" class="text-sm text-destructive">
+                  {{ formErrors.host }}
+                </p>
+              </div>
+
+              <!-- Recent Databases -->
+              <div v-if="recentDatabases.length > 0" class="space-y-2">
+                <Label>{{ t('components.serverForm.labels.recentDatabases') }}</Label>
+                <div class="p-2 border rounded-md max-h-32 overflow-y-auto space-y-1">
+                  <div
+                    v-for="db in recentDatabases"
+                    :key="db.path"
+                    class="text-sm p-1 rounded flex gap-2 cursor-pointer items-center hover:bg-muted"
+                    @click="selectRecentDatabase(db.path)"
+                  >
+                    <svg
+                      class="text-muted-foreground h-4 w-4"
+                      xmlns="http://www.w3.org/2000/svg"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                      <polyline points="14 2 14 8 20 8" />
+                    </svg>
+                    <span class="flex-1 truncate">{{ db.path }}</span>
+                    <span class="text-xs text-muted-foreground">{{ formatTimeAgo(db.timestamp) }}</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty state for recent databases -->
+              <div v-if="recentDatabases.length === 0" class="text-sm text-muted-foreground">
+                {{ t('components.serverForm.sqlite.recentEmpty') }}
+              </div>
+            </TabsContent>
+
+            <!-- In-Memory Mode -->
+            <TabsContent value="in-memory">
+              <p class="text-sm text-muted-foreground">
+                {{ t('components.serverForm.sqlite.inMemoryHint') }}
+              </p>
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <!-- Host field for non-SQLite databases -->
+        <div v-if="!isSqlite" class="space-y-2">
+          <Label for="host">{{ t('components.serverForm.labels.host') }}</Label>
           <Input
             id="host"
             v-model="formData.host"
-            :placeholder="isSqlite ? t('components.serverForm.placeholders.filePath') : t('components.serverForm.placeholders.host')"
+            :placeholder="t('components.serverForm.placeholders.host')"
             :class="{ 'border-destructive': formErrors.host }"
           />
           <p v-if="formErrors.host" class="text-sm text-destructive">

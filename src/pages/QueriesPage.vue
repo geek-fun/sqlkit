@@ -1,10 +1,9 @@
 <script setup lang="ts">
-import type { CursorPosition, Selection } from '@/common/sqlParser'
+import type { StatementToExecute } from '@/composables/useSqlStatements'
 import type { TableInfo } from '@/store/databaseStore'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
-import { extractStatementAtCursor } from '@/common/sqlParser'
 import { DatabaseBrowser, DataTableView, QueryResultPanel, QueryTabs } from '@/components/database-browser'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
@@ -146,9 +145,7 @@ watch(activeTab, (tab) => {
   }
 })
 
-type ExecuteQueryDetails = { query: string, cursorPosition?: CursorPosition, selection?: Selection }
-
-async function executeQuery(details?: ExecuteQueryDetails) {
+async function executeQuery(details?: StatementToExecute) {
   if (!activeTab.value) {
     return
   }
@@ -158,9 +155,7 @@ async function executeQuery(details?: ExecuteQueryDetails) {
     return
   }
 
-  const sqlToExecute = details && typeof details === 'object' && 'query' in details
-    ? extractStatementAtCursor(details.query || '', details.cursorPosition, details.selection)
-    : tabContent
+  const sqlToExecute = details?.found ? details.sql : tabContent
 
   if (!sqlToExecute?.trim()) {
     return
@@ -522,6 +517,7 @@ async function handleDownloadQuery() {
                 :minimap="appStore.editorConfig.showMinimap"
                 :show-line-numbers="appStore.editorConfig.showLineNumbers"
                 @execute="(details) => executeQuery(details)"
+                @statement-not-found="toast.error(t('pages.queries.notifications.noStatementFound'))"
                 @save="handleSaveQuery"
               />
               <div v-else class="text-muted-foreground flex h-full items-center justify-center">

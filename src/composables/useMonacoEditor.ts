@@ -1,8 +1,19 @@
 import type { Ref } from 'vue'
+import type { SqlStatement, StatementToExecute } from './useSqlStatements'
 import * as monaco from 'monaco-editor'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { onBeforeUnmount } from 'vue'
+import {
+  getSqlGutterDecorations,
+  getStatementAtLine,
+  getStatementToExecute,
+  MOUSE_TARGET_GUTTER_LINE_DECORATIONS,
+  parseSqlStatements,
+  SQL_EXECUTE_GUTTER_CLASS,
+} from './useSqlStatements'
 import { useTheme } from './useTheme'
+
+export type { ExecuteSource, StatementToExecute } from './useSqlStatements'
 
 // Configure Monaco Editor workers for Vite
 globalThis.MonacoEnvironment = {
@@ -177,16 +188,53 @@ const SQL_FUNCTIONS = [
   'LOG',
 ]
 
+type ExecuteGutterCallback = (lineNumber: number) => void
+type ExecuteQueryCallback = (result: StatementToExecute) => void
+type StatementNotFoundCallback = () => void
+
+export type EditorCallbacks = {
+  onExecuteQuery: ExecuteQueryCallback
+  onStatementNotFound: StatementNotFoundCallback
+  onGutterExecute?: ExecuteGutterCallback
+  onGutterContextMenu?: (lineNumber: number, x: number, y: number) => void
+  onSave?: (query: string) => void
+}
+
 export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialValue: Ref<string>, options: MonacoEditorOptions = {}) {
   let editor: monaco.editor.IStandaloneCodeEditor | null = null
   let completionProvider: monaco.IDisposable | null = null
+  let gutterDecorations: monaco.editor.IEditorDecorationsCollection | null = null
+  let parsedStatements: SqlStatement[] = []
+  let registeredCallbacks: EditorCallbacks | null = null
+  let refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null
   const { isDark } = useTheme()
 
-  const initEditor = () => {
+  const refreshGutterDecorations = () => {
+    if (refreshDebounceTimer !== null)
+      clearTimeout(refreshDebounceTimer)
+    refreshDebounceTimer = setTimeout(() => {
+      refreshDebounceTimer = null
+      if (!editor)
+        return
+      const model = editor.getModel()
+      if (!model)
+        return
+      parsedStatements = parseSqlStatements(model.getValue())
+      const decorations = getSqlGutterDecorations(parsedStatements)
+      if (gutterDecorations) {
+        gutterDecorations.set(decorations)
+      }
+      else {
+        gutterDecorations = editor.createDecorationsCollection(decorations)
+      }
+    }, 150)
+  }
+
+  const initEditor = (callbacks: EditorCallbacks) => {
+    registeredCallbacks = callbacks
     if (!containerRef.value)
       return
 
-    // Set up auto-completion provider
     completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
       provideCompletionItems: (model, position) => {
         const word = model.getWordUntilPosition(position)
@@ -197,6 +245,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
           endColumn: word.endColumn,
         }
 
+        const noParenFunctions = ['NOW', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP']
         const suggestions: monaco.languages.CompletionItem[] = [
           ...SQL_KEYWORDS.map(keyword => ({
             label: keyword,
@@ -210,33 +259,25 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
             insertText: type,
             range,
           })),
-          ...SQL_FUNCTIONS.map((func) => {
-            // Some functions don't require parentheses in all SQL dialects
-            const noParenFunctions = ['NOW', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP']
-            const insertText = noParenFunctions.includes(func) ? func : `${func}()`
-            return {
-              label: func,
-              kind: monaco.languages.CompletionItemKind.Function,
-              insertText,
-              range,
-            }
-          }),
+          ...SQL_FUNCTIONS.map(func => ({
+            label: func,
+            kind: monaco.languages.CompletionItemKind.Function,
+            insertText: noParenFunctions.includes(func) ? func : `${func}()`,
+            range,
+          })),
         ]
 
         return { suggestions }
       },
     })
 
-    // Create editor instance
     editor = monaco.editor.create(containerRef.value, {
       value: initialValue.value,
       language: options.language || 'sql',
       theme: isDark.value ? 'vs-dark' : 'vs',
       automaticLayout: true,
       readOnly: options.readOnly || false,
-      minimap: {
-        enabled: options.minimap !== false,
-      },
+      minimap: { enabled: options.minimap !== false },
       fontSize: options.fontSize || 14,
       tabSize: options.tabSize || 2,
       lineNumbers: options.showLineNumbers === false ? 'off' : 'on',
@@ -245,49 +286,78 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
       contextmenu: true,
       formatOnPaste: true,
       formatOnType: true,
-      suggest: {
-        showKeywords: true,
-        showSnippets: true,
-      },
+      suggest: { showKeywords: true, showSnippets: true },
     })
 
-    // Add keyboard shortcuts
-    editor.addCommand(
-      monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter,
-      () => {
-        // Get cursor position
-        const position = editor?.getPosition()
-        const selection = editor?.getSelection()
+    refreshGutterDecorations()
 
-        // This will be handled by parent component
-        const event = new CustomEvent('execute-query', {
-          detail: {
-            query: editor?.getValue(),
-            cursorPosition: position,
-            selection: selection
-              ? {
-                  startLineNumber: selection.startLineNumber,
-                  startColumn: selection.startColumn,
-                  endLineNumber: selection.endLineNumber,
-                  endColumn: selection.endColumn,
-                }
-              : undefined,
-          },
-        })
-        containerRef.value?.dispatchEvent(event)
-      },
-    )
+    editor.onDidChangeModelContent(() => {
+      refreshGutterDecorations()
+    })
 
-    editor.addCommand(
-      monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS,
-      () => {
-        // This will be handled by parent component
-        const event = new CustomEvent('save-query', {
-          detail: { query: editor?.getValue() },
-        })
-        containerRef.value?.dispatchEvent(event)
-      },
-    )
+    editor.onMouseDown(({ event, target }) => {
+      if (
+        event.leftButton
+        && target.type === MOUSE_TARGET_GUTTER_LINE_DECORATIONS
+        && target.element?.classList
+        && Array.from(target.element.classList).includes(SQL_EXECUTE_GUTTER_CLASS)
+        && target.position
+      ) {
+        const stmt = getStatementAtLine(parsedStatements, target.position.lineNumber)
+        if (stmt) {
+          callbacks.onExecuteQuery({ sql: stmt.statement, source: 'statement', found: true })
+        }
+        else {
+          callbacks.onStatementNotFound()
+        }
+      }
+    })
+
+    editor.onContextMenu(({ event, target }) => {
+      if (
+        target.type === MOUSE_TARGET_GUTTER_LINE_DECORATIONS
+        && target.element?.classList
+        && Array.from(target.element.classList).includes(SQL_EXECUTE_GUTTER_CLASS)
+        && target.position
+        && callbacks.onGutterContextMenu
+      ) {
+        event.preventDefault()
+        event.stopPropagation()
+        callbacks.onGutterContextMenu(target.position.lineNumber, event.posx, event.posy)
+      }
+    })
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+      if (!editor)
+        return
+      const result = getStatementToExecute(editor, parsedStatements)
+      if (result.found) {
+        callbacks.onExecuteQuery(result)
+      }
+      else {
+        callbacks.onStatementNotFound()
+      }
+    })
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      callbacks.onSave?.(editor?.getValue() ?? '')
+    })
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Slash, () => {
+      editor?.trigger('keyboard', 'editor.action.commentLine', {})
+    })
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI, () => {
+      editor?.trigger('keyboard', 'editor.action.formatDocument', {})
+    })
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space, () => {
+      editor?.trigger('keyboard', 'editor.action.triggerSuggest', {})
+    })
+
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF, () => {
+      editor?.trigger('keyboard', 'editor.action.formatDocument', {})
+    })
 
     return editor
   }
@@ -317,6 +387,9 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
   }
 
   const dispose = () => {
+    if (refreshDebounceTimer !== null)
+      clearTimeout(refreshDebounceTimer)
+    gutterDecorations?.clear()
     completionProvider?.dispose()
     editor?.dispose()
   }
@@ -332,5 +405,20 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     updateTheme,
     updateOptions,
     dispose,
+    executeAtLine: (lineNumber: number) => {
+      if (!editor || !registeredCallbacks)
+        return
+      const stmt = getStatementAtLine(parsedStatements, lineNumber)
+      if (stmt) {
+        registeredCallbacks.onExecuteQuery({ sql: stmt.statement, source: 'statement', found: true })
+      }
+      else {
+        registeredCallbacks.onStatementNotFound()
+      }
+    },
+    getStatementTextAtLine: (lineNumber: number): string | null => {
+      const stmt = getStatementAtLine(parsedStatements, lineNumber)
+      return stmt?.statement ?? null
+    },
   }
 }

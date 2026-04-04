@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import type * as monaco from 'monaco-editor'
 import type { MonacoEditorOptions, SQLDialect } from '@/composables/useMonacoEditor'
-import { onMounted, ref, watch } from 'vue'
+import type { StatementToExecute } from '@/composables/useSqlStatements'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { ProgressBar } from '@/components/ui/progress'
 import { useMonacoEditor } from '@/composables/useMonacoEditor'
 import { useTheme } from '@/composables/useTheme'
@@ -36,13 +36,21 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   'update:modelValue': [value: string]
-  'execute': [details: { query: string, cursorPosition?: { lineNumber: number, column: number }, selection?: { startLineNumber: number, startColumn: number, endLineNumber: number, endColumn: number } }]
+  'execute': [details: StatementToExecute]
+  'statementNotFound': []
   'save': [query: string]
 }>()
 
 const editorContainer = ref<HTMLElement | null>(null)
 const editorValue = ref(props.modelValue || props.placeholder)
 const { isDark } = useTheme()
+
+const isMac = (navigator.userAgentData?.platform ?? navigator.platform).toUpperCase().includes('MAC')
+const cmdKey = isMac ? '⌘' : 'Ctrl+'
+
+const contextMenuVisible = ref(false)
+const contextMenuPosition = ref({ x: 0, y: 0 })
+const contextMenuLine = ref<number | null>(null)
 
 const editorOptions: MonacoEditorOptions = {
   language: props.dialect,
@@ -54,60 +62,115 @@ const editorOptions: MonacoEditorOptions = {
   wordWrap: props.wordWrap,
 }
 
-const { initEditor, getValue, setValue, updateTheme, updateOptions } = useMonacoEditor(
+const { initEditor, getValue, setValue, updateTheme, updateOptions, executeAtLine, getStatementTextAtLine } = useMonacoEditor(
   editorContainer,
   editorValue,
   editorOptions,
 )
 
-let editor: monaco.editor.IStandaloneCodeEditor | null = null
+let editorInstance: ReturnType<typeof initEditor> | null = null
+
+function hideContextMenu() {
+  contextMenuVisible.value = false
+  contextMenuLine.value = null
+}
+
+function handleDocumentClick(event: MouseEvent) {
+  if (!contextMenuVisible.value)
+    return
+  const target = event.target as HTMLElement
+  if (!target.closest('.sql-context-menu'))
+    hideContextMenu()
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (contextMenuVisible.value && event.key === 'Escape')
+    hideContextMenu()
+}
+
+const CONTEXT_MENU_WIDTH = 180
+const CONTEXT_MENU_HEIGHT = 100
+
+function clampMenuPosition(x: number, y: number): { x: number, y: number } {
+  const vw = window.innerWidth
+  const vh = window.innerHeight
+  return {
+    x: Math.min(x, vw - CONTEXT_MENU_WIDTH),
+    y: Math.min(y, vh - CONTEXT_MENU_HEIGHT),
+  }
+}
 
 onMounted(() => {
-  editor = initEditor() ?? null
+  editorInstance = initEditor({
+    onExecuteQuery: (result: StatementToExecute) => {
+      emit('execute', result)
+    },
+    onStatementNotFound: () => {
+      emit('statementNotFound')
+    },
+    onSave: (query: string) => {
+      emit('save', query)
+    },
+    onGutterContextMenu: (lineNumber: number, x: number, y: number) => {
+      const clamped = clampMenuPosition(x, y)
+      contextMenuPosition.value = clamped
+      contextMenuLine.value = lineNumber
+      contextMenuVisible.value = true
+    },
+  })
 
-  if (editor) {
-    // Listen for content changes
-    editor.onDidChangeModelContent(() => {
-      const value = getValue()
-      emit('update:modelValue', value)
+  if (editorInstance) {
+    editorInstance.onDidChangeModelContent(() => {
+      emit('update:modelValue', getValue())
     })
-
-    // Listen for execute command
-    editorContainer.value?.addEventListener('execute-query', ((event: CustomEvent) => {
-      emit('execute', event.detail)
-    }) as EventListener)
-
-    // Listen for save command
-    editorContainer.value?.addEventListener('save-query', ((event: CustomEvent) => {
-      emit('save', event.detail.query)
-    }) as EventListener)
   }
+
+  document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('keydown', handleDocumentKeydown)
 })
 
-// Watch for external value changes
+onUnmounted(() => {
+  document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('keydown', handleDocumentKeydown)
+})
+
 watch(() => props.modelValue, (newValue) => {
-  if (newValue !== getValue()) {
+  if (newValue !== getValue())
     setValue(newValue || '')
-  }
 })
 
-// Watch for theme changes
-watch(isDark, (dark) => {
-  updateTheme(dark)
-})
+watch(isDark, dark => updateTheme(dark))
 
-// Watch for editor option changes
 watch(() => props.showLineNumbers, val => updateOptions({ showLineNumbers: val }))
 watch(() => props.wordWrap, val => updateOptions({ wordWrap: val }))
 watch(() => props.fontSize, val => updateOptions({ fontSize: val }))
 watch(() => props.tabSize, val => updateOptions({ tabSize: val }))
 watch(() => props.minimap, val => updateOptions({ minimap: val }))
 
-// Expose methods for parent component
-defineExpose({
-  getValue,
-  setValue,
-})
+function handleContextMenuExecute() {
+  if (contextMenuLine.value === null)
+    return
+  const line = contextMenuLine.value
+  hideContextMenu()
+  executeAtLine(line)
+}
+
+function handleContextMenuFormat() {
+  hideContextMenu()
+  editorInstance?.trigger('contextmenu', 'editor.action.formatDocument', {})
+}
+
+async function handleContextMenuCopy() {
+  if (contextMenuLine.value === null)
+    return
+  const line = contextMenuLine.value
+  hideContextMenu()
+  const statementText = getStatementTextAtLine(line)
+  if (statementText && navigator.clipboard)
+    await navigator.clipboard.writeText(statementText)
+}
+
+defineExpose({ getValue, setValue })
 </script>
 
 <template>
@@ -118,18 +181,32 @@ defineExpose({
       class="sql-editor-container"
       :style="{ height: '100%', width: '100%' }"
     />
+    <div
+      v-if="contextMenuVisible"
+      class="sql-context-menu"
+      :style="{ top: `${contextMenuPosition.y}px`, left: `${contextMenuPosition.x}px` }"
+      @click.stop
+    >
+      <ul>
+        <li @click="handleContextMenuExecute">
+          <span>Execute</span>
+          <span class="shortcut">{{ cmdKey }}Enter</span>
+        </li>
+        <li @click="handleContextMenuFormat">
+          <span>Format</span>
+          <span class="shortcut">{{ cmdKey }}I</span>
+        </li>
+        <li @click="handleContextMenuCopy">
+          <span>Copy</span>
+        </li>
+      </ul>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .sql-editor-wrapper {
   position: relative;
-  overflow: hidden;
-}
-</style>
-
-<style scoped>
-.sql-editor-wrapper {
   border: 1px solid var(--border-color, #e5e7eb);
   border-radius: 0.375rem;
   overflow: hidden;
@@ -143,5 +220,63 @@ defineExpose({
 
 .sql-editor-container {
   position: relative;
+}
+
+.sql-context-menu {
+  position: fixed;
+  background-color: hsl(var(--background));
+  border: 1px solid hsl(var(--border));
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 10000;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.sql-context-menu ul {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  min-width: 160px;
+}
+
+.sql-context-menu li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.sql-context-menu li .shortcut {
+  font-size: 11px;
+  opacity: 0.5;
+  white-space: nowrap;
+}
+
+.sql-context-menu li:hover {
+  background: hsl(var(--accent));
+}
+
+:deep(.sql-execute-decoration) {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:deep(.sql-execute-decoration::before) {
+  content: '';
+  display: block;
+  width: 0;
+  height: 0;
+  border-style: solid;
+  border-width: 6px 0 6px 10px;
+  border-color: transparent transparent transparent hsl(var(--primary));
+}
+
+:deep(.sql-execute-decoration:hover::before) {
+  border-color: transparent transparent transparent hsl(var(--primary) / 0.7);
 }
 </style>

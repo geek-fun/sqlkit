@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { toast } from '@/composables/useNotifications'
 import { ConnectionStatus, useConnectionStore } from '@/store'
 
 const MIN_LOADING_TIME = 1500
@@ -197,7 +198,7 @@ function handleDuplicateConnection(connection: ServerConnection) {
 async function handleSaveConnection(connection: ServerConnection) {
   const result = await connectionStore.saveConnection(connection)
   if (!result.success) {
-    console.error('Failed to save connection:', result.message)
+    toast.error(t('pages.connections.saveFailed'), { description: result.message })
   }
 }
 

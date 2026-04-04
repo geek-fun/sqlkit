@@ -87,7 +87,9 @@ impl ServerConfig {
             config = config.with_password(password);
         }
 
-        if let Some(ref database) = self.database {
+        if self.db_type.to_lowercase() == "sqlite" {
+            config = config.with_database(&self.host);
+        } else if let Some(ref database) = self.database {
             config = config.with_database(database);
         }
 

@@ -77,6 +77,7 @@ export const enUS = {
       error: {
         title: 'Connection Error',
       },
+      saveFailed: 'Failed to save connection',
     },
     settings: {
       title: 'Settings',
@@ -227,6 +228,7 @@ export const enUS = {
       notifications: {
         querySaved: 'Query saved',
         saveFailed: 'Save failed',
+        noStatementFound: 'No SQL statement found at cursor position',
       },
     },
     dataStudio: {
@@ -240,21 +242,6 @@ export const enUS = {
     },
   },
   components: {
-    updater: {
-      updateAvailable: 'Update Available',
-      newVersion: 'Version {version} is available',
-      download: 'Download',
-      install: 'Install',
-      later: 'Later',
-      downloading: 'Downloading update...',
-      installing: 'Installing update...',
-      installed: 'Update installed',
-      restart: 'Restart now',
-      upToDate: 'You have the latest version',
-      checkFailed: 'Failed to check for updates',
-      downloadFailed: 'Failed to download update',
-      installFailed: 'Failed to install update',
-    },
     serverForm: {
       title: {
         edit: 'Edit Connection',
@@ -274,6 +261,8 @@ export const enUS = {
         username: 'Username',
         password: 'Password',
         ssl: 'Use SSL/TLS encryption',
+        sqliteMode: 'SQLite Mode',
+        recentDatabases: 'Recent Databases',
       },
       placeholders: {
         connectionName: 'My Database',
@@ -291,11 +280,26 @@ export const enUS = {
         mariadb: 'MariaDB',
         sqlite: 'SQLite',
       },
+      sqlite: {
+        modes: {
+          file: 'File',
+          inMemory: 'In-Memory',
+        },
+        recentEmpty: 'No recent databases',
+        ago: '{time} ago',
+        inMemoryHint: 'In-memory databases are temporary and will be lost when the connection is closed. Useful for testing and temporary data.',
+        pathStatus: {
+          valid: 'File exists',
+          notFound: 'File not found',
+          noPermission: 'No write permission',
+        },
+      },
       errors: {
         nameRequired: 'Connection name is required',
         hostRequired: 'Host is required',
         filePathRequired: 'Database file path is required',
         portInvalid: 'Port must be a positive number',
+        filePickerFailed: 'Failed to open file picker',
       },
     },
     serverCard: {
@@ -403,6 +407,16 @@ export const enUS = {
     header: {
       appName: 'SQLKit',
     },
+  },
+  updater: {
+    updateAvailable: 'Update Available',
+    newVersion: 'Version {version} is available',
+    upToDate: 'You have the latest version',
+    checkFailed: 'Failed to check for updates',
+    downloading: 'Downloading update...',
+    installing: 'Installing update...',
+    installed: 'Update installed. Restarting...',
+    installFailed: 'Failed to install update',
   },
   errors: {
     unexpected: 'Unexpected error: {error}',

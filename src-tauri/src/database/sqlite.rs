@@ -112,7 +112,7 @@ impl SQLitePool {
         // Enable Write-Ahead Logging (WAL) mode for better concurrency
         // WAL mode allows multiple readers and one writer to proceed concurrently
         if self.db_path.is_some() {
-            conn.execute("PRAGMA journal_mode=WAL", [])
+            conn.query_row("PRAGMA journal_mode=WAL", [], |_| Ok(()))
                 .map_err(|e| DbError::Configuration(format!("Failed to enable WAL mode: {}", e)))?;
         }
 
@@ -532,9 +532,9 @@ impl DatabaseAdapter for SQLiteAdapter {
                 _ => "".to_string(),
             };
 
-            let nullable = match row.get("notnull") {
-                Some(QueryValue::Int(i)) => *i == 0,
-                _ => true,
+            let notnull = match row.get("notnull") {
+                Some(QueryValue::Int(i)) => *i != 0,
+                _ => false,
             };
 
             let default_value = match row.get("dflt_value") {
@@ -547,6 +547,8 @@ impl DatabaseAdapter for SQLiteAdapter {
                 Some(QueryValue::Int(i)) => *i > 0,
                 _ => false,
             };
+
+            let nullable = !notnull && !is_primary_key;
 
             columns.push(ColumnInfo {
                 name,

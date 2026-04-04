@@ -77,6 +77,7 @@ export const zhCN = {
       error: {
         title: '连接错误',
       },
+      saveFailed: '保存连接失败',
     },
     settings: {
       title: '设置',
@@ -210,6 +211,7 @@ export const zhCN = {
       notifications: {
         querySaved: '查询已保存',
         saveFailed: '保存失败',
+        noStatementFound: '未找到光标位置的 SQL 语句',
       },
     },
     dataStudio: {
@@ -242,6 +244,8 @@ export const zhCN = {
         username: '用户名',
         password: '密码',
         ssl: '使用SSL/TLS加密',
+        sqliteMode: 'SQLite 模式',
+        recentDatabases: '最近数据库',
       },
       placeholders: {
         connectionName: '我的数据库',
@@ -259,11 +263,26 @@ export const zhCN = {
         mariadb: 'MariaDB',
         sqlite: 'SQLite',
       },
+      sqlite: {
+        modes: {
+          file: '文件',
+          inMemory: '内存',
+        },
+        recentEmpty: '没有最近数据库',
+        ago: '{time}前',
+        inMemoryHint: '内存数据库是临时的，连接关闭后数据将丢失。适用于测试和临时数据。',
+        pathStatus: {
+          valid: '文件存在',
+          notFound: '文件未找到',
+          noPermission: '没有写入权限',
+        },
+      },
       errors: {
         nameRequired: '连接名称是必填项',
         hostRequired: '主机地址是必填项',
         filePathRequired: '数据库文件路径是必填项',
         portInvalid: '端口必须是正数',
+        filePickerFailed: '打开文件选择器失败',
       },
     },
     serverCard: {
@@ -371,6 +390,16 @@ export const zhCN = {
     header: {
       appName: 'SQLKit',
     },
+  },
+  updater: {
+    updateAvailable: '发现新版本',
+    newVersion: '版本 {version} 可用',
+    upToDate: '您已是最新版本',
+    checkFailed: '检查更新失败',
+    downloading: '正在下载更新...',
+    installing: '正在安装更新...',
+    installed: '更新已安装，正在重启...',
+    installFailed: '安装更新失败',
   },
   errors: {
     unexpected: '意外错误：{error}',
