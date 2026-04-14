@@ -212,11 +212,11 @@ export const enUS = {
         explain: 'Explain',
       },
       shortcuts: {
-        execute: 'Execute query (Ctrl+Enter)',
+        execute: 'Execute query ({key}Enter)',
         explain: 'Explain query (F6)',
-        save: 'Save (Ctrl+S)',
+        save: 'Save ({key}S)',
         saveAs: 'Save As .sql file',
-        comment: 'Toggle comment (Ctrl+/)',
+        comment: 'Toggle comment ({key}/)',
       },
       status: {
         connection: 'Connection',

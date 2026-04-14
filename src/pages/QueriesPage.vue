@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from '@/composables/useNotifications'
+import { usePlatform } from '@/composables/usePlatform'
 import { saveQueryFile, saveQueryFileAs } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
@@ -26,6 +27,7 @@ const appStore = useAppStore()
 const connectionStore = useConnectionStore()
 const databaseStore = useDatabaseStore()
 const tabStore = useTabStore()
+const { modifierKey } = usePlatform()
 
 const showResultPanel = ref(false)
 const sidebarWidth = ref(250)
@@ -442,7 +444,7 @@ async function handleDownloadQuery() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{{ t('pages.queries.shortcuts.execute') }}</p>
+                    <p>{{ t('pages.queries.shortcuts.execute', { key: modifierKey }) }}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -465,7 +467,7 @@ async function handleDownloadQuery() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{{ t('pages.queries.shortcuts.explain') }}</p>
+                    <p>{{ t('pages.queries.shortcuts.explain', { key: modifierKey }) }}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -491,7 +493,7 @@ async function handleDownloadQuery() {
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{{ t('pages.queries.shortcuts.saveAs') }}</p>
+                    <p>{{ t('pages.queries.shortcuts.saveAs', { key: modifierKey }) }}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

@@ -195,11 +195,11 @@ export const zhCN = {
         explain: '解释',
       },
       shortcuts: {
-        execute: '执行查询 (Ctrl+Enter)',
+        execute: '执行查询 ({key}Enter)',
         explain: '解释查询 (F6)',
-        save: '保存 (Ctrl+S)',
+        save: '保存 ({key}S)',
         saveAs: '另存为 .sql 文件',
-        comment: '切换注释 (Ctrl+/)',
+        comment: '切换注释 ({key}/)',
       },
       status: {
         connection: '连接',

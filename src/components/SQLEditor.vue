@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import type { MonacoEditorOptions, SQLDialect } from '@/composables/useMonacoEditor'
 import type { StatementToExecute } from '@/composables/useSqlStatements'
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ProgressBar } from '@/components/ui/progress'
 import { useMonacoEditor } from '@/composables/useMonacoEditor'
+import { usePlatform } from '@/composables/usePlatform'
 import { useTheme } from '@/composables/useTheme'
 
 type Props = {
@@ -30,7 +31,7 @@ const props = withDefaults(defineProps<Props>(), {
   showLineNumbers: true,
   wordWrap: true,
   height: '400px',
-  placeholder: '-- Enter your SQL query here\n-- Press Ctrl+Enter to execute',
+  placeholder: '',
   isExecuting: false,
 })
 
@@ -42,11 +43,16 @@ const emit = defineEmits<{
 }>()
 
 const editorContainer = ref<HTMLElement | null>(null)
-const editorValue = ref(props.modelValue || props.placeholder)
 const { isDark } = useTheme()
+const { modifierKey } = usePlatform()
 
-const isMac = (navigator.userAgentData?.platform ?? navigator.platform).toUpperCase().includes('MAC')
-const cmdKey = isMac ? '⌘' : 'Ctrl+'
+const cmdKey = modifierKey
+
+const defaultPlaceholder = computed(() =>
+  `-- Enter your SQL query here\n-- Press ${modifierKey.value}Enter to execute`,
+)
+
+const editorValue = ref(props.modelValue || props.placeholder || defaultPlaceholder.value)
 
 const contextMenuVisible = ref(false)
 const contextMenuPosition = ref({ x: 0, y: 0 })
