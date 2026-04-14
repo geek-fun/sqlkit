@@ -127,7 +127,20 @@ jobs:
           tagName: v__VERSION__
           releaseName: SqlKit v__VERSION__
           releaseBody: See the assets to download this version and install.
-          releaseDraft: false
+          releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
           includeUpdaterJson: true
+
+  publish:
+    name: Publish Release
+    needs: [check-version, build]
+    if: needs.check-version.outputs.is_new_version == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish draft release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "v${{ needs.check-version.outputs.version }}" --draft=false --repo ${{ github.repository }}
