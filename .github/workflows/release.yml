@@ -49,12 +49,12 @@ jobs:
             target: aarch64-apple-darwin,x86_64-apple-darwin
           - name: Windows
             platform: windows-latest
-            args: ""
-            target: ""
+            args: ''
+            target: ''
           - name: Linux
             platform: ubuntu-latest
-            args: ""
-            target: ""
+            args: ''
+            target: ''
 
     runs-on: ${{ matrix.platform }}
     steps:
