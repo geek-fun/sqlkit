@@ -374,7 +374,16 @@ impl DatabaseAdapter for SQLiteAdapter {
     type Pool = SQLitePool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        let max_connections = self.config.pool_config.max_connections as usize;
+        // For in-memory databases, force max_connections = 1 because each
+        // Connection::open_in_memory() creates a separate isolated database.
+        // With multiple connections, CREATE TABLE on one connection won't be
+        // visible to other connections, causing "no such table" errors.
+        let max_connections = if self.db_path.is_none() {
+            1 // Single connection for in-memory databases
+        } else {
+            self.config.pool_config.max_connections as usize
+        };
+
         let pool = SQLitePool::new(max_connections, self.db_path.clone());
 
         // Test the connection by creating one

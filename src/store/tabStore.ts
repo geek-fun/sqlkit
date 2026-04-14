@@ -1,6 +1,7 @@
 import type { ApiError, ApiResponse } from '@/types/api'
 import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
+import { withMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { isApiError, isApiSuccess } from '@/types/api'
 import { useConnectionStore } from './connectionStore'
 import { useHistoryStore } from './historyStore'
@@ -160,35 +161,40 @@ export const useTabStore = defineStore('tabs', {
       tab.isExecuting = true
       tab.error = undefined
 
-      const startTime = Date.now()
       const connectionStore = useConnectionStore()
       const connection = connectionStore.getConnectionById(tab.connectionId)
       const historyStore = useHistoryStore()
 
+      const queryStartTime = Date.now()
+      let actualExecutionTime = 0
+
       try {
-        const response = await invoke<ApiResponse<QueryResult>>('execute_query', {
-          connectionId: tab.connectionId,
-          sql,
-          database: tab.database ?? null,
+        let response: ApiResponse<QueryResult>
+
+        await withMinLoadingTime(async () => {
+          response = await invoke<ApiResponse<QueryResult>>('execute_query', {
+            connectionId: tab.connectionId,
+            sql,
+            database: tab.database ?? null,
+          })
+          actualExecutionTime = Date.now() - queryStartTime
         })
 
-        const executionTime = Date.now() - startTime
-
-        if (isApiSuccess(response)) {
-          tab.results = response.data
-          tab.executionTime = executionTime
+        if (isApiSuccess(response!)) {
+          tab.results = response!.data
+          tab.executionTime = actualExecutionTime
           historyStore.addEntry({
             sql,
             connectionId: tab.connectionId,
             connectionName: connection?.name ?? tab.connectionId,
             database: tab.database,
             timestamp: Date.now(),
-            executionTime,
+            executionTime: actualExecutionTime,
             status: 'success',
           })
         }
-        else if (isApiError(response)) {
-          const err = response.error
+        else if (isApiError(response!)) {
+          const err = response!.error
           if (tab.database && err.details) {
             const firstBreak = err.details.indexOf('\n')
             if (firstBreak !== -1) {
@@ -208,13 +214,14 @@ export const useTabStore = defineStore('tabs', {
             connectionName: connection?.name ?? tab.connectionId,
             database: tab.database,
             timestamp: Date.now(),
-            executionTime,
+            executionTime: actualExecutionTime,
             status: 'error',
-            errorMessage: response.error.message,
+            errorMessage: response!.error.message,
           })
         }
       }
       catch (error) {
+        actualExecutionTime = Date.now() - queryStartTime
         tab.error = String(error)
         historyStore.addEntry({
           sql,
@@ -222,7 +229,7 @@ export const useTabStore = defineStore('tabs', {
           connectionName: connection?.name ?? tab.connectionId,
           database: tab.database,
           timestamp: Date.now(),
-          executionTime: Date.now() - startTime,
+          executionTime: actualExecutionTime,
           status: 'error',
           errorMessage: String(error),
         })

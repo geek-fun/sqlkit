@@ -93,6 +93,16 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
     return
   }
 
+  // Reset state when switching connections to avoid showing cached data from previous connection
+  selectedDatabase.value = ''
+  databaseStore.resetSelection()
+
+  // Close tabs belonging to the old connection (including table-view tabs)
+  if (oldConnId) {
+    tabStore.closeTabsForConnection(oldConnId)
+    databaseStore.clearMetadata(oldConnId)
+  }
+
   const alreadyConnected = connectionStore.getConnectionStatus(newConnId) === ConnectionStatus.CONNECTED
 
   if (alreadyConnected) {

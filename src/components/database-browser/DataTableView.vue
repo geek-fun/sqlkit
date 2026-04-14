@@ -28,6 +28,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Spinner } from '@/components/ui/spinner'
+import { useMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { toast } from '@/composables/useNotifications'
 import { ConnectionStatus, useConnectionStore } from '@/store'
 import {
@@ -96,6 +98,11 @@ const editForm = ref<Record<string, { value: string, setNull: boolean }>>({})
 const editErrors = ref<Record<string, string>>({})
 const isSaving = ref(false)
 
+// --- Export state ---
+const isExporting = ref(false)
+
+const { withMinLoadingTime } = useMinLoadingTime()
+
 const visibleColumns = computed(() =>
   data.value ? data.value.columns.filter((c: string) => !hiddenColumns.value.has(c)) : [],
 )
@@ -162,19 +169,21 @@ async function fetchData() {
   error.value = null
 
   try {
-    const result = await invoke<TableDataResult>('get_table_data', {
-      connectionId: props.connectionId,
-      query: {
-        database: props.database || null,
-        table: props.tableName,
-        schema: props.schema ?? null,
-        filter: appliedFilter.value.trim() || null,
-        limit: rowsPerPage.value,
-        offset: offset.value,
-      },
+    await withMinLoadingTime(async () => {
+      const result = await invoke<TableDataResult>('get_table_data', {
+        connectionId: props.connectionId,
+        query: {
+          database: props.database || null,
+          table: props.tableName,
+          schema: props.schema ?? null,
+          filter: appliedFilter.value.trim() || null,
+          limit: rowsPerPage.value,
+          offset: offset.value,
+        },
+      })
+      data.value = result
+      executionTimeMs.value = result.execution_time_ms ?? null
     })
-    data.value = result
-    executionTimeMs.value = result.execution_time_ms ?? null
   }
   catch (err) {
     error.value = String(err)
@@ -214,7 +223,9 @@ async function ensureConnection(): Promise<boolean> {
   connectionError.value = null
 
   try {
-    await connectionStore.connect(props.connectionId)
+    await withMinLoadingTime(async () => {
+      await connectionStore.connect(props.connectionId)
+    })
     isReconnecting.value = false
     return true
   }
@@ -305,9 +316,18 @@ async function exportCSV() {
     if (!selectedPath)
       return
 
+    isExporting.value = true
     const filePath = selectedPath.endsWith('.csv') ? selectedPath : `${selectedPath}.csv`
-    await invoke('write_text_file', { path: filePath, content: csv })
-    toast.success(t('components.dataTableView.notifications.csvExported'), { description: filePath })
+
+    try {
+      await withMinLoadingTime(async () => {
+        await invoke('write_text_file', { path: filePath, content: csv })
+      })
+      toast.success(t('components.dataTableView.notifications.csvExported'), { description: filePath })
+    }
+    finally {
+      isExporting.value = false
+    }
   }
   catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -330,16 +350,19 @@ function openDeleteDialog(row: Record<string, unknown>) {
 }
 
 async function confirmDelete() {
-  if (!deletingRow.value)
+  const row = deletingRow.value
+  if (!row)
     return
   isDeleting.value = true
   try {
-    await invoke('delete_table_row', {
-      connectionId: props.connectionId,
-      database: props.database ?? null,
-      table: props.tableName,
-      schema: props.schema ?? null,
-      pkValues: extractPkValues(deletingRow.value),
+    await withMinLoadingTime(async () => {
+      await invoke('delete_table_row', {
+        connectionId: props.connectionId,
+        database: props.database ?? null,
+        table: props.tableName,
+        schema: props.schema ?? null,
+        pkValues: extractPkValues(row),
+      })
     })
     toast.success(t('components.dataTableView.notifications.rowDeleted'))
     deleteDialogOpen.value = false
@@ -382,16 +405,81 @@ function openEditDialog(row: Record<string, unknown>) {
 
 function validateEditForm(): boolean {
   const columns = data.value?.columns ?? []
-  const errors = Object.fromEntries(
-    columns
-      .filter((col: string) => {
-        const field = editForm.value[col]
-        return field && !columnNullable.value[col] && (field.setNull || field.value.trim() === '')
-      })
-      .map((col: string) => [col, t('components.dataTableView.validation.required')]),
-  )
+  const errors: Record<string, string> = {}
+
+  for (const col of columns) {
+    const field = editForm.value[col]
+    if (!field)
+      continue
+
+    // Skip validation if set to NULL
+    if (field.setNull) {
+      if (!columnNullable.value[col]) {
+        errors[col] = t('components.dataTableView.validation.required')
+      }
+      continue
+    }
+
+    const value = field.value.trim()
+    const type = (columnTypeMap.value[col] ?? '').toLowerCase()
+
+    // Required field check
+    if (value === '' && !columnNullable.value[col]) {
+      errors[col] = t('components.dataTableView.validation.required')
+      continue
+    }
+
+    // Skip empty values for nullable fields
+    if (value === '')
+      continue
+
+    // Type validation
+    if (isNumericType(type)) {
+      if (!isValidNumber(value)) {
+        errors[col] = t('components.dataTableView.validation.invalidNumber')
+        continue
+      }
+    }
+
+    if (type === 'bool' || type === 'boolean') {
+      if (!isValidBoolean(value)) {
+        errors[col] = t('components.dataTableView.validation.invalidBoolean')
+        continue
+      }
+    }
+  }
+
   editErrors.value = errors
   return Object.keys(errors).length === 0
+}
+
+function isNumericType(type: string): boolean {
+  return type.includes('int')
+    || type.includes('serial')
+    || type.includes('numeric')
+    || type.includes('decimal')
+    || type.includes('float')
+    || type.includes('double')
+    || type.includes('real')
+    || type.includes('money')
+    || type.includes('number')
+}
+
+function isValidNumber(value: string): boolean {
+  // Allow negative numbers, decimals, scientific notation
+  return /^-?(?:\d+(?:\.\d+)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value) && !Number.isNaN(Number(value))
+}
+
+function isValidBoolean(value: string): boolean {
+  const lower = value.toLowerCase()
+  return ['true', 'false', '1', '0', 't', 'f', 'y', 'n', 'yes', 'no'].includes(lower)
+}
+
+function getEditInputType(col: string): string {
+  const type = (columnTypeMap.value[col] ?? '').toLowerCase()
+  if (isNumericType(type))
+    return 'number'
+  return 'text'
 }
 
 function coerceEditValue(col: string, value: string): unknown {
@@ -411,7 +499,8 @@ function coerceEditValue(col: string, value: string): unknown {
 }
 
 async function confirmEdit() {
-  if (!editingRow.value)
+  const row = editingRow.value
+  if (!row)
     return
   if (!validateEditForm())
     return
@@ -428,13 +517,15 @@ async function confirmEdit() {
         .filter((entry): entry is [string, unknown] => entry !== null),
     )
 
-    await invoke('update_table_row', {
-      connectionId: props.connectionId,
-      database: props.database ?? null,
-      table: props.tableName,
-      schema: props.schema ?? null,
-      pkValues: extractPkValues(editingRow.value),
-      updates,
+    await withMinLoadingTime(async () => {
+      await invoke('update_table_row', {
+        connectionId: props.connectionId,
+        database: props.database ?? null,
+        table: props.tableName,
+        schema: props.schema ?? null,
+        pkValues: extractPkValues(row),
+        updates,
+      })
     })
     toast.success(t('components.dataTableView.notifications.rowUpdated'))
     editDialogOpen.value = false
@@ -598,11 +689,12 @@ watch(
         variant="ghost"
         size="icon"
         class="flex-shrink-0 h-7 w-7"
-        :disabled="!data || data.rows.length === 0"
+        :disabled="!data || data.rows.length === 0 || isExporting"
         :title="t('components.dataTableView.exportCsv')"
         @click.stop="exportCSV"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <Spinner v-if="isExporting" size="sm" />
+        <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
           <polyline points="7 10 12 15 17 10" />
           <line x1="12" x2="12" y1="15" y2="3" />
@@ -940,10 +1032,7 @@ watch(
             :disabled="isDeleting"
             @click.prevent="confirmDelete"
           >
-            <svg v-if="isDeleting" class="mr-1.5 h-3 w-3 inline-block animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
+            <Spinner v-if="isDeleting" size="sm" class="mr-1.5" />
             {{ t('components.dataTableView.deleteDialog.confirm') }}
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -965,26 +1054,21 @@ watch(
             class="space-y-1"
           >
             <div class="flex gap-2 items-center">
-              <Label :for="`edit-field-${col}`" class="text-xs font-medium flex gap-1 items-center">
-                <svg
+              <!-- Column name, type, and PK icon - inline -->
+              <Label :for="`edit-field-${col}`" class="text-xs font-medium whitespace-nowrap">
+                {{ col }}<span v-if="columnTypeMap[col]" class="text-[10px] text-muted-foreground font-mono font-normal ml-1">{{ columnTypeMap[col] }}</span><svg
                   v-if="columnIsPK[col]"
                   xmlns="http://www.w3.org/2000/svg"
-                  width="9"
-                  height="9"
+                  width="10"
+                  height="10"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2"
                   stroke-linecap="round"
                   stroke-linejoin="round"
-                  class="text-amber-500 flex-shrink-0"
-                >
-                  <circle cx="7.5" cy="15.5" r="5.5" />
-                  <path d="m21 2-9.6 9.6" />
-                  <path d="m15.5 7.5 3 3L22 7l-3-3" />
-                </svg>
-                {{ col }}
-                <span v-if="columnTypeMap[col]" class="text-[10px] text-muted-foreground font-mono font-normal">{{ columnTypeMap[col] }}</span>
+                  class="text-amber-500 ml-1.5 inline-block"
+                ><circle cx="7.5" cy="15.5" r="5.5" /><path d="m21 2-9.6 9.6" /><path d="m15.5 7.5 3 3L22 7l-3-3" /></svg>
               </Label>
               <div class="flex-1" />
               <!-- Set to NULL toggle -->
@@ -1000,9 +1084,11 @@ watch(
             </div>
             <Input
               :id="`edit-field-${col}`"
+              :type="getEditInputType(col)"
               :model-value="editForm[col]?.setNull ? '' : (editForm[col]?.value ?? '')"
               :disabled="editForm[col]?.setNull"
               :placeholder="editForm[col]?.setNull ? 'NULL' : ''"
+              :step="getEditInputType(col) === 'number' ? 'any' : undefined"
               class="text-xs font-mono h-7"
               :class="{ 'border-destructive': editErrors[col] }"
               @update:model-value="(v) => editForm[col] = { ...editForm[col], value: String(v), setNull: editForm[col]?.setNull ?? false }"
@@ -1019,10 +1105,7 @@ watch(
             {{ t('common.buttons.cancel') }}
           </Button>
           <Button size="sm" :disabled="isSaving" @click="confirmEdit">
-            <svg v-if="isSaving" class="mr-1.5 h-3 w-3 inline-block animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
+            <Spinner v-if="isSaving" size="sm" class="mr-1.5" />
             {{ t('common.buttons.save') }}
           </Button>
         </div>

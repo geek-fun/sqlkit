@@ -393,6 +393,8 @@ export const enUS = {
       },
       validation: {
         required: 'This field is required',
+        invalidNumber: 'Please enter a valid number',
+        invalidBoolean: 'Please enter true or false',
       },
     },
     queryTabs: {

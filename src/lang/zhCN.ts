@@ -376,6 +376,8 @@ export const zhCN = {
       },
       validation: {
         required: '此字段为必填项',
+        invalidNumber: '请输入有效的数字',
+        invalidBoolean: '请输入 true 或 false',
       },
     },
     queryTabs: {

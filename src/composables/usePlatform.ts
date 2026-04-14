@@ -1,9 +1,9 @@
-import { computed, ref } from 'vue'
 import { platform } from '@tauri-apps/plugin-os'
+import { computed, ref } from 'vue'
 
 const platformCache = ref<string | null>(null)
 
-const getPlatform = async (): Promise<string> => {
+async function getPlatform(): Promise<string> {
   if (platformCache.value) {
     return platformCache.value
   }
@@ -11,7 +11,8 @@ const getPlatform = async (): Promise<string> => {
     const p = await platform()
     platformCache.value = p
     return p
-  } catch {
+  }
+  catch {
     return 'unknown'
   }
 }
@@ -19,7 +20,7 @@ const getPlatform = async (): Promise<string> => {
 // Initialize platform detection on module load
 getPlatform()
 
-const usePlatform = () => {
+function usePlatform() {
   const isMac = computed(() => platformCache.value === 'macos')
   const isWindows = computed(() => platformCache.value === 'windows')
   const isLinux = computed(() => platformCache.value === 'linux')
@@ -40,4 +41,4 @@ const usePlatform = () => {
   }
 }
 
-export { usePlatform, getPlatform }
+export { getPlatform, usePlatform }
