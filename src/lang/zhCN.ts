@@ -211,6 +211,7 @@ export const zhCN = {
       notifications: {
         querySaved: '查询已保存',
         saveFailed: '保存失败',
+        loadFailed: '加载查询失败',
         noStatementFound: '未找到光标位置的 SQL 语句',
       },
     },
@@ -307,6 +308,7 @@ export const zhCN = {
       selectDatabase: '选择数据库',
       noTables: '未找到表',
       noViews: '未找到视图',
+      noSavedQueries: '暂无已保存的查询',
       comingSoon: '即将推出',
       sections: {
         tables: '表',
@@ -324,6 +326,11 @@ export const zhCN = {
         viewStructure: '查看结构',
         createScript: 'CREATE脚本',
         exportData: '导出数据',
+      },
+      savedQueryActions: {
+        open: '打开',
+        delete: '删除',
+        reveal: '在 Finder 中显示',
       },
     },
     queryResult: {

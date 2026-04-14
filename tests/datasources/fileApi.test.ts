@@ -1,4 +1,4 @@
-import { deleteQueryFile, listSavedQueries, loadQueryFile, saveQueryFile, saveQueryFileAs } from '@/datasources/fileApi'
+import { deleteQueryFile, listSavedQueryFiles, loadQueryFile, saveQueryFile, saveQueryFileAs } from '@/datasources/fileApi'
 
 jest.mock('@tauri-apps/api/core', () => ({
   invoke: jest.fn(),
@@ -187,20 +187,26 @@ describe('fileApi', () => {
     })
   })
 
-  describe('listSavedQueries', () => {
-    it('returns list of saved query files', async () => {
-      invoke.mockResolvedValue(['/path/query1.sql', '/path/query2.sql'])
+  describe('listSavedQueryFiles', () => {
+    it('returns list of saved query files with metadata', async () => {
+      invoke.mockResolvedValue([
+        { file_name: 'query1.sql', file_path: '/path/query1.sql', folder: 'queries', modified_at: 1000, size_bytes: 100 },
+        { file_name: 'query2.sql', file_path: '/path/query2.sql', folder: 'queries', modified_at: 2000, size_bytes: 200 },
+      ])
 
-      const result = await listSavedQueries()
+      const result = await listSavedQueryFiles()
 
       expect(invoke).toHaveBeenCalledWith('list_saved_queries')
-      expect(result).toEqual(['/path/query1.sql', '/path/query2.sql'])
+      expect(result).toEqual([
+        { file_name: 'query1.sql', file_path: '/path/query1.sql', folder: 'queries', modified_at: 1000, size_bytes: 100 },
+        { file_name: 'query2.sql', file_path: '/path/query2.sql', folder: 'queries', modified_at: 2000, size_bytes: 200 },
+      ])
     })
 
     it('returns empty array when no saved queries', async () => {
       invoke.mockResolvedValue([])
 
-      const result = await listSavedQueries()
+      const result = await listSavedQueryFiles()
 
       expect(result).toEqual([])
     })

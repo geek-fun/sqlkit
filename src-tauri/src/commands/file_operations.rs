@@ -23,6 +23,21 @@ pub struct LoadResult {
     pub message: String,
 }
 
+/// Metadata for a saved query file
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SavedQueryInfo {
+    /// Filename with extension, e.g. "monthly_revenue.sql"
+    pub file_name: String,
+    /// Full absolute path to the file
+    pub file_path: String,
+    /// Parent folder name relative to queries directory, e.g. "queries" or "finance"
+    pub folder: String,
+    /// Last modified time as Unix timestamp (seconds)
+    pub modified_at: u64,
+    /// File size in bytes
+    pub size_bytes: u64,
+}
+
 /// Get the queries directory path, creating it if necessary
 fn get_queries_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app_handle
@@ -120,40 +135,76 @@ pub async fn load_query_file(file_path: String) -> Result<LoadResult, String> {
     })
 }
 
-/// List all saved SQL query files.
+/// List all saved SQL query files with metadata.
 ///
-/// # Arguments
-///
-/// * `app_handle` - Tauri app handle
-///
-/// # Returns
-///
-/// List of file paths
+/// Walks the queries directory recursively and collects metadata for each .sql file.
+/// Returns files sorted by modification time (most recent first).
 #[tauri::command]
-pub async fn list_saved_queries(app_handle: AppHandle) -> Result<Vec<String>, String> {
+pub async fn list_saved_queries(app_handle: AppHandle) -> Result<Vec<SavedQueryInfo>, String> {
     let queries_dir = get_queries_dir(&app_handle)?;
+    let queries_dir_str = queries_dir.to_string_lossy().to_string();
 
     let mut files = Vec::new();
 
     if queries_dir.exists() {
-        let entries = fs::read_dir(&queries_dir)
-            .map_err(|e| format!("Failed to read queries directory: {}", e))?;
+        collect_sql_files(&queries_dir, &queries_dir_str, &mut files)?;
+    }
 
-        for entry in entries.flatten() {
-            if let Ok(file_type) = entry.file_type() {
-                if file_type.is_file() {
-                    if let Some(ext) = entry.path().extension() {
-                        if ext == "sql" {
-                            files.push(entry.path().to_string_lossy().to_string());
-                        }
-                    }
+    files.sort_by(|a, b| b.modified_at.cmp(&a.modified_at));
+    Ok(files)
+}
+
+fn collect_sql_files(
+    dir: &Path,
+    queries_dir_str: &str,
+    files: &mut Vec<SavedQueryInfo>,
+) -> Result<(), String> {
+    let entries = fs::read_dir(dir)
+        .map_err(|e| format!("Failed to read directory: {}", e))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        
+        if let Ok(file_type) = entry.file_type() {
+            if file_type.is_file() {
+                if path.extension().map_or(false, |ext| ext == "sql") {
+                    let metadata = fs::metadata(&path)
+                        .map_err(|e| format!("Failed to read file metadata: {}", e))?;
+                    
+                    let modified_at = metadata
+                        .modified()
+                        .map_err(|e| format!("Failed to get modification time: {}", e))?
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .map_err(|e| format!("Time conversion error: {}", e))?
+                        .as_secs();
+
+                    let file_name = path
+                        .file_name()
+                        .map(|n| n.to_string_lossy().to_string())
+                        .unwrap_or_default();
+
+                    let parent = path.parent().unwrap_or(&Path::new(""));
+                    let folder = parent
+                        .strip_prefix(queries_dir_str)
+                        .map(|p| p.to_string_lossy().to_string())
+                        .unwrap_or_else(|_| "queries".to_string());
+                    let folder = if folder.is_empty() { "queries".to_string() } else { folder };
+
+                    files.push(SavedQueryInfo {
+                        file_name,
+                        file_path: path.to_string_lossy().to_string(),
+                        folder,
+                        modified_at,
+                        size_bytes: metadata.len(),
+                    });
                 }
+            } else if file_type.is_dir() {
+                collect_sql_files(&path, queries_dir_str, files)?;
             }
         }
     }
 
-    files.sort();
-    Ok(files)
+    Ok(())
 }
 
 /// Delete a saved SQL query file.

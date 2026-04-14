@@ -18,7 +18,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
-import { saveQueryFile, saveQueryFileAs } from '@/datasources'
+import { loadQueryFile, saveQueryFile, saveQueryFileAs } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
 const { t } = useI18n()
@@ -34,6 +34,7 @@ const sidebarWidth = ref(250)
 const isResizingSidebar = ref(false)
 const selectedDatabase = ref<string>('')
 const queryTabsRef = ref<InstanceType<typeof QueryTabs>>()
+const databaseBrowserRef = ref<InstanceType<typeof DatabaseBrowser>>()
 
 // Available connections
 const availableConnections = computed(() => connectionStore.connections)
@@ -285,6 +286,106 @@ function handleSelectTable(table: TableInfo, database: string, schema?: string) 
   tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
+async function handleOpenSavedQuery(filePath: string) {
+  const existingTab = tabStore.tabByFilePath(filePath)
+  if (existingTab) {
+    tabStore.setActiveTab(existingTab.id)
+    return
+  }
+
+  const connId = getActiveConnectionId() || ''
+  const db = connId
+    ? (selectedDatabase.value || connectionStore.getCurrentDatabase(connId) || connectionStore.getConnectionById(connId)?.database || undefined)
+    : undefined
+
+  const tab = tabStore.createTab(connId, db)
+
+  try {
+    const result = await loadQueryFile(filePath)
+    if (result.success && result.content) {
+      tabStore.updateTabContent(tab.id, result.content)
+      tabStore.markTabSaved(tab.id, filePath)
+    }
+    else {
+      toast.error(t('pages.queries.notifications.loadFailed'), { description: result.message })
+    }
+  }
+  catch (error) {
+    toast.error(t('pages.queries.notifications.loadFailed'), { description: error instanceof Error ? error.message : String(error) })
+  }
+}
+
+function sanitizeFileName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 30) || 'query'
+}
+
+async function handleSaveQuery() {
+  if (!activeTab.value || !activeTab.value.content.trim()) {
+    return
+  }
+
+  const connectionName = activeConnection.value?.name || 'query'
+  const tabName = activeTab.value.name || 'query'
+  const defaultFileName = activeTab.value.filePath
+    ? undefined
+    : `${sanitizeFileName(connectionName)}-${sanitizeFileName(tabName)}.sql`
+
+  try {
+    const result = await saveQueryFile(
+      activeTab.value.content,
+      activeTab.value.filePath,
+      defaultFileName,
+    )
+
+    if (result.success && result.file_path) {
+      tabStore.markTabSaved(activeTab.value.id, result.file_path)
+      toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
+      databaseBrowserRef.value?.fetchSavedQueryFiles()
+    }
+    else {
+      toast.error(t('pages.queries.notifications.saveFailed'), { description: result.message })
+    }
+  }
+  catch (error) {
+    toast.error(t('pages.queries.notifications.saveFailed'), { description: error instanceof Error ? error.message : String(error) })
+  }
+}
+
+async function handleDownloadQuery() {
+  if (!activeTab.value || !activeTab.value.content.trim()) {
+    return
+  }
+
+  const connectionName = activeConnection.value?.name || 'query'
+  const tabName = activeTab.value.name || 'query'
+  const defaultFileName = `${sanitizeFileName(connectionName)}-${sanitizeFileName(tabName)}.sql`
+
+  try {
+    const result = await saveQueryFileAs(
+      activeTab.value.content,
+      defaultFileName,
+    )
+    if (!result) {
+      return
+    }
+    if (result.success && result.file_path) {
+      tabStore.markTabSaved(activeTab.value.id, result.file_path)
+      toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
+      databaseBrowserRef.value?.fetchSavedQueryFiles()
+    }
+    else {
+      toast.error(t('pages.queries.notifications.loadFailed'), { description: result.message })
+    }
+  }
+  catch (error) {
+    toast.error(t('pages.queries.notifications.loadFailed'), { description: error instanceof Error ? error.message : String(error) })
+  }
+}
+
 function startSidebarResize(_e: MouseEvent) {
   isResizingSidebar.value = true
   document.addEventListener('mousemove', handleSidebarResize)
@@ -306,57 +407,6 @@ function stopSidebarResize() {
 
 function closeResultPanel() {
   showResultPanel.value = false
-}
-
-async function handleSaveQuery() {
-  if (!activeTab.value || !activeTab.value.content.trim()) {
-    return
-  }
-
-  try {
-    const result = await saveQueryFile(
-      activeTab.value.content,
-      activeTab.value.filePath,
-      activeTab.value.filePath ? undefined : `${activeTab.value.name}.sql`,
-    )
-
-    if (result.success && result.file_path) {
-      tabStore.markTabSaved(activeTab.value.id, result.file_path)
-      toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
-    }
-    else {
-      toast.error(t('pages.queries.notifications.saveFailed'), { description: result.message })
-    }
-  }
-  catch (error) {
-    toast.error(t('pages.queries.notifications.saveFailed'), { description: error instanceof Error ? error.message : String(error) })
-  }
-}
-
-async function handleDownloadQuery() {
-  if (!activeTab.value || !activeTab.value.content.trim()) {
-    return
-  }
-
-  try {
-    const result = await saveQueryFileAs(
-      activeTab.value.content,
-      `${activeTab.value.name}.sql`,
-    )
-    if (!result) {
-      return
-    }
-    if (result.success && result.file_path) {
-      tabStore.markTabSaved(activeTab.value.id, result.file_path)
-      toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
-    }
-    else {
-      toast.error(t('pages.queries.notifications.saveFailed'), { description: result.message })
-    }
-  }
-  catch (error) {
-    toast.error(t('pages.queries.notifications.saveFailed'), { description: error instanceof Error ? error.message : String(error) })
-  }
 }
 </script>
 
@@ -392,6 +442,7 @@ async function handleDownloadQuery() {
 
           <!-- Database Browser -->
           <DatabaseBrowser
+            ref="databaseBrowserRef"
             v-model:selected-database="selectedDatabase"
             :connection-id="selectedConnectionId"
             class="flex-1"
@@ -400,6 +451,7 @@ async function handleDownloadQuery() {
             @select-top-n="handleSelectTopN"
             @view-structure="handleViewStructure"
             @export-data="handleExportData"
+            @open-saved-query="handleOpenSavedQuery"
           />
         </div>
 

@@ -58,6 +58,8 @@ const contextMenuVisible = ref(false)
 const contextMenuPosition = ref({ x: 0, y: 0 })
 const contextMenuLine = ref<number | null>(null)
 
+const isSettingValueFromProp = ref(false)
+
 const editorOptions: MonacoEditorOptions = {
   language: props.dialect,
   readOnly: props.readOnly,
@@ -127,6 +129,8 @@ onMounted(() => {
 
   if (editorInstance) {
     editorInstance.onDidChangeModelContent(() => {
+      if (isSettingValueFromProp.value)
+        return
       emit('update:modelValue', getValue())
     })
   }
@@ -141,8 +145,11 @@ onUnmounted(() => {
 })
 
 watch(() => props.modelValue, (newValue) => {
-  if (newValue !== getValue())
+  if (newValue !== getValue()) {
+    isSettingValueFromProp.value = true
     setValue(newValue || '')
+    isSettingValueFromProp.value = false
+  }
 })
 
 watch(isDark, dark => updateTheme(dark))

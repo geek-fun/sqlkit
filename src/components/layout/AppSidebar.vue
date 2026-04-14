@@ -6,9 +6,9 @@ const route = useRoute()
 
 const menuItems = [
   { id: 'connections', label: 'Connections', icon: 'dns', path: '/connections' },
-  { id: 'import-export', label: 'Import / Export', icon: 'import_export', path: '/import-export' },
-  { id: 'data-studio', label: 'Data Studio', icon: 'smart_toy', path: '/data-studio', badge: 'AI' },
   { id: 'queries', label: 'Queries', icon: 'code', path: '/queries' },
+  // { id: 'data-studio', label: 'Data Studio', icon: 'smart_toy', path: '/data-studio', badge: 'AI' },
+  { id: 'import-export', label: 'Import / Export', icon: 'import_export', path: '/import-export' },
   { id: 'history', label: 'History', icon: 'history', path: '/history' },
 ]
 

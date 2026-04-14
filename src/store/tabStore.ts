@@ -55,6 +55,9 @@ export const useTabStore = defineStore('tabs', {
     tabById: state => (id: string): QueryTab | undefined =>
       state.tabs.find(t => t.id === id),
 
+    tabByFilePath: state => (filePath: string): QueryTab | undefined =>
+      state.tabs.find(t => t.filePath === filePath),
+
     unsavedTabs: (state): QueryTab[] =>
       state.tabs.filter(t => t.hasUnsavedChanges),
 
@@ -251,9 +254,8 @@ export const useTabStore = defineStore('tabs', {
         tab.hasUnsavedChanges = false
         if (filePath) {
           tab.filePath = filePath
-          // Update tab name to just the filename
           const fileName = filePath.split('/').pop() || filePath
-          tab.name = fileName.replace(/\.sql$/, '')
+          tab.name = fileName
         }
       }
     },

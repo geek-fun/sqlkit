@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import type { SavedQueryInfo } from '@/datasources/fileApi'
 import type { TableInfo } from '@/store/databaseStore'
+import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
@@ -11,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { deleteQueryFile, listSavedQueryFiles } from '@/datasources'
 import { ConnectionStatus, useConnectionStore, useDatabaseStore } from '@/store'
 
 export type TreeNodeMetadata = TableInfo & {
@@ -43,6 +46,7 @@ const emit = defineEmits<{
   (e: 'viewStructure', table: TableInfo, database: string, schema?: string): void
   (e: 'exportData', table: TableInfo, database: string, schema?: string): void
   (e: 'update:selectedDatabase', database: string): void
+  (e: 'openSavedQuery', filePath: string): void
 }>()
 
 const { t } = useI18n()
@@ -58,6 +62,11 @@ const showContextMenu = ref(false)
 const showTables = ref(true)
 const showViews = ref(false)
 const showSavedQueries = ref(false)
+const savedQueryFiles = ref<SavedQueryInfo[]>([])
+const savedQueriesLoading = ref(false)
+const savedQueryContextMenu = ref<SavedQueryInfo | null>(null)
+const savedQueryContextMenuPosition = ref({ x: 0, y: 0 })
+const showSavedQueryContextMenu = ref(false)
 
 const activeConnection = computed(() => {
   const connId = props.connectionId || connectionStore.activeConnectionId
@@ -154,6 +163,82 @@ const tablesAndViews = computed(() => {
     views: filtered.filter(item => item.type === 'view'),
   }
 })
+
+const filteredSavedQueries = computed(() => {
+  const query = searchQuery.value.toLowerCase().trim()
+  return query
+    ? savedQueryFiles.value.filter(file =>
+        file.file_name.toLowerCase().includes(query)
+        || file.folder.toLowerCase().includes(query),
+      )
+    : savedQueryFiles.value
+})
+
+async function fetchSavedQueryFiles() {
+  savedQueriesLoading.value = true
+  try {
+    savedQueryFiles.value = await listSavedQueryFiles()
+  }
+  catch (error) {
+    console.error('Failed to fetch saved queries:', error)
+    savedQueryFiles.value = []
+  }
+  finally {
+    savedQueriesLoading.value = false
+  }
+}
+
+function handleSavedQueryClick(file: SavedQueryInfo) {
+  emit('openSavedQuery', file.file_path)
+}
+
+function handleSavedQueryContextMenu(event: MouseEvent, file: SavedQueryInfo) {
+  event.preventDefault()
+  savedQueryContextMenu.value = file
+  savedQueryContextMenuPosition.value = { x: event.clientX, y: event.clientY }
+  showSavedQueryContextMenu.value = true
+}
+
+function handleSavedQueryOpen() {
+  if (savedQueryContextMenu.value) {
+    emit('openSavedQuery', savedQueryContextMenu.value.file_path)
+  }
+  closeSavedQueryContextMenu()
+}
+
+async function handleSavedQueryDelete() {
+  if (!savedQueryContextMenu.value)
+    return
+
+  try {
+    await deleteQueryFile(savedQueryContextMenu.value.file_path)
+    savedQueryFiles.value = savedQueryFiles.value.filter(
+      f => f.file_path !== savedQueryContextMenu.value!.file_path,
+    )
+  }
+  catch (error) {
+    console.error('Failed to delete saved query:', error)
+  }
+  closeSavedQueryContextMenu()
+}
+
+async function handleSavedQueryReveal() {
+  if (!savedQueryContextMenu.value)
+    return
+
+  try {
+    await revealItemInDir(savedQueryContextMenu.value.file_path)
+  }
+  catch (error) {
+    console.error('Failed to reveal file:', error)
+  }
+  closeSavedQueryContextMenu()
+}
+
+function closeSavedQueryContextMenu() {
+  showSavedQueryContextMenu.value = false
+  savedQueryContextMenu.value = null
+}
 
 async function toggleNode(node: TreeNode) {
   const nodeId = node.id
@@ -341,8 +426,6 @@ watch(() => props.selectedDatabase, async (newDb, oldDb) => {
     return
   }
 
-  // Force-clear stale cached schemas/tables for the newly selected database
-  // so we always get fresh data rather than showing previously loaded results.
   const meta = databaseStore.metadata[connectionId.value]
   if (meta) {
     delete meta.schemas[newDb]
@@ -353,12 +436,19 @@ watch(() => props.selectedDatabase, async (newDb, oldDb) => {
   await loadDatabaseData(connectionId.value, newDb)
 })
 
+watch(showSavedQueries, async (isExpanded) => {
+  if (isExpanded && savedQueryFiles.value.length === 0) {
+    await fetchSavedQueryFiles()
+  }
+})
+
 function closeContextMenu() {
   showContextMenu.value = false
   contextMenuNode.value = null
+  closeSavedQueryContextMenu()
 }
 
-type IconType = 'table' | 'view' | 'database' | 'column' | 'schema'
+type IconType = 'table' | 'view' | 'database' | 'column' | 'schema' | 'file'
 
 const iconMap: Record<IconType, string> = {
   database: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></svg>`,
@@ -366,9 +456,12 @@ const iconMap: Record<IconType, string> = {
   view: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`,
   schema: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`,
   column: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+  file: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>`,
 }
 
 const getIcon = (type: IconType) => iconMap[type] || iconMap.column
+
+defineExpose({ fetchSavedQueryFiles })
 </script>
 
 <template>
@@ -546,10 +639,48 @@ const getIcon = (type: IconType) => iconMap[type] || iconMap.column
             <path d="m9 18 6-6-6-6" />
           </svg>
           {{ t('components.databaseBrowser.sections.savedQueries') }}
+          <Button
+            variant="ghost"
+            size="icon"
+            class="ml-auto h-4 w-4"
+            :title="t('components.databaseBrowser.refresh')"
+            @click.stop="fetchSavedQueryFiles"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M8 16H3v5" />
+            </svg>
+          </Button>
         </button>
         <div v-if="showSavedQueries" class="py-1">
-          <div class="text-xs text-muted-foreground px-2 py-2">
-            {{ t('components.databaseBrowser.comingSoon') }}
+          <!-- Loading state -->
+          <div v-if="savedQueriesLoading" class="text-xs text-muted-foreground px-2 py-2 flex gap-2 items-center">
+            <svg class="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            {{ t('components.databaseBrowser.loading') }}
+          </div>
+          <!-- File list -->
+          <div
+            v-for="file in filteredSavedQueries"
+            :key="file.file_path"
+            class="tree-node text-sm px-2 py-1 flex flex-col cursor-pointer hover:bg-accent"
+            :class="{ 'bg-accent': savedQueryContextMenu?.file_path === file.file_path }"
+            @click="handleSavedQueryClick(file)"
+            @contextmenu="handleSavedQueryContextMenu($event, file)"
+          >
+            <div class="flex gap-2 items-center">
+              <span class="opacity-70 flex-shrink-0" v-html="getIcon('file')" />
+              <span class="truncate">{{ file.file_name }}</span>
+            </div>
+            <span class="text-xs text-muted-foreground pl-[calc(16px+8px)] truncate">{{ file.folder }}</span>
+          </div>
+          <!-- Empty state -->
+          <div v-if="filteredSavedQueries.length === 0 && !savedQueriesLoading" class="text-xs text-muted-foreground px-2 py-2">
+            {{ t('components.databaseBrowser.noSavedQueries') }}
           </div>
         </div>
       </div>
@@ -623,6 +754,48 @@ const getIcon = (type: IconType) => iconMap[type] || iconMap.column
             <line x1="12" x2="12" y1="15" y2="3" />
           </svg>
           {{ t('components.databaseBrowser.contextMenu.exportData') }}
+        </div>
+      </div>
+    </div>
+
+    <!-- Saved Query Context Menu -->
+    <div
+      v-if="showSavedQueryContextMenu"
+      class="text-popover-foreground border rounded-md bg-popover w-48 shadow-md fixed z-50"
+      :style="{ left: `${savedQueryContextMenuPosition.x}px`, top: `${savedQueryContextMenuPosition.y}px` }"
+    >
+      <div class="p-1">
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleSavedQueryOpen"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
+            <path d="M5 12h14" />
+            <path d="M12 5v14" />
+          </svg>
+          {{ t('components.databaseBrowser.savedQueryActions.open') }}
+        </div>
+        <div class="my-1 bg-border h-px" />
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleSavedQueryReveal"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+          </svg>
+          {{ t('components.databaseBrowser.savedQueryActions.reveal') }}
+        </div>
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleSavedQueryDelete"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
+            <path d="M3 6h18" />
+            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+          </svg>
+          {{ t('components.databaseBrowser.savedQueryActions.delete') }}
         </div>
       </div>
     </div>

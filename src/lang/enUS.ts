@@ -228,6 +228,7 @@ export const enUS = {
       notifications: {
         querySaved: 'Query saved',
         saveFailed: 'Save failed',
+        loadFailed: 'Failed to load query',
         noStatementFound: 'No SQL statement found at cursor position',
       },
     },
@@ -324,6 +325,7 @@ export const enUS = {
       selectDatabase: 'Select Database',
       noTables: 'No tables found',
       noViews: 'No views found',
+      noSavedQueries: 'No saved queries yet',
       comingSoon: 'Coming soon',
       sections: {
         tables: 'Tables',
@@ -341,6 +343,11 @@ export const enUS = {
         viewStructure: 'View Structure',
         createScript: 'CREATE Script',
         exportData: 'Export Data',
+      },
+      savedQueryActions: {
+        open: 'Open',
+        delete: 'Delete',
+        reveal: 'Reveal in Finder',
       },
     },
     queryResult: {

@@ -13,7 +13,15 @@ export type LoadResult = {
   message: string
 }
 
-export async function saveQueryFile(content: string, filePath?: string, fileName?: string): Promise<SaveResult> {
+export type SavedQueryInfo = {
+  file_name: string
+  file_path: string
+  folder: string
+  modified_at: number
+  size_bytes: number
+}
+
+export function saveQueryFile(content: string, filePath?: string, fileName?: string): Promise<SaveResult> {
   return invoke<SaveResult>('save_query_file', {
     content,
     filePath,
@@ -35,17 +43,17 @@ export async function saveQueryFileAs(content: string, suggestedName: string = '
   return invoke<SaveResult>('save_query_file', { content, filePath })
 }
 
-export async function loadQueryFile(filePath: string): Promise<LoadResult> {
+export function loadQueryFile(filePath: string): Promise<LoadResult> {
   return invoke<LoadResult>('load_query_file', {
     filePath,
   })
 }
 
-export async function listSavedQueries(): Promise<string[]> {
-  return invoke<string[]>('list_saved_queries')
+export function listSavedQueryFiles(): Promise<SavedQueryInfo[]> {
+  return invoke<SavedQueryInfo[]>('list_saved_queries')
 }
 
-export async function deleteQueryFile(filePath: string): Promise<string> {
+export function deleteQueryFile(filePath: string): Promise<string> {
   return invoke<string>('delete_query_file', {
     filePath,
   })
