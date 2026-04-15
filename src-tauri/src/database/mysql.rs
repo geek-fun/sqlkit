@@ -530,16 +530,36 @@ impl DatabaseAdapter for MySQLAdapter {
         let columns = rows
             .into_iter()
             .map(|row| {
-                let name: String = row.get(0).unwrap();
-                let data_type: String = row.get(1).unwrap();
-                let is_nullable: String = row.get(2).unwrap();
-                let default_value: Option<String> = row.get(3);
-                let max_length: Option<u32> = row.get(4);
-                let precision: Option<u32> = row.get(5);
-                let scale: Option<u32> = row.get(6);
-                let column_key: String = row.get(7).unwrap_or_default();
-                let extra: String = row.get(8).unwrap_or_default();
-                let description: Option<String> = row.get(9);
+                let name: String = row.get_opt(0)
+                    .and_then(|r| r.ok())
+                    .unwrap_or_default();
+                let data_type: String = row.get_opt(1)
+                    .and_then(|r| r.ok())
+                    .unwrap_or_default();
+                let is_nullable: String = row.get_opt(2)
+                    .and_then(|r| r.ok())
+                    .unwrap_or_else(|| "YES".to_string());
+                let default_value: Option<String> = row.get_opt(3)
+                    .and_then(|r| r.ok())
+                    .flatten();
+                let max_length: Option<u32> = row.get_opt(4)
+                    .and_then(|r| r.ok())
+                    .flatten();
+                let precision: Option<u32> = row.get_opt(5)
+                    .and_then(|r| r.ok())
+                    .flatten();
+                let scale: Option<u32> = row.get_opt(6)
+                    .and_then(|r| r.ok())
+                    .flatten();
+                let column_key: String = row.get_opt(7)
+                    .and_then(|r| r.ok())
+                    .unwrap_or_default();
+                let extra: String = row.get_opt(8)
+                    .and_then(|r| r.ok())
+                    .unwrap_or_default();
+                let description: Option<String> = row.get_opt(9)
+                    .and_then(|r| r.ok())
+                    .flatten();
 
                 let is_primary_key = column_key.to_uppercase().contains("PRI");
                 let is_auto_increment = extra.to_uppercase().contains("AUTO_INCREMENT");
@@ -740,5 +760,43 @@ mod tests {
         let adapter = MySQLAdapter::new(config);
 
         assert!(adapter.get_pool().is_none());
+    }
+
+    #[test]
+    fn test_auto_increment_detection_from_extra_field() {
+        let test_cases = vec![
+            ("auto_increment", true),
+            ("AUTO_INCREMENT", true),
+            ("Auto_Increment", true),
+            ("auto_increment,persistent", true),
+            ("DEFAULT_GENERATED auto_increment", true),
+            ("", false),
+            ("DEFAULT_GENERATED", false),
+            ("on update current_timestamp", false),
+            ("VIRTUAL", false),
+            ("STORED", false),
+        ];
+
+        for (extra, expected) in test_cases {
+            let is_auto_increment = extra.to_uppercase().contains("AUTO_INCREMENT");
+            assert_eq!(is_auto_increment, expected, "Failed for extra='{}'", extra);
+        }
+    }
+
+    #[test]
+    fn test_primary_key_detection_from_column_key() {
+        let test_cases = vec![
+            ("PRI", true),
+            ("pri", true),
+            ("Pri", true),
+            ("UNI", false),
+            ("MUL", false),
+            ("", false),
+        ];
+
+        for (column_key, expected) in test_cases {
+            let is_primary_key = column_key.to_uppercase().contains("PRI");
+            assert_eq!(is_primary_key, expected, "Failed for column_key='{}'", column_key);
+        }
     }
 }

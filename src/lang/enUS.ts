@@ -392,6 +392,8 @@ export const enUS = {
         deleteFailed: 'Failed to delete row',
         rowUpdated: 'Row updated',
         updateFailed: 'Failed to update row',
+        noPrimaryKey: 'Cannot edit row',
+        noPrimaryKeyDesc: 'This table has no primary key column detected. Row editing requires a primary key.',
       },
       deleteDialog: {
         title: 'Delete Row',

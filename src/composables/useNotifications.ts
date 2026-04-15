@@ -1,6 +1,6 @@
 import { ref } from 'vue'
 
-type ToastType = 'success' | 'error' | 'info'
+type ToastType = 'success' | 'error' | 'info' | 'warning'
 
 type Toast = {
   id: number
@@ -28,6 +28,7 @@ export const toast = {
   success: (title: string, opts?: { description?: string }) => add('success', title, opts?.description),
   error: (title: string, opts?: { description?: string }) => add('error', title, opts?.description),
   info: (title: string, opts?: { description?: string }) => add('info', title, opts?.description),
+  warning: (title: string, opts?: { description?: string }) => add('warning', title, opts?.description),
 }
 
 export const useNotifications = () => ({ toasts, dismiss })

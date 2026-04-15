@@ -375,6 +375,8 @@ export const zhCN = {
         deleteFailed: '删除行失败',
         rowUpdated: '行已更新',
         updateFailed: '更新行失败',
+        noPrimaryKey: '无法编辑行',
+        noPrimaryKeyDesc: '此表未检测到主键列。编辑行需要主键。',
       },
       deleteDialog: {
         title: '删除行',

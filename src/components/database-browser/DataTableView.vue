@@ -267,7 +267,8 @@ async function fetchColumnInfo() {
       tableName: props.tableName,
     })
   }
-  catch {
+  catch (err) {
+    console.error('Failed to fetch column info:', err)
     columnInfoList.value = []
   }
 }
@@ -350,6 +351,12 @@ async function exportCSV() {
 }
 
 function openDeleteDialog(row: Record<string, unknown>) {
+  if (pkColumns.value.length === 0) {
+    toast.warning(t('components.dataTableView.notifications.noPrimaryKey'), {
+      description: t('components.dataTableView.notifications.noPrimaryKeyDesc'),
+    })
+    return
+  }
   deletingRow.value = row
   deleteDialogOpen.value = true
 }
@@ -393,6 +400,12 @@ function rawValueToString(v: unknown): string {
 }
 
 function openEditDialog(row: Record<string, unknown>) {
+  if (pkColumns.value.length === 0) {
+    toast.warning(t('components.dataTableView.notifications.noPrimaryKey'), {
+      description: t('components.dataTableView.notifications.noPrimaryKeyDesc'),
+    })
+    return
+  }
   editingRow.value = row
   editErrors.value = {}
   const cols = data.value?.columns ?? []
