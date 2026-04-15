@@ -62,9 +62,16 @@ function tokenizeLine(line: string): LineTokens {
 }
 
 const WITH_REGEX = /^\s*WITH\b/i
+const UPDATE_REGEX = /^\s*UPDATE\b/i
+const SET_REGEX = /^\s*SET\b/i
+
+function isUpdateContinuation(line: string, startKeyword: string): boolean {
+  return UPDATE_REGEX.test(startKeyword) && SET_REGEX.test(line)
+}
 
 function findStatementEnd(lines: string[], startLine: number): number {
   const isCte = WITH_REGEX.test(lines[startLine])
+  const startKeyword = lines[startLine]
   let parenDepth = 0
 
   for (let i = startLine; i < lines.length; i++) {
@@ -74,8 +81,11 @@ function findStatementEnd(lines: string[], startLine: number): number {
 
     parenDepth += parenDelta
 
-    if (i > startLine && parenDepth === 0 && !isCte && isStatementStart(lines[i].trim()))
+    if (i > startLine && parenDepth === 0 && !isCte && isStatementStart(lines[i].trim())) {
+      if (isUpdateContinuation(lines[i], startKeyword))
+        continue
       return i - 1
+    }
   }
   return lines.length - 1
 }

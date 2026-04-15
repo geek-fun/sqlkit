@@ -24,9 +24,28 @@ use std::fs;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_postgres::{
-    types::{Kind, Type},
+    types::{FromSql, Kind, Type},
     Client, NoTls, Row,
 };
+
+/// A wrapper type that accepts any PostgreSQL type and reads raw bytes as UTF-8.
+/// Used for custom types like ENUMs where the standard String deserialization
+/// rejects non-text OIDs.
+struct RawString(String);
+
+impl<'a> FromSql<'a> for RawString {
+    fn from_sql(
+        _ty: &Type,
+        raw: &'a [u8],
+    ) -> Result<Self, Box<dyn std::error::Error + Sync + Send>> {
+        let s = std::str::from_utf8(raw)?;
+        Ok(RawString(s.to_owned()))
+    }
+
+    fn accepts(_ty: &Type) -> bool {
+        true
+    }
+}
 
 /// Convert PostgreSQL error to DbError with detailed information
 fn postgres_error_to_db_error(error: tokio_postgres::Error) -> DbError {
@@ -265,18 +284,20 @@ impl PostgresAdapter {
 
     /// Safely convert a PostgreSQL value to QueryValue with fallback to string.
     fn convert_value_safe(row: &Row, idx: usize, col_type: &Type) -> QueryValue {
-        // Try the typed conversion first
         match Self::convert_value(row, idx, col_type) {
             Ok(value) => value,
             Err(_) => {
-                // If typed conversion fails, try to get as raw text
-                // This handles unsupported types gracefully
                 match row.try_get::<_, Option<String>>(idx) {
                     Ok(Some(s)) => QueryValue::String(s),
                     Ok(None) => QueryValue::Null,
                     Err(_) => {
-                        // Last resort: use type name as placeholder
-                        QueryValue::String(format!("<{}>", col_type.name()))
+                        match row.try_get::<_, Option<RawString>>(idx) {
+                            Ok(Some(s)) => QueryValue::String(s.0),
+                            Ok(None) => QueryValue::Null,
+                            Err(_) => {
+                                QueryValue::String(format!("<{}>", col_type.name()))
+                            }
+                        }
                     }
                 }
             }
@@ -295,7 +316,16 @@ impl PostgresAdapter {
                     None => Ok(QueryValue::Null),
                 }
             }
-            Type::INT2 | Type::INT4 => {
+            Type::INT2 => {
+                let val: Option<i16> = row
+                    .try_get(idx)
+                    .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                match val {
+                    Some(v) => Ok(QueryValue::Int(v as i64)),
+                    None => Ok(QueryValue::Null),
+                }
+            }
+            Type::INT4 => {
                 let val: Option<i32> = row
                     .try_get(idx)
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
@@ -331,6 +361,16 @@ impl PostgresAdapter {
                     None => Ok(QueryValue::Null),
                 }
             }
+            Type::NUMERIC => {
+                use rust_decimal::Decimal;
+                let val: Option<Decimal> = row
+                    .try_get(idx)
+                    .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                match val {
+                    Some(v) => Ok(QueryValue::String(v.to_string())),
+                    None => Ok(QueryValue::Null),
+                }
+            }
             Type::VARCHAR | Type::TEXT | Type::BPCHAR | Type::NAME => {
                 let val: Option<String> = row
                     .try_get(idx)
@@ -346,6 +386,16 @@ impl PostgresAdapter {
                     .map_err(|e| DbError::TypeConversion(e.to_string()))?;
                 match val {
                     Some(v) => Ok(QueryValue::Bytes(v)),
+                    None => Ok(QueryValue::Null),
+                }
+            }
+            Type::UUID => {
+                use uuid::Uuid;
+                let val: Option<Uuid> = row
+                    .try_get(idx)
+                    .map_err(|e| DbError::TypeConversion(e.to_string()))?;
+                match val {
+                    Some(v) => Ok(QueryValue::String(v.to_string())),
                     None => Ok(QueryValue::Null),
                 }
             }
@@ -502,7 +552,13 @@ impl PostgresAdapter {
                 };
                 Ok(QueryValue::String(format!("[{}]", formatted)))
             }
-            // Default to string representation
+            _ if matches!(col_type.kind(), Kind::Enum(_)) => {
+                match row.try_get::<_, Option<RawString>>(idx) {
+                    Ok(Some(v)) => Ok(QueryValue::String(v.0)),
+                    Ok(None) => Ok(QueryValue::Null),
+                    Err(e) => Err(DbError::TypeConversion(e.to_string())),
+                }
+            }
             _ => {
                 let val: Option<String> = row
                     .try_get(idx)
@@ -867,6 +923,7 @@ impl DatabaseAdapter for PostgresAdapter {
             SELECT 
                 c.column_name,
                 c.data_type,
+                c.udt_name,
                 c.is_nullable,
                 c.column_default,
                 c.character_maximum_length,
@@ -876,7 +933,12 @@ impl DatabaseAdapter for PostgresAdapter {
                     (c.table_schema || '.' || c.table_name)::regclass::oid,
                     c.ordinal_position
                 ) as description,
-                CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key
+                CASE WHEN pk.column_name IS NOT NULL THEN true ELSE false END as is_primary_key,
+                CASE WHEN c.data_type = 'USER-DEFINED' AND EXISTS (
+                    SELECT 1 FROM pg_catalog.pg_type t
+                    JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid
+                    WHERE t.typname = c.udt_name AND n.nspname = c.udt_schema AND t.typtype = 'e'
+                ) THEN true ELSE false END as is_enum
             FROM information_schema.columns c
             LEFT JOIN (
                 SELECT ku.table_schema, ku.table_name, ku.column_name
@@ -913,22 +975,35 @@ impl DatabaseAdapter for PostgresAdapter {
             .map(|row| {
                 let name: String = row.get(0);
                 let data_type: String = row.get(1);
-                let is_nullable: String = row.get(2);
-                let default_value: Option<String> = row.get(3);
-                let max_length: Option<i32> = row.get(4);
-                let precision: Option<i32> = row.get(5);
-                let scale: Option<i32> = row.get(6);
-                let description: Option<String> = row.get(7);
-                let is_primary_key: bool = row.get(8);
+                let udt_name: String = row.get(2);
+                let is_nullable: String = row.get(3);
+                let default_value: Option<String> = row.get(4);
+                let max_length: Option<i32> = row.get(5);
+                let precision: Option<i32> = row.get(6);
+                let scale: Option<i32> = row.get(7);
+                let description: Option<String> = row.get(8);
+                let is_primary_key: bool = row.get(9);
+                let is_enum: bool = row.get(10);
 
                 let is_auto_increment = default_value
                     .as_ref()
                     .map(|d| d.contains("nextval"))
                     .unwrap_or(false);
 
+                let actual_type = if data_type == "USER-DEFINED" {
+                    udt_name
+                } else {
+                    data_type
+                };
+
+                let mut metadata = HashMap::new();
+                if is_enum {
+                    metadata.insert("is_enum".to_string(), "true".to_string());
+                }
+
                 ColumnInfo {
                     name,
-                    data_type,
+                    data_type: actual_type,
                     nullable: is_nullable == "YES",
                     default_value,
                     is_primary_key,
@@ -937,7 +1012,7 @@ impl DatabaseAdapter for PostgresAdapter {
                     precision: precision.map(|v| v as u32),
                     scale: scale.map(|v| v as u32),
                     description,
-                    metadata: HashMap::new(),
+                    metadata,
                 }
             })
             .collect();

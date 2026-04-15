@@ -4,8 +4,8 @@
 //! including databases, schemas, tables, columns, and table data.
 
 use crate::database::{
-    ColumnInfo, DatabaseAdapter, DatabaseSchema, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter,
-    TableInfo,
+    ColumnInfo, DatabaseAdapter, DatabaseSchema, MySQLAdapter, PostgresAdapter, QueryResult,
+    SqlServerAdapter, TableInfo,
 };
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
@@ -402,7 +402,6 @@ pub async fn get_table_data(
                 build_qualified_table(query.schema.as_deref(), &query.table, "postgres");
             let sql =
                 build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "postgres");
-            // If a different database is requested, create a temporary connection to it.
             if let Some(ref db) = query.database {
                 if Some(db.as_str()) != adapter.config.database.as_deref() {
                     let mut temp_config = adapter.config.clone();
@@ -907,7 +906,7 @@ mod tests {
         );
     }
 
-    #[test]
+#[test]
     fn test_build_paginated_select() {
         let query = build_paginated_select("\"table\"", None, 10, 0, "postgres");
         assert!(query.contains("LIMIT 10"));
