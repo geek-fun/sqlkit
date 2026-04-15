@@ -4,7 +4,7 @@
 //! including databases, schemas, tables, columns, and table data.
 
 use crate::database::{
-    ColumnInfo, DatabaseAdapter, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter,
+    ColumnInfo, DatabaseAdapter, DatabaseSchema, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter,
     TableInfo,
 };
 use crate::state::{ActiveConnection, AppState};
@@ -105,12 +105,12 @@ fn build_count_query(qualified_table: &str, filter: Option<&str>) -> String {
 ///
 /// # Returns
 ///
-/// Vector of database names.
+/// Vector of database schemas with name, description, and is_system flag.
 #[tauri::command]
 pub async fn list_databases(
     connection_id: String,
     state: State<'_, AppState>,
-) -> Result<Vec<String>, String> {
+) -> Result<Vec<DatabaseSchema>, String> {
     let connections = state.connections.lock().await;
 
     let connection = connections
@@ -131,14 +131,14 @@ pub async fn list_databases(
             let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
-        ActiveConnection::SQLite(_) => {
-            // SQLite doesn't have multiple databases in the same connection
-            return Ok(vec!["main".to_string()]);
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_databases().await
         }
     }
     .map_err(|e| format!("Failed to list databases: {}", e))?;
 
-    Ok(databases.iter().map(|db| db.name.clone()).collect())
+    Ok(databases)
 }
 
 /// List all schemas in a database.

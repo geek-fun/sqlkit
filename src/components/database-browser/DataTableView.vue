@@ -52,6 +52,7 @@ type ColumnTypeInfo = {
   data_type: string
   is_primary_key: boolean
   nullable: boolean
+  is_auto_increment: boolean
 }
 
 const props = defineProps<{
@@ -117,6 +118,10 @@ const columnIsPK = computed(() =>
 
 const columnNullable = computed(() =>
   Object.fromEntries(columnInfoList.value.map(c => [c.name, c.nullable])),
+)
+
+const columnIsAutoIncrement = computed(() =>
+  Object.fromEntries(columnInfoList.value.map(c => [c.name, c.is_auto_increment])),
 )
 
 /** PK columns (in order they appear in the result set) */
@@ -511,6 +516,10 @@ async function confirmEdit() {
     const updates = Object.fromEntries(
       columns
         .map((col: string) => {
+          // Skip auto-increment columns - they cannot be updated
+          if (columnIsAutoIncrement.value[col]) {
+            return null
+          }
           const field = editForm.value[col]
           return field ? [col, field.setNull ? null : coerceEditValue(col, field.value)] : null
         })
@@ -1072,7 +1081,7 @@ watch(
               </Label>
               <div class="flex-1" />
               <!-- Set to NULL toggle -->
-              <label class="text-xs text-muted-foreground flex gap-1 cursor-pointer select-none items-center">
+              <label v-if="!columnIsAutoIncrement[col]" class="text-xs text-muted-foreground flex gap-1 cursor-pointer select-none items-center">
                 <input
                   type="checkbox"
                   class="h-3 w-3 cursor-pointer"
@@ -1081,16 +1090,20 @@ watch(
                 >
                 NULL
               </label>
+              <!-- Auto-increment indicator -->
+              <span v-if="columnIsAutoIncrement[col]" class="text-xs text-muted-foreground italic">
+                (auto)
+              </span>
             </div>
             <Input
               :id="`edit-field-${col}`"
               :type="getEditInputType(col)"
               :model-value="editForm[col]?.setNull ? '' : (editForm[col]?.value ?? '')"
-              :disabled="editForm[col]?.setNull"
-              :placeholder="editForm[col]?.setNull ? 'NULL' : ''"
+              :disabled="editForm[col]?.setNull || columnIsAutoIncrement[col]"
+              :placeholder="editForm[col]?.setNull ? 'NULL' : columnIsAutoIncrement[col] ? 'Auto-generated' : ''"
               :step="getEditInputType(col) === 'number' ? 'any' : undefined"
               class="text-xs font-mono h-7"
-              :class="{ 'border-destructive': editErrors[col] }"
+              :class="{ 'border-destructive': editErrors[col], 'opacity-60': columnIsAutoIncrement[col] }"
               @update:model-value="(v) => editForm[col] = { ...editForm[col], value: String(v), setNull: editForm[col]?.setNull ?? false }"
             />
             <p v-if="editErrors[col]" class="text-xs text-destructive">

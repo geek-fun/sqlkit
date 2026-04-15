@@ -25,9 +25,15 @@ const SQL_STATEMENT_START_REGEX
 
 const isStatementStart = (line: string): boolean => SQL_STATEMENT_START_REGEX.test(line)
 
-function findFirstUnquotedSemicolon(line: string): number {
+type LineTokens = {
+  semicolonIndex: number
+  parenDelta: number
+}
+
+function tokenizeLine(line: string): LineTokens {
   let singleQuote = false
   let doubleQuote = false
+  let parenDelta = 0
   for (let i = 0; i < line.length; i++) {
     const ch = line[i]
     if (ch === '\'' && !doubleQuote) {
@@ -41,23 +47,34 @@ function findFirstUnquotedSemicolon(line: string): number {
       doubleQuote = !doubleQuote
     }
     else if (ch === '-' && line[i + 1] === '-' && !singleQuote && !doubleQuote) {
-      // Line comment starts -- everything after is ignored
-      return -1
+      break
     }
-    else if (ch === ';' && !singleQuote && !doubleQuote) {
-      return i
+    else if (!singleQuote && !doubleQuote) {
+      if (ch === '(')
+        parenDelta++
+      else if (ch === ')')
+        parenDelta--
+      else if (ch === ';')
+        return { semicolonIndex: i, parenDelta }
     }
   }
-  return -1
+  return { semicolonIndex: -1, parenDelta }
 }
 
+const WITH_REGEX = /^\s*WITH\b/i
+
 function findStatementEnd(lines: string[], startLine: number): number {
+  const isCte = WITH_REGEX.test(lines[startLine])
+  let parenDepth = 0
+
   for (let i = startLine; i < lines.length; i++) {
-    const semiIdx = findFirstUnquotedSemicolon(lines[i])
-    if (semiIdx !== -1)
+    const { semicolonIndex, parenDelta } = tokenizeLine(lines[i])
+    if (semicolonIndex !== -1)
       return i
 
-    if (i > startLine && isStatementStart(lines[i].trim()))
+    parenDepth += parenDelta
+
+    if (i > startLine && parenDepth === 0 && !isCte && isStatementStart(lines[i].trim()))
       return i - 1
   }
   return lines.length - 1

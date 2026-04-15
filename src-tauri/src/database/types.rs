@@ -13,6 +13,9 @@ pub struct DatabaseSchema {
     pub name: String,
     /// Optional description or comment.
     pub description: Option<String>,
+    /// Whether this is a system database.
+    #[serde(default)]
+    pub is_system: bool,
     /// Additional metadata.
     #[serde(default)]
     pub metadata: HashMap<String, String>,

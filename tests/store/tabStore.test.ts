@@ -337,17 +337,17 @@ describe('tabStore', () => {
       store.markTabSaved('tab-1', '/path/to/my-query.sql')
 
       expect(store.tabs[0].filePath).toBe('/path/to/my-query.sql')
-      expect(store.tabs[0].name).toBe('my-query')
+      expect(store.tabs[0].name).toBe('my-query.sql')
     })
 
-    it('should remove .sql extension from name', () => {
+    it('should keep .sql extension in name', () => {
       const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
       store.createTab('conn-1')
 
       store.markTabSaved('tab-1', '/path/to/query.sql')
 
-      expect(store.tabs[0].name).toBe('query')
+      expect(store.tabs[0].name).toBe('query.sql')
     })
 
     it('handles path without slashes', () => {
@@ -357,7 +357,7 @@ describe('tabStore', () => {
 
       store.markTabSaved('tab-1', 'query.sql')
 
-      expect(store.tabs[0].name).toBe('query')
+      expect(store.tabs[0].name).toBe('query.sql')
     })
   })
 

@@ -5013,7 +5013,7 @@ dependencies = [
 
 [[package]]
 name = "sqlkit"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -5023,6 +5023,7 @@ dependencies = [
  "native-tls",
  "postgres-native-tls",
  "rusqlite",
+ "rust_decimal",
  "serde",
  "serde_json",
  "tauri",
@@ -5758,6 +5759,7 @@ dependencies = [
  "asynchronous-codec",
  "byteorder",
  "bytes",
+ "chrono",
  "connection-string",
  "encoding_rs",
  "enumflags2",
@@ -5766,6 +5768,7 @@ dependencies = [
  "once_cell",
  "pin-project-lite",
  "pretty-hex",
+ "rust_decimal",
  "rustls-native-certs 0.6.3",
  "rustls-pemfile",
  "thiserror 1.0.69",

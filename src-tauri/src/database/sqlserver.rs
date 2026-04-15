@@ -13,6 +13,8 @@ use crate::database::{
     },
 };
 use async_trait::async_trait;
+use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -246,9 +248,6 @@ impl SqlServerAdapter {
 
     /// Convert a SQL Server value to QueryValue.
     fn convert_value(row: &Row, idx: usize) -> DbResult<QueryValue> {
-        // Try different types using try_get
-        // In tiberius 0.12, ColumnData fields are Option-wrapped
-
         // Try boolean
         if let Ok(Some(v)) = row.try_get::<bool, _>(idx) {
             return Ok(QueryValue::Bool(v));
@@ -265,12 +264,28 @@ impl SqlServerAdapter {
             return Ok(QueryValue::Int(v));
         }
 
-        // Try floats
+        // Try floats (also handles some decimal types)
         if let Ok(Some(v)) = row.try_get::<f32, _>(idx) {
             return Ok(QueryValue::Float(v as f64));
         }
         if let Ok(Some(v)) = row.try_get::<f64, _>(idx) {
             return Ok(QueryValue::Float(v));
+        }
+
+        // Try Decimal (MSSQL DECIMAL/NUMERIC types)
+        if let Ok(Some(v)) = row.try_get::<Decimal, _>(idx) {
+            return Ok(QueryValue::String(v.to_string()));
+        }
+
+        // Try datetime types (chrono)
+        if let Ok(Some(v)) = row.try_get::<NaiveDateTime, _>(idx) {
+            return Ok(QueryValue::DateTime(v.to_string()));
+        }
+        if let Ok(Some(v)) = row.try_get::<NaiveDate, _>(idx) {
+            return Ok(QueryValue::DateTime(v.to_string()));
+        }
+        if let Ok(Some(v)) = row.try_get::<NaiveTime, _>(idx) {
+            return Ok(QueryValue::DateTime(v.to_string()));
         }
 
         // Try string
@@ -460,10 +475,10 @@ impl DatabaseAdapter for SqlServerAdapter {
         let query = r#"
             SELECT 
                 name,
-                NULL as description
+                NULL as description,
+                CASE WHEN name IN ('master', 'tempdb', 'model', 'msdb') THEN 1 ELSE 0 END as is_system
             FROM sys.databases
-            WHERE name NOT IN ('master', 'tempdb', 'model', 'msdb')
-            ORDER BY name
+            ORDER BY is_system, name
         "#;
 
         let client = self.get_client().await?;
@@ -490,10 +505,16 @@ impl DatabaseAdapter for SqlServerAdapter {
                     Ok(QueryValue::String(s)) => Some(s),
                     _ => None,
                 };
+                let is_system = match Self::convert_value(row, 2) {
+                    Ok(QueryValue::Int(i)) => i == 1,
+                    Ok(QueryValue::Bool(b)) => b,
+                    _ => false,
+                };
 
                 DatabaseSchema {
                     name,
                     description,
+                    is_system,
                     metadata: HashMap::new(),
                 }
             })

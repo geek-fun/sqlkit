@@ -452,6 +452,7 @@ function closeResultPanel() {
             @view-structure="handleViewStructure"
             @export-data="handleExportData"
             @open-saved-query="handleOpenSavedQuery"
+            @create-new-query="handleNewTab"
           />
         </div>
 

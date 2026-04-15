@@ -42,7 +42,9 @@ tokio-native-tls = "0.3"
 tiberius = { version = "0.12", default-features = false, features = [
   "sql-browser-tokio",
   "tds73",
-  "rustls"
+  "rustls",
+  "chrono",
+  "rust_decimal"
 ] }
 tokio-util = { version = "0.7", features = [ "compat" ] }
 rusqlite = { version = "0.32", features = [
@@ -57,3 +59,4 @@ tauri-plugin-os = "2"
 url = "2"
 base64 = "0.22"
 chrono = "0.4"
+rust_decimal = "1"

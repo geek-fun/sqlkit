@@ -688,10 +688,11 @@ impl DatabaseAdapter for PostgresAdapter {
         let query = r#"
             SELECT 
                 datname as name,
-                pg_catalog.shobj_description(oid, 'pg_database') as description
+                pg_catalog.shobj_description(oid, 'pg_database') as description,
+                CASE WHEN datname IN ('postgres', 'template0', 'template1') THEN true ELSE false END as is_system
             FROM pg_catalog.pg_database
             WHERE datistemplate = false
-            ORDER BY datname
+            ORDER BY is_system, datname
         "#;
 
         let pool = self
@@ -715,10 +716,12 @@ impl DatabaseAdapter for PostgresAdapter {
             .map(|row| {
                 let name: String = row.get(0);
                 let description: Option<String> = row.get(1);
+                let is_system: bool = row.get(2);
 
                 DatabaseSchema {
                     name,
                     description,
+                    is_system,
                     metadata: HashMap::new(),
                 }
             })

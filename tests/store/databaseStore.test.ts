@@ -1,6 +1,12 @@
+import type { DatabaseSchema } from '@/store/databaseStore'
 import { createPinia, setActivePinia } from 'pinia'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useDatabaseStore } from '@/store/databaseStore'
+
+const mockDb1: DatabaseSchema = { name: 'db1', is_system: false }
+const mockDb2: DatabaseSchema = { name: 'db2', is_system: false }
+const mockDb3: DatabaseSchema = { name: 'db3', is_system: false }
+const mockSystemDb: DatabaseSchema = { name: 'master', is_system: true }
 
 // Mock the Tauri invoke API
 jest.mock('@tauri-apps/api/core', () => ({
@@ -76,7 +82,7 @@ describe('databaseStore', () => {
     it('should clear metadata for connection', () => {
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
-        databases: ['db1'],
+        databases: [mockDb1],
         schemas: {},
         tables: {},
         lastRefresh: new Date().toISOString(),
@@ -90,22 +96,22 @@ describe('databaseStore', () => {
 
   describe('fetchDatabases', () => {
     it('should fetch and store databases', async () => {
-      invoke.mockResolvedValue(['db1', 'db2'])
+      invoke.mockResolvedValue([mockDb1, mockDb2])
 
       const store = useDatabaseStore()
       await store.fetchDatabases('conn-1')
 
       expect(invoke).toHaveBeenCalledWith('list_databases', { connectionId: 'conn-1' })
-      expect(store.metadata['conn-1']?.databases).toEqual(['db1', 'db2'])
+      expect(store.metadata['conn-1']?.databases).toEqual([mockDb1, mockDb2])
       expect(store.loading).toBe(false)
     })
 
     it('should update existing metadata', async () => {
-      invoke.mockResolvedValue(['db3'])
+      invoke.mockResolvedValue([mockDb3])
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
-        databases: ['db1', 'db2'],
+        databases: [mockDb1, mockDb2],
         schemas: { db1: ['public'] },
         tables: {},
         lastRefresh: new Date(2020, 0, 1).toISOString(),
@@ -113,7 +119,7 @@ describe('databaseStore', () => {
 
       await store.fetchDatabases('conn-1')
 
-      expect(store.metadata['conn-1']?.databases).toEqual(['db3'])
+      expect(store.metadata['conn-1']?.databases).toEqual([mockDb3])
       // Should preserve schemas
       expect(store.metadata['conn-1']?.schemas.db1).toEqual(['public'])
     })
@@ -136,7 +142,7 @@ describe('databaseStore', () => {
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
-        databases: ['db1'],
+        databases: [mockDb1],
         schemas: {},
         tables: {},
         lastRefresh: new Date().toISOString(),
@@ -162,7 +168,7 @@ describe('databaseStore', () => {
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
-        databases: ['db1'],
+        databases: [mockDb1],
         schemas: {},
         tables: {},
         lastRefresh: new Date().toISOString(),
@@ -183,7 +189,7 @@ describe('databaseStore', () => {
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
-        databases: ['db1'],
+        databases: [mockDb1],
         schemas: {},
         tables: {},
         lastRefresh: new Date().toISOString(),
@@ -208,13 +214,43 @@ describe('databaseStore', () => {
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
-        databases: ['db1', 'db2'],
+        databases: [mockDb1, mockDb2],
         schemas: {},
         tables: {},
         lastRefresh: new Date().toISOString(),
       }
 
-      expect(store.databases).toEqual(['db1', 'db2'])
+      expect(store.databases).toEqual([mockDb1, mockDb2])
+    })
+
+    it('userDatabases getter should filter out system databases', () => {
+      const connectionStore = useConnectionStore()
+      connectionStore.activeConnectionId = 'conn-1'
+
+      const store = useDatabaseStore()
+      store.metadata['conn-1'] = {
+        databases: [mockDb1, mockSystemDb, mockDb2],
+        schemas: {},
+        tables: {},
+        lastRefresh: new Date().toISOString(),
+      }
+
+      expect(store.userDatabases).toEqual([mockDb1, mockDb2])
+    })
+
+    it('systemDatabases getter should return only system databases', () => {
+      const connectionStore = useConnectionStore()
+      connectionStore.activeConnectionId = 'conn-1'
+
+      const store = useDatabaseStore()
+      store.metadata['conn-1'] = {
+        databases: [mockDb1, mockSystemDb, mockDb2],
+        schemas: {},
+        tables: {},
+        lastRefresh: new Date().toISOString(),
+      }
+
+      expect(store.systemDatabases).toEqual([mockSystemDb])
     })
 
     it('schemas getter should return empty array when no database selected', () => {
@@ -230,7 +266,7 @@ describe('databaseStore', () => {
       const store = useDatabaseStore()
       store.selectedDatabase = 'db1'
       store.metadata['conn-1'] = {
-        databases: ['db1'],
+        databases: [mockDb1],
         schemas: { db1: ['public', 'private'] },
         tables: {},
         lastRefresh: new Date().toISOString(),
@@ -249,7 +285,7 @@ describe('databaseStore', () => {
 
       const mockTables = [{ name: 'users' }, { name: 'orders' }]
       store.metadata['conn-1'] = {
-        databases: ['db1'],
+        databases: [mockDb1],
         schemas: {},
         tables: { 'db1.public': mockTables },
         lastRefresh: new Date().toISOString(),

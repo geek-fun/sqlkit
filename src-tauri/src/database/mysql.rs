@@ -426,9 +426,11 @@ impl DatabaseAdapter for MySQLAdapter {
             .into_iter()
             .map(|row| {
                 let name: String = row.get(0).unwrap();
+                let is_system = matches!(name.as_str(), "mysql" | "information_schema" | "performance_schema" | "sys");
                 DatabaseSchema {
                     name,
                     description: None,
+                    is_system,
                     metadata: HashMap::new(),
                 }
             })

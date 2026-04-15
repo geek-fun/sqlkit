@@ -443,18 +443,15 @@ impl DatabaseAdapter for SQLiteAdapter {
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
-        // SQLite doesn't have multiple databases in the same connection
-        // Return the current database
-        let db_name = self
-            .db_path
-            .as_ref()
-            .and_then(|p| p.to_str())
-            .unwrap_or(MEMORY_DB)
-            .to_string();
-
         Ok(vec![DatabaseSchema {
-            name: db_name,
+            name: self
+                .db_path
+                .as_ref()
+                .and_then(|p| p.to_str())
+                .unwrap_or(MEMORY_DB)
+                .to_string(),
             description: Some("SQLite database".to_string()),
+            is_system: false,
             metadata: HashMap::new(),
         }])
     }

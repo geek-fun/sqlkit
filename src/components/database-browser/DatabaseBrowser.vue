@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { SavedQueryInfo } from '@/datasources/fileApi'
-import type { TableInfo } from '@/store/databaseStore'
+import type { DatabaseSchema, TableInfo } from '@/store/databaseStore'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -47,6 +49,7 @@ const emit = defineEmits<{
   (e: 'exportData', table: TableInfo, database: string, schema?: string): void
   (e: 'update:selectedDatabase', database: string): void
   (e: 'openSavedQuery', filePath: string): void
+  (e: 'createNewQuery'): void
 }>()
 
 const { t } = useI18n()
@@ -101,41 +104,52 @@ function createSchemaNode(database: string, schema: string, tables: TableInfo[],
   }
 }
 
-function createDatabaseNode(database: string, metadata: { schemas: Record<string, string[]>, tables: Record<string, TableInfo[]> }): TreeNode {
-  const dbId = `db-${database}`
-  const schemas = metadata.schemas[database] || []
+function createDatabaseNode(database: DatabaseSchema, metadata: { schemas: Record<string, string[]>, tables: Record<string, TableInfo[]> }): TreeNode {
+  const dbId = `db-${database.name}`
+  const schemas = metadata.schemas[database.name] || []
 
   const children = schemas.length > 0
     ? schemas.map(schema => createSchemaNode(
-        database,
+        database.name,
         schema,
-        metadata.tables[`${database}.${schema}`] || [],
+        metadata.tables[`${database.name}.${schema}`] || [],
         dbId,
       ))
-    : (metadata.tables[database] || []).map(table => createTableNode(database, undefined, table, dbId))
+    : (metadata.tables[database.name] || []).map(table => createTableNode(database.name, undefined, table, dbId))
 
   return {
     id: dbId,
-    name: database,
+    name: database.name,
     type: 'database',
     isExpanded: expandedNodes.value.has(dbId),
     children,
   }
 }
 
-const treeNodes = computed<TreeNode[]>(() => {
+const userDatabaseNodes = computed<TreeNode[]>(() => {
   if (!connectionId.value || !databaseStore.metadata[connectionId.value]) {
     return []
   }
 
   const metadata = databaseStore.metadata[connectionId.value]
-  return metadata.databases.map(database => createDatabaseNode(database, metadata))
+  return metadata.databases
+    .filter(db => !db.is_system)
+    .map(database => createDatabaseNode(database, metadata))
+})
+
+const systemDatabaseNodes = computed<TreeNode[]>(() => {
+  if (!connectionId.value || !databaseStore.metadata[connectionId.value]) {
+    return []
+  }
+
+  const metadata = databaseStore.metadata[connectionId.value]
+  return metadata.databases
+    .filter(db => db.is_system)
+    .map(database => createDatabaseNode(database, metadata))
 })
 
 const tablesAndViews = computed(() => {
   const currentDb = props.selectedDatabase
-    || connectionStore.getCurrentDatabase(connectionId.value || '')
-    || activeConnection.value?.database
   if (!currentDb || !connectionId.value || !databaseStore.metadata[connectionId.value]) {
     return { tables: [], views: [] }
   }
@@ -370,6 +384,9 @@ async function refreshTree() {
 
     await fetchTablesForSchemas(connectionId.value, connectedDb, schemas)
   }
+
+  // Also refresh saved queries
+  await fetchSavedQueryFiles()
 }
 
 async function loadDatabaseData(connId: string, database: string) {
@@ -520,13 +537,30 @@ defineExpose({ fetchSavedQueryFiles })
           <SelectValue :placeholder="t('components.databaseBrowser.selectDatabase')" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem
-            v-for="db in treeNodes"
-            :key="db.id"
-            :value="db.name"
-          >
-            {{ db.name }}
-          </SelectItem>
+          <SelectGroup v-if="userDatabaseNodes.length > 0">
+            <SelectLabel class="text-xs text-muted-foreground">
+              {{ t('components.databaseBrowser.userDatabases') }}
+            </SelectLabel>
+            <SelectItem
+              v-for="db in userDatabaseNodes"
+              :key="db.id"
+              :value="db.name"
+            >
+              {{ db.name }}
+            </SelectItem>
+          </SelectGroup>
+          <SelectGroup v-if="systemDatabaseNodes.length > 0">
+            <SelectLabel class="text-xs text-muted-foreground">
+              {{ t('components.databaseBrowser.systemDatabases') }}
+            </SelectLabel>
+            <SelectItem
+              v-for="db in systemDatabaseNodes"
+              :key="db.id"
+              :value="db.name"
+            >
+              {{ db.name }}
+            </SelectItem>
+          </SelectGroup>
         </SelectContent>
       </Select>
     </div>
@@ -643,14 +677,12 @@ defineExpose({ fetchSavedQueryFiles })
             variant="ghost"
             size="icon"
             class="ml-auto h-4 w-4"
-            :title="t('components.databaseBrowser.refresh')"
-            @click.stop="fetchSavedQueryFiles"
+            :title="t('components.databaseBrowser.newQuery')"
+            @click.stop="emit('createNewQuery')"
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-              <path d="M21 3v5h-5" />
-              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-              <path d="M8 16H3v5" />
+              <path d="M5 12h14" />
+              <path d="M12 5v14" />
             </svg>
           </Button>
         </button>

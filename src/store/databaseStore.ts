@@ -10,8 +10,14 @@ export type TableInfo = {
   size?: string
 }
 
+export type DatabaseSchema = {
+  name: string
+  description?: string
+  is_system: boolean
+}
+
 export type DatabaseMetadata = {
-  databases: string[]
+  databases: DatabaseSchema[]
   schemas: Record<string, string[]>
   tables: Record<string, TableInfo[]>
   lastRefresh: string
@@ -39,8 +45,16 @@ export const useDatabaseStore = defineStore('databases', {
       return connId ? state.metadata[connId] ?? null : null
     },
 
-    databases(): string[] {
+    databases(): DatabaseSchema[] {
       return this.currentMetadata?.databases ?? []
+    },
+
+    userDatabases(): DatabaseSchema[] {
+      return this.databases.filter(db => !db.is_system)
+    },
+
+    systemDatabases(): DatabaseSchema[] {
+      return this.databases.filter(db => db.is_system)
     },
 
     schemas(state): string[] {
@@ -61,7 +75,7 @@ export const useDatabaseStore = defineStore('databases', {
     async fetchDatabases(connectionId: string) {
       this.loading = true
       try {
-        const result = await invoke<string[]>('list_databases', {
+        const result = await invoke<DatabaseSchema[]>('list_databases', {
           connectionId,
         })
 
@@ -70,18 +84,16 @@ export const useDatabaseStore = defineStore('databases', {
           return
         }
 
-        const databases = result
-
         if (!this.metadata[connectionId]) {
           this.metadata[connectionId] = {
-            databases,
+            databases: result,
             schemas: {},
             tables: {},
             lastRefresh: new Date().toISOString(),
           }
         }
         else {
-          this.metadata[connectionId].databases = databases
+          this.metadata[connectionId].databases = result
           this.metadata[connectionId].lastRefresh = new Date().toISOString()
         }
       }
