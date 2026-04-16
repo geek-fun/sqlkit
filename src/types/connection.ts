@@ -149,3 +149,20 @@ function isValidCertPath(path: string): boolean {
 export function hasSslValidationErrors(sslConfig: SslConfig, dbType: string): boolean {
   return validateSslConfig(sslConfig, dbType).length > 0
 }
+
+/**
+ * Column metadata from database table
+ */
+export type ColumnInfo = {
+  name: string
+  data_type: string
+  nullable: boolean
+  default_value?: string
+  is_primary_key: boolean
+  is_auto_increment: boolean
+  max_length?: number
+  precision?: number
+  scale?: number
+  description?: string
+  metadata?: Record<string, string>
+}

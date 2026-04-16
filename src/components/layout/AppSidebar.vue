@@ -7,8 +7,7 @@ const route = useRoute()
 const menuItems = [
   { id: 'connections', label: 'Connections', icon: 'dns', path: '/connections' },
   { id: 'queries', label: 'Queries', icon: 'code', path: '/queries' },
-  // { id: 'data-studio', label: 'Data Studio', icon: 'smart_toy', path: '/data-studio', badge: 'AI' },
-  { id: 'import-export', label: 'Import / Export', icon: 'import_export', path: '/import-export' },
+  { id: 'transfer', label: 'Transfer', icon: 'import_export', path: '/transfer' },
   { id: 'history', label: 'History', icon: 'history', path: '/history' },
 ]
 
@@ -136,10 +135,10 @@ const isActive = (path: string) => route.path === path
 
                 <!-- AI Badge -->
                 <span
-                  v-if="item.badge"
+                  v-if="false"
                   class="text-[8px] text-white font-bold px-1 rounded-full bg-primary right-1 top-1 absolute"
                 >
-                  {{ item.badge }}
+                  AI
                 </span>
               </button>
             </TooltipTrigger>
