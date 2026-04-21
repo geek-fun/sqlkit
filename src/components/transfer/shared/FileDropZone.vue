@@ -15,6 +15,19 @@ const isDragging = ref(false)
 
 const formats = props.acceptedFormats || ['csv', 'jsonl', 'sql', 'xlsx']
 
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+function triggerFileInput() {
+  fileInputRef.value?.click()
+}
+
+function handleKeyDown(e: KeyboardEvent) {
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault()
+    triggerFileInput()
+  }
+}
+
 function handleDragOver(e: DragEvent) {
   e.preventDefault()
   isDragging.value = true
@@ -44,28 +57,39 @@ function handleFileInput(e: Event) {
 
 <template>
   <Card
-    class="cursor-pointer transition-colors"
-    :class="isDragging ? 'border-primary bg-secondary' : 'border-border'"
+    class="border-dashed cursor-pointer transition-all duration-200 focus-visible:outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+    :class="isDragging ? 'border-primary bg-primary/5' : 'border-border'"
+    role="button"
+    tabindex="0"
+    aria-label="Drop a file or click to browse"
     @dragover="handleDragOver"
     @dragleave="handleDragLeave"
     @drop="handleDrop"
+    @click="triggerFileInput"
+    @keydown="handleKeyDown"
   >
-    <CardContent class="pt-6 flex flex-col min-h-32 items-center justify-center">
-      <div class="text-4xl mb-2">
-        📄
+    <CardContent class="p-8 text-center flex flex-col min-h-[160px] items-center justify-center">
+      <div
+        class="text-primary mb-4 rounded-full bg-primary/10 flex h-12 w-12 transition-transform duration-200 items-center justify-center"
+        :class="{ 'scale-110': isDragging }"
+        aria-hidden="true"
+      >
+        <span class="i-carbon-document-upload h-6 w-6" />
       </div>
-      <div class="text-sm font-medium">
+      <h3 class="text-sm text-foreground tracking-tight font-semibold">
         Drag & drop a file here
-      </div>
-      <div class="text-xs text-muted-foreground mt-1">
-        or click to browse
-      </div>
-      <div class="text-xs text-muted-foreground mt-2">
-        Supported: {{ formats.map(f => f.toUpperCase()).join(', ') }}
+      </h3>
+      <p class="text-sm text-muted-foreground mt-1">
+        or click to browse from your computer
+      </p>
+      <div class="text-xs text-muted-foreground font-medium mt-4 px-2 py-1 rounded bg-muted/50">
+        Supported formats: {{ formats.map(f => f.toUpperCase()).join(', ') }}
       </div>
       <input
+        ref="fileInputRef"
         type="file"
         class="hidden"
+        tabindex="-1"
         :accept="formats.map(f => `.${f}`).join(',')"
         @change="handleFileInput"
       >

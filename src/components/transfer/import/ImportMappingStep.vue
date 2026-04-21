@@ -2,7 +2,7 @@
 import type { ColumnMapping } from '@/types/transfer'
 
 import { invoke } from '@tauri-apps/api/core'
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -69,17 +69,31 @@ function clearAll() {
   }))
 }
 
-watch([connectionId, database, schema, table], () => {
+const targetParams = computed(() => {
+  return {
+    connectionId: connectionId.value,
+    database: database.value,
+    schema: schema.value,
+    table: table.value,
+  }
+})
+
+watch(targetParams, (params, oldParams) => {
   transferStore.importRequest = {
     ...transferStore.importRequest,
-    connectionId: connectionId.value || undefined,
-    database: database.value || undefined,
-    schema: schema.value || undefined,
-    table: table.value,
+    connectionId: params.connectionId || undefined,
+    database: params.database || undefined,
+    schema: params.schema || undefined,
+    table: params.table,
     columnMappings: mappings.value,
   }
-  fetchTargetColumns()
-})
+
+  if (params && JSON.stringify(params) !== JSON.stringify(oldParams)) {
+    if (params.connectionId && params.database && params.table) {
+      fetchTargetColumns()
+    }
+  }
+}, { deep: true })
 
 watch(table, () => {
   autoMap()
@@ -127,30 +141,36 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
 
       <div v-else class="border rounded">
         <table class="text-sm w-full">
-          <thead class="border-b">
+          <caption class="sr-only">
+            Column mapping between source and target database
+          </caption>
+          <thead class="border-b bg-muted/50">
             <tr>
-              <th class="p-2 text-left">
+              <th scope="col" class="font-medium p-2 text-left">
                 Source Column
               </th>
-              <th class="p-2 text-left">
+              <th scope="col" class="font-medium p-2 text-left">
                 Target Column
               </th>
-              <th class="p-2 text-left">
+              <th scope="col" class="font-medium p-2 text-left">
                 Type
               </th>
-              <th class="p-2 text-left">
+              <th scope="col" class="font-medium p-2 text-left">
                 Status
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="mapping in mappings" :key="mapping.sourceColumn" class="border-b">
-              <td class="p-2">
+            <tr v-for="mapping in mappings" :key="mapping.sourceColumn" class="border-b transition-colors hover:bg-muted/50">
+              <th scope="row" class="font-normal p-2 text-left align-middle">
                 {{ mapping.sourceColumn }}
-              </td>
-              <td class="p-2">
+              </th>
+              <td class="p-2 align-middle">
                 <Select v-model="mapping.targetColumn">
-                  <SelectTrigger class="w-full">
+                  <SelectTrigger
+                    class="w-full"
+                    :aria-label="`Target column for ${mapping.sourceColumn}`"
+                  >
                     <SelectValue placeholder="Select column" />
                   </SelectTrigger>
                   <SelectContent>
@@ -167,15 +187,17 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
                   </SelectContent>
                 </Select>
               </td>
-              <td class="text-muted-foreground p-2">
+              <td class="text-muted-foreground p-2 align-middle">
                 {{ mapping.targetType || '-' }}
               </td>
-              <td class="p-2">
-                <span v-if="mapping.targetColumn" class="text-sm text-green-600">
-                  ✓ Mapped
+              <td class="p-2 align-middle">
+                <span v-if="mapping.targetColumn" class="text-sm text-green-600 font-medium flex items-center">
+                  <span class="sr-only">Status: </span>
+                  <span aria-hidden="true" class="mr-1">✓</span> Mapped
                 </span>
-                <span v-else class="text-sm text-muted-foreground">
-                  ⊘ Skipped
+                <span v-else class="text-sm text-muted-foreground font-medium flex items-center">
+                  <span class="sr-only">Status: </span>
+                  <span aria-hidden="true" class="mr-1">⊘</span> Skipped
                 </span>
               </td>
             </tr>

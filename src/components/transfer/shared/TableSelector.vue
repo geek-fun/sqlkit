@@ -8,6 +8,8 @@ import { Label } from '@/components/ui/label'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
+import { ConnectionStatus, useConnectionStore } from '@/store/connectionStore'
+
 const props = defineProps<{
   connectionId?: string
   database?: string
@@ -19,6 +21,8 @@ const emit = defineEmits<{
   'update:table': [value: string]
 }>()
 
+const connectionStore = useConnectionStore()
+
 const selectedTable = computed({
   get: () => props.table || '',
   set: val => emit('update:table', val),
@@ -27,8 +31,15 @@ const selectedTable = computed({
 const tables = ref<TableInfo[]>([])
 const loading = ref(false)
 
+// Check if connection is actually connected
+const isConnected = computed(() => {
+  if (!props.connectionId)
+    return false
+  return connectionStore.getConnectionStatus(props.connectionId) === ConnectionStatus.CONNECTED
+})
+
 async function fetchTables() {
-  if (!props.connectionId || !props.database)
+  if (!props.connectionId || !props.database || !isConnected.value)
     return
 
   loading.value = true
@@ -51,9 +62,22 @@ async function fetchTables() {
   }
 }
 
-watch([() => props.connectionId, () => props.database], () => {
-  fetchTables()
-}, { immediate: true })
+// Watch for connection status and database changes
+const tableFetchParams = computed(() => {
+  if (!isConnected.value || !props.database)
+    return null
+  return {
+    connectionId: props.connectionId,
+    database: props.database,
+    schema: props.schema,
+  }
+})
+
+watch(tableFetchParams, (params, oldParams) => {
+  if (params && JSON.stringify(params) !== JSON.stringify(oldParams)) {
+    fetchTables()
+  }
+}, { immediate: true, deep: true })
 
 const selectedTableInfo = computed(() =>
   tables.value.find(t => t.name === selectedTable.value),
@@ -62,8 +86,8 @@ const selectedTableInfo = computed(() =>
 
 <template>
   <div class="space-y-4">
-    <div class="space-y-2">
-      <Label>Table</Label>
+    <div class="space-y-2.5">
+      <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Table</Label>
       <Select v-model="selectedTable" :disabled="!tables.length || loading">
         <SelectTrigger>
           <SelectValue placeholder="Select table" />

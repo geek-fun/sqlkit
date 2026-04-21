@@ -52,6 +52,26 @@ export const zhCN = {
       trustServerCertHint: '接受自签名证书',
     },
   },
+  transfer: {
+    export: {
+      step: {
+        source: '数据源',
+        format: '格式',
+        output: '输出',
+      },
+      whereClause: 'WHERE 条件',
+      whereClausePlaceholder: '如 status = "active"',
+      orderBy: 'ORDER BY 排序',
+      orderByPlaceholder: '如 created_at DESC',
+      limit: 'LIMIT 限制',
+      limitPlaceholder: '如 1000',
+    },
+    connection: {
+      connectFailed: '连接失败',
+      databasesFailed: '加载数据库列表失败',
+      schemasFailed: '加载 Schema 列表失败',
+    },
+  },
   pages: {
     connections: {
       title: '连接管理',
@@ -179,6 +199,54 @@ export const zhCN = {
         title: '数据导入/导出',
         description: '导入和导出数据库架构和数据',
         comingSoon: '导入和导出功能将在未来的更新中提供。',
+      },
+    },
+    transfer: {
+      title: '传输',
+      subtitle: '导入、导出和迁移您的数据',
+      tabs: {
+        export: '导出',
+        import: '导入',
+        structure: '结构',
+        migration: '迁移',
+      },
+      export: {
+        step: {
+          source: '数据源',
+          format: '格式',
+          output: '输出',
+          formatOutput: '格式与输出',
+          preview: '预览',
+          execute: '导出',
+        },
+        columns: {
+          selectAll: '全选',
+          deselectAll: '取消全选',
+        },
+        whereClause: 'WHERE 条件（可选）',
+        where: 'WHERE 条件（可选）',
+        whereClausePlaceholder: 'status = "active"',
+        orderBy: 'ORDER BY 排序（可选）',
+        orderByPlaceholder: 'created_at DESC',
+        limit: 'LIMIT 限制（可选）',
+        limitPlaceholder: '1000',
+      },
+      connection: {
+        connectFailed: '连接失败',
+        databasesFailed: '加载数据库列表失败',
+        schemasFailed: '加载 Schema 列表失败',
+      },
+      structure: {
+        generateDdl: '生成 DDL',
+        runSqlFile: '运行 SQL 文件',
+        errorHandling: '错误处理',
+        onErrorStop: '遇到第一个错误时停止',
+        onErrorSkip: '跳过并继续',
+        onErrorRollback: '回滚事务',
+      },
+      migration: {
+        sourceConnection: '源连接',
+        targetConnection: '目标连接',
       },
     },
     queries: {

@@ -52,6 +52,26 @@ export const enUS = {
       trustServerCertHint: 'Accept self-signed certificates',
     },
   },
+  transfer: {
+    export: {
+      step: {
+        source: 'Source',
+        format: 'Format',
+        output: 'Output',
+      },
+      whereClause: 'WHERE clause',
+      whereClausePlaceholder: 'e.g. status = "active"',
+      orderBy: 'ORDER BY',
+      orderByPlaceholder: 'e.g. created_at DESC',
+      limit: 'LIMIT',
+      limitPlaceholder: 'e.g. 1000',
+    },
+    connection: {
+      connectFailed: 'Failed to connect',
+      databasesFailed: 'Failed to load databases',
+      schemasFailed: 'Failed to load schemas',
+    },
+  },
   pages: {
     connections: {
       title: 'Connections',
@@ -211,6 +231,8 @@ export const enUS = {
         step: {
           source: 'Source',
           format: 'Format',
+          output: 'Output',
+          formatOutput: 'Format & Output',
           preview: 'Preview',
           execute: 'Export',
         },
@@ -218,9 +240,18 @@ export const enUS = {
           selectAll: 'Select All',
           deselectAll: 'Deselect All',
         },
+        whereClause: 'WHERE clause (optional)',
         where: 'WHERE clause (optional)',
+        whereClausePlaceholder: 'status = \"active\"',
         orderBy: 'ORDER BY (optional)',
+        orderByPlaceholder: 'created_at DESC',
         limit: 'LIMIT (optional)',
+        limitPlaceholder: '1000',
+      },
+      connection: {
+        connectFailed: 'Failed to connect',
+        databasesFailed: 'Failed to load databases',
+        schemasFailed: 'Failed to load schemas',
       },
       import: {
         step: {

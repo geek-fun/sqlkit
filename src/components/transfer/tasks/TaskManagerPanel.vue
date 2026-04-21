@@ -58,7 +58,7 @@ function handleDismiss(taskId: string) {
         </Button>
       </DialogTitle>
 
-      <div class="mt-4 max-h-400px overflow-auto space-y-4">
+      <div class="mt-4 max-h-[400px] overflow-auto space-y-4">
         <div v-if="transferStore.runningTasks.length === 0" class="text-muted-foreground py-8 text-center">
           No transfer tasks
         </div>

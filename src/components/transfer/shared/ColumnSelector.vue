@@ -6,6 +6,8 @@ import { Checkbox } from '@/components/ui/checkbox'
 
 import { Label } from '@/components/ui/label'
 
+import { ConnectionStatus, useConnectionStore } from '@/store/connectionStore'
+
 export type ColumnInfo = {
   name: string
   data_type?: string
@@ -26,6 +28,8 @@ const emit = defineEmits<{
   'update:columns': [value: string[]]
 }>()
 
+const connectionStore = useConnectionStore()
+
 const selectedColumns = computed({
   get: () => props.columns || [],
   set: val => emit('update:columns', val),
@@ -34,8 +38,15 @@ const selectedColumns = computed({
 const availableColumns = ref<ColumnInfo[]>([])
 const loading = ref(false)
 
+// Check if connection is actually connected
+const isConnected = computed(() => {
+  if (!props.connectionId)
+    return false
+  return connectionStore.getConnectionStatus(props.connectionId) === ConnectionStatus.CONNECTED
+})
+
 async function fetchColumns() {
-  if (!props.connectionId || !props.database || !props.table)
+  if (!props.connectionId || !props.database || !props.table || !isConnected.value)
     return
 
   loading.value = true
@@ -59,9 +70,23 @@ async function fetchColumns() {
   }
 }
 
-watch([() => props.connectionId, () => props.database, () => props.table], () => {
-  fetchColumns()
-}, { immediate: true })
+// Watch for connection status, database, and table changes
+const columnFetchParams = computed(() => {
+  if (!isConnected.value || !props.database || !props.table)
+    return null
+  return {
+    connectionId: props.connectionId,
+    database: props.database,
+    schema: props.schema,
+    table: props.table,
+  }
+})
+
+watch(columnFetchParams, (params, oldParams) => {
+  if (params && JSON.stringify(params) !== JSON.stringify(oldParams)) {
+    fetchColumns()
+  }
+}, { immediate: true, deep: true })
 
 function selectAll() {
   selectedColumns.value = availableColumns.value.map((c: ColumnInfo) => c.name)
@@ -89,39 +114,42 @@ const isColumnSelected = (colName: string) => selectedColumns.value.includes(col
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <Label>Columns</Label>
+      <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Columns</Label>
       <div class="flex gap-2">
-        <Button variant="outline" size="sm" @click="selectAll">
+        <Button variant="ghost" size="sm" class="text-xs h-8" @click="selectAll">
           Select All
         </Button>
-        <Button variant="outline" size="sm" @click="deselectAll">
+        <Button variant="ghost" size="sm" class="text-xs h-8" @click="deselectAll">
           Deselect All
         </Button>
       </div>
     </div>
 
-    <div v-if="loading" class="text-sm text-muted-foreground">
-      Loading columns...
+    <div v-if="loading" class="text-sm text-muted-foreground p-8 border rounded-md border-dashed flex items-center justify-center">
+      <span class="i-carbon-circle-dash mr-2 animate-spin" /> Loading columns...
     </div>
 
-    <div v-else class="gap-2 grid grid-cols-4">
-      <div
+    <div v-else class="gap-3 grid grid-cols-1 md:grid-cols-4 sm:grid-cols-2">
+      <label
         v-for="col in availableColumns"
         :key="col.name"
-        class="p-2 border rounded flex items-center space-x-2"
-        :class="isColumnSelected(col.name) ? 'bg-secondary' : 'bg-transparent'"
+        class="p-3 border rounded-md flex cursor-pointer transition-colors items-center space-x-3 hover:bg-muted/50"
+        :class="[
+          isColumnSelected(col.name) ? 'border-primary/50 bg-primary/5' : 'border-border bg-transparent',
+        ]"
       >
         <Checkbox
+          :id="`col-${col.name}`"
           :checked="isColumnSelected(col.name)"
           @update:checked="toggleColumn(col.name)"
         />
-        <Label class="text-sm cursor-pointer" @click="toggleColumn(col.name)">
+        <span class="text-sm leading-none font-medium peer-disabled:opacity-70 peer-disabled:cursor-not-allowed">
           {{ col.name }}
-        </Label>
-      </div>
+        </span>
+      </label>
     </div>
 
-    <div class="text-sm text-muted-foreground">
+    <div class="text-xs text-muted-foreground">
       {{ selectedColumns.length }} of {{ availableColumns.length }} columns selected
     </div>
   </div>

@@ -88,7 +88,7 @@ watch(filePath, () => {
 
     <Card v-if="detectionResult">
       <CardContent class="pt-4 space-y-4">
-        <div class="text-sm gap-4 grid grid-cols-2">
+        <div class="text-sm gap-4 grid grid-cols-1 sm:grid-cols-2">
           <div>
             <Label>Detected Format</Label>
             <Badge class="mt-1">

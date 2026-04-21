@@ -43,10 +43,13 @@ function formatTime(seconds: number) {
 <template>
   <div class="space-y-4">
     <div class="flex items-center justify-between">
-      <Badge variant="outline">
-        {{ props.progress?.phase || 'Preparing' }}
-      </Badge>
-      <div class="text-sm text-muted-foreground">
+      <div role="status" aria-live="polite">
+        <Badge variant="outline">
+          <span class="sr-only">Current phase: </span>
+          {{ props.progress?.phase || 'Preparing' }}
+        </Badge>
+      </div>
+      <div class="text-sm text-muted-foreground" aria-live="off">
         {{ formatTime(elapsedSeconds) }} elapsed
         <span v-if="remainingSeconds > 0" class="ml-2">
           ~{{ formatTime(remainingSeconds) }} remaining
@@ -54,9 +57,18 @@ function formatTime(seconds: number) {
       </div>
     </div>
 
-    <ProgressBar :value="percent" class="h-2" />
+    <div
+      role="progressbar"
+      :aria-valuenow="Math.round(percent)"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      :aria-label="`Transfer progress: ${Math.round(percent)}%`"
+      class="w-full"
+    >
+      <ProgressBar :value="percent" class="h-2" />
+    </div>
 
-    <div class="text-sm flex items-center justify-between">
+    <div class="text-sm flex items-center justify-between" aria-hidden="true">
       <div>
         <span class="font-medium">{{ processedRows.toLocaleString() }}</span>
         <span v-if="totalRows > 0" class="text-muted-foreground">
@@ -68,8 +80,13 @@ function formatTime(seconds: number) {
       </div>
     </div>
 
-    <div v-if="props.progress && props.progress.errorCount > 0" class="text-sm text-destructive">
-      {{ props.progress.errorCount }} errors
+    <div
+      v-if="props.progress && props.progress.errorCount > 0"
+      class="text-sm text-destructive"
+      role="alert"
+      aria-live="assertive"
+    >
+      {{ props.progress.errorCount }} errors occurred during transfer.
     </div>
 
     <div class="flex gap-2 justify-end">

@@ -101,13 +101,13 @@ watch(() => transferStore.importRequest.filePath, () => {
         </div>
 
         <div class="flex items-center space-x-2">
-          <Checkbox v-model:checked="truncateBefore" />
-          <Label class="cursor-pointer">Truncate table before import</Label>
+          <Checkbox id="import-opt-truncate" v-model:checked="truncateBefore" />
+          <Label for="import-opt-truncate" class="cursor-pointer">Truncate table before import</Label>
         </div>
 
         <div class="flex items-center space-x-2">
-          <Checkbox v-model:checked="dryRun" />
-          <Label class="cursor-pointer">Dry run (validate without inserting)</Label>
+          <Checkbox id="import-opt-dry-run" v-model:checked="dryRun" />
+          <Label for="import-opt-dry-run" class="cursor-pointer">Dry run (validate without inserting)</Label>
         </div>
       </CardContent>
     </Card>
@@ -115,7 +115,7 @@ watch(() => transferStore.importRequest.filePath, () => {
     <Card>
       <CardContent class="pt-4">
         <Label class="mb-2">Data Preview (first 10 rows)</Label>
-        <div v-if="previewData.length > 0" class="mt-2 max-h-200px overflow-auto">
+        <div v-if="previewData.length > 0" class="mt-2 max-h-[200px] overflow-auto">
           <table class="text-xs w-full">
             <thead>
               <tr>

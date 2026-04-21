@@ -79,6 +79,7 @@ export type ImportRequest = {
   truncateBefore?: boolean
   dryRun?: boolean
   csvOptions?: CsvImportOptions
+  excelOptions?: ExcelImportOptions
 }
 
 export type TransferProgress = {

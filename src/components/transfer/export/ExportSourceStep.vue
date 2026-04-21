@@ -66,7 +66,7 @@ watch(() => props.modelValue, (newValue) => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-8">
     <ConnectionSelector
       v-model:connection-id="connectionId"
       v-model:database="database"
@@ -81,36 +81,41 @@ watch(() => props.modelValue, (newValue) => {
       :schema="schema"
     />
 
-    <ColumnSelector
-      v-model:columns="columns"
-      :connection-id="connectionId"
-      :database="database"
-      :schema="schema"
-      :table="table"
-    />
+    <div v-if="table" class="pt-2 border-t border-border/40 space-y-6">
+      <ColumnSelector
+        v-model:columns="columns"
+        :connection-id="connectionId"
+        :database="database"
+        :schema="schema"
+        :table="table"
+      />
 
-    <div class="gap-4 grid grid-cols-3">
-      <div class="space-y-2">
-        <Label>{{ $t('transfer.export.whereClause') }}</Label>
-        <Input
-          v-model="whereClause"
-          :placeholder="$t('transfer.export.whereClausePlaceholder')"
-        />
-      </div>
-      <div class="space-y-2">
-        <Label>{{ $t('transfer.export.orderBy') }}</Label>
-        <Input
-          v-model="orderBy"
-          :placeholder="$t('transfer.export.orderByPlaceholder')"
-        />
-      </div>
-      <div class="space-y-2">
-        <Label>{{ $t('transfer.export.limit') }}</Label>
-        <Input
-          v-model.number="limit"
-          type="number"
-          :placeholder="$t('transfer.export.limitPlaceholder')"
-        />
+      <div class="gap-5 grid grid-cols-1 md:grid-cols-3">
+        <div class="space-y-2.5">
+          <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">{{ $t('transfer.export.whereClause') }}</Label>
+          <Input
+            v-model="whereClause"
+            :placeholder="$t('transfer.export.whereClausePlaceholder')"
+            class="text-sm font-mono"
+          />
+        </div>
+        <div class="space-y-2.5">
+          <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">{{ $t('transfer.export.orderBy') }}</Label>
+          <Input
+            v-model="orderBy"
+            :placeholder="$t('transfer.export.orderByPlaceholder')"
+            class="text-sm font-mono"
+          />
+        </div>
+        <div class="space-y-2.5">
+          <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">{{ $t('transfer.export.limit') }}</Label>
+          <Input
+            v-model.number="limit"
+            type="number"
+            min="1"
+            :placeholder="$t('transfer.export.limitPlaceholder')"
+          />
+        </div>
       </div>
     </div>
   </div>

@@ -6,36 +6,41 @@ const props = defineProps<{
 </script>
 
 <template>
-  <div class="mb-6 flex gap-2 items-center">
+  <div class="mb-8 flex w-full items-start">
     <div
       v-for="(step, index) in steps"
       :key="index"
-      class="flex-1"
+      class="flex flex-1 flex-col items-center relative"
     >
-      <div class="flex items-center">
-        <div
-          class="text-sm font-medium rounded-full flex h-8 w-8 transition-colors items-center justify-center"
-          :class="[
-            index <= props.currentStep
-              ? 'bg-primary text-primary-foreground'
-              : 'bg-muted text-muted-foreground',
-          ]"
-        >
-          {{ index + 1 }}
-        </div>
-        <div
-          v-if="index < props.steps.length - 1"
-          class="mx-2 flex-1 h-1 transition-colors"
-          :class="[
-            index < props.currentStep
-              ? 'bg-primary'
-              : 'bg-muted',
-          ]"
-        />
-      </div>
+      <!-- Connecting Line (extends to next step) -->
       <div
-        class="text-sm mt-2 text-center" :class="[
-          index === props.currentStep ? 'text-foreground font-medium' : 'text-muted-foreground',
+        v-if="index < props.steps.length - 1"
+        class="h-[2px] w-full transition-colors left-1/2 top-4 absolute -translate-y-1/2"
+        :class="[
+          index < props.currentStep
+            ? 'bg-primary'
+            : 'bg-muted',
+        ]"
+      />
+
+      <!-- Step Circle -->
+      <div
+        class="text-sm font-medium rounded-full flex h-8 w-8 transition-colors items-center justify-center relative z-10"
+        :class="[
+          index <= props.currentStep
+            ? 'bg-primary text-primary-foreground shadow-sm ring-4 ring-background'
+            : 'bg-muted text-muted-foreground ring-4 ring-background',
+          index === props.currentStep && 'ring-primary/20 ring-offset-2 ring-offset-background',
+        ]"
+      >
+        {{ index + 1 }}
+      </div>
+
+      <!-- Step Label -->
+      <div
+        class="text-xs tracking-tight mt-3 text-center transition-colors"
+        :class="[
+          index <= props.currentStep ? 'text-foreground font-medium' : 'text-muted-foreground',
         ]"
       >
         {{ step }}

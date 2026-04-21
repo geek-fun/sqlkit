@@ -82,7 +82,7 @@ onMounted(() => {
 
 <template>
   <div class="space-y-6">
-    <div class="text-sm gap-4 grid grid-cols-4">
+    <div class="text-sm gap-4 grid grid-cols-2 md:grid-cols-4">
       <div>
         <Label>Connection</Label>
         <div class="mt-1">
@@ -111,9 +111,12 @@ onMounted(() => {
 
     <Card>
       <CardContent class="pt-4">
-        <Label class="mb-2">Preview (first {{ props.previewRows || 10 }} rows)</Label>
+        <Label id="preview-label" class="mb-2">Preview (first {{ props.previewRows || 10 }} rows)</Label>
         <div
-          class="text-xs font-mono mt-2 p-4 rounded bg-muted max-h-200px whitespace-pre overflow-auto"
+          role="region"
+          aria-labelledby="preview-label"
+          tabindex="0"
+          class="text-xs font-mono mt-2 p-4 rounded bg-muted max-h-[200px] whitespace-pre overflow-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           {{ previewData || 'Loading preview...' }}
         </div>
