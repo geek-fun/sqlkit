@@ -4,7 +4,6 @@ import type { ColumnMapping } from '@/types/transfer'
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 import { useTransferStore } from '@/store/transferStore'
@@ -38,8 +37,8 @@ async function fetchTargetColumns() {
     const result = await invoke<ColumnInfo[]>('list_columns', {
       connectionId: connectionId.value,
       database: database.value,
-      schema: schema.value,
-      table: table.value,
+      schema: schema.value || null,
+      tableName: table.value,
     })
     targetColumns.value = result || []
   }
@@ -107,97 +106,111 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <ConnectionSelector
-      v-model:connection-id="connectionId"
-      v-model:database="database"
-      v-model:schema="schema"
-      show-schema
-    />
+  <div class="space-y-4">
+    <div class="gap-2.5 grid grid-cols-2">
+      <div class="col-span-2">
+        <ConnectionSelector
+          v-model:connection-id="connectionId"
+          v-model:database="database"
+          v-model:schema="schema"
+          show-schema
+        />
+      </div>
+      <div class="col-span-2">
+        <TableSelector
+          v-model:table="table"
+          :connection-id="connectionId"
+          :database="database"
+          :schema="schema"
+        />
+      </div>
+    </div>
 
-    <TableSelector
-      v-model:table="table"
-      :connection-id="connectionId"
-      :database="database"
-      :schema="schema"
-    />
-
-    <div class="space-y-4">
+    <div class="space-y-2">
       <div class="flex items-center justify-between">
-        <Label>Column Mapping</Label>
+        <div class="text-xs tracking-wide font-semibold flex gap-2 items-center">
+          <div class="i-carbon-flow-data" />
+          COLUMN MAPPING
+        </div>
         <div class="flex gap-2">
-          <Button variant="outline" size="sm" @click="autoMap">
+          <Button variant="outline" size="sm" class="text-[11px] px-2 h-6" @click="autoMap">
             Auto-Map
           </Button>
-          <Button variant="outline" size="sm" @click="clearAll">
+          <Button variant="ghost" size="sm" class="text-[11px] px-2 h-6" @click="clearAll">
             Clear All
           </Button>
         </div>
       </div>
 
-      <div v-if="loadingColumns" class="text-sm text-muted-foreground">
+      <div v-if="loadingColumns" class="text-[11px] text-muted-foreground py-2 text-center border border-border/40 rounded-sm border-dashed">
         Loading target columns...
       </div>
 
-      <div v-else class="border rounded">
-        <table class="text-sm w-full">
+      <div v-else class="border border-border/40 rounded-sm overflow-hidden">
+        <table class="text-xs w-full">
           <caption class="sr-only">
             Column mapping between source and target database
           </caption>
-          <thead class="border-b bg-muted/50">
+          <thead class="text-[10px] text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase">
             <tr>
-              <th scope="col" class="font-medium p-2 text-left">
+              <th scope="col" class="font-medium px-2 py-1.5 text-left">
                 Source Column
               </th>
-              <th scope="col" class="font-medium p-2 text-left">
+              <th scope="col" class="font-medium px-2 py-1.5 text-left w-[40%]">
                 Target Column
               </th>
-              <th scope="col" class="font-medium p-2 text-left">
+              <th scope="col" class="font-medium px-2 py-1.5 text-left">
                 Type
               </th>
-              <th scope="col" class="font-medium p-2 text-left">
+              <th scope="col" class="font-medium px-2 py-1.5 text-left w-20">
                 Status
               </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="mapping in mappings" :key="mapping.sourceColumn" class="border-b transition-colors hover:bg-muted/50">
-              <th scope="row" class="font-normal p-2 text-left align-middle">
+            <tr v-if="mappings.length === 0" class="border-b border-border/40">
+              <td colspan="4" class="text-[11px] text-muted-foreground px-2 py-4 text-center italic">
+                No columns detected
+              </td>
+            </tr>
+            <tr v-for="mapping in mappings" :key="mapping.sourceColumn" class="border-b border-border/40 transition-colors last:border-0 hover:bg-muted/40">
+              <th scope="row" class="font-mono font-normal px-2 py-1 text-left align-middle max-w-[120px] truncate" :title="mapping.sourceColumn">
                 {{ mapping.sourceColumn }}
               </th>
-              <td class="p-2 align-middle">
+              <td class="px-2 py-1 align-middle">
                 <Select v-model="mapping.targetColumn">
                   <SelectTrigger
-                    class="w-full"
+                    class="text-xs font-mono h-7 w-full"
                     :aria-label="`Target column for ${mapping.sourceColumn}`"
                   >
-                    <SelectValue placeholder="Select column" />
+                    <SelectValue placeholder="Skip" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">
+                    <SelectItem value="" class="text-xs text-muted-foreground italic">
                       (Skip)
                     </SelectItem>
                     <SelectItem
                       v-for="col in targetColumns"
                       :key="col.name"
                       :value="col.name"
+                      class="text-xs font-mono"
                     >
                       {{ col.name }}
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </td>
-              <td class="text-muted-foreground p-2 align-middle">
+              <td class="text-[10px] text-muted-foreground font-mono px-2 py-1 align-middle max-w-[80px] truncate uppercase" :title="mapping.targetType">
                 {{ mapping.targetType || '-' }}
               </td>
-              <td class="p-2 align-middle">
-                <span v-if="mapping.targetColumn" class="text-sm text-green-600 font-medium flex items-center">
+              <td class="px-2 py-1 align-middle">
+                <span v-if="mapping.targetColumn" class="text-[10px] text-green-600 tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-green-500/10 flex w-fit uppercase items-center">
                   <span class="sr-only">Status: </span>
-                  <span aria-hidden="true" class="mr-1">✓</span> Mapped
+                  <div class="i-carbon-checkmark mr-1" aria-hidden="true" /> Mapped
                 </span>
-                <span v-else class="text-sm text-muted-foreground font-medium flex items-center">
+                <span v-else class="text-[10px] text-muted-foreground tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-muted flex w-fit uppercase items-center">
                   <span class="sr-only">Status: </span>
-                  <span aria-hidden="true" class="mr-1">⊘</span> Skipped
+                  <div class="i-carbon-subtract mr-1" aria-hidden="true" /> Skipped
                 </span>
               </td>
             </tr>
@@ -205,8 +218,9 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
         </table>
       </div>
 
-      <div class="text-sm text-muted-foreground">
-        {{ mappings.filter(m => m.targetColumn).length }} of {{ mappings.length }} columns mapped
+      <div class="text-[11px] text-muted-foreground tracking-wide flex uppercase justify-end">
+        <span class="font-mono mr-1 tabular-nums">{{ mappings.filter(m => m.targetColumn).length }}</span> of
+        <span class="font-mono mx-1 tabular-nums">{{ mappings.length }}</span> columns mapped
       </div>
     </div>
   </div>

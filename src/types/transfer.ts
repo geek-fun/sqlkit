@@ -1,5 +1,19 @@
 export type ExportFormat = 'csv' | 'jsonl' | 'sql' | 'excel'
 
+export type ColumnInfo = {
+  name: string
+  data_type?: string
+  nullable?: boolean
+  default_value?: string
+  is_primary_key?: boolean
+}
+
+export type TableColumns = {
+  tableName: string
+  columns: ColumnInfo[]
+  selectedColumns: string[]
+}
+
 export type ExportSource = {
   table: string
   columns: string[]

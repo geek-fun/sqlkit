@@ -1,3 +1,7 @@
+<!--
+  Visual Role: Post-transfer summary panel.
+  Presents completion status, compact stat cards, and scrollable error logs (if any).
+-->
 <script setup lang="ts">
 import type { TransferResult } from '@/types/transfer'
 
@@ -42,96 +46,97 @@ function formatDuration(seconds: number) {
 </script>
 
 <template>
-  <div v-if="props.result" class="flex flex-col space-y-6">
-    <!-- Status Header -->
-    <div class="py-8 text-center border rounded-lg bg-card flex flex-col shadow-sm items-center justify-center space-y-3">
+  <div v-if="props.result" class="flex flex-col space-y-4">
+    <!-- Status Header: Compact horizontal row -->
+    <div class="px-3 py-2 border border-border/40 rounded-md bg-card flex gap-3 shadow-none items-center">
       <div
-        class="rounded-full flex h-12 w-12 items-center justify-center"
+        class="rounded-full flex h-6 w-6 items-center justify-center"
         :class="isSuccess ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'"
       >
-        <span v-if="isSuccess" class="i-carbon-checkmark-filled h-6 w-6" />
-        <span v-else class="i-carbon-warning-filled h-6 w-6" />
+        <span v-if="isSuccess" class="i-carbon-checkmark-filled h-3.5 w-3.5" />
+        <span v-else class="i-carbon-warning-filled h-3.5 w-3.5" />
       </div>
-      <div class="space-y-1">
-        <h3 class="text-lg tracking-tight font-semibold">
+      <div class="flex flex-1 items-center justify-between">
+        <h3 class="text-sm tracking-wide font-medium">
           {{ isSuccess ? 'Transfer Completed' : 'Transfer Failed' }}
         </h3>
-        <p class="text-sm text-muted-foreground">
-          Operation finished in {{ formatDuration(durationSeconds) }}
+        <p class="text-[11px] text-muted-foreground font-mono tabular-nums">
+          {{ formatDuration(durationSeconds) }}
         </p>
       </div>
     </div>
 
     <!-- Statistics Grid -->
-    <div class="gap-4 grid grid-cols-2 sm:grid-cols-4">
-      <Card class="bg-muted/30 shadow-none">
-        <CardContent class="p-4 flex flex-col justify-center">
-          <span class="text-xs text-muted-foreground tracking-wider font-medium uppercase">Processed</span>
-          <span class="text-2xl font-semibold mt-1">{{ props.result.processedRows.toLocaleString() }}</span>
+    <div class="gap-3 grid grid-cols-2 sm:grid-cols-4">
+      <Card class="border-border/40 rounded-md bg-muted/20 shadow-none">
+        <CardContent class="p-3 flex flex-col justify-center">
+          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">Processed</span>
+          <span class="text-lg font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.processedRows.toLocaleString() }}</span>
         </CardContent>
       </Card>
 
-      <Card v-if="props.result.skippedRows > 0" class="bg-muted/30 shadow-none">
-        <CardContent class="p-4 flex flex-col justify-center">
-          <span class="text-xs text-muted-foreground tracking-wider font-medium uppercase">Skipped</span>
-          <span class="text-2xl font-semibold mt-1">{{ props.result.skippedRows.toLocaleString() }}</span>
+      <Card v-if="props.result.skippedRows > 0" class="border-border/40 rounded-md bg-muted/20 shadow-none">
+        <CardContent class="p-3 flex flex-col justify-center">
+          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">Skipped</span>
+          <span class="text-lg font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.skippedRows.toLocaleString() }}</span>
         </CardContent>
       </Card>
 
-      <Card v-if="props.result.outputSizeBytes" class="bg-muted/30 shadow-none">
-        <CardContent class="p-4 flex flex-col justify-center">
-          <span class="text-xs text-muted-foreground tracking-wider font-medium uppercase">File Size</span>
-          <span class="text-2xl font-semibold mt-1">{{ formatFileSize(props.result.outputSizeBytes) }}</span>
+      <Card v-if="props.result.outputSizeBytes" class="border-border/40 rounded-md bg-muted/20 shadow-none">
+        <CardContent class="p-3 flex flex-col justify-center">
+          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">File Size</span>
+          <span class="text-lg font-mono font-semibold mt-0.5 tabular-nums">{{ formatFileSize(props.result.outputSizeBytes) }}</span>
         </CardContent>
       </Card>
 
-      <Card v-if="props.result.errorCount > 0" class="border-destructive/20 bg-destructive/5 shadow-none">
-        <CardContent class="p-4 flex flex-col justify-center">
-          <span class="text-xs text-destructive/80 tracking-wider font-medium uppercase">Errors</span>
-          <span class="text-2xl text-destructive font-semibold mt-1">{{ props.result.errorCount.toLocaleString() }}</span>
+      <Card v-if="props.result.errorCount > 0" class="border-destructive/20 rounded-md bg-destructive/5 shadow-none">
+        <CardContent class="p-3 flex flex-col justify-center">
+          <span class="text-[10px] text-destructive/80 tracking-widest font-medium uppercase">Errors</span>
+          <span class="text-lg text-destructive font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.errorCount.toLocaleString() }}</span>
         </CardContent>
       </Card>
     </div>
 
     <!-- Error Log -->
-    <div v-if="props.result.errors.length > 0" class="space-y-2">
-      <h4 class="text-sm text-destructive font-medium">
-        Error Log
-      </h4>
-      <Card class="border-destructive/20 shadow-none">
-        <CardContent class="p-0">
-          <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border text-sm p-4 max-h-48 overflow-auto">
-            <div
-              v-for="(error, index) in props.result.errors.slice(0, 10)"
-              :key="index"
-              class="mb-2 flex items-start last:mb-0"
-            >
-              <span v-if="error.rowNumber" class="text-xs text-destructive font-medium mr-2 mt-0.5 px-1.5 py-0.5 rounded bg-destructive/10 inline-flex items-center">
-                Row {{ error.rowNumber }}
-              </span>
-              <span class="text-muted-foreground">{{ error.message }}</span>
-            </div>
-            <div v-if="props.result.errors.length > 10" class="text-xs text-muted-foreground mt-2 italic">
-              And {{ props.result.errors.length - 10 }} more errors...
-            </div>
+    <div v-if="props.result.errors.length > 0" class="space-y-1.5">
+      <div class="px-1 flex gap-2 items-center">
+        <span class="i-carbon-list text-muted-foreground h-3.5 w-3.5" />
+        <h4 class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">
+          Log Details
+        </h4>
+      </div>
+      <div class="border border-border/40 rounded-md bg-muted/40">
+        <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border text-[11px] leading-snug font-mono p-3 max-h-40 overflow-auto">
+          <div
+            v-for="(error, index) in props.result.errors.slice(0, 10)"
+            :key="index"
+            class="mb-1.5 flex items-start last:mb-0"
+          >
+            <span v-if="error.rowNumber" class="text-destructive/80 mr-2 whitespace-nowrap">
+              [Row {{ String(error.rowNumber).padStart(3, '0') }}]
+            </span>
+            <span class="text-muted-foreground">{{ error.message }}</span>
           </div>
-        </CardContent>
-      </Card>
+          <div v-if="props.result.errors.length > 10" class="text-muted-foreground/60 mt-2 italic">
+            ...and {{ props.result.errors.length - 10 }} more errors
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Actions -->
-    <div class="pt-4 border-t flex flex-wrap gap-3 items-center justify-end">
-      <Button v-if="props.outputPath" variant="outline" @click="emit('openFile')">
-        <span class="i-carbon-document mr-2" /> Open File
+    <div class="pt-3 border-t border-border/40 flex flex-wrap gap-2 items-center justify-end">
+      <Button v-if="props.outputPath" variant="outline" size="sm" class="text-xs h-8" @click="emit('openFile')">
+        <span class="i-carbon-document mr-1.5" /> Open File
       </Button>
-      <Button v-if="props.outputPath" variant="outline" @click="emit('openFolder')">
-        <span class="i-carbon-folder mr-2" /> Open Folder
+      <Button v-if="props.outputPath" variant="outline" size="sm" class="text-xs h-8" @click="emit('openFolder')">
+        <span class="i-carbon-folder mr-1.5" /> Open Folder
       </Button>
-      <Button variant="outline" @click="emit('viewTable')">
-        <span class="i-carbon-data-table mr-2" /> View Table
+      <Button variant="outline" size="sm" class="text-xs h-8" @click="emit('viewTable')">
+        <span class="i-carbon-data-table mr-1.5" /> View Table
       </Button>
-      <Button @click="emit('again')">
-        <span class="i-carbon-reset mr-2" /> {{ props.outputPath ? 'Export Again' : 'Import Again' }}
+      <Button size="sm" class="text-xs h-8" @click="emit('again')">
+        <span class="i-carbon-reset mr-1.5" /> {{ props.outputPath ? 'Export Again' : 'Import Again' }}
       </Button>
     </div>
   </div>

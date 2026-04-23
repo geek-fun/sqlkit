@@ -69,72 +69,96 @@ watch(() => transferStore.importRequest.filePath, () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <Card>
-      <CardContent class="pt-4 space-y-4">
-        <div class="space-y-2">
-          <Label>On Conflict</Label>
-          <Select v-model="conflictStrategy">
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="opt in conflictOptions"
-                :key="opt.value"
-                :value="opt.value"
-              >
-                {{ opt.label }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+  <div class="space-y-4">
+    <Card class="border-border/40 shadow-none">
+      <CardContent class="p-3">
+        <div class="text-xs tracking-wide font-semibold mb-3 flex gap-2 items-center">
+          <div class="i-carbon-settings-adjust" />
+          IMPORT SETTINGS
         </div>
 
-        <div class="space-y-2">
-          <Label>Batch Size</Label>
-          <Input
-            v-model.number="batchSize"
-            type="number"
-            min="1"
-            max="100000"
-          />
+        <div class="mb-3 gap-4 grid grid-cols-2">
+          <div class="space-y-1.5">
+            <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">On Conflict</Label>
+            <Select v-model="conflictStrategy">
+              <SelectTrigger class="text-xs h-8">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="opt in conflictOptions"
+                  :key="opt.value"
+                  :value="opt.value"
+                  class="text-xs"
+                >
+                  {{ opt.label }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div class="space-y-1.5">
+            <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">Batch Size</Label>
+            <Input
+              v-model.number="batchSize"
+              type="number"
+              min="1"
+              max="100000"
+              class="text-xs font-mono h-8 tabular-nums"
+            />
+          </div>
         </div>
 
-        <div class="flex items-center space-x-2">
-          <Checkbox id="import-opt-truncate" v-model:checked="truncateBefore" />
-          <Label for="import-opt-truncate" class="cursor-pointer">Truncate table before import</Label>
-        </div>
+        <div class="pt-2 border-t border-border/40 space-y-0.5">
+          <div class="px-2 py-1.5 rounded-sm flex transition-colors items-center space-x-2 hover:bg-muted/40">
+            <Checkbox id="import-opt-truncate" v-model:checked="truncateBefore" class="h-3.5 w-3.5" />
+            <Label for="import-opt-truncate" class="text-xs cursor-pointer select-none">Truncate table before import</Label>
+          </div>
 
-        <div class="flex items-center space-x-2">
-          <Checkbox id="import-opt-dry-run" v-model:checked="dryRun" />
-          <Label for="import-opt-dry-run" class="cursor-pointer">Dry run (validate without inserting)</Label>
+          <div class="px-2 py-1.5 rounded-sm flex transition-colors items-center space-x-2 hover:bg-muted/40">
+            <Checkbox id="import-opt-dry-run" v-model:checked="dryRun" class="h-3.5 w-3.5" />
+            <Label for="import-opt-dry-run" class="text-xs cursor-pointer select-none">Dry run (validate without inserting)</Label>
+          </div>
         </div>
       </CardContent>
     </Card>
 
-    <Card>
-      <CardContent class="pt-4">
-        <Label class="mb-2">Data Preview (first 10 rows)</Label>
-        <div v-if="previewData.length > 0" class="mt-2 max-h-[200px] overflow-auto">
-          <table class="text-xs w-full">
-            <thead>
-              <tr>
-                <th v-for="col in previewColumns" :key="col" class="p-2 text-left border-b">
-                  {{ col }}
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(row, i) in previewData" :key="i">
-                <td v-for="(val, j) in row" :key="j" class="p-2 border-b">
-                  {{ val }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+    <Card class="border-border/40 shadow-none">
+      <CardContent class="p-3">
+        <div class="mb-2 flex items-center justify-between">
+          <div class="text-xs tracking-wide font-semibold flex gap-2 items-center">
+            <div class="i-carbon-table" />
+            DATA PREVIEW
+          </div>
+          <span class="text-[10px] text-muted-foreground tracking-wide font-mono uppercase">10 Rows</span>
         </div>
-        <div v-else class="text-sm mt-2 p-4 text-center rounded bg-muted">
-          {{ isLoading ? 'Loading preview...' : 'No preview data' }}
+
+        <div class="border border-border/40 rounded-sm overflow-hidden">
+          <div v-if="previewData.length > 0" class="max-h-[240px] overflow-auto">
+            <table class="text-[10px] text-left w-full whitespace-nowrap border-collapse">
+              <thead class="bg-muted/40 shadow-border/40 shadow-sm top-0 sticky z-10">
+                <tr>
+                  <th v-for="col in previewColumns" :key="col" class="text-muted-foreground tracking-wide font-medium px-2 py-1.5 border-b border-border/40 uppercase">
+                    {{ col }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="font-mono">
+                <tr v-for="(row, i) in previewData" :key="i" class="border-b border-border/40 transition-colors last:border-0 hover:bg-muted/40">
+                  <td v-for="(val, j) in row" :key="j" class="px-2 py-1.5 max-w-[150px] truncate" :title="val">
+                    {{ val }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div v-else class="text-[11px] text-muted-foreground py-6 text-center bg-muted/20">
+            <div v-if="isLoading" class="flex flex-col gap-2 items-center justify-center">
+              <div class="i-carbon-circle-dash opacity-50 animate-spin" />
+              Loading preview...
+            </div>
+            <span v-else>No preview data</span>
+          </div>
         </div>
       </CardContent>
     </Card>

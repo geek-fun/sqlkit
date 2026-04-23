@@ -1,3 +1,7 @@
+<!--
+  Visual Role: Compact file upload area for import wizard.
+  Uses subtle primary outlines and monospaced format badges on hover/drag.
+-->
 <script setup lang="ts">
 import { ref } from 'vue'
 
@@ -57,8 +61,8 @@ function handleFileInput(e: Event) {
 
 <template>
   <Card
-    class="border-dashed cursor-pointer transition-all duration-200 focus-visible:outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-    :class="isDragging ? 'border-primary bg-primary/5' : 'border-border'"
+    class="rounded-md border-dashed cursor-pointer transition-all duration-200 focus-visible:outline-none hover:bg-muted/30 focus-visible:ring-1 focus-visible:ring-primary focus-visible:ring-offset-1"
+    :class="isDragging ? 'border-primary/60 bg-primary/[0.04]' : 'border-border/60'"
     role="button"
     tabindex="0"
     aria-label="Drop a file or click to browse"
@@ -68,22 +72,27 @@ function handleFileInput(e: Event) {
     @click="triggerFileInput"
     @keydown="handleKeyDown"
   >
-    <CardContent class="p-8 text-center flex flex-col min-h-[160px] items-center justify-center">
+    <CardContent class="p-4 text-center flex flex-col min-h-[120px] items-center justify-center">
       <div
-        class="text-primary mb-4 rounded-full bg-primary/10 flex h-12 w-12 transition-transform duration-200 items-center justify-center"
-        :class="{ 'scale-110': isDragging }"
+        class="text-primary mb-2.5 rounded-full bg-primary/5 flex h-9 w-9 items-center justify-center"
         aria-hidden="true"
       >
-        <span class="i-carbon-document-upload h-6 w-6" />
+        <span class="i-carbon-document-upload h-4.5 w-4.5" />
       </div>
-      <h3 class="text-sm text-foreground tracking-tight font-semibold">
+      <h3 class="text-sm text-foreground tracking-tight font-medium">
         Drag & drop a file here
       </h3>
-      <p class="text-sm text-muted-foreground mt-1">
+      <p class="text-[11px] text-muted-foreground mt-0.5">
         or click to browse from your computer
       </p>
-      <div class="text-xs text-muted-foreground font-medium mt-4 px-2 py-1 rounded bg-muted/50">
-        Supported formats: {{ formats.map(f => f.toUpperCase()).join(', ') }}
+      <div class="mt-3 flex flex-wrap gap-1.5 justify-center">
+        <span
+          v-for="f in formats"
+          :key="f"
+          class="text-[10px] text-muted-foreground tracking-wider font-mono px-1.5 py-0.5 rounded-sm bg-muted/60 uppercase"
+        >
+          {{ f }}
+        </span>
       </div>
       <input
         ref="fileInputRef"

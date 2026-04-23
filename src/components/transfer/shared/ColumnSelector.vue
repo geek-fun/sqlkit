@@ -1,3 +1,7 @@
+<!--
+  Visual Role: Dense column selection grid.
+  Uses small checkboxes, tight rows, and muted ghost buttons for bulk actions.
+-->
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
@@ -54,8 +58,8 @@ async function fetchColumns() {
     const result = await invoke<ColumnInfo[]>('list_columns', {
       connectionId: props.connectionId,
       database: props.database,
-      schema: props.schema,
-      table: props.table,
+      schema: props.schema || null,
+      tableName: props.table,
     })
     availableColumns.value = result || []
     if (selectedColumns.value.length === 0 && availableColumns.value.length > 0) {
@@ -112,44 +116,45 @@ const isColumnSelected = (colName: string) => selectedColumns.value.includes(col
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-3">
     <div class="flex items-center justify-between">
-      <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Columns</Label>
-      <div class="flex gap-2">
-        <Button variant="ghost" size="sm" class="text-xs h-8" @click="selectAll">
+      <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Columns</Label>
+      <div class="flex gap-1.5">
+        <Button variant="ghost" size="sm" class="text-[11px] text-muted-foreground px-2 h-6 hover:text-foreground" @click="selectAll">
           Select All
         </Button>
-        <Button variant="ghost" size="sm" class="text-xs h-8" @click="deselectAll">
+        <Button variant="ghost" size="sm" class="text-[11px] text-muted-foreground px-2 h-6 hover:text-foreground" @click="deselectAll">
           Deselect All
         </Button>
       </div>
     </div>
 
-    <div v-if="loading" class="text-sm text-muted-foreground p-8 border rounded-md border-dashed flex items-center justify-center">
-      <span class="i-carbon-circle-dash mr-2 animate-spin" /> Loading columns...
+    <div v-if="loading" class="text-[11px] text-muted-foreground p-6 border rounded-md border-dashed bg-muted/20 flex items-center justify-center">
+      <span class="i-carbon-circle-dash mr-1.5 animate-spin" /> Loading columns...
     </div>
 
-    <div v-else class="gap-3 grid grid-cols-1 md:grid-cols-4 sm:grid-cols-2">
+    <div v-else class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border pr-2 gap-1.5 grid grid-cols-1 max-h-60 overflow-y-auto md:grid-cols-5 sm:grid-cols-3">
       <label
         v-for="col in availableColumns"
         :key="col.name"
-        class="p-3 border rounded-md flex cursor-pointer transition-colors items-center space-x-3 hover:bg-muted/50"
+        class="px-2 py-1 rounded-sm flex cursor-pointer transition-colors items-center space-x-2 hover:bg-muted/40"
         :class="[
-          isColumnSelected(col.name) ? 'border-primary/50 bg-primary/5' : 'border-border bg-transparent',
+          isColumnSelected(col.name) ? 'bg-primary/[0.03]' : 'bg-transparent',
         ]"
       >
         <Checkbox
           :id="`col-${col.name}`"
           :checked="isColumnSelected(col.name)"
+          class="h-3.5 w-3.5"
           @update:checked="toggleColumn(col.name)"
         />
-        <span class="text-sm leading-none font-medium peer-disabled:opacity-70 peer-disabled:cursor-not-allowed">
+        <span class="text-[11px] leading-none font-mono truncate peer-disabled:opacity-70 peer-disabled:cursor-not-allowed" :title="col.name">
           {{ col.name }}
         </span>
       </label>
     </div>
 
-    <div class="text-xs text-muted-foreground">
+    <div class="text-[10px] text-muted-foreground font-mono">
       {{ selectedColumns.length }} of {{ availableColumns.length }} columns selected
     </div>
   </div>

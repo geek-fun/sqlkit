@@ -1,9 +1,12 @@
+<!--
+  Visual Role: Compact table selection dropdown.
+  Displays table names alongside row counts using monospaced numerals.
+-->
 <script setup lang="ts">
 import type { TableInfo } from '@/store/databaseStore'
 
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
-import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -85,11 +88,11 @@ const selectedTableInfo = computed(() =>
 </script>
 
 <template>
-  <div class="space-y-4">
-    <div class="space-y-2.5">
-      <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Table</Label>
+  <div class="space-y-3">
+    <div class="space-y-1.5">
+      <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Table</Label>
       <Select v-model="selectedTable" :disabled="!tables.length || loading">
-        <SelectTrigger>
+        <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
           <SelectValue placeholder="Select table" />
         </SelectTrigger>
         <SelectContent>
@@ -97,24 +100,25 @@ const selectedTableInfo = computed(() =>
             v-for="t in tables"
             :key="t.name"
             :value="t.name"
+            class="text-xs"
           >
-            <div class="flex w-full items-center justify-between">
+            <div class="flex gap-4 w-full items-center justify-between">
               <span>{{ t.name }}</span>
-              <Badge v-if="t.rowCount" variant="outline" class="ml-2">
+              <span v-if="t.rowCount" class="text-[10px] text-muted-foreground font-mono px-1 rounded-sm bg-muted/60 tabular-nums">
                 {{ t.rowCount.toLocaleString() }} rows
-              </Badge>
+              </span>
             </div>
           </SelectItem>
         </SelectContent>
       </Select>
     </div>
 
-    <div v-if="selectedTableInfo" class="text-sm text-muted-foreground">
-      <span v-if="selectedTableInfo.rowCount">
+    <div v-if="selectedTableInfo" class="text-[11px] text-muted-foreground flex gap-2 items-center">
+      <span v-if="selectedTableInfo.rowCount" class="font-mono tabular-nums">
         {{ selectedTableInfo.rowCount.toLocaleString() }} rows
       </span>
-      <span v-if="selectedTableInfo.table_type" class="ml-2">
-        ({{ selectedTableInfo.table_type }})
+      <span v-if="selectedTableInfo.table_type" class="text-muted-foreground/60 uppercase">
+        {{ selectedTableInfo.table_type }}
       </span>
     </div>
   </div>

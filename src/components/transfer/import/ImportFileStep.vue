@@ -79,53 +79,62 @@ watch(filePath, () => {
 </script>
 
 <template>
-  <div class="space-y-6">
+  <div class="space-y-2">
     <FileDropZone @file-selected="handleFileDrop" />
 
-    <Button variant="outline" class="w-full" @click="handleBrowse">
-      Browse Files
-    </Button>
+    <div class="flex justify-end">
+      <Button variant="outline" size="sm" @click="handleBrowse">
+        <div class="i-carbon-folder-open mr-2" />
+        Browse Files
+      </Button>
+    </div>
 
-    <Card v-if="detectionResult">
-      <CardContent class="pt-4 space-y-4">
-        <div class="text-sm gap-4 grid grid-cols-1 sm:grid-cols-2">
+    <Card v-if="detectionResult" class="border-border/40 shadow-none">
+      <CardContent class="p-3 space-y-3">
+        <div class="text-xs tracking-wide font-semibold mb-2 flex gap-2 items-center">
+          <div class="i-carbon-document" />
+          FILE DETAILS
+        </div>
+
+        <div class="gap-2.5 grid grid-cols-2">
           <div>
-            <Label>Detected Format</Label>
-            <Badge class="mt-1">
+            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">Detected Format</Label>
+            <Badge class="text-[10px] font-mono px-1 py-0.5 uppercase" variant="secondary">
               {{ formatLabel }}
             </Badge>
           </div>
           <div>
-            <Label>Encoding</Label>
-            <div class="mt-1">
+            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">Encoding</Label>
+            <Badge class="text-[10px] font-mono px-1 py-0.5 uppercase" variant="outline">
               {{ detectionResult.encoding }}
-            </div>
+            </Badge>
           </div>
           <div>
-            <Label>Estimated Rows</Label>
-            <div class="mt-1">
+            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">Estimated Rows</Label>
+            <div class="text-xs font-mono tabular-nums">
               {{ detectionResult.estimatedRows?.toLocaleString() || 'Unknown' }}
             </div>
           </div>
           <div>
-            <Label>File Size</Label>
-            <div class="mt-1">
+            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">File Size</Label>
+            <div class="text-xs font-mono tabular-nums">
               {{ (detectionResult.fileSizeBytes / 1024).toFixed(1) }} KB
             </div>
           </div>
         </div>
 
-        <div>
-          <Label>Detected Columns</Label>
-          <div class="mt-2 flex flex-wrap gap-2">
+        <div class="pt-2 border-t border-border/40">
+          <Label class="text-[11px] text-muted-foreground tracking-wide mb-2 block uppercase">Detected Columns</Label>
+          <div class="flex flex-wrap gap-1.5">
             <Badge
               v-for="col in detectionResult.columns.slice(0, 10)"
               :key="col"
               variant="outline"
+              class="text-[10px] font-mono px-1.5 py-0.5 border-border/40"
             >
               {{ col }}
             </Badge>
-            <Badge v-if="detectionResult.columns.length > 10" variant="outline">
+            <Badge v-if="detectionResult.columns.length > 10" variant="outline" class="text-[10px] font-mono px-1.5 py-0.5 border-dashed">
               +{{ detectionResult.columns.length - 10 }} more
             </Badge>
           </div>

@@ -1,9 +1,12 @@
+<!--
+  Visual Role: Configuration form for source/destination connections.
+  Tight grid layout with small uppercase labels and mono-styled status badges.
+-->
 <script setup lang="ts">
 import type { DatabaseSchema } from '@/store/databaseStore'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
-import { Badge } from '@/components/ui/badge'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -158,6 +161,9 @@ async function fetchSchemas(connId: string, db: string) {
 // Watch for connection changes
 watch(selectedConnectionId, (newId, oldId) => {
   if (newId && newId !== oldId) {
+    // Reset database and schema when connection changes
+    selectedDatabase.value = ''
+    selectedSchema.value = ''
     handleConnectionSelect(newId)
   }
 }, { immediate: true })
@@ -183,42 +189,36 @@ const shouldShowSchema = computed(() => {
 </script>
 
 <template>
-  <div class="space-y-4">
+  <div class="space-y-3">
     <!-- No connections message -->
-    <div v-if="allConnections.length === 0" class="p-8 text-center border rounded-lg border-dashed bg-muted/30 flex flex-col items-center justify-center">
-      <span class="i-carbon-api-1 text-muted-foreground mb-3 opacity-50 h-8 w-8" />
-      <p class="text-sm text-muted-foreground font-medium">
+    <div v-if="allConnections.length === 0" class="p-6 text-center border rounded-md border-dashed bg-muted/20 flex flex-col items-center justify-center">
+      <span class="i-carbon-api-1 text-muted-foreground mb-2 opacity-50 h-6 w-6" />
+      <p class="text-xs text-muted-foreground font-medium">
         No connections available. Please add a connection first.
       </p>
     </div>
 
-    <div v-else class="gap-5 grid grid-cols-1 md:grid-cols-3 sm:grid-cols-2">
-      <div class="space-y-2.5">
-        <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Connection</Label>
+    <div v-else class="space-y-3">
+      <div class="space-y-1.5">
+        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Connection</Label>
         <Select
           :model-value="selectedConnectionId"
           :disabled="isConnecting"
           @update:model-value="handleConnectionSelect"
         >
-          <SelectTrigger>
+          <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
             <SelectValue placeholder="Select connection">
-              <div v-if="selectedConnection" class="flex gap-2 items-center">
-                <span>{{ selectedConnection.name }}</span>
-                <Badge
+              <template v-if="selectedConnection">
+                <span class="font-mono">{{ selectedConnection.name }}</span>
+                <span
                   v-if="isConnected"
-                  variant="success"
-                  class="text-[10px] tracking-wider px-1.5 py-0 uppercase"
-                >
-                  Connected
-                </Badge>
-                <Badge
+                  class="text-[9px] text-green-600 font-medium ml-1.5"
+                >●</span>
+                <span
                   v-else-if="isConnecting"
-                  variant="outline"
-                  class="text-[10px] tracking-wider px-1.5 py-0 uppercase"
-                >
-                  Connecting...
-                </Badge>
-              </div>
+                  class="text-[9px] text-muted-foreground ml-1.5 animate-pulse"
+                >●</span>
+              </template>
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
@@ -226,37 +226,36 @@ const shouldShowSchema = computed(() => {
               v-for="conn in allConnections"
               :key="conn.id!"
               :value="conn.id!"
+              class="text-xs"
             >
               <div class="flex gap-2 items-center">
                 <span>{{ conn.name }}</span>
-                <Badge
+                <span
                   v-if="connectionStore.getConnectionStatus(conn.id!) === ConnectionStatus.CONNECTED"
-                  variant="success"
-                  class="text-[10px] tracking-wider px-1.5 py-0 uppercase"
+                  class="text-[10px] text-green-600 tracking-wide font-mono px-1 rounded-sm bg-green-500/10 uppercase"
                 >
                   Connected
-                </Badge>
-                <Badge
+                </span>
+                <span
                   v-else
-                  variant="outline"
-                  class="text-[10px] tracking-wider px-1.5 py-0 uppercase"
+                  class="text-[10px] text-muted-foreground tracking-wide font-mono px-1 rounded-sm bg-muted/60 uppercase"
                 >
                   Offline
-                </Badge>
-                <span class="text-xs text-muted-foreground ml-auto">{{ conn.type }}</span>
+                </span>
+                <span class="text-[10px] text-muted-foreground font-mono ml-auto">{{ conn.type }}</span>
               </div>
             </SelectItem>
           </SelectContent>
         </Select>
       </div>
 
-      <div class="space-y-2.5">
-        <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Database</Label>
+      <div class="space-y-1.5">
+        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Database</Label>
         <Select
           v-model="selectedDatabase"
           :disabled="!isConnected || loadingDatabases || databases.length === 0"
         >
-          <SelectTrigger>
+          <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
             <SelectValue placeholder="Select database" />
           </SelectTrigger>
           <SelectContent>
@@ -264,32 +263,32 @@ const shouldShowSchema = computed(() => {
               v-for="db in databases"
               :key="db.name"
               :value="db.name"
+              class="text-xs"
             >
               <div class="flex gap-2 w-full items-center">
                 <span>{{ db.name }}</span>
-                <Badge
+                <span
                   v-if="db.is_system"
-                  variant="outline"
-                  class="text-[10px] tracking-wider ml-auto px-1.5 py-0 uppercase"
+                  class="text-[10px] text-muted-foreground tracking-wide font-mono ml-auto px-1 rounded-sm bg-muted/60 uppercase"
                 >
                   System
-                </Badge>
+                </span>
               </div>
             </SelectItem>
           </SelectContent>
         </Select>
-        <div v-if="loadingDatabases" class="text-xs text-muted-foreground flex items-center">
-          <span class="i-carbon-circle-dash mr-1.5 animate-spin" /> Loading databases...
+        <div v-if="loadingDatabases" class="text-[10px] text-muted-foreground flex items-center">
+          <span class="i-carbon-circle-dash mr-1 animate-spin" /> Loading databases...
         </div>
       </div>
 
-      <div v-if="shouldShowSchema" class="space-y-2.5">
-        <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Schema</Label>
+      <div v-if="shouldShowSchema" class="space-y-1.5">
+        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Schema</Label>
         <Select
           v-model="selectedSchema"
           :disabled="!selectedDatabase || loadingSchemas || schemas.length === 0"
         >
-          <SelectTrigger>
+          <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
             <SelectValue placeholder="Select schema" />
           </SelectTrigger>
           <SelectContent>
@@ -297,13 +296,14 @@ const shouldShowSchema = computed(() => {
               v-for="s in schemas"
               :key="s"
               :value="s"
+              class="text-xs"
             >
               {{ s }}
             </SelectItem>
           </SelectContent>
         </Select>
-        <div v-if="loadingSchemas" class="text-xs text-muted-foreground flex items-center">
-          <span class="i-carbon-circle-dash mr-1.5 animate-spin" /> Loading schemas...
+        <div v-if="loadingSchemas" class="text-[10px] text-muted-foreground flex items-center">
+          <span class="i-carbon-circle-dash mr-1 animate-spin" /> Loading schemas...
         </div>
       </div>
     </div>

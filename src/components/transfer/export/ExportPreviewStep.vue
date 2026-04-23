@@ -81,76 +81,80 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="text-sm gap-4 grid grid-cols-2 md:grid-cols-4">
-      <div>
-        <Label>Connection</Label>
-        <div class="mt-1">
+  <div class="space-y-4">
+    <div class="text-xs gap-2.5 grid grid-cols-2">
+      <div class="space-y-1">
+        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Connection</Label>
+        <div class="text-foreground font-mono tabular-nums">
           {{ sourceInfo.connection }}
         </div>
       </div>
-      <div>
-        <Label>Database</Label>
-        <div class="mt-1">
+      <div class="space-y-1">
+        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Database</Label>
+        <div class="text-foreground font-mono tabular-nums">
           {{ sourceInfo.database }}
         </div>
       </div>
-      <div>
-        <Label>Table</Label>
-        <div class="mt-1">
+      <div class="space-y-1">
+        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Table</Label>
+        <div class="text-foreground font-mono tabular-nums">
           {{ sourceInfo.table }}
         </div>
       </div>
-      <div>
-        <Label>Format</Label>
-        <Badge class="mt-1">
-          {{ sourceInfo.format }}
-        </Badge>
+      <div class="space-y-1">
+        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Format</Label>
+        <div>
+          <Badge class="text-[10px] text-primary font-mono px-1.5 py-0.5 border border-primary/60 bg-primary/[0.04] uppercase hover:bg-primary/[0.08]" variant="outline">
+            {{ sourceInfo.format }}
+          </Badge>
+        </div>
       </div>
     </div>
 
-    <Card>
-      <CardContent class="pt-4">
-        <Label id="preview-label" class="mb-2">Preview (first {{ props.previewRows || 10 }} rows)</Label>
+    <Card class="border-border/40 shadow-sm overflow-hidden">
+      <CardContent class="p-0 flex flex-col">
+        <div class="px-3 py-2 border-b border-border/40 bg-muted/20 flex items-center justify-between">
+          <Label id="preview-label" class="text-[11px] tracking-wide font-semibold flex gap-1.5 uppercase items-center"><span class="i-carbon-view text-muted-foreground" /> Preview <span class="text-muted-foreground font-normal normal-case">(first {{ props.previewRows || 10 }} rows)</span></Label>
+          <div class="text-[10px] text-muted-foreground font-mono tabular-nums">
+            <span v-if="estimatedRows">~{{ estimatedRows.toLocaleString() }} rows • </span>{{ sourceInfo.columns }} cols
+          </div>
+        </div>
         <div
           role="region"
           aria-labelledby="preview-label"
           tabindex="0"
-          class="text-xs font-mono mt-2 p-4 rounded bg-muted max-h-[200px] whitespace-pre overflow-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          class="text-[11px] leading-snug font-mono p-3 bg-card max-h-[200px] whitespace-pre overflow-auto tabular-nums focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
         >
           {{ previewData || 'Loading preview...' }}
-        </div>
-        <div class="text-sm text-muted-foreground mt-2">
-          <span v-if="estimatedRows">
-            Estimated {{ estimatedRows.toLocaleString() }} rows
-          </span>
-          <span class="ml-2">
-            {{ sourceInfo.columns }} columns
-          </span>
         </div>
       </CardContent>
     </Card>
 
-    <div class="space-y-2">
-      <Label>Output File</Label>
+    <div class="pt-2 space-y-1.5">
+      <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Output File</Label>
       <div class="flex gap-2">
-        <Input
-          v-model="outputPath"
-          placeholder="/path/to/output.csv"
-          class="flex-1"
-        />
-        <Button variant="outline" @click="handleBrowse">
+        <div class="flex-1 relative">
+          <span class="i-carbon-document text-muted-foreground left-2.5 top-1/2 absolute -translate-y-1/2" />
+          <Input
+            v-model="outputPath"
+            placeholder="/path/to/output.csv"
+            class="text-xs font-mono pl-8 h-8 tabular-nums"
+          />
+        </div>
+        <Button variant="outline" size="sm" class="text-xs px-3 h-8" @click="handleBrowse">
           Browse
         </Button>
       </div>
     </div>
 
-    <div class="flex justify-end">
+    <div class="pt-2 border-t border-border/40 flex justify-end">
       <Button
         :disabled="!outputPath"
+        size="sm"
+        class="text-xs font-semibold px-4 h-8"
         @click="emit('execute')"
       >
-        Export
+        <span class="i-carbon-play mr-1.5" /> Start Export
       </Button>
     </div>
   </div>

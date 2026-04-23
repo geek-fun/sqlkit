@@ -260,10 +260,10 @@ const canExecute = computed(() =>
 </script>
 
 <template>
-  <div class="pb-6 flex flex-col gap-4">
+  <div class="pb-6 flex flex-col gap-2.5">
     <!-- Source -->
     <TransferStepCard
-      :title="t('pages.transfer.migration.sourceConnection')"
+      :title="t('transfer.migration.sourceConnection')"
       :step-number="1"
       icon="i-carbon-data-base"
       icon-class="text-emerald-600 dark:text-emerald-500"
@@ -278,55 +278,58 @@ const canExecute = computed(() =>
 
       <!-- Tables -->
       <div class="mt-4 pt-4 border-t border-border/40">
-        <div class="mb-4 flex items-center justify-between">
-          <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Tables</Label>
+        <div class="mb-3 flex items-center justify-between">
+          <Label class="text-[11px] text-muted-foreground tracking-wide font-semibold flex gap-1.5 uppercase items-center">
+            <span class="i-carbon-table" />
+            Tables
+          </Label>
           <div class="flex gap-2 items-center">
-            <Button variant="ghost" size="sm" class="text-xs h-8" @click="selectAllTables">
+            <Button variant="ghost" size="sm" class="text-xs px-2 h-8" @click="selectAllTables">
               Select All
             </Button>
-            <Button variant="ghost" size="sm" class="text-xs h-8" @click="deselectAllTables">
+            <Button variant="ghost" size="sm" class="text-xs px-2 h-8" @click="deselectAllTables">
               Deselect All
             </Button>
           </div>
         </div>
 
-        <div v-if="loadingTables" class="text-sm text-muted-foreground p-8 border rounded-md border-dashed flex items-center justify-center">
+        <div v-if="loadingTables" class="text-xs text-muted-foreground p-6 border border-border/40 rounded-md border-dashed flex items-center justify-center">
           <span class="i-carbon-circle-dash mr-2 animate-spin" /> Loading tables...
         </div>
 
-        <div v-else-if="availableTables.length === 0 && sourceDatabase" class="text-sm text-muted-foreground p-8 text-center border rounded-md border-dashed bg-muted/10 flex flex-col items-center justify-center">
-          <span class="i-carbon-data-base mb-2 opacity-50 h-6 w-6" />
+        <div v-else-if="availableTables.length === 0 && sourceDatabase" class="text-xs text-muted-foreground p-6 text-center border border-border/40 rounded-md border-dashed bg-muted/10 flex flex-col items-center justify-center">
+          <span class="i-carbon-data-base mb-2 opacity-50 h-5 w-5" />
           No tables found
         </div>
 
-        <div v-else class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border pr-2 gap-3 grid grid-cols-1 max-h-[300px] overflow-y-auto md:grid-cols-3 sm:grid-cols-2">
+        <div v-else class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border pr-2 gap-2 grid grid-cols-1 max-h-[300px] overflow-y-auto md:grid-cols-3 sm:grid-cols-2">
           <label
             v-for="table in availableTables"
             :key="table.name"
-            class="p-3 border rounded-md flex cursor-pointer transition-colors items-center space-x-3 hover:bg-muted/50"
-            :class="selectedTables.includes(table.name) ? 'border-primary/50 bg-primary/5' : 'border-border bg-transparent'"
+            class="px-3 py-1.5 border border-border/40 rounded-md flex cursor-pointer transition-colors items-center space-x-2 hover:bg-muted/50"
+            :class="selectedTables.includes(table.name) ? 'border-primary/30 bg-primary/5' : 'bg-transparent'"
           >
             <Checkbox
               :id="`mig-table-${table.name}`"
               :checked="selectedTables.includes(table.name)"
               @update:checked="toggleTable(table.name)"
             />
-            <div class="flex flex-col">
-              <span class="text-sm leading-none font-medium">{{ table.name }}</span>
-              <span v-if="table.rowCount" class="text-[10px] text-muted-foreground tracking-wider mt-1 uppercase">{{ table.rowCount.toLocaleString() }} rows</span>
+            <div class="flex flex-1 min-w-0 items-center justify-between">
+              <span class="text-xs leading-none font-mono truncate">{{ table.name }}</span>
+              <Badge v-if="table.rowCount" variant="secondary" class="text-[10px] font-mono ml-2 px-1 py-0 bg-muted/50 uppercase tabular-nums">{{ table.rowCount }} rows</Badge>
             </div>
           </label>
         </div>
 
-        <div v-if="availableTables.length > 0" class="text-xs text-muted-foreground mt-3">
-          {{ selectedTables.length }} of {{ availableTables.length }} tables selected
+        <div v-if="availableTables.length > 0" class="text-[11px] text-muted-foreground font-mono mt-3 tabular-nums">
+          {{ selectedTables.length }} / {{ availableTables.length }} tables selected
         </div>
       </div>
     </TransferStepCard>
 
     <!-- Target -->
     <TransferStepCard
-      :title="t('pages.transfer.migration.targetConnection')"
+      :title="t('transfer.migration.targetConnection')"
       :step-number="2"
       icon="i-carbon-data-refinery"
       icon-class="text-blue-600 dark:text-blue-500"
@@ -340,50 +343,53 @@ const canExecute = computed(() =>
       />
 
       <!-- Migration Direction -->
-      <div v-if="sourceConnectionId && targetConnectionId" class="mt-4 p-6 border rounded-lg border-dashed bg-muted/10 flex gap-6 items-center justify-center">
-        <div class="p-4 border rounded-md bg-card flex flex-col gap-2 shadow-sm items-center justify-center">
-          <Badge variant="outline" class="text-[10px] tracking-wider px-1.5 py-0 uppercase">
+      <div v-if="sourceConnectionId && targetConnectionId" class="mb-1 mt-5 flex gap-4 items-center justify-center">
+        <div class="px-4 py-3 border border-border/40 rounded-md bg-muted/20 flex flex-col gap-1 min-w-[140px] shadow-sm items-center justify-center">
+          <Badge variant="outline" class="text-[10px] tracking-wide font-mono px-1.5 py-0 border-border/60 uppercase">
             {{ sourceEngine }}
           </Badge>
-          <span class="text-sm font-medium">{{ sourceDatabase }}</span>
-          <span class="text-xs text-muted-foreground">{{ selectedTables.length }} tables selected</span>
+          <span class="text-xs font-medium font-mono">{{ sourceDatabase }}</span>
+          <span class="text-[11px] text-muted-foreground font-mono tabular-nums">{{ selectedTables.length }} tables</span>
         </div>
-        <span class="i-carbon-arrow-right text-2xl text-muted-foreground opacity-50" />
-        <div class="p-4 border rounded-md bg-card flex flex-col gap-2 shadow-sm items-center justify-center">
-          <Badge variant="outline" class="text-[10px] tracking-wider px-1.5 py-0 uppercase">
+
+        <span class="i-carbon-arrow-right text-xl text-muted-foreground/40" />
+
+        <div class="px-4 py-3 border border-border/40 rounded-md bg-muted/20 flex flex-col gap-1 min-w-[140px] shadow-sm items-center justify-center">
+          <Badge variant="outline" class="text-[10px] tracking-wide font-mono px-1.5 py-0 border-border/60 uppercase">
             {{ targetEngine }}
           </Badge>
-          <span class="text-sm font-medium">{{ targetDatabase }}</span>
-          <span class="text-xs text-muted-foreground">{{ targetSchema || 'default schema' }}</span>
+          <span class="text-xs font-medium font-mono">{{ targetDatabase }}</span>
+          <span class="text-[11px] text-muted-foreground font-mono">{{ targetSchema || 'default' }}</span>
         </div>
       </div>
 
       <!-- Options -->
-      <div class="mt-4 pt-4 border-t border-border/40">
-        <div class="gap-5 grid grid-cols-1 md:grid-cols-2">
-          <div class="space-y-2.5">
-            <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Batch Size</Label>
+      <div class="mt-5 pt-4 border-t border-border/40">
+        <div class="gap-4 grid grid-cols-1 md:grid-cols-2">
+          <div class="space-y-1.5">
+            <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Batch Size</Label>
             <Input
               v-model.number="batchSize"
               type="number"
               min="100"
               max="10000"
+              class="text-xs font-mono h-8 tabular-nums"
             />
           </div>
-          <div class="space-y-2.5">
-            <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">On Error</Label>
+          <div class="space-y-1.5">
+            <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">On Error</Label>
             <Select v-model="onError">
-              <SelectTrigger>
+              <SelectTrigger class="text-xs h-8">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="skipRow">
+                <SelectItem value="skipRow" class="text-xs">
                   Skip Row
                 </SelectItem>
-                <SelectItem value="skipTable">
+                <SelectItem value="skipTable" class="text-xs">
                   Skip Table
                 </SelectItem>
-                <SelectItem value="abort">
+                <SelectItem value="abort" class="text-xs">
                   Abort
                 </SelectItem>
               </SelectContent>
@@ -391,14 +397,14 @@ const canExecute = computed(() =>
           </div>
         </div>
 
-        <div class="mt-3 gap-4 grid grid-cols-1 sm:grid-cols-2">
-          <label class="flex cursor-pointer items-center space-x-2">
-            <Checkbox id="mig-opt-create" v-model:checked="createTables" />
-            <span class="text-sm leading-none font-medium">Create tables if not exist</span>
+        <div class="mt-4 flex flex-wrap gap-4">
+          <label class="flex cursor-pointer items-center space-x-1.5">
+            <Checkbox id="mig-opt-create" v-model:checked="createTables" class="h-3.5 w-3.5" />
+            <span class="text-[11px] leading-none font-medium">Create tables if not exist</span>
           </label>
-          <label class="flex cursor-pointer items-center space-x-2">
-            <Checkbox id="mig-opt-drop" v-model:checked="dropTables" />
-            <span class="text-sm leading-none font-medium">Drop existing tables</span>
+          <label class="flex cursor-pointer items-center space-x-1.5">
+            <Checkbox id="mig-opt-drop" v-model:checked="dropTables" class="h-3.5 w-3.5" />
+            <span class="text-[11px] leading-none font-medium">Drop existing tables</span>
           </label>
         </div>
       </div>
@@ -414,52 +420,53 @@ const canExecute = computed(() =>
       variant="highlight"
     >
       <div v-if="preview">
-        <div class="mb-4 flex flex-wrap gap-2">
-          <Badge variant="outline" class="text-xs">
+        <div class="mb-3 flex flex-wrap gap-2">
+          <Badge variant="outline" class="text-[10px] font-mono px-1.5 py-0 border-border/60 tabular-nums">
             {{ preview.tables.length }} tables
           </Badge>
-          <Badge variant="outline" class="text-xs">
+          <Badge variant="outline" class="text-[10px] font-mono px-1.5 py-0 border-border/60 tabular-nums">
             {{ preview.totalRows.toLocaleString() }} total rows
           </Badge>
-          <Badge variant="secondary" class="text-xs">
-            {{ preview.typeConversions }} type conversions needed
+          <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0 bg-muted tabular-nums">
+            {{ preview.typeConversions }} type conversions
           </Badge>
         </div>
 
         <!-- Mappings Preview -->
-        <div class="space-y-2">
-          <div v-for="plan in tablePlans.slice(0, 3)" :key="plan.sourceTable" class="p-3 border rounded-md bg-card flex shadow-sm items-center justify-between">
-            <span class="text-sm font-medium">{{ plan.sourceTable }}</span>
-            <span class="text-xs text-muted-foreground">{{ plan.columnMappings.length }} columns mapped</span>
+        <div class="space-y-1.5">
+          <div v-for="plan in tablePlans.slice(0, 3)" :key="plan.sourceTable" class="px-3 py-2 border border-border/40 rounded-md bg-muted/20 flex shadow-sm items-center justify-between">
+            <span class="text-xs font-mono">{{ plan.sourceTable }}</span>
+            <span class="text-[11px] text-muted-foreground font-mono tabular-nums">{{ plan.columnMappings.length }} columns mapped</span>
           </div>
-          <div v-if="tablePlans.length > 3" class="text-xs text-muted-foreground p-2 text-center italic">
-            And {{ tablePlans.length - 3 }} more tables...
+          <div v-if="tablePlans.length > 3" class="text-[11px] text-muted-foreground font-mono p-1 text-center opacity-70 tabular-nums">
+            + {{ tablePlans.length - 3 }} more tables
           </div>
         </div>
       </div>
 
       <!-- Result -->
-      <div v-if="result" class="mt-3 pt-4 border-t border-border/40">
-        <div v-if="result.success" class="text-sm text-emerald-600 font-medium flex gap-2 items-center dark:text-emerald-500">
-          <span class="i-carbon-checkmark-filled h-5 w-5" />
-          {{ result.message }}
+      <div v-if="result" class="mt-4 pt-3 border-t border-border/40">
+        <div v-if="result.success" class="text-xs text-green-600 font-medium px-3 py-2 border border-green-500/20 rounded-md bg-green-500/10 flex gap-2 shadow-sm items-center">
+          <span class="i-carbon-checkmark-filled shrink-0 h-4 w-4" />
+          <span class="font-mono">{{ result.message }}</span>
         </div>
-        <div v-else class="text-sm text-destructive font-medium flex gap-2 items-center">
-          <span class="i-carbon-warning-filled h-5 w-5" />
-          {{ result.message }}
+        <div v-else class="text-xs text-destructive font-medium px-3 py-2 border border-destructive/20 rounded-md bg-destructive/10 flex gap-2 shadow-sm items-center">
+          <span class="i-carbon-warning-filled shrink-0 h-4 w-4" />
+          <span class="font-mono">{{ result.message }}</span>
         </div>
       </div>
 
       <!-- Execute -->
-      <div class="mt-4 pt-4 border-t border-border/40 flex justify-end">
+      <div class="mt-5 pt-4 border-t border-border/40 flex justify-end">
         <Button
           :disabled="!canExecute || executing"
-          class="min-w-[120px]"
+          size="sm"
+          class="h-8 min-w-[120px]"
           @click="executeMigration"
         >
-          <span v-if="executing" class="i-carbon-circle-dash mr-2 animate-spin" />
-          <span v-else class="i-carbon-play mr-2" />
-          Run Migration
+          <span v-if="executing" class="i-carbon-circle-dash mr-1.5 animate-spin" />
+          <span v-else class="i-carbon-play mr-1.5" />
+          Start Migration
         </Button>
       </div>
     </TransferStepCard>

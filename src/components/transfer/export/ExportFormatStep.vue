@@ -40,20 +40,20 @@ watch([selectedFormat, csvDelimiter, csvEncoding, csvIncludeHeader], () => {
 </script>
 
 <template>
-  <div class="space-y-6">
-    <div class="space-y-3">
-      <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Select Format</Label>
-      <RadioGroup v-model="selectedFormat" class="gap-4 grid grid-cols-1 md:grid-cols-2">
+  <div class="space-y-4">
+    <div class="space-y-2">
+      <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Select Format</Label>
+      <RadioGroup v-model="selectedFormat" class="gap-2.5 grid grid-cols-1 md:grid-cols-2">
         <label
           v-for="format in formats"
           :key="format.value"
-          class="p-4 border rounded-lg flex cursor-pointer transition-all duration-200 items-start space-x-3 hover:bg-muted/50"
-          :class="selectedFormat === format.value ? 'border-primary bg-primary/5 shadow-sm' : 'border-border bg-card'"
+          class="p-2.5 border rounded-md flex cursor-pointer transition-all duration-200 items-start space-x-2.5 hover:bg-muted/40"
+          :class="selectedFormat === format.value ? 'border-primary/60 bg-primary/[0.04] shadow-sm' : 'border-border/40 bg-card'"
         >
-          <RadioGroupItem :id="`format-${format.value}`" :value="format.value" class="mt-1" />
+          <RadioGroupItem :id="`format-${format.value}`" :value="format.value" class="mt-0.5" />
           <div class="flex-1 space-y-1">
-            <div class="text-sm tracking-tight font-semibold">{{ format.label }}</div>
-            <div class="text-xs text-muted-foreground">
+            <div class="text-xs tracking-tight font-semibold">{{ format.label }}</div>
+            <div class="text-[11px] text-muted-foreground">
               {{ format.defaults }}
             </div>
           </div>
@@ -61,16 +61,16 @@ watch([selectedFormat, csvDelimiter, csvEncoding, csvIncludeHeader], () => {
       </RadioGroup>
     </div>
 
-    <Button variant="ghost" class="text-xs text-muted-foreground w-full" @click="showAdvanced = !showAdvanced">
-      <span :class="showAdvanced ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="mr-2" />
+    <Button variant="ghost" size="sm" class="text-[11px] text-muted-foreground h-8 w-full" @click="showAdvanced = !showAdvanced">
+      <span :class="showAdvanced ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="mr-1.5" />
       {{ showAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options' }}
     </Button>
 
-    <div v-if="showAdvanced && selectedFormat === 'csv'" class="pt-6 border-t gap-5 grid grid-cols-1 md:grid-cols-3 sm:grid-cols-2">
-      <div class="space-y-2.5">
-        <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Delimiter</Label>
+    <div v-if="showAdvanced && selectedFormat === 'csv'" class="p-3 border border-border/40 rounded-md bg-muted/20 gap-2.5 grid grid-cols-1 md:grid-cols-3">
+      <div class="space-y-1.5">
+        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Delimiter</Label>
         <Select v-model="csvDelimiter">
-          <SelectTrigger>
+          <SelectTrigger class="text-xs font-mono h-8">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -86,10 +86,10 @@ watch([selectedFormat, csvDelimiter, csvEncoding, csvIncludeHeader], () => {
           </SelectContent>
         </Select>
       </div>
-      <div class="space-y-2.5">
-        <Label class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">Encoding</Label>
+      <div class="space-y-1.5">
+        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Encoding</Label>
         <Select v-model="csvEncoding">
-          <SelectTrigger>
+          <SelectTrigger class="text-xs font-mono h-8">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -102,9 +102,9 @@ watch([selectedFormat, csvDelimiter, csvEncoding, csvIncludeHeader], () => {
           </SelectContent>
         </Select>
       </div>
-      <div class="flex items-center space-x-2 sm:mt-8">
+      <div class="flex items-center space-x-2 sm:mt-5">
         <Checkbox id="export-csv-header" v-model:checked="csvIncludeHeader" />
-        <Label for="export-csv-header" class="text-sm leading-none font-medium cursor-pointer">Include header row</Label>
+        <Label for="export-csv-header" class="text-xs leading-none font-medium cursor-pointer">Include header row</Label>
       </div>
     </div>
   </div>

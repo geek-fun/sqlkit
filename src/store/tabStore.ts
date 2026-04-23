@@ -24,8 +24,10 @@ export type QueryTab = {
   id: string
   name: string
   content: string
-  connectionId: string
+  /** Connection this tab originated from. Used to detect stale tabs across connection switches. */
+  connectionId?: string
   database?: string
+  schema?: string
   isExecuting: boolean
   hasUnsavedChanges: boolean
   filePath?: string
@@ -33,6 +35,8 @@ export type QueryTab = {
   error?: ApiError | string
   executionTime?: number
   tableView?: TableViewMeta
+  /** If set, this tab is orphaned from the specified connection and cannot execute queries */
+  orphanFromConnectionId?: string
 }
 
 type TabStoreState = {
@@ -61,17 +65,24 @@ export const useTabStore = defineStore('tabs', {
     unsavedTabs: (state): QueryTab[] =>
       state.tabs.filter(t => t.hasUnsavedChanges),
 
+    orphanTabs: (state): QueryTab[] =>
+      state.tabs.filter(t => t.orphanFromConnectionId),
+
+    isOrphanTab: state => (id: string): boolean =>
+      state.tabs.find(t => t.id === id)?.orphanFromConnectionId !== undefined,
+
     tabCount: (state): number => state.tabs.length,
   },
 
   actions: {
-    createTab(connectionId: string, database?: string): QueryTab {
+    createTab(database?: string, schema?: string, connectionId?: string): QueryTab {
       const tab: QueryTab = {
         id: generateId(),
         name: `Query ${this.tabs.length + 1}`,
         content: '',
         connectionId,
         database,
+        schema,
         isExecuting: false,
         hasUnsavedChanges: false,
       }
@@ -80,14 +91,14 @@ export const useTabStore = defineStore('tabs', {
       return tab
     },
 
-    /** Open a table-view tab for the given table, or switch to one that is already open. */
-    openTableViewTab(connectionId: string, database: string, tableName: string, schema?: string): QueryTab {
+    openTableViewTab(database: string, tableName: string, schema?: string, connectionId?: string): QueryTab {
       const existing = this.tabs.find(
         t => t.tableView
           && t.tableView.tableName === tableName
           && t.tableView.database === database
           && (t.tableView.schema ?? null) === (schema ?? null)
-          && t.connectionId === connectionId,
+          && t.connectionId === connectionId
+          && !t.orphanFromConnectionId,
       )
       if (existing) {
         this.activeTabId = existing.id
@@ -100,6 +111,7 @@ export const useTabStore = defineStore('tabs', {
         content: '',
         connectionId,
         database,
+        schema,
         isExecuting: false,
         hasUnsavedChanges: false,
         tableView: { tableName, database, schema },
@@ -126,10 +138,83 @@ export const useTabStore = defineStore('tabs', {
       this.activeTabId = null
     },
 
-    closeTabsForConnection(connectionId: string) {
-      this.tabs = this.tabs.filter(t => t.connectionId !== connectionId)
+    closeNonOrphanTabs() {
+      this.tabs = this.tabs.filter(t => t.orphanFromConnectionId)
       if (this.activeTabId && !this.tabs.find(t => t.id === this.activeTabId)) {
-        this.activeTabId = this.tabs[0]?.id ?? null
+        const orphanTab = this.tabs.find(t => t.orphanFromConnectionId)
+        this.activeTabId = orphanTab?.id ?? null
+      }
+    },
+
+    reconcileTabsForConnection(currentConnectionId: string) {
+      const isStale = (t: QueryTab) =>
+        !t.orphanFromConnectionId
+        && t.connectionId !== currentConnectionId
+
+      const staleTableViewIds = this.tabs
+        .filter(t => isStale(t) && t.tableView)
+        .map(t => t.id)
+
+      const staleSavedQueryIds = this.tabs
+        .filter(t => isStale(t) && !t.tableView && !t.hasUnsavedChanges)
+        .map(t => t.id)
+
+      const staleUnsavedQueryTabs = this.tabs.filter(
+        t => isStale(t) && !t.tableView && t.hasUnsavedChanges,
+      )
+
+      const toCloseIds = new Set([...staleTableViewIds, ...staleSavedQueryIds])
+
+      const orphanedIds = new Set(staleUnsavedQueryTabs.map(t => t.id))
+
+      this.tabs = this.tabs
+        .filter(t => !toCloseIds.has(t.id))
+        .map(t =>
+          orphanedIds.has(t.id)
+            ? { ...t, orphanFromConnectionId: t.connectionId ?? 'unknown' }
+            : t,
+        )
+
+      if (this.activeTabId && !this.tabs.find(t => t.id === this.activeTabId)) {
+        const nonOrphanTab = this.tabs.find(t => !t.orphanFromConnectionId)
+        const orphanTab = this.tabs.find(t => t.orphanFromConnectionId)
+        this.activeTabId = nonOrphanTab?.id ?? orphanTab?.id ?? null
+      }
+    },
+
+    transitionTabsForConnection(oldConnectionId: string) {
+      const tableViewTabIds = this.tabs
+        .filter(t => t.tableView && !t.orphanFromConnectionId)
+        .map(t => t.id)
+
+      const savedQueryTabIds = this.tabs
+        .filter(t => !t.tableView && !t.hasUnsavedChanges && !t.orphanFromConnectionId)
+        .map(t => t.id)
+
+      const unsavedQueryTabs = this.tabs.filter(
+        t => !t.tableView && t.hasUnsavedChanges && !t.orphanFromConnectionId,
+      )
+
+      const toCloseIds = new Set([...tableViewTabIds, ...savedQueryTabIds])
+
+      this.tabs = this.tabs.filter(t => !toCloseIds.has(t.id))
+
+      unsavedQueryTabs.forEach((tab) => {
+        const index = this.tabs.findIndex(t => t.id === tab.id)
+        if (index !== -1) {
+          const orphanedTab = { ...tab, orphanFromConnectionId: oldConnectionId }
+          this.tabs = [
+            ...this.tabs.slice(0, index),
+            orphanedTab,
+            ...this.tabs.slice(index + 1),
+          ]
+        }
+      })
+
+      if (this.activeTabId && !this.tabs.find(t => t.id === this.activeTabId)) {
+        const nonOrphanTab = this.tabs.find(t => !t.orphanFromConnectionId)
+        const orphanTab = this.tabs.find(t => t.orphanFromConnectionId)
+        this.activeTabId = nonOrphanTab?.id ?? orphanTab?.id ?? null
       }
     },
 
@@ -148,15 +233,14 @@ export const useTabStore = defineStore('tabs', {
       }
     },
 
-    async executeQuery(tabId: string, sqlToExecute?: string) {
+    async executeQuery(tabId: string, activeConnectionId: string, sqlToExecute?: string) {
       const tab = this.tabs.find(t => t.id === tabId)
-      if (!tab) {
+      if (!tab || tab.orphanFromConnectionId) {
         return
       }
 
       const sql = sqlToExecute !== undefined ? sqlToExecute : tab.content
 
-      // Validate SQL is a non-empty string
       if (typeof sql !== 'string' || sql.trim() === '') {
         return
       }
@@ -165,7 +249,7 @@ export const useTabStore = defineStore('tabs', {
       tab.error = undefined
 
       const connectionStore = useConnectionStore()
-      const connection = connectionStore.getConnectionById(tab.connectionId)
+      const connection = connectionStore.getConnectionById(activeConnectionId)
       const historyStore = useHistoryStore()
 
       const queryStartTime = Date.now()
@@ -176,7 +260,7 @@ export const useTabStore = defineStore('tabs', {
 
         await withMinLoadingTime(async () => {
           response = await invoke<ApiResponse<QueryResult>>('execute_query', {
-            connectionId: tab.connectionId,
+            connectionId: activeConnectionId,
             sql,
             database: tab.database ?? null,
           })
@@ -188,8 +272,8 @@ export const useTabStore = defineStore('tabs', {
           tab.executionTime = actualExecutionTime
           historyStore.addEntry({
             sql,
-            connectionId: tab.connectionId,
-            connectionName: connection?.name ?? tab.connectionId,
+            connectionId: activeConnectionId,
+            connectionName: connection?.name ?? activeConnectionId,
             database: tab.database,
             timestamp: Date.now(),
             executionTime: actualExecutionTime,
@@ -213,8 +297,8 @@ export const useTabStore = defineStore('tabs', {
           tab.error = err
           historyStore.addEntry({
             sql,
-            connectionId: tab.connectionId,
-            connectionName: connection?.name ?? tab.connectionId,
+            connectionId: activeConnectionId,
+            connectionName: connection?.name ?? activeConnectionId,
             database: tab.database,
             timestamp: Date.now(),
             executionTime: actualExecutionTime,
@@ -228,8 +312,8 @@ export const useTabStore = defineStore('tabs', {
         tab.error = String(error)
         historyStore.addEntry({
           sql,
-          connectionId: tab.connectionId,
-          connectionName: connection?.name ?? tab.connectionId,
+          connectionId: activeConnectionId,
+          connectionName: connection?.name ?? activeConnectionId,
           database: tab.database,
           timestamp: Date.now(),
           executionTime: actualExecutionTime,

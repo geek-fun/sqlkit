@@ -4,7 +4,7 @@ import type { BackgroundTask } from '@/types/transfer'
 import { computed } from 'vue'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 
 import { ProgressBar } from '@/components/ui/progress'
 
@@ -20,7 +20,7 @@ const emit = defineEmits<{
 const statusColor = computed(() => {
   switch (props.task.status) {
     case 'running': return 'default'
-    case 'completed': return 'default'
+    case 'completed': return 'outline'
     case 'failed': return 'destructive'
     default: return 'outline'
   }
@@ -43,9 +43,9 @@ const progressPercent = computed(() =>
 
 const icon = computed(() => {
   switch (props.task.kind) {
-    case 'export': return '📤'
-    case 'import': return '📥'
-    default: return '🔄'
+    case 'export': return 'i-carbon-document-export text-blue-500/80'
+    case 'import': return 'i-carbon-document-import text-purple-500/80'
+    default: return 'i-carbon-data-refinery text-orange-500/80'
   }
 })
 
@@ -65,14 +65,19 @@ const timeAgo = computed(() => {
 </script>
 
 <template>
-  <Card>
-    <CardContent class="pt-4 space-y-3">
+  <Card class="p-3 border-border/40 shadow-sm transition-all hover:border-border/60">
+    <div class="flex flex-col space-y-2.5">
       <div class="flex items-center justify-between">
         <div class="flex gap-2 items-center">
-          <span class="text-lg">{{ icon }}</span>
-          <span class="text-sm font-medium">{{ props.task.label }}</span>
+          <span :class="icon" class="h-3.5 w-3.5" />
+          <span class="text-xs font-medium">{{ props.task.label }}</span>
         </div>
-        <Badge :variant="statusColor">
+        <Badge
+          :variant="statusColor"
+          class="text-[10px] tracking-wide font-mono px-1.5 py-0.5 rounded-sm uppercase" :class="[
+            props.task.status === 'completed' ? 'bg-green-500/10 text-green-600 border-transparent' : '',
+          ]"
+        >
           {{ statusLabel }}
         </Badge>
       </div>
@@ -80,10 +85,10 @@ const timeAgo = computed(() => {
       <ProgressBar
         v-if="props.task.status === 'running'"
         :value="progressPercent"
-        class="h-2"
+        class="bg-muted h-1"
       />
 
-      <div class="text-xs text-muted-foreground flex items-center justify-between">
+      <div class="text-[11px] text-muted-foreground font-mono flex items-center justify-between tabular-nums">
         <span>
           {{ props.task.runtime.complete.toLocaleString() }}
           <span v-if="props.task.runtime.total > 0">
@@ -93,15 +98,16 @@ const timeAgo = computed(() => {
         <span>{{ timeAgo }}</span>
       </div>
 
-      <div v-if="props.task.error" class="text-xs text-destructive">
+      <div v-if="props.task.error" class="text-[11px] text-destructive">
         {{ props.task.error }}
       </div>
 
-      <div class="flex gap-2 justify-end">
+      <div class="pt-1 flex gap-2 items-center justify-end">
         <Button
           v-if="props.task.status !== 'running'"
           variant="ghost"
           size="sm"
+          class="text-[11px] text-muted-foreground tracking-wide px-2.5 h-7 uppercase"
           @click="emit('dismiss')"
         >
           Dismiss
@@ -109,11 +115,13 @@ const timeAgo = computed(() => {
         <Button
           variant="outline"
           size="sm"
+          class="text-[11px] px-2.5 border-border/40 flex gap-1.5 h-7"
           @click="emit('goToTask')"
         >
-          Go to Task
+          <span class="i-carbon-arrow-right h-3 w-3" />
+          <span>View</span>
         </Button>
       </div>
-    </CardContent>
+    </div>
   </Card>
 </template>
