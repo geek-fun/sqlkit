@@ -531,14 +531,16 @@ function closeResultPanel() {
           <!-- Invalid table-view state (connection mismatch - tab being closed) -->
           <div
             v-else-if="activeTab?.tableView && !isTableViewConnectionValid"
-            class="flex-1 flex items-center justify-center"
+            class="flex flex-1 items-center justify-center"
           >
-            <div class="text-center text-muted-foreground">
-              <svg class="animate-spin h-8 w-8 mx-auto mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            <div class="text-muted-foreground text-center">
+              <svg class="mx-auto mb-2 h-8 w-8 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
-              <p class="text-sm">{{ t('pages.queries.status.executing') }}</p>
+              <p class="text-sm">
+                {{ t('pages.queries.status.executing') }}
+              </p>
             </div>
           </div>
 
@@ -642,10 +644,10 @@ function closeResultPanel() {
                 @save="handleSaveQuery"
               />
               <div v-else class="flex h-full items-center justify-center">
-                <div class="text-center max-w-md px-6">
+                <div class="px-6 text-center max-w-md">
                   <!-- Connection info card when connected -->
-                  <div v-if="activeConnection && getConnectionId()" class="bg-muted/50 rounded-lg p-6 mb-6">
-                    <div class="flex items-center justify-center gap-3 mb-4">
+                  <div v-if="activeConnection && getConnectionId()" class="mb-6 p-6 rounded-lg bg-muted/50">
+                    <div class="mb-4 flex gap-3 items-center justify-center">
                       <DbTypeIcon
                         v-if="activeConnection.type"
                         :type="activeConnection.type"
@@ -655,17 +657,23 @@ function closeResultPanel() {
                     </div>
                     <div class="text-sm text-muted-foreground space-y-1">
                       <p>{{ activeConnection.host }}:{{ activeConnection.port }}</p>
-                      <p v-if="activeConnection.username">{{ t('pages.queries.landing.connectedAs') }}: {{ activeConnection.username }}</p>
-                      <p v-if="selectedDatabase">{{ t('pages.queries.landing.currentDatabase') }}: {{ selectedDatabase }}</p>
+                      <p v-if="activeConnection.username">
+                        {{ t('pages.queries.landing.connectedAs') }}: {{ activeConnection.username }}
+                      </p>
+                      <p v-if="selectedDatabase">
+                        {{ t('pages.queries.landing.currentDatabase') }}: {{ selectedDatabase }}
+                      </p>
                     </div>
                   </div>
 
                   <!-- Welcome message -->
-                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 text-muted-foreground/50">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground/50 mx-auto mb-4">
                     <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                     <polyline points="14 2 14 8 20 8" />
                   </svg>
-                  <p class="text-muted-foreground mb-4">{{ getConnectionId() ? t('pages.queries.landing.ready') : t('pages.queries.noTab') }}</p>
+                  <p class="text-muted-foreground mb-4">
+                    {{ getConnectionId() ? t('pages.queries.landing.ready') : t('pages.queries.noTab') }}
+                  </p>
 
                   <!-- Action buttons -->
                   <div class="flex flex-col gap-2">
@@ -678,7 +686,7 @@ function closeResultPanel() {
                   </div>
 
                   <!-- Quick tips -->
-                  <div v-if="getConnectionId()" class="mt-6 text-xs text-muted-foreground">
+                  <div v-if="getConnectionId()" class="text-xs text-muted-foreground mt-6">
                     <p>{{ t('pages.queries.landing.tip') }}</p>
                   </div>
                 </div>

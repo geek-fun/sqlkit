@@ -162,12 +162,12 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
         </table>
       </div>
 
-      <div v-else class="border border-border/40 rounded-md flex-1 flex flex-col overflow-hidden">
+      <div v-else class="border border-border/40 rounded-md flex flex-1 flex-col overflow-hidden">
         <table class="text-xs w-full">
           <caption class="sr-only">
             Available tables for export selection
           </caption>
-          <thead class="text-[10px] text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase sticky top-0 z-10">
+          <thead class="text-[10px] text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase top-0 sticky z-10">
             <tr>
               <th scope="col" class="font-medium px-2 py-1.5 text-left w-8">
                 <Checkbox
@@ -189,7 +189,7 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
             </tr>
           </thead>
         </table>
-        <div class="overflow-y-auto flex-1 scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border">
+        <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border flex-1 overflow-y-auto">
           <table class="text-xs w-full">
             <tbody>
               <tr

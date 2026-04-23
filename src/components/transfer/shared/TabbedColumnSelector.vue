@@ -108,11 +108,11 @@ watch(columnFetchParams, (params, oldParams) => {
 async function fetchColumnsForTable(tableName: string) {
   loadingTables.value.add(tableName)
   try {
-const result = await invoke<ColumnInfo[]>('list_columns', {
+    const result = await invoke<ColumnInfo[]>('list_columns', {
       connectionId: props.connectionId,
       database: props.database,
       schema: props.schema || null,
-      tableName: tableName,
+      tableName,
     })
     const columns = result || []
     tableColumnsMap.value.set(tableName, {
@@ -247,16 +247,16 @@ const showTotalSummary = computed(() => selectedTablesCount.value > 1)
                 <td colspan="5" class="text-[11px] text-muted-foreground px-2 py-6 text-center italic">
                   <span class="i-carbon-data-base mr-1.5 opacity-50" /> {{ t('transfer.export.selectTablesFirst', 'Select tables above to configure columns') }}
                 </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+              </tr>
+            </tbody>
+          </table>
         </div>
+      </div>
 
       <!-- Selected Tables: Show tabs and content -->
-      <Tabs v-else v-model="activeTab" class="flex flex-col h-full shrink">
+      <Tabs v-else v-model="activeTab" class="flex shrink flex-col h-full">
         <!-- Tabs List -->
-        <TabsList class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border p-1 border border-border/40 rounded-lg bg-muted/50 shrink-0 flex-nowrap gap-1 h-9 overflow-x-auto justify-start">
+        <TabsList class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border p-1 border border-border/40 rounded-lg bg-muted/50 shrink-0 flex-nowrap gap-1 h-9 justify-start overflow-x-auto">
           <TabsTrigger
             v-for="tableName in selectedTables"
             :key="tableName"
@@ -295,7 +295,7 @@ const showTotalSummary = computed(() => selectedTablesCount.value > 1)
             <span class="i-carbon-circle-dash mr-1.5 animate-spin" /> Loading columns...
           </div>
 
-          <div v-else-if="getTableData(tableName)?.columns.length === 0" class="border border-border/40 rounded-md flex-1 flex flex-col overflow-hidden">
+          <div v-else-if="getTableData(tableName)?.columns.length === 0" class="border border-border/40 rounded-md flex flex-1 flex-col overflow-hidden">
             <table class="text-xs w-full">
               <thead class="text-[10px] text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase">
                 <tr>
@@ -355,7 +355,7 @@ const showTotalSummary = computed(() => selectedTablesCount.value > 1)
               </thead>
             </table>
             <!-- Scrollable body table -->
-            <div class="overflow-y-auto max-h-[180px] scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border">
+            <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border max-h-[180px] overflow-y-auto">
               <table class="text-xs w-full">
                 <tbody>
                   <tr

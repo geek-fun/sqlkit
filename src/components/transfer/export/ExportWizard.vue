@@ -164,7 +164,7 @@ function startExport() {
       :summary="sourceSummary"
       min-height="340px"
     >
-      <div class="gap-3 grid grid-cols-1 h-[280px] overflow-hidden items-stretch lg:grid-cols-3">
+      <div class="gap-3 grid grid-cols-1 h-[280px] items-stretch overflow-hidden lg:grid-cols-3">
         <!-- Left: Connection, Database, Schema (1/3) -->
         <div class="lg:col-span-1">
           <ConnectionSelector

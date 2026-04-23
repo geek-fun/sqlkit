@@ -32,7 +32,7 @@ const stepLabel = computed(() =>
 
 <template>
   <Card
-    class="rounded-md transition-all duration-200 overflow-hidden flex flex-col h-full"
+    class="rounded-md flex flex-col h-full transition-all duration-200 overflow-hidden"
     :class="cardClasses"
     :style="{ minHeight }"
   >
@@ -46,7 +46,7 @@ const stepLabel = computed(() =>
         {{ summary }}
       </span>
     </div>
-    <CardContent class="px-3 pb-3 pt-2.5 flex flex-col flex-1">
+    <CardContent class="px-3 pb-3 pt-2.5 flex flex-1 flex-col">
       <slot />
     </CardContent>
   </Card>
