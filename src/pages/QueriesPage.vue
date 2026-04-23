@@ -3,8 +3,8 @@ import type { StatementToExecute } from '@/composables/useSqlStatements'
 import type { TableInfo } from '@/store/databaseStore'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
-import { DatabaseBrowser, DataTableView, QueryResultPanel, QueryTabs } from '@/components/database-browser'
+import { useRoute, useRouter } from 'vue-router'
+import { DatabaseBrowser, DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/components/database-browser'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,7 @@ import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, us
 
 const { t } = useI18n()
 const route = useRoute()
+const router = useRouter()
 const appStore = useAppStore()
 const connectionStore = useConnectionStore()
 const databaseStore = useDatabaseStore()
@@ -33,8 +34,11 @@ const showResultPanel = ref(false)
 const sidebarWidth = ref(250)
 const isResizingSidebar = ref(false)
 const selectedDatabase = ref<string>('')
+const selectedSchema = ref<string>('')
 const queryTabsRef = ref<InstanceType<typeof QueryTabs>>()
 const databaseBrowserRef = ref<InstanceType<typeof DatabaseBrowser>>()
+const showOrphanTabDialog = ref(false)
+const orphanTabToHandle = ref<string | null>(null)
 
 // Available connections
 const availableConnections = computed(() => connectionStore.connections)
@@ -61,16 +65,14 @@ const editorContent = computed({
   },
 })
 
-// Initialize on mount — restore previously selected connection & database from store
 onMounted(async () => {
-  // Route query param takes priority (e.g. deep-link from ConnectionsPage)
   const routeConnId = route.query.connectionId as string | undefined
   const connId = routeConnId || connectionStore.activeConnectionId
 
   if (connId) {
+    tabStore.reconcileTabsForConnection(connId)
     selectedConnectionId.value = connId
 
-    // If already connected, just restore UI state — no need to reconnect
     const isConnected = connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
     if (isConnected) {
       const currentDb = connectionStore.getCurrentDatabase(connId)
@@ -78,43 +80,39 @@ onMounted(async () => {
         selectedDatabase.value = currentDb
       }
 
-      if (tabStore.tabs.length === 0) {
-        tabStore.createTab(connId, currentDb || undefined)
-      }
-
       await databaseStore.fetchDatabases(connId)
     }
-    // If not connected yet (e.g. first visit via route param), the watch will connect
   }
 })
 
-// Watch for connection changes — connect only when not already connected
+watch(selectedConnectionId, (newConnId, oldConnId) => {
+  if (!newConnId || newConnId === oldConnId) {
+    return
+  }
+
+  selectedDatabase.value = ''
+  selectedSchema.value = ''
+  databaseStore.resetSelection()
+
+  tabStore.reconcileTabsForConnection(newConnId)
+  if (oldConnId) {
+    databaseStore.clearMetadata(oldConnId)
+  }
+}, { flush: 'sync' })
+
+// Async operations after tabs are closed
 watch(selectedConnectionId, async (newConnId, oldConnId) => {
   if (!newConnId || newConnId === oldConnId) {
     return
   }
 
-  // Reset state when switching connections to avoid showing cached data from previous connection
-  selectedDatabase.value = ''
-  databaseStore.resetSelection()
-
-  // Close tabs belonging to the old connection (including table-view tabs)
-  if (oldConnId) {
-    tabStore.closeTabsForConnection(oldConnId)
-    databaseStore.clearMetadata(oldConnId)
-  }
-
   const alreadyConnected = connectionStore.getConnectionStatus(newConnId) === ConnectionStatus.CONNECTED
 
   if (alreadyConnected) {
-    // Already connected — just restore UI state and make it active
     connectionStore.setActiveConnection(newConnId)
     const currentDb = connectionStore.getCurrentDatabase(newConnId)
     if (currentDb) {
       selectedDatabase.value = currentDb
-    }
-    if (tabStore.tabs.length === 0) {
-      tabStore.createTab(newConnId, currentDb || undefined)
     }
     await databaseStore.fetchDatabases(newConnId)
     return
@@ -128,10 +126,6 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
     const currentDb = connectionStore.getCurrentDatabase(newConnId)
     if (currentDb) {
       selectedDatabase.value = currentDb
-    }
-
-    if (tabStore.tabs.length === 0) {
-      tabStore.createTab(newConnId, connectionStore.getCurrentDatabase(newConnId) || undefined)
     }
   }
   catch (error) {
@@ -149,6 +143,8 @@ watch(selectedDatabase, (db) => {
   if (db && activeTab.value) {
     activeTab.value.database = db
   }
+  // Reset schema when database changes
+  selectedSchema.value = ''
 })
 
 // When the active tab changes, sync selectedDatabase to reflect that tab's DB
@@ -158,8 +154,36 @@ watch(activeTab, (tab) => {
   }
 })
 
+const getConnectionId = () => selectedConnectionId.value || connectionStore.activeConnectionId
+
+const isTableViewConnectionValid = computed(() => {
+  if (!activeTab.value?.tableView)
+    return true
+  if (activeTab.value.orphanFromConnectionId)
+    return false
+
+  const connId = getConnectionId()
+  if (!connId)
+    return false
+
+  const status = connectionStore.getConnectionStatus(connId)
+  if (status !== ConnectionStatus.CONNECTED)
+    return false
+
+  return true
+})
+
+function isConnectionActive(connId: string | null | undefined): boolean {
+  return connId !== null && connId !== undefined && connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
+}
+
+function getActiveConnectionId(): string | null {
+  const connId = getConnectionId()
+  return isConnectionActive(connId) ? connId : null
+}
+
 async function executeQuery(details?: StatementToExecute) {
-  if (!activeTab.value) {
+  if (!activeTab.value || activeTab.value.orphanFromConnectionId) {
     return
   }
 
@@ -174,35 +198,51 @@ async function executeQuery(details?: StatementToExecute) {
     return
   }
 
+  const connId = getConnectionId()
+  if (!connId) {
+    return
+  }
+
   showResultPanel.value = true
-  await tabStore.executeQuery(activeTab.value.id, sqlToExecute)
+  await tabStore.executeQuery(activeTab.value.id, connId, sqlToExecute)
 }
 
 async function handleExplainQuery() {
   // TODO: Implement explain query
 }
 
-const getConnectionId = () => selectedConnectionId.value || connectionStore.activeConnectionId
-
-function isConnectionActive(connId: string | null | undefined): boolean {
-  return connId !== null && connId !== undefined && connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
-}
-
-function getActiveConnectionId(): string | null {
-  const connId = getConnectionId()
-  return isConnectionActive(connId) ? connId : null
-}
-
 function handleNewTab() {
-  const connId = getActiveConnectionId() || ''
+  const connId = getActiveConnectionId()
   const db = connId
     ? (selectedDatabase.value || connectionStore.getCurrentDatabase(connId) || connectionStore.getConnectionById(connId)?.database || undefined)
     : undefined
-  tabStore.createTab(connId, db)
+  tabStore.createTab(db, undefined, connId ?? undefined)
 }
 
 function handleTabSelect(tabId: string) {
+  const tab = tabStore.tabById(tabId)
+  if (tab?.orphanFromConnectionId) {
+    orphanTabToHandle.value = tabId
+    showOrphanTabDialog.value = true
+    return
+  }
   tabStore.setActiveTab(tabId)
+}
+
+function handleOrphanTabClose() {
+  if (orphanTabToHandle.value) {
+    tabStore.closeTab(orphanTabToHandle.value)
+    orphanTabToHandle.value = null
+  }
+  showOrphanTabDialog.value = false
+}
+
+function handleOrphanTabAcknowledge() {
+  if (orphanTabToHandle.value) {
+    tabStore.setActiveTab(orphanTabToHandle.value)
+    orphanTabToHandle.value = null
+  }
+  showOrphanTabDialog.value = false
 }
 
 function handleTabClose(tabId: string) {
@@ -237,7 +277,7 @@ CREATE TABLE ${schemaPrefix}"${table.name}" (
 
   const connId = getActiveConnectionId()
   if (connId) {
-    const tab = tabStore.createTab(connId, database)
+    const tab = tabStore.createTab(database, schema, connId)
     tabStore.updateTabContent(tab.id, script)
     tabStore.updateTabName(tab.id, `CREATE_${table.name}.sql`)
   }
@@ -249,11 +289,11 @@ function handleSelectTopN(table: TableInfo, database: string, schema?: string, n
 
   const connId = getActiveConnectionId()
   if (connId) {
-    const tab = tabStore.createTab(connId, database)
+    const tab = tabStore.createTab(database, schema, connId)
     tabStore.updateTabContent(tab.id, query)
     tabStore.updateTabName(tab.id, `SELECT_${table.name}`)
 
-    tabStore.executeQuery(tab.id)
+    tabStore.executeQuery(tab.id, connId)
     showResultPanel.value = true
   }
 }
@@ -269,7 +309,7 @@ WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` :
 
   const connId = getActiveConnectionId()
   if (connId) {
-    const tab = tabStore.createTab(connId, database)
+    const tab = tabStore.createTab(database, schema, connId)
     tabStore.updateTabContent(tab.id, query)
     tabStore.updateTabName(tab.id, `STRUCTURE_${table.name}`)
   }
@@ -283,7 +323,7 @@ function handleSelectTable(table: TableInfo, database: string, schema?: string) 
   const connId = getActiveConnectionId()
   if (!connId)
     return
-  tabStore.openTableViewTab(connId, database, table.name, schema)
+  tabStore.openTableViewTab(database, table.name, schema, connId)
 }
 
 async function handleOpenSavedQuery(filePath: string) {
@@ -293,12 +333,12 @@ async function handleOpenSavedQuery(filePath: string) {
     return
   }
 
-  const connId = getActiveConnectionId() || ''
+  const connId = getActiveConnectionId()
   const db = connId
     ? (selectedDatabase.value || connectionStore.getCurrentDatabase(connId) || connectionStore.getConnectionById(connId)?.database || undefined)
     : undefined
 
-  const tab = tabStore.createTab(connId, db)
+  const tab = tabStore.createTab(db, undefined, connId ?? undefined)
 
   try {
     const result = await loadQueryFile(filePath)
@@ -444,6 +484,7 @@ function closeResultPanel() {
           <DatabaseBrowser
             ref="databaseBrowserRef"
             v-model:selected-database="selectedDatabase"
+            v-model:selected-schema="selectedSchema"
             :connection-id="selectedConnectionId"
             class="flex-1"
             @select-table="handleSelectTable"
@@ -469,22 +510,39 @@ function closeResultPanel() {
             ref="queryTabsRef"
             :tabs="tabStore.tabs"
             :active-tab-id="tabStore.activeTabId"
+            :active-connection-id="getConnectionId() || undefined"
             @select="handleTabSelect"
             @close="handleTabClose"
             @close-force="handleTabCloseForce"
             @new="handleNewTab"
           />
 
-          <!-- Data Table View (shown when the active tab is a table-view tab) -->
+          <!-- Data Table View (shown when the active tab is a table-view tab AND connection matches) -->
           <DataTableView
-            v-if="activeTab?.tableView"
-            :key="activeTab.id"
-            :connection-id="activeTab.connectionId"
+            v-if="activeTab?.tableView && !activeTab.orphanFromConnectionId && isTableViewConnectionValid"
+            :key="`${getConnectionId()}-${activeTab.id}-${activeTab.tableView.database}-${activeTab.tableView.tableName}`"
+            :connection-id="getConnectionId() || ''"
             :database="activeTab.tableView.database"
             :schema="activeTab.tableView.schema"
             :table-name="activeTab.tableView.tableName"
             class="flex-1"
           />
+
+          <!-- Invalid table-view state (connection mismatch - tab being closed) -->
+          <div
+            v-else-if="activeTab?.tableView && !isTableViewConnectionValid"
+            class="flex flex-1 items-center justify-center"
+          >
+            <div class="text-muted-foreground text-center">
+              <svg class="mx-auto mb-2 h-8 w-8 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              <p class="text-sm">
+                {{ t('pages.queries.status.executing') }}
+              </p>
+            </div>
+          </div>
 
           <!-- Query editor area (shown for normal query tabs) -->
           <template v-else>
@@ -497,7 +555,7 @@ function closeResultPanel() {
                       variant="ghost"
                       size="sm"
                       class="gap-1 h-7"
-                      :disabled="!activeTab"
+                      :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="executeQuery"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -585,16 +643,52 @@ function closeResultPanel() {
                 @statement-not-found="toast.error(t('pages.queries.notifications.noStatementFound'))"
                 @save="handleSaveQuery"
               />
-              <div v-else class="text-muted-foreground flex h-full items-center justify-center">
-                <div class="text-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-4 opacity-50">
+              <div v-else class="flex h-full items-center justify-center">
+                <div class="px-6 text-center max-w-md">
+                  <!-- Connection info card when connected -->
+                  <div v-if="activeConnection && getConnectionId()" class="mb-6 p-6 rounded-lg bg-muted/50">
+                    <div class="mb-4 flex gap-3 items-center justify-center">
+                      <DbTypeIcon
+                        v-if="activeConnection.type"
+                        :type="activeConnection.type"
+                        :size="24"
+                      />
+                      <span class="text-lg font-semibold">{{ activeConnection.name }}</span>
+                    </div>
+                    <div class="text-sm text-muted-foreground space-y-1">
+                      <p>{{ activeConnection.host }}:{{ activeConnection.port }}</p>
+                      <p v-if="activeConnection.username">
+                        {{ t('pages.queries.landing.connectedAs') }}: {{ activeConnection.username }}
+                      </p>
+                      <p v-if="selectedDatabase">
+                        {{ t('pages.queries.landing.currentDatabase') }}: {{ selectedDatabase }}
+                      </p>
+                    </div>
+                  </div>
+
+                  <!-- Welcome message -->
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground/50 mx-auto mb-4">
                     <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
                     <polyline points="14 2 14 8 20 8" />
                   </svg>
-                  <p>{{ t('pages.queries.noTab') }}</p>
-                  <Button variant="outline" size="sm" class="mt-2" @click="handleNewTab">
-                    {{ t('pages.queries.newTab') }}
-                  </Button>
+                  <p class="text-muted-foreground mb-4">
+                    {{ getConnectionId() ? t('pages.queries.landing.ready') : t('pages.queries.noTab') }}
+                  </p>
+
+                  <!-- Action buttons -->
+                  <div class="flex flex-col gap-2">
+                    <Button v-if="getConnectionId()" variant="default" size="sm" class="w-full" @click="handleNewTab">
+                      {{ t('pages.queries.newTab') }}
+                    </Button>
+                    <Button v-if="!getConnectionId()" variant="outline" size="sm" class="w-full" @click="router.push('/connections')">
+                      {{ t('pages.queries.landing.selectConnection') }}
+                    </Button>
+                  </div>
+
+                  <!-- Quick tips -->
+                  <div v-if="getConnectionId()" class="text-xs text-muted-foreground mt-6">
+                    <p>{{ t('pages.queries.landing.tip') }}</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -632,5 +726,25 @@ function closeResultPanel() {
         </div>
       </div>
     </div>
+
+    <!-- Orphan Tab Warning Dialog -->
+    <AlertDialog v-model:open="showOrphanTabDialog">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ t('pages.queries.orphanDialog.title') }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t('pages.queries.orphanDialog.message') }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="handleOrphanTabAcknowledge">
+            {{ t('pages.queries.orphanDialog.acknowledge') }}
+          </AlertDialogCancel>
+          <AlertDialogAction @click="handleOrphanTabClose">
+            {{ t('pages.queries.orphanDialog.close') }}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
   </AppLayout>
 </template>

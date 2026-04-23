@@ -80,6 +80,7 @@ const loading = ref(false)
 const error = ref<string | null>(null)
 const executionTimeMs = ref<number | null>(null)
 const columnInfoList = ref<ColumnTypeInfo[]>([])
+const invalidated = ref(false)
 
 // --- Connection state ---
 const connectionStore = useConnectionStore()
@@ -170,6 +171,9 @@ const formattedTime = computed(() => {
 })
 
 async function fetchData() {
+  if (invalidated.value) {
+    return
+  }
   loading.value = true
   error.value = null
 
@@ -200,6 +204,9 @@ async function fetchData() {
 }
 
 async function fetchCount() {
+  if (invalidated.value) {
+    return
+  }
   try {
     const count = await invoke<number>('get_table_count', {
       connectionId: props.connectionId,
@@ -255,6 +262,10 @@ async function handleRetry() {
 }
 
 async function fetchColumnInfo() {
+  if (invalidated.value) {
+    columnInfoList.value = []
+    return
+  }
   if (!props.database || !props.tableName) {
     columnInfoList.value = []
     return
@@ -577,15 +588,24 @@ onMounted(async () => {
 
 watch(
   () => [props.connectionId, props.tableName, props.schema] as const,
-  async () => {
+  async ([newConnId, _newTable, _newSchema], [oldConnId]) => {
     currentPage.value = 1
     appliedFilter.value = ''
     filterInput.value = ''
     hiddenColumns.value = new Set()
     connectionError.value = null
 
+    if (newConnId !== oldConnId) {
+      data.value = null
+      totalCount.value = 0
+      columnInfoList.value = []
+      invalidated.value = true
+      return
+    }
+
+    invalidated.value = false
     const connected = await ensureConnection()
-    if (connected) {
+    if (connected && !invalidated.value) {
       fetchColumnInfo()
       refresh()
     }

@@ -52,6 +52,50 @@ export const zhCN = {
       trustServerCertHint: '接受自签名证书',
     },
   },
+  transfer: {
+    title: '传输',
+    subtitle: '导入、导出和迁移您的数据',
+    tabs: {
+      export: '导出',
+      import: '导入',
+    },
+    export: {
+      step: {
+        source: '数据源',
+        format: '格式',
+        output: '输出',
+        formatOutput: '格式与输出',
+        preview: '预览',
+        execute: '开始导出',
+      },
+      selectTablesFirst: '请先选择表以配置列',
+      tables: {
+        label: '表',
+        loadFailed: '加载表列表失败',
+      },
+      columns: {
+        label: '列',
+        selectAll: '全选',
+        deselectAll: '取消全选',
+        loadFailed: '加载列失败',
+      },
+      whereClause: 'WHERE 条件（可选）',
+      where: 'WHERE 条件（可选）',
+      whereClausePlaceholder: 'status = "active"',
+      orderBy: 'ORDER BY 排序（可选）',
+      orderByPlaceholder: 'created_at DESC',
+      limit: 'LIMIT 限制（可选）',
+      limitPlaceholder: '1000',
+    },
+    connection: {
+      connectFailed: '连接失败',
+      databasesFailed: '加载数据库列表失败',
+      schemasFailed: '加载 Schema 列表失败',
+    },
+    migration: {
+      tablesSelected: '个表已选择',
+    },
+  },
   pages: {
     connections: {
       title: '连接管理',
@@ -188,6 +232,13 @@ export const zhCN = {
       selectDatabase: '选择数据库',
       noTab: '没有打开的查询标签页',
       newTab: '新建查询',
+      landing: {
+        ready: '准备编写查询',
+        connectedAs: '连接用户',
+        currentDatabase: '数据库',
+        selectConnection: '选择连接',
+        tip: '提示：双击侧边栏中的表格可查看其数据',
+      },
       editor: {
         title: 'SQL编辑器',
         description: '在此处编写您的SQL查询',
@@ -213,6 +264,12 @@ export const zhCN = {
         saveFailed: '保存失败',
         loadFailed: '加载查询失败',
         noStatementFound: '未找到光标位置的 SQL 语句',
+      },
+      orphanDialog: {
+        title: '孤立标签页',
+        message: '此标签页属于其他连接，无法执行查询。您仍可以编辑和保存其内容。',
+        acknowledge: '保持孤立',
+        close: '关闭标签页',
       },
     },
     dataStudio: {
@@ -307,6 +364,7 @@ export const zhCN = {
       loading: '加载中...',
       empty: '未找到数据库。请先连接到服务器。',
       selectDatabase: '选择数据库',
+      selectSchema: '选择 Schema',
       userDatabases: '用户数据库',
       systemDatabases: '系统数据库',
       noTables: '未找到表',
@@ -394,6 +452,7 @@ export const zhCN = {
     },
     queryTabs: {
       unsaved: '未保存的更改',
+      orphan: '此标签页属于其他连接',
       new: '新建查询',
       closeDialog: {
         title: '未保存的更改',

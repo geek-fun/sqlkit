@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { deleteQueryFile, listSavedQueryFiles } from '@/datasources'
-import { ConnectionStatus, useConnectionStore, useDatabaseStore } from '@/store'
+import { ConnectionStatus, DatabaseType, useConnectionStore, useDatabaseStore } from '@/store'
 
 export type TreeNodeMetadata = TableInfo & {
   database: string
@@ -39,6 +39,7 @@ export type TreeNode = {
 const props = defineProps<{
   connectionId?: string
   selectedDatabase?: string
+  selectedSchema?: string
 }>()
 
 const emit = defineEmits<{
@@ -48,6 +49,7 @@ const emit = defineEmits<{
   (e: 'viewStructure', table: TableInfo, database: string, schema?: string): void
   (e: 'exportData', table: TableInfo, database: string, schema?: string): void
   (e: 'update:selectedDatabase', database: string): void
+  (e: 'update:selectedSchema', schema: string): void
   (e: 'openSavedQuery', filePath: string): void
   (e: 'createNewQuery'): void
 }>()
@@ -81,6 +83,18 @@ const isActiveConnectionConnected = computed(() =>
     ? connectionStore.getConnectionStatus(connectionId.value) === ConnectionStatus.CONNECTED
     : false,
 )
+
+const supportsSchemas = computed(() => {
+  const type = activeConnection.value?.type
+  return type === DatabaseType.POSTGRESQL || type === DatabaseType.SQLSERVER
+})
+
+const availableSchemas = computed<string[]>(() => {
+  if (!props.selectedDatabase || !connectionId.value || !supportsSchemas.value) {
+    return []
+  }
+  return databaseStore.metadata[connectionId.value]?.schemas[props.selectedDatabase] ?? []
+})
 
 function createTableNode(database: string, schema: string | undefined, table: TableInfo, parentId: string): TreeNode {
   return {
@@ -158,11 +172,13 @@ const tablesAndViews = computed(() => {
   const schemas = metadata.schemas[currentDb] || []
 
   const allItems: TreeNode[] = schemas.length > 0
-    ? schemas.flatMap((schema) => {
+    ? (() => {
+        const schema = props.selectedSchema || schemas[0]
         const tablesKey = `${currentDb}.${schema}`
-        const tables = metadata.tables[tablesKey] || []
-        return tables.map(table => createTableNode(currentDb, schema, table, `schema-${currentDb}-${schema}`))
-      })
+        return (metadata.tables[tablesKey] || []).map(table =>
+          createTableNode(currentDb, schema, table, `schema-${currentDb}-${schema}`),
+        )
+      })()
     : (metadata.tables[currentDb] || []).map(table =>
         createTableNode(currentDb, undefined, table, `db-${currentDb}`),
       )
@@ -453,6 +469,18 @@ watch(() => props.selectedDatabase, async (newDb, oldDb) => {
   await loadDatabaseData(connectionId.value, newDb)
 })
 
+watch(() => props.selectedSchema, async (newSchema, oldSchema) => {
+  if (!newSchema || !props.selectedDatabase || !connectionId.value || newSchema === oldSchema) {
+    return
+  }
+
+  const tablesKey = `${props.selectedDatabase}.${newSchema}`
+  const meta = databaseStore.metadata[connectionId.value]
+  if (!meta?.tables[tablesKey]) {
+    await databaseStore.fetchTables(connectionId.value, props.selectedDatabase, newSchema)
+  }
+})
+
 watch(showSavedQueries, async (isExpanded) => {
   if (isExpanded && savedQueryFiles.value.length === 0) {
     await fetchSavedQueryFiles()
@@ -561,6 +589,24 @@ defineExpose({ fetchSavedQueryFiles })
               {{ db.name }}
             </SelectItem>
           </SelectGroup>
+        </SelectContent>
+      </Select>
+    </div>
+
+    <!-- Schema selector: only for databases with schema concept (PG, MSSQL) -->
+    <div v-if="isActiveConnectionConnected && supportsSchemas && availableSchemas.length > 0" class="px-2 py-1 border-b">
+      <Select :model-value="props.selectedSchema || availableSchemas[0]" @update:model-value="(val) => emit('update:selectedSchema', val)">
+        <SelectTrigger class="text-xs h-7">
+          <SelectValue :placeholder="t('components.databaseBrowser.selectSchema')" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem
+            v-for="schema in availableSchemas"
+            :key="schema"
+            :value="schema"
+          >
+            {{ schema }}
+          </SelectItem>
         </SelectContent>
       </Select>
     </div>

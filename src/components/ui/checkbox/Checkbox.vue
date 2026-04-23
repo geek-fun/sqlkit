@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { CheckboxRootEmits, CheckboxRootProps } from 'radix-vue'
-import { CheckboxRoot, useForwardPropsEmits } from 'radix-vue'
+import { CheckboxIndicator, CheckboxRoot, useForwardPropsEmits } from 'radix-vue'
 import { cn } from '@/lib/utils'
 
 type Props = {
@@ -21,6 +21,10 @@ const forwarded = useForwardPropsEmits(props, emits)
       props.class,
     )"
   >
-    <slot />
+    <CheckboxIndicator class="text-current flex items-center justify-center">
+      <svg class="h-3 w-3" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="1,6 4.5,9.5 11,2" />
+      </svg>
+    </CheckboxIndicator>
   </CheckboxRoot>
 </template>

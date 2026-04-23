@@ -1,7 +1,5 @@
-// Database adapter module
 pub mod database;
-
-// API response types
+pub mod transfer;
 pub mod api_response;
 
 // Application state management
@@ -128,6 +126,11 @@ pub fn run() {
             commands::list_saved_queries,
             commands::delete_query_file,
             commands::write_text_file,
+            commands::preview_export_data,
+            commands::execute_export_data,
+            commands::detect_file_format,
+            commands::preview_import_data,
+            commands::execute_import_data,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

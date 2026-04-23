@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { QueryTab } from '@/store/tabStore'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   AlertDialog,
@@ -13,10 +13,13 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { useConnectionStore } from '@/store'
+import DbTypeIcon from './DbTypeIcon.vue'
 
 type Props = {
   tabs: QueryTab[]
   activeTabId: string | null
+  activeConnectionId?: string
 }
 
 const props = defineProps<Props>()
@@ -29,6 +32,21 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const connectionStore = useConnectionStore()
+
+const activeConnectionDbType = computed(() =>
+  props.activeConnectionId ? connectionStore.getConnectionById(props.activeConnectionId)?.type : undefined,
+)
+
+function getTabDbType(tab: QueryTab) {
+  if (tab.orphanFromConnectionId) {
+    return connectionStore.getConnectionById(tab.orphanFromConnectionId)?.type
+  }
+  return activeConnectionDbType.value
+}
+
+const isOrphanTab = (tab: QueryTab) => tab.orphanFromConnectionId !== undefined
 
 const showCloseDialog = ref(false)
 const tabToClose = ref<QueryTab | null>(null)
@@ -97,9 +115,38 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
         :class="{
           'bg-background': isActiveTab(tab.id),
           'hover:bg-accent/50': !isActiveTab(tab.id),
+          'opacity-60 border-l-2 border-l-orange-500': isOrphanTab(tab),
         }"
         @click="handleTabClick(tab.id)"
       >
+        <!-- Orphan warning icon -->
+        <svg
+          v-if="isOrphanTab(tab)"
+          xmlns="http://www.w3.org/2000/svg"
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="text-orange-500 flex-shrink-0"
+          :title="t('components.queryTabs.orphan')"
+        >
+          <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 3 21h18a2 2 0 0 0 1.73-3Z" />
+          <line x1="12" x2="12" y1="9" y2="13" />
+          <line x1="12" x2="12.01" y1="17" y2="17" />
+        </svg>
+
+        <!-- DB type icon -->
+        <DbTypeIcon
+          v-if="getTabDbType(tab)"
+          :type="getTabDbType(tab)!"
+          :size="12"
+          class="flex-shrink-0"
+        />
+
         <!-- Tab icon: table grid icon for table-view tabs, file icon for query tabs -->
         <svg
           v-if="tab.tableView"
