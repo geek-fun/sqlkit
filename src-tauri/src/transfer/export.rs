@@ -655,7 +655,7 @@ fn write_excel_cell(
         }
         QueryValue::Bytes(b) => {
             worksheet
-                .write_string(row, col, &hex::encode(b))
+                .write_string(row, col, hex::encode(b))
                 .map_err(|e| e.to_string())?;
             Ok(())
         }

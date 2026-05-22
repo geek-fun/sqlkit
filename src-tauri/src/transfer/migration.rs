@@ -216,8 +216,8 @@ async fn migrate_table<A1: DatabaseAdapter, A2: DatabaseAdapter>(
                 phase: "processing".to_string(),
                 current_table: Some(table_plan.source_table.clone()),
                 total_rows: Some(total_rows),
-                processed_rows: processed_rows,
-                skipped_rows: skipped_rows,
+                processed_rows,
+                skipped_rows,
                 error_count: errors.len() as u64,
                 percent: if total_rows > 0 {
                     (processed_rows as f32 / total_rows as f32) * 100.0
