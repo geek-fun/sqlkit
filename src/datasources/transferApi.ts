@@ -1,5 +1,6 @@
 import type {
   DdlRequest,
+  ExportFormat,
   ExportPreview,
   ExportRequest,
   FileDetectionResult,
@@ -8,6 +9,8 @@ import type {
   MigrationMapping,
   MigrationPreview,
   MigrationRequest,
+  ObjectSelection,
+  TransferProfile,
   TransferResult,
 } from '@/types/transfer'
 
@@ -55,4 +58,46 @@ export function autoMapMigrationColumns(params: AutoMapParams) {
 
 export function generateDdl(request: DdlRequest) {
   return invoke<string>('generate_ddl_for_objects', { request })
+}
+
+export function backupServer(
+  connectionId: string,
+  selection: ObjectSelection,
+  format: ExportFormat,
+  destination: string,
+  options: Record<string, unknown>,
+) {
+  return invoke<string>('backup_server', {
+    connectionId,
+    selection,
+    format,
+    destination,
+    options,
+  })
+}
+
+export function migrateServer(
+  sourceConnectionId: string,
+  targetConnectionId: string,
+  selection: ObjectSelection,
+  options: Record<string, unknown>,
+) {
+  return invoke<string>('migrate_server', {
+    sourceConnectionId,
+    targetConnectionId,
+    selection,
+    options,
+  })
+}
+
+export function saveTransferProfile(profile: TransferProfile) {
+  return invoke<string>('save_transfer_profile', { profile })
+}
+
+export function listTransferProfiles() {
+  return invoke<TransferProfile[]>('list_transfer_profiles')
+}
+
+export function runTransferProfile(profileId: string) {
+  return invoke<string>('run_transfer_profile', { profileId })
 }
