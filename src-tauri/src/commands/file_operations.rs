@@ -159,18 +159,17 @@ fn collect_sql_files(
     queries_dir_str: &str,
     files: &mut Vec<SavedQueryInfo>,
 ) -> Result<(), String> {
-    let entries = fs::read_dir(dir)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
+    let entries = fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
 
     for entry in entries.flatten() {
         let path = entry.path();
-        
+
         if let Ok(file_type) = entry.file_type() {
             if file_type.is_file() {
                 if path.extension().map_or(false, |ext| ext == "sql") {
                     let metadata = fs::metadata(&path)
                         .map_err(|e| format!("Failed to read file metadata: {}", e))?;
-                    
+
                     let modified_at = metadata
                         .modified()
                         .map_err(|e| format!("Failed to get modification time: {}", e))?
@@ -188,7 +187,11 @@ fn collect_sql_files(
                         .strip_prefix(queries_dir_str)
                         .map(|p| p.to_string_lossy().to_string())
                         .unwrap_or_else(|_| "queries".to_string());
-                    let folder = if folder.is_empty() { "queries".to_string() } else { folder };
+                    let folder = if folder.is_empty() {
+                        "queries".to_string()
+                    } else {
+                        folder
+                    };
 
                     files.push(SavedQueryInfo {
                         file_name,

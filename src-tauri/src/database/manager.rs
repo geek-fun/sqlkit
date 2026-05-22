@@ -187,7 +187,10 @@ impl<P: ConnectionPool> ConnectionManager<P> {
     async fn update_stats_from_metadata(&self, metadata: &HashMap<String, ConnectionMetadata>) {
         let mut stats = self.stats.write().await;
         stats.active_connections = metadata.values().filter(|m| m.in_use).count();
-        stats.idle_connections = metadata.values().filter(|m| !m.in_use && m.is_healthy).count();
+        stats.idle_connections = metadata
+            .values()
+            .filter(|m| !m.in_use && m.is_healthy)
+            .count();
         stats.unhealthy_connections = metadata.values().filter(|m| !m.is_healthy).count();
 
         let total_queries: u64 = metadata.values().map(|m| m.query_count).sum();

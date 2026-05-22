@@ -906,7 +906,7 @@ mod tests {
         );
     }
 
-#[test]
+    #[test]
     fn test_build_paginated_select() {
         let query = build_paginated_select("\"table\"", None, 10, 0, "postgres");
         assert!(query.contains("LIMIT 10"));

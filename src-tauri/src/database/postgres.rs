@@ -286,21 +286,15 @@ impl PostgresAdapter {
     fn convert_value_safe(row: &Row, idx: usize, col_type: &Type) -> QueryValue {
         match Self::convert_value(row, idx, col_type) {
             Ok(value) => value,
-            Err(_) => {
-                match row.try_get::<_, Option<String>>(idx) {
-                    Ok(Some(s)) => QueryValue::String(s),
+            Err(_) => match row.try_get::<_, Option<String>>(idx) {
+                Ok(Some(s)) => QueryValue::String(s),
+                Ok(None) => QueryValue::Null,
+                Err(_) => match row.try_get::<_, Option<RawString>>(idx) {
+                    Ok(Some(s)) => QueryValue::String(s.0),
                     Ok(None) => QueryValue::Null,
-                    Err(_) => {
-                        match row.try_get::<_, Option<RawString>>(idx) {
-                            Ok(Some(s)) => QueryValue::String(s.0),
-                            Ok(None) => QueryValue::Null,
-                            Err(_) => {
-                                QueryValue::String(format!("<{}>", col_type.name()))
-                            }
-                        }
-                    }
-                }
-            }
+                    Err(_) => QueryValue::String(format!("<{}>", col_type.name())),
+                },
+            },
         }
     }
 

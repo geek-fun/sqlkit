@@ -2,11 +2,13 @@
 import type { DdlOptions } from '@/types/transfer'
 
 import { invoke } from '@tauri-apps/api/core'
+import { save } from '@tauri-apps/plugin-dialog'
 import { computed, ref, watch } from 'vue'
 
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { generateDdl as generateDdlApi } from '@/datasources/transferApi'
 
 import { ConnectionStatus, useConnectionStore } from '@/store/connectionStore'
 import ConnectionSelector from '../shared/ConnectionSelector.vue'
@@ -110,14 +112,14 @@ async function generateDdl() {
 
   loadingDdl.value = true
   try {
-    const result = await invoke<string>('generate_ddl', {
-      request: {
-        connectionId: connectionId.value,
-        database: database.value || null,
-        schema: schema.value || null,
-        objects: objects.value.filter(o => selectedObjects.value.includes(o.name)),
-        options: ddlOptions.value,
-      },
+    const result = await generateDdlApi({
+      connectionId: connectionId.value,
+      database: database.value || undefined,
+      schema: schema.value || undefined,
+      objects: objects.value
+        .filter(o => selectedObjects.value.includes(o.name))
+        .map(o => ({ name: o.name, objectType: 'table' as const, schema: schema.value || undefined })),
+      options: ddlOptions.value,
     })
     generatedDdl.value = result
   }
@@ -137,7 +139,7 @@ async function copyToClipboard() {
 // Save to file
 async function saveToFile() {
   try {
-    const path = await invoke<string>('save_file_dialog', {
+    const path = await save({
       defaultPath: 'ddl.sql',
       filters: [{ name: 'SQL', extensions: ['sql'] }],
     })

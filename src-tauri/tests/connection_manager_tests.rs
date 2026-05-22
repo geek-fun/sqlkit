@@ -348,8 +348,14 @@ async fn test_concurrent_connections() {
     assert_eq!(success_count, 5, "All 5 tasks should complete");
 
     let stats = manager.get_stats().await;
-    assert_eq!(stats.successful_acquisitions, 5, "All 5 acquisitions should succeed");
-    assert_eq!(stats.connection_requests, 5, "Should have 5 connection requests");
+    assert_eq!(
+        stats.successful_acquisitions, 5,
+        "All 5 acquisitions should succeed"
+    );
+    assert_eq!(
+        stats.connection_requests, 5,
+        "Should have 5 connection requests"
+    );
 }
 
 #[tokio::test]
@@ -364,7 +370,10 @@ async fn test_concurrent_isolation_no_interference() {
     }
 
     while let Some(result) = set.join_next().await {
-        assert!(result.unwrap().is_ok(), "Each concurrent connection should succeed");
+        assert!(
+            result.unwrap().is_ok(),
+            "Each concurrent connection should succeed"
+        );
     }
 
     let metadata = manager.get_all_metadata().await;

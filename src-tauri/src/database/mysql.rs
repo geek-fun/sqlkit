@@ -426,7 +426,10 @@ impl DatabaseAdapter for MySQLAdapter {
             .into_iter()
             .map(|row| {
                 let name: String = row.get(0).unwrap();
-                let is_system = matches!(name.as_str(), "mysql" | "information_schema" | "performance_schema" | "sys");
+                let is_system = matches!(
+                    name.as_str(),
+                    "mysql" | "information_schema" | "performance_schema" | "sys"
+                );
                 DatabaseSchema {
                     name,
                     description: None,
@@ -530,36 +533,19 @@ impl DatabaseAdapter for MySQLAdapter {
         let columns = rows
             .into_iter()
             .map(|row| {
-                let name: String = row.get_opt(0)
-                    .and_then(|r| r.ok())
-                    .unwrap_or_default();
-                let data_type: String = row.get_opt(1)
-                    .and_then(|r| r.ok())
-                    .unwrap_or_default();
-                let is_nullable: String = row.get_opt(2)
+                let name: String = row.get_opt(0).and_then(|r| r.ok()).unwrap_or_default();
+                let data_type: String = row.get_opt(1).and_then(|r| r.ok()).unwrap_or_default();
+                let is_nullable: String = row
+                    .get_opt(2)
                     .and_then(|r| r.ok())
                     .unwrap_or_else(|| "YES".to_string());
-                let default_value: Option<String> = row.get_opt(3)
-                    .and_then(|r| r.ok())
-                    .flatten();
-                let max_length: Option<u32> = row.get_opt(4)
-                    .and_then(|r| r.ok())
-                    .flatten();
-                let precision: Option<u32> = row.get_opt(5)
-                    .and_then(|r| r.ok())
-                    .flatten();
-                let scale: Option<u32> = row.get_opt(6)
-                    .and_then(|r| r.ok())
-                    .flatten();
-                let column_key: String = row.get_opt(7)
-                    .and_then(|r| r.ok())
-                    .unwrap_or_default();
-                let extra: String = row.get_opt(8)
-                    .and_then(|r| r.ok())
-                    .unwrap_or_default();
-                let description: Option<String> = row.get_opt(9)
-                    .and_then(|r| r.ok())
-                    .flatten();
+                let default_value: Option<String> = row.get_opt(3).and_then(|r| r.ok()).flatten();
+                let max_length: Option<u32> = row.get_opt(4).and_then(|r| r.ok()).flatten();
+                let precision: Option<u32> = row.get_opt(5).and_then(|r| r.ok()).flatten();
+                let scale: Option<u32> = row.get_opt(6).and_then(|r| r.ok()).flatten();
+                let column_key: String = row.get_opt(7).and_then(|r| r.ok()).unwrap_or_default();
+                let extra: String = row.get_opt(8).and_then(|r| r.ok()).unwrap_or_default();
+                let description: Option<String> = row.get_opt(9).and_then(|r| r.ok()).flatten();
 
                 let is_primary_key = column_key.to_uppercase().contains("PRI");
                 let is_auto_increment = extra.to_uppercase().contains("AUTO_INCREMENT");
@@ -796,7 +782,11 @@ mod tests {
 
         for (column_key, expected) in test_cases {
             let is_primary_key = column_key.to_uppercase().contains("PRI");
-            assert_eq!(is_primary_key, expected, "Failed for column_key='{}'", column_key);
+            assert_eq!(
+                is_primary_key, expected,
+                "Failed for column_key='{}'",
+                column_key
+            );
         }
     }
 }
