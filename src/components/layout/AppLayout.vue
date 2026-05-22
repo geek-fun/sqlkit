@@ -1,12 +1,16 @@
 <script setup lang="ts">
+import ActivityDrawer from '@/components/transfer/ActivityDrawer.vue'
 import AppSidebar from './AppSidebar.vue'
 </script>
 
 <template>
   <div class="flex h-screen">
     <AppSidebar />
-    <main class="flex-1 overflow-y-auto">
-      <slot />
-    </main>
+    <div class="flex-1 relative overflow-hidden">
+      <main class="h-full overflow-y-auto">
+        <slot />
+      </main>
+      <ActivityDrawer />
+    </div>
   </div>
 </template>
