@@ -204,7 +204,7 @@ async function executeQuery(details?: StatementToExecute) {
   }
 
   showResultPanel.value = true
-  await tabStore.executeQuery(activeTab.value.id, connId, sqlToExecute)
+  await tabStore.executeQuery(activeTab.value.id, sqlToExecute)
 }
 
 async function handleExplainQuery() {
@@ -216,7 +216,7 @@ function handleNewTab() {
   const db = connId
     ? (selectedDatabase.value || connectionStore.getCurrentDatabase(connId) || connectionStore.getConnectionById(connId)?.database || undefined)
     : undefined
-  tabStore.createTab(db, undefined, connId ?? undefined)
+  tabStore.createTab(connId ?? undefined, db)
 }
 
 function handleTabSelect(tabId: string) {
@@ -277,7 +277,7 @@ CREATE TABLE ${schemaPrefix}"${table.name}" (
 
   const connId = getActiveConnectionId()
   if (connId) {
-    const tab = tabStore.createTab(database, schema, connId)
+    const tab = tabStore.createTab(connId, database, schema)
     tabStore.updateTabContent(tab.id, script)
     tabStore.updateTabName(tab.id, `CREATE_${table.name}.sql`)
   }
@@ -289,11 +289,11 @@ function handleSelectTopN(table: TableInfo, database: string, schema?: string, n
 
   const connId = getActiveConnectionId()
   if (connId) {
-    const tab = tabStore.createTab(database, schema, connId)
+    const tab = tabStore.createTab(connId, database, schema)
     tabStore.updateTabContent(tab.id, query)
     tabStore.updateTabName(tab.id, `SELECT_${table.name}`)
 
-    tabStore.executeQuery(tab.id, connId)
+    tabStore.executeQuery(tab.id)
     showResultPanel.value = true
   }
 }
@@ -309,7 +309,7 @@ WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` :
 
   const connId = getActiveConnectionId()
   if (connId) {
-    const tab = tabStore.createTab(database, schema, connId)
+    const tab = tabStore.createTab(connId, database, schema)
     tabStore.updateTabContent(tab.id, query)
     tabStore.updateTabName(tab.id, `STRUCTURE_${table.name}`)
   }
@@ -323,7 +323,7 @@ function handleSelectTable(table: TableInfo, database: string, schema?: string) 
   const connId = getActiveConnectionId()
   if (!connId)
     return
-  tabStore.openTableViewTab(database, table.name, schema, connId)
+  tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
 async function handleOpenSavedQuery(filePath: string) {
@@ -338,7 +338,7 @@ async function handleOpenSavedQuery(filePath: string) {
     ? (selectedDatabase.value || connectionStore.getCurrentDatabase(connId) || connectionStore.getConnectionById(connId)?.database || undefined)
     : undefined
 
-  const tab = tabStore.createTab(db, undefined, connId ?? undefined)
+  const tab = tabStore.createTab(connId ?? undefined, db)
 
   try {
     const result = await loadQueryFile(filePath)
