@@ -1,6 +1,6 @@
+pub mod api_response;
 pub mod database;
 pub mod transfer;
-pub mod api_response;
 
 // Application state management
 pub mod state;
@@ -131,6 +131,11 @@ pub fn run() {
             commands::detect_file_format,
             commands::preview_import_data,
             commands::execute_import_data,
+            commands::preview_migration_data,
+            commands::execute_migration_data,
+            commands::auto_map_migration_columns,
+            commands::generate_ddl_for_objects,
+            commands::execute_sql_content,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

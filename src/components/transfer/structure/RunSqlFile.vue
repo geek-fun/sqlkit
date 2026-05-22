@@ -41,16 +41,11 @@ const fileSummary = computed(() => {
   return ''
 })
 
-// Handle file selection
+// Handle file selection - read content via FileReader (browser API)
 async function handleFileSelected(file: File) {
   try {
-    const path = await invoke<string>('save_temp_file', {
-      name: file.name,
-      content: await file.arrayBuffer(),
-    })
-    filePath.value = path
-    const content = await invoke<string>('read_text_file', { path })
-    fileContent.value = content
+    filePath.value = file.name
+    fileContent.value = await file.text()
   }
   catch (error) {
     console.error('Failed to read file:', error)
@@ -59,7 +54,7 @@ async function handleFileSelected(file: File) {
 
 // Execute SQL
 async function executeSql() {
-  if (!connectionId.value || !filePath.value || !isConnected.value)
+  if (!connectionId.value || !fileContent.value || !isConnected.value)
     return
 
   executing.value = true
@@ -75,10 +70,10 @@ async function executeSql() {
   result.value = null
 
   try {
-    const res = await invoke<TransferResult>('execute_sql_file', {
+    const res = await invoke<TransferResult>('execute_sql_content', {
       connectionId: connectionId.value,
       database: database.value || null,
-      filePath: filePath.value,
+      content: fileContent.value,
       onError: onError.value,
     })
     result.value = res
@@ -107,7 +102,7 @@ function reset() {
 }
 
 const canExecute = computed(() =>
-  connectionId.value !== '' && isConnected.value && filePath.value !== '',
+  connectionId.value !== '' && isConnected.value && fileContent.value !== '',
 )
 </script>
 

@@ -5,6 +5,8 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import ExportWizard from '@/components/transfer/export/ExportWizard.vue'
 import ImportWizard from '@/components/transfer/import/ImportWizard.vue'
+import MigrationWizard from '@/components/transfer/migration/MigrationWizard.vue'
+import StructureWizard from '@/components/transfer/structure/StructureWizard.vue'
 import TaskManagerButton from '@/components/transfer/tasks/TaskManagerButton.vue'
 import TaskManagerPanel from '@/components/transfer/tasks/TaskManagerPanel.vue'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -23,6 +25,8 @@ const activeTab = computed({
 const tabConfig = computed(() => [
   { value: 'export', label: t('transfer.tabs.export'), icon: 'i-carbon-document-export' },
   { value: 'import', label: t('transfer.tabs.import'), icon: 'i-carbon-document-import' },
+  { value: 'migration', label: t('transfer.tabs.migration'), icon: 'i-carbon-data-share' },
+  { value: 'structure', label: t('transfer.tabs.structure'), icon: 'i-carbon-schematics' },
 ])
 </script>
 
@@ -67,6 +71,8 @@ const tabConfig = computed(() => [
           <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border pr-2 flex flex-1 flex-col gap-3 overflow-y-auto">
             <ExportWizard v-if="activeTab === 'export'" />
             <ImportWizard v-if="activeTab === 'import'" />
+            <MigrationWizard v-if="activeTab === 'migration'" />
+            <StructureWizard v-if="activeTab === 'structure'" />
           </div>
         </div>
       </div>

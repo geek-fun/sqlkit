@@ -58,6 +58,8 @@ export const enUS = {
     tabs: {
       export: 'Export',
       import: 'Import',
+      migration: 'Migration',
+      structure: 'Structure',
     },
     export: {
       step: {
@@ -147,7 +149,7 @@ export const enUS = {
       errorHandling: 'Error Handling',
       onErrorStop: 'Stop on first error',
       onErrorSkip: 'Skip and continue',
-      onErrorRollback: 'Rollback transaction',
+      onErrorRollback: 'Rollback (best-effort; aborts on first error)',
       reset: 'Reset',
       execute: 'Execute',
     },
