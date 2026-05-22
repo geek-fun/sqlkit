@@ -4,9 +4,9 @@ use crate::transfer::{
     auto_map_columns, detect_file, execute_export, execute_import, execute_migration,
     generate_ddl_for_engine, load_profiles, preview_export, preview_import, preview_migration,
     save_profiles, DdlRequest, ExportFormat, ExportPreview, ExportRequest, ExportSource,
-    FileDetectionResult, ImportFormat, ImportRequest, JobProgress, MigrationPreview,
-    MigrationRequest, MigrationTablePlan, ObjectSelection, TransferError, TransferJob,
-    TransferJobStatus, TransferProfile, TransferProfileKind, TransferProgress, TransferResult,
+    FileDetectionResult, ImportFormat, ImportRequest, JobEventPayload, JobProgress,
+    MigrationPreview, MigrationRequest, MigrationTablePlan, ObjectSelection, TransferError,
+    TransferJob, TransferJobStatus, TransferProfile, TransferProfileKind, TransferResult,
     TransferScope,
 };
 use chrono::Utc;
@@ -14,8 +14,10 @@ use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 use tauri::{AppHandle, Emitter, State};
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 #[tauri::command]
@@ -565,82 +567,204 @@ fn export_extension(format: &ExportFormat) -> &'static str {
     }
 }
 
-fn calculate_percent(current: u64, total: u64) -> f32 {
-    if total == 0 {
-        0.0
+fn quote_ident_mysql(name: &str) -> Result<String, String> {
+    if name.contains('\0') {
+        return Err("Invalid identifier: contains null byte".to_string());
+    }
+    Ok(format!("`{}`", name.replace('`', "``")))
+}
+
+fn quote_ident_pg(name: &str) -> Result<String, String> {
+    if name.contains('\0') {
+        return Err("Invalid identifier: contains null byte".to_string());
+    }
+    Ok(format!("\"{}\"", name.replace('"', "\"\"")))
+}
+
+fn quote_ident_mssql(name: &str) -> Result<String, String> {
+    if name.contains('\0') {
+        return Err("Invalid identifier: contains null byte".to_string());
+    }
+    Ok(format!("[{}]", name.replace(']', "]]")))
+}
+
+fn normalize_schema(database: &str, schema: &str) -> Option<String> {
+    if schema == database || schema == "main" {
+        None
     } else {
-        (current as f32 / total as f32) * 100.0
+        Some(schema.to_string())
     }
 }
 
-fn collect_selected_tables(selection: &ObjectSelection) -> Vec<(String, Option<String>, String)> {
-    let mut seen: HashSet<(String, String, String)> = HashSet::new();
-
-    selection
-        .databases
-        .iter()
-        .flat_map(|db_name| {
-            let db_prefix = format!("{}.", db_name);
-            let db_prefix_for_filter = db_prefix.clone();
-            selection
-                .tables
-                .iter()
-                .filter(move |(key, _)| key.starts_with(&db_prefix_for_filter))
-                .flat_map(move |(key, tables)| {
-                    let schema = key.strip_prefix(&db_prefix).unwrap_or_default().to_string();
-                    tables.iter().map(move |table| {
-                        (
-                            db_name.clone(),
-                            if schema.is_empty() {
-                                None
-                            } else {
-                                Some(schema.clone())
-                            },
-                            table.clone(),
-                        )
-                    })
-                })
-        })
-        .filter(|(db, schema, table)| {
-            let schema_key = schema.clone().unwrap_or_default();
-            seen.insert((db.clone(), schema_key, table.clone()))
-        })
-        .collect()
+async fn get_connection(
+    connection_id: &str,
+    connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
+) -> Result<ActiveConnection, String> {
+    let guard = connections.lock().await;
+    guard
+        .get(connection_id)
+        .cloned()
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))
 }
 
-fn emit_job_progress(
-    app: &AppHandle,
-    job_id: &str,
-    payload: JobProgressPayload,
-) -> Result<(), String> {
-    let progress = TransferProgress {
-        operation: "transfer".to_string(),
-        phase: payload.stage,
-        current_table: None,
-        total_rows: Some(payload.total),
-        processed_rows: payload.current,
-        skipped_rows: 0,
-        error_count: payload.error_count,
-        percent: calculate_percent(payload.current, payload.total),
-        elapsed_ms: payload.elapsed_ms,
-        estimated_remaining_ms: payload.eta_ms,
-        message: payload.message,
+async fn list_schemas_for_database(
+    connection_id: &str,
+    database: &str,
+    connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
+) -> Result<Vec<String>, String> {
+    let connection = get_connection(connection_id, connections).await?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_schemas(Some(database))
+                .await
+                .map_err(|e| e.to_string())
+        }
+        ActiveConnection::MySQL(_) => Ok(vec![database.to_string()]),
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_schemas(Some(database))
+                .await
+                .map_err(|e| e.to_string())
+        }
+        ActiveConnection::SQLite(_) => Ok(vec!["main".to_string()]),
+    }
+}
+
+async fn list_table_names(
+    connection_id: &str,
+    database: &str,
+    schema: Option<&str>,
+    connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
+) -> Result<Vec<String>, String> {
+    let connection = get_connection(connection_id, connections).await?;
+
+    let tables = match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(Some(database), schema)
+                .await
+                .map_err(|e| e.to_string())?
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(Some(database), schema)
+                .await
+                .map_err(|e| e.to_string())?
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(Some(database), schema)
+                .await
+                .map_err(|e| e.to_string())?
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(None, None)
+                .await
+                .map_err(|e| e.to_string())?
+        }
     };
 
-    app.emit_to("main", &format!("transfer://progress/{}", job_id), progress)
-        .map_err(|e| e.to_string())
+    Ok(tables.into_iter().map(|table| table.name).collect())
 }
 
-type JobProgressPayload = JobProgressData;
+async fn expand_selection(
+    connection_id: &str,
+    selection: &ObjectSelection,
+    connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
+) -> Result<Vec<(String, Option<String>, String)>, String> {
+    let mut seen: HashSet<(String, String, String)> = HashSet::new();
+    let mut expanded: Vec<(String, Option<String>, String)> = Vec::new();
 
-struct JobProgressData {
-    stage: String,
+    if !selection.tables.is_empty() {
+        selection.tables.iter().for_each(|(key, tables)| {
+            let (database, schema) = key
+                .split_once('.')
+                .map(|(db, sch)| (db.to_string(), Some(sch.to_string())))
+                .unwrap_or_else(|| (key.clone(), None));
+
+            tables.iter().for_each(|table| {
+                let schema_key = schema.clone().unwrap_or_default();
+                if seen.insert((database.clone(), schema_key, table.clone())) {
+                    expanded.push((database.clone(), schema.clone(), table.clone()));
+                }
+            });
+        });
+
+        return Ok(expanded);
+    }
+
+    let mut databases_to_expand = selection.databases.clone();
+    if databases_to_expand.is_empty() && !selection.schemas.is_empty() {
+        databases_to_expand = selection.schemas.keys().cloned().collect();
+    }
+
+    for database in databases_to_expand {
+        let explicit_schemas = selection
+            .schemas
+            .get(&database)
+            .cloned()
+            .unwrap_or_default();
+        let schemas = if explicit_schemas.is_empty() {
+            list_schemas_for_database(connection_id, &database, connections).await?
+        } else {
+            explicit_schemas
+        };
+
+        for schema_name in schemas {
+            let tables = list_table_names(
+                connection_id,
+                &database,
+                Some(schema_name.as_str()),
+                connections,
+            )
+            .await?;
+
+            for table in tables {
+                let normalized_schema = normalize_schema(&database, &schema_name);
+                let schema_key = normalized_schema.clone().unwrap_or_default();
+                if seen.insert((database.clone(), schema_key, table.clone())) {
+                    expanded.push((database.clone(), normalized_schema, table));
+                }
+            }
+        }
+    }
+
+    Ok(expanded)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn emit_job_event(
+    app: &AppHandle,
+    job_id: &str,
+    status: TransferJobStatus,
+    stage: &str,
     current: u64,
     total: u64,
-    elapsed_ms: u64,
-    error_count: u64,
     eta_ms: Option<u64>,
-    message: Option<String>,
+    error: Option<String>,
+) -> Result<(), String> {
+    let payload = JobEventPayload {
+        status,
+        progress: JobProgress {
+            stage: stage.to_string(),
+            current,
+            total,
+            eta_ms,
+        },
+        error,
+    };
+
+    app.emit_to("main", &format!("transfer://progress/{}", job_id), payload)
+        .map_err(|e| e.to_string())
 }
 
 async fn list_columns_for_table(
@@ -648,12 +772,9 @@ async fn list_columns_for_table(
     database: &str,
     schema: Option<&str>,
     table: &str,
-    state: &State<'_, AppState>,
+    connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
 ) -> Result<Vec<String>, String> {
-    let connections = state.connections.lock().await;
-    let connection = connections
-        .get(connection_id)
-        .ok_or_else(|| "No active connection found".to_string())?;
+    let connection = get_connection(connection_id, connections).await?;
 
     let columns = match connection {
         ActiveConnection::Postgres(adapter) => {
@@ -718,12 +839,9 @@ async fn list_columns_for_table(
 async fn execute_export_request(
     request: ExportRequest,
     app: &AppHandle,
-    state: &State<'_, AppState>,
+    connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.lock().await;
-    let connection = connections
-        .get(&request.connection_id)
-        .ok_or_else(|| "No active connection found".to_string())?;
+    let connection = get_connection(&request.connection_id, connections).await?;
 
     match connection {
         ActiveConnection::Postgres(adapter) => {
@@ -778,20 +896,19 @@ async fn execute_import_request(
 async fn ensure_target_database(
     target_connection_id: &str,
     database_name: &str,
-    state: &State<'_, AppState>,
+    connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
 ) -> Result<(), String> {
-    let connections = state.connections.lock().await;
-    let connection = connections
-        .get(target_connection_id)
-        .ok_or_else(|| "No target connection found".to_string())?;
+    let connection = get_connection(target_connection_id, connections)
+        .await
+        .map_err(|_| "No target connection found".to_string())?;
 
     match connection {
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .execute_query(&format!(
-                    "CREATE DATABASE IF NOT EXISTS `{}`",
-                    database_name
+                    "CREATE DATABASE IF NOT EXISTS {}",
+                    quote_ident_mysql(database_name)?
                 ))
                 .await
                 .map_err(|e| e.to_string())?;
@@ -807,7 +924,29 @@ async fn ensure_target_database(
                 .any(|db| db.name == database_name);
             if !exists {
                 adapter
-                    .execute_query(&format!("CREATE DATABASE \"{}\"", database_name))
+                    .execute_query(&format!(
+                        "CREATE DATABASE {}",
+                        quote_ident_pg(database_name)?
+                    ))
+                    .await
+                    .map_err(|e| e.to_string())?;
+            }
+            Ok(())
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            let exists = adapter
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?
+                .iter()
+                .any(|db| db.name == database_name);
+            if !exists {
+                adapter
+                    .execute_query(&format!(
+                        "CREATE DATABASE {}",
+                        quote_ident_mssql(database_name)?
+                    ))
                     .await
                     .map_err(|e| e.to_string())?;
             }
@@ -820,17 +959,15 @@ async fn ensure_target_database(
 async fn execute_migration_request(
     request: MigrationRequest,
     app: &AppHandle,
-    state: &State<'_, AppState>,
+    connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.lock().await;
+    let source_connection = get_connection(&request.source_connection_id, connections)
+        .await
+        .map_err(|_| "No source connection found".to_string())?;
 
-    let source_connection = connections
-        .get(&request.source_connection_id)
-        .ok_or_else(|| "No source connection found".to_string())?;
-
-    let target_connection = connections
-        .get(&request.target_connection_id)
-        .ok_or_else(|| "No target connection found".to_string())?;
+    let target_connection = get_connection(&request.target_connection_id, connections)
+        .await
+        .map_err(|_| "No target connection found".to_string())?;
 
     macro_rules! run_migration {
         ($source_adapter:expr, $target_adapter:expr) => {
@@ -838,7 +975,7 @@ async fn execute_migration_request(
         };
     }
 
-    match (source_connection, target_connection) {
+    match (&source_connection, &target_connection) {
         (ActiveConnection::Postgres(src), ActiveConnection::Postgres(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
@@ -1047,180 +1184,224 @@ pub async fn backup_server(
 ) -> Result<String, String> {
     let _ = &options;
     let job_id = Uuid::new_v4().to_string();
-    let started_at = Instant::now();
-    let selected_tables = collect_selected_tables(&selection);
+    let connections = state.connections.clone();
+    let selected_tables = expand_selection(&connection_id, &selection, &connections).await?;
     let total_tables = selected_tables.len() as u64;
 
     if total_tables == 0 {
         return Err("No tables selected for server backup".to_string());
     }
 
-    emit_job_progress(
+    emit_job_event(
         &app,
         &job_id,
-        JobProgressPayload {
-            stage: "preparing".to_string(),
-            current: 0,
-            total: total_tables,
-            elapsed_ms: 0,
-            error_count: 0,
-            eta_ms: None,
-            message: Some("Starting server backup".to_string()),
-        },
+        TransferJobStatus::Queued,
+        "preparing",
+        0,
+        total_tables,
+        None,
+        None,
     )?;
 
-    let mut outcomes: Vec<(String, Result<(), String>)> = Vec::new();
-    let mut succeeded_tables = 0u64;
+    let app_clone = app.clone();
+    let job_id_clone = job_id.clone();
+    let connection_id_clone = connection_id.clone();
+    let format_clone = format.clone();
+    let destination_clone = destination.clone();
+    let connections_clone = connections.clone();
 
-    for (index, (database, schema, table)) in selected_tables.iter().enumerate() {
-        let db_output_dir = PathBuf::from(&destination).join(database);
-        fs::create_dir_all(&db_output_dir)
-            .map_err(|e| format!("Failed to create backup directory: {}", e))?;
+    tokio::spawn(async move {
+        let started_at = Instant::now();
+        let outcome: Result<(TransferJobStatus, Option<String>), String> = async {
+            let mut outcomes: Vec<(String, Result<(), String>)> = Vec::new();
+            let mut succeeded_tables = 0u64;
 
-        let output_path = db_output_dir.join(format!("{}.{}", table, export_extension(&format)));
-        let columns = match list_columns_for_table(
-            &connection_id,
-            database,
-            schema.as_deref(),
-            table,
-            &state,
-        )
-        .await
-        {
-            Ok(columns) => columns,
-            Err(error) => {
-                outcomes.push((
-                    format!(
-                        "{}.{}.{}",
-                        database,
-                        schema.clone().unwrap_or_else(|| "default".to_string()),
-                        table
-                    ),
-                    Err(error),
-                ));
+            for (index, (database, schema, table)) in selected_tables.iter().enumerate() {
+                let db_output_dir = PathBuf::from(&destination_clone).join(database);
+                if let Err(error) = fs::create_dir_all(&db_output_dir)
+                    .map_err(|e| format!("Failed to create backup directory: {}", e))
+                {
+                    outcomes.push((
+                        format!(
+                            "{}.{}.{}",
+                            database,
+                            schema.clone().unwrap_or_else(|| "default".to_string()),
+                            table
+                        ),
+                        Err(error),
+                    ));
+                    let _ = emit_job_event(
+                        &app_clone,
+                        &job_id_clone,
+                        TransferJobStatus::Running,
+                        "processing",
+                        index as u64 + 1,
+                        total_tables,
+                        None,
+                        None,
+                    );
+                    continue;
+                }
 
-                let error_count = outcomes
-                    .iter()
-                    .filter(|(_, result)| result.is_err())
-                    .count() as u64;
+                let output_path =
+                    db_output_dir.join(format!("{}.{}", table, export_extension(&format_clone)));
+                let columns = match list_columns_for_table(
+                    &connection_id_clone,
+                    database,
+                    schema.as_deref(),
+                    table,
+                    &connections_clone,
+                )
+                .await
+                {
+                    Ok(columns) => columns,
+                    Err(error) => {
+                        outcomes.push((
+                            format!(
+                                "{}.{}.{}",
+                                database,
+                                schema.clone().unwrap_or_else(|| "default".to_string()),
+                                table
+                            ),
+                            Err(error),
+                        ));
+                        let _ = emit_job_event(
+                            &app_clone,
+                            &job_id_clone,
+                            TransferJobStatus::Running,
+                            "processing",
+                            index as u64 + 1,
+                            total_tables,
+                            None,
+                            None,
+                        );
+                        continue;
+                    }
+                };
 
-                emit_job_progress(
-                    &app,
-                    &job_id,
-                    JobProgressPayload {
-                        stage: "processing".to_string(),
-                        current: index as u64 + 1,
-                        total: total_tables,
-                        elapsed_ms: started_at.elapsed().as_millis() as u64,
-                        error_count,
-                        eta_ms: None,
-                        message: Some("Failed to load table columns, continuing".to_string()),
+                let request = ExportRequest {
+                    connection_id: connection_id_clone.clone(),
+                    database: Some(database.clone()),
+                    schema: schema.clone(),
+                    source: ExportSource {
+                        table: table.clone(),
+                        columns,
+                        where_clause: None,
+                        order_by: None,
+                        limit: None,
                     },
-                )?;
-                continue;
+                    format: format_clone.clone(),
+                    csv_options: None,
+                    jsonl_options: None,
+                    sql_options: None,
+                    excel_options: None,
+                    output_path: output_path.to_string_lossy().to_string(),
+                };
+
+                let export_result =
+                    execute_export_request(request, &app_clone, &connections_clone).await;
+                let table_label = format!(
+                    "{}.{}.{}",
+                    database,
+                    schema.clone().unwrap_or_else(|| "default".to_string()),
+                    table
+                );
+
+                match export_result {
+                    Ok(result) if result.success => {
+                        outcomes.push((table_label, Ok(())));
+                        succeeded_tables += 1;
+                    }
+                    Ok(result) => {
+                        let first_error = result
+                            .errors
+                            .first()
+                            .map(|error| error.message.clone())
+                            .unwrap_or_else(|| "Export failed".to_string());
+                        outcomes.push((table_label, Err(first_error)));
+                    }
+                    Err(error) => {
+                        outcomes.push((table_label, Err(error)));
+                    }
+                }
+
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    TransferJobStatus::Running,
+                    "processing",
+                    index as u64 + 1,
+                    total_tables,
+                    None,
+                    None,
+                );
             }
-        };
 
-        let request = ExportRequest {
-            connection_id: connection_id.clone(),
-            database: Some(database.clone()),
-            schema: schema.clone(),
-            source: ExportSource {
-                table: table.clone(),
-                columns,
-                where_clause: None,
-                order_by: None,
-                limit: None,
-            },
-            format: format.clone(),
-            csv_options: None,
-            jsonl_options: None,
-            sql_options: None,
-            excel_options: None,
-            output_path: output_path.to_string_lossy().to_string(),
-        };
+            let failed_tables = outcomes
+                .iter()
+                .filter_map(|(name, result)| result.as_ref().err().map(|_| name.clone()))
+                .collect::<Vec<_>>();
 
-        let export_result = execute_export_request(request, &app, &state).await;
-        let table_label = format!(
-            "{}.{}.{}",
-            database,
-            schema.clone().unwrap_or_else(|| "default".to_string()),
-            table
-        );
+            let status_text = if succeeded_tables > 0 {
+                "completed"
+            } else {
+                "failed"
+            };
 
-        match export_result {
-            Ok(result) if result.success => {
-                outcomes.push((table_label, Ok(())));
-                succeeded_tables += 1;
+            let summary = format!(
+                "Backup {}: {} succeeded, {} failed{}",
+                status_text,
+                succeeded_tables,
+                failed_tables.len(),
+                if failed_tables.is_empty() {
+                    String::new()
+                } else {
+                    format!(" [{}]", failed_tables.join(", "))
+                }
+            );
+
+            if succeeded_tables > 0 {
+                Ok((TransferJobStatus::Completed, None))
+            } else {
+                Ok((TransferJobStatus::Failed, Some(summary)))
             }
-            Ok(result) => {
-                let first_error = result
-                    .errors
-                    .first()
-                    .map(|error| error.message.clone())
-                    .unwrap_or_else(|| "Export failed".to_string());
-                outcomes.push((table_label, Err(first_error)));
+        }
+        .await;
+
+        match outcome {
+            Ok((status, error)) => {
+                let stage = if status == TransferJobStatus::Completed {
+                    "completed"
+                } else {
+                    "failed"
+                };
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    status,
+                    stage,
+                    total_tables,
+                    total_tables,
+                    None,
+                    error,
+                );
             }
             Err(error) => {
-                outcomes.push((table_label, Err(error)));
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    TransferJobStatus::Failed,
+                    "failed",
+                    0,
+                    total_tables,
+                    None,
+                    Some(error),
+                );
             }
         }
 
-        let error_count = outcomes
-            .iter()
-            .filter(|(_, result)| result.is_err())
-            .count() as u64;
-
-        emit_job_progress(
-            &app,
-            &job_id,
-            JobProgressPayload {
-                stage: "processing".to_string(),
-                current: index as u64 + 1,
-                total: total_tables,
-                elapsed_ms: started_at.elapsed().as_millis() as u64,
-                error_count,
-                eta_ms: None,
-                message: None,
-            },
-        )?;
-    }
-
-    let failed_tables = outcomes
-        .iter()
-        .filter_map(|(name, result)| result.as_ref().err().map(|_| name.clone()))
-        .collect::<Vec<_>>();
-
-    let status_text = if succeeded_tables > 0 {
-        "completed"
-    } else {
-        "failed"
-    };
-    let summary = format!(
-        "Backup {}: {} succeeded, {} failed{}",
-        status_text,
-        succeeded_tables,
-        failed_tables.len(),
-        if failed_tables.is_empty() {
-            String::new()
-        } else {
-            format!(" [{}]", failed_tables.join(", "))
-        }
-    );
-
-    emit_job_progress(
-        &app,
-        &job_id,
-        JobProgressPayload {
-            stage: status_text.to_string(),
-            current: total_tables,
-            total: total_tables,
-            elapsed_ms: started_at.elapsed().as_millis() as u64,
-            error_count: failed_tables.len() as u64,
-            eta_ms: None,
-            message: Some(summary),
-        },
-    )?;
+        let _ = started_at;
+    });
 
     Ok(job_id)
 }
@@ -1235,26 +1416,23 @@ pub async fn migrate_server(
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let job_id = Uuid::new_v4().to_string();
-    let started_at = Instant::now();
-    let selected_tables = collect_selected_tables(&selection);
+    let connections = state.connections.clone();
+    let selected_tables = expand_selection(&source_connection_id, &selection, &connections).await?;
     let total_tables = selected_tables.len() as u64;
 
     if total_tables == 0 {
         return Err("No tables selected for server migration".to_string());
     }
 
-    emit_job_progress(
+    emit_job_event(
         &app,
         &job_id,
-        JobProgressPayload {
-            stage: "preparing".to_string(),
-            current: 0,
-            total: total_tables,
-            elapsed_ms: 0,
-            error_count: 0,
-            eta_ms: None,
-            message: Some("Starting server migration".to_string()),
-        },
+        TransferJobStatus::Queued,
+        "preparing",
+        0,
+        total_tables,
+        None,
+        None,
     )?;
 
     let grouped = selected_tables.into_iter().fold(
@@ -1265,141 +1443,237 @@ pub async fn migrate_server(
         },
     );
 
-    let mut outcomes: Vec<(String, Result<(), String>)> = Vec::new();
-    let mut migrated_tables = 0u64;
-    let mut processed_tables = 0u64;
+    let app_clone = app.clone();
+    let job_id_clone = job_id.clone();
+    let source_connection_id_clone = source_connection_id.clone();
+    let target_connection_id_clone = target_connection_id.clone();
+    let options_clone = options.clone();
+    let connections_clone = connections.clone();
 
-    for ((database, schema), tables) in grouped {
-        ensure_target_database(&target_connection_id, &database, &state).await?;
+    tokio::spawn(async move {
+        let outcome: Result<(TransferJobStatus, Option<String>), String> = async {
+            let mut outcomes: Vec<(String, Result<(), String>)> = Vec::new();
+            let mut migrated_rows = 0u64;
+            let mut processed_tables = 0u64;
+            let mut succeeded_groups = 0u64;
 
-        let mappings = tables
-            .iter()
-            .map(|table| async {
-                let columns = list_columns_for_table(
-                    &source_connection_id,
+            for ((database, schema), tables) in grouped {
+                let group_label = format!(
+                    "{}.{}",
+                    database,
+                    schema.clone().unwrap_or_else(|| "default".to_string())
+                );
+
+                match ensure_target_database(
+                    &target_connection_id_clone,
                     &database,
-                    schema.as_deref(),
-                    table,
-                    &state,
+                    &connections_clone,
                 )
-                .await?;
+                .await
+                {
+                    Ok(_) => {}
+                    Err(error) => {
+                        outcomes.push((group_label, Err(error)));
+                        processed_tables += tables.len() as u64;
+                        let _ = emit_job_event(
+                            &app_clone,
+                            &job_id_clone,
+                            TransferJobStatus::Running,
+                            "processing",
+                            processed_tables,
+                            total_tables,
+                            None,
+                            None,
+                        );
+                        continue;
+                    }
+                }
 
-                let mapping = columns
-                    .into_iter()
-                    .map(|column| crate::transfer::MigrationMapping {
-                        source_column: column.clone(),
-                        source_type: "text".to_string(),
-                        target_column: column,
-                        target_type: "text".to_string(),
-                        conversion: crate::transfer::MigrationConversion::Direct,
-                    })
-                    .collect::<Vec<_>>();
+                let mut mapping_results: HashMap<String, Vec<crate::transfer::MigrationMapping>> =
+                    HashMap::new();
+                let mut group_mapping_error: Option<String> = None;
 
-                Ok::<(String, Vec<crate::transfer::MigrationMapping>), String>((
-                    table.clone(),
-                    mapping,
-                ))
-            })
-            .collect::<Vec<_>>();
+                for table in &tables {
+                    match list_columns_for_table(
+                        &source_connection_id_clone,
+                        &database,
+                        schema.as_deref(),
+                        table,
+                        &connections_clone,
+                    )
+                    .await
+                    {
+                        Ok(columns) => {
+                            let mapping = columns
+                                .into_iter()
+                                .map(|column| crate::transfer::MigrationMapping {
+                                    source_column: column.clone(),
+                                    source_type: "text".to_string(),
+                                    target_column: column,
+                                    target_type: "text".to_string(),
+                                    conversion: crate::transfer::MigrationConversion::Direct,
+                                })
+                                .collect::<Vec<_>>();
+                            mapping_results.insert(table.clone(), mapping);
+                        }
+                        Err(error) => {
+                            outcomes.push((
+                                format!(
+                                    "{}.{}.{}",
+                                    database,
+                                    schema.clone().unwrap_or_else(|| "default".to_string()),
+                                    table
+                                ),
+                                Err(error.clone()),
+                            ));
+                            group_mapping_error = Some(error);
+                            break;
+                        }
+                    }
+                }
 
-        let mut mapping_results: HashMap<String, Vec<crate::transfer::MigrationMapping>> =
-            HashMap::new();
+                if mapping_results.is_empty() {
+                    outcomes.push((
+                        group_label,
+                        Err(group_mapping_error
+                            .unwrap_or_else(|| "All table mappings failed".to_string())),
+                    ));
+                    processed_tables += tables.len() as u64;
+                    let _ = emit_job_event(
+                        &app_clone,
+                        &job_id_clone,
+                        TransferJobStatus::Running,
+                        "processing",
+                        processed_tables,
+                        total_tables,
+                        None,
+                        None,
+                    );
+                    continue;
+                }
 
-        for mapping_result in mappings {
-            let (table_name, table_mapping) = mapping_result.await?;
-            mapping_results.insert(table_name, table_mapping);
-        }
+                if let Some(error) = group_mapping_error {
+                    outcomes.push((group_label, Err(error)));
+                    processed_tables += tables.len() as u64;
+                    let _ = emit_job_event(
+                        &app_clone,
+                        &job_id_clone,
+                        TransferJobStatus::Running,
+                        "processing",
+                        processed_tables,
+                        total_tables,
+                        None,
+                        None,
+                    );
+                    continue;
+                }
 
-        let request = build_migration_request(
-            source_connection_id.clone(),
-            target_connection_id.clone(),
-            database.clone(),
-            schema.clone(),
-            tables.clone(),
-            mapping_results,
-            &options,
-        );
+                let request = build_migration_request(
+                    source_connection_id_clone.clone(),
+                    target_connection_id_clone.clone(),
+                    database.clone(),
+                    schema.clone(),
+                    tables.clone(),
+                    mapping_results,
+                    &options_clone,
+                );
 
-        let migration_result = execute_migration_request(request, &app, &state).await;
-        let group_label = format!(
-            "{}.{}",
-            database,
-            schema.clone().unwrap_or_else(|| "default".to_string())
-        );
+                let migration_result =
+                    execute_migration_request(request, &app_clone, &connections_clone).await;
 
-        match migration_result {
-            Ok(result) if result.success => {
-                outcomes.push((group_label, Ok(())));
-                migrated_tables += result.processed_rows;
+                match migration_result {
+                    Ok(result) if result.success => {
+                        outcomes.push((group_label, Ok(())));
+                        migrated_rows += result.processed_rows;
+                        succeeded_groups += 1;
+                    }
+                    Ok(result) => {
+                        let first_error = result
+                            .errors
+                            .first()
+                            .map(|error| error.message.clone())
+                            .unwrap_or_else(|| "Migration failed".to_string());
+                        outcomes.push((group_label, Err(first_error)));
+                    }
+                    Err(error) => {
+                        outcomes.push((group_label, Err(error)));
+                    }
+                }
+
+                processed_tables += tables.len() as u64;
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    TransferJobStatus::Running,
+                    "processing",
+                    processed_tables,
+                    total_tables,
+                    None,
+                    None,
+                );
             }
-            Ok(result) => {
-                let first_error = result
-                    .errors
-                    .first()
-                    .map(|error| error.message.clone())
-                    .unwrap_or_else(|| "Migration failed".to_string());
-                outcomes.push((group_label, Err(first_error)));
-            }
-            Err(error) => {
-                outcomes.push((group_label, Err(error)));
-            }
-        }
 
-        processed_tables += tables.len() as u64;
-        let error_count = outcomes
-            .iter()
-            .filter(|(_, result)| result.is_err())
-            .count() as u64;
+            let failed_groups = outcomes
+                .iter()
+                .filter_map(|(name, result)| result.as_ref().err().map(|_| name.clone()))
+                .collect::<Vec<_>>();
 
-        emit_job_progress(
-            &app,
-            &job_id,
-            JobProgressPayload {
-                stage: "processing".to_string(),
-                current: processed_tables,
-                total: total_tables,
-                elapsed_ms: started_at.elapsed().as_millis() as u64,
-                error_count,
-                eta_ms: None,
-                message: None,
-            },
-        )?;
-    }
-
-    let failed_groups = outcomes
-        .iter()
-        .filter_map(|(name, result)| result.as_ref().err().map(|_| name.clone()))
-        .collect::<Vec<_>>();
-
-    let status_text = if migrated_tables > 0 {
-        "completed"
-    } else {
-        "failed"
-    };
-
-    emit_job_progress(
-        &app,
-        &job_id,
-        JobProgressPayload {
-            stage: status_text.to_string(),
-            current: total_tables,
-            total: total_tables,
-            elapsed_ms: started_at.elapsed().as_millis() as u64,
-            error_count: failed_groups.len() as u64,
-            eta_ms: None,
-            message: Some(format!(
+            let summary = format!(
                 "Migration {}: {} rows migrated, {} groups failed{}",
-                status_text,
-                migrated_tables,
+                if succeeded_groups > 0 {
+                    "completed"
+                } else {
+                    "failed"
+                },
+                migrated_rows,
                 failed_groups.len(),
                 if failed_groups.is_empty() {
                     String::new()
                 } else {
                     format!(" [{}]", failed_groups.join(", "))
                 }
-            )),
-        },
-    )?;
+            );
+
+            if succeeded_groups > 0 {
+                Ok((TransferJobStatus::Completed, None))
+            } else {
+                Ok((TransferJobStatus::Failed, Some(summary)))
+            }
+        }
+        .await;
+
+        match outcome {
+            Ok((status, error)) => {
+                let stage = if status == TransferJobStatus::Completed {
+                    "completed"
+                } else {
+                    "failed"
+                };
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    status,
+                    stage,
+                    total_tables,
+                    total_tables,
+                    None,
+                    error,
+                );
+            }
+            Err(error) => {
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    TransferJobStatus::Failed,
+                    "failed",
+                    0,
+                    total_tables,
+                    None,
+                    Some(error),
+                );
+            }
+        }
+    });
 
     Ok(job_id)
 }
@@ -1485,7 +1759,9 @@ pub async fn run_transfer_profile(
         (TransferProfileKind::Export, TransferScope::Server)
         | (TransferProfileKind::Export, TransferScope::Database)
         | (TransferProfileKind::Export, TransferScope::Table) => {
-            let selected_tables = collect_selected_tables(&profile.selection);
+            let connections = state.connections.clone();
+            let selected_tables =
+                expand_selection(&profile.connection_id, &profile.selection, &connections).await?;
             let (database, schema, table) = selected_tables
                 .first()
                 .cloned()
@@ -1503,7 +1779,7 @@ pub async fn run_transfer_profile(
                 &database,
                 schema.as_deref(),
                 &table,
-                &state,
+                &connections,
             )
             .await?;
 
@@ -1528,7 +1804,7 @@ pub async fn run_transfer_profile(
                 output_path: output_path.to_string_lossy().to_string(),
             };
 
-            execute_export_request(request, &app, &state).await?;
+            execute_export_request(request, &app, &connections).await?;
             Ok(Uuid::new_v4().to_string())
         }
         (TransferProfileKind::Import, TransferScope::Server)
@@ -1540,7 +1816,10 @@ pub async fn run_transfer_profile(
             request.connection_id = profile.connection_id;
 
             if request.table.trim().is_empty() {
-                let selected_tables = collect_selected_tables(&profile.selection);
+                let connections = state.connections.clone();
+                let selected_tables =
+                    expand_selection(&request.connection_id, &profile.selection, &connections)
+                        .await?;
                 let (database, schema, table) = selected_tables
                     .first()
                     .cloned()
@@ -1553,5 +1832,44 @@ pub async fn run_transfer_profile(
             execute_import_request(request, &app, &state).await?;
             Ok(Uuid::new_v4().to_string())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{quote_ident_mysql, quote_ident_pg};
+
+    #[test]
+    fn quote_ident_mysql_quotes_simple_name() {
+        assert_eq!(quote_ident_mysql("foo").unwrap_or_default(), "`foo`");
+    }
+
+    #[test]
+    fn quote_ident_mysql_escapes_backticks() {
+        assert_eq!(
+            quote_ident_mysql("foo`bar").unwrap_or_default(),
+            "`foo``bar`"
+        );
+    }
+
+    #[test]
+    fn quote_ident_pg_escapes_quotes() {
+        assert_eq!(
+            quote_ident_pg("foo\"bar").unwrap_or_default(),
+            "\"foo\"\"bar\""
+        );
+    }
+
+    #[test]
+    fn quote_ident_mysql_rejects_null_byte() {
+        assert!(quote_ident_mysql("foo\0bar").is_err());
+    }
+
+    #[test]
+    fn quote_ident_pg_prevents_injection_escape() {
+        assert_eq!(
+            quote_ident_pg("a; DROP TABLE x;--").unwrap_or_default(),
+            "\"a; DROP TABLE x;--\""
+        );
     }
 }

@@ -506,6 +506,15 @@ pub struct JobProgress {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct JobEventPayload {
+    pub status: TransferJobStatus,
+    pub progress: JobProgress,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TransferJob {
     pub id: String,
     pub name: String,
