@@ -106,7 +106,7 @@ async function handleRerun(entry: HistoryEntry) {
     return
   }
   const database = entry.database
-  const tab = tabStore.createTab(database, undefined, connectionId)
+  const tab = tabStore.createTab(connectionId, database)
   tabStore.updateTabContent(tab.id, entry.sql)
   const createdTab = tabStore.tabs.find(t => t.id === tab.id)
   if (createdTab)

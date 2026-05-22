@@ -75,7 +75,7 @@ export const useTabStore = defineStore('tabs', {
   },
 
   actions: {
-    createTab(database?: string, schema?: string, connectionId?: string): QueryTab {
+    createTab(connectionId?: string, database?: string, schema?: string): QueryTab {
       const tab: QueryTab = {
         id: generateId(),
         name: `Query ${this.tabs.length + 1}`,
@@ -91,7 +91,7 @@ export const useTabStore = defineStore('tabs', {
       return tab
     },
 
-    openTableViewTab(database: string, tableName: string, schema?: string, connectionId?: string): QueryTab {
+    openTableViewTab(connectionId: string, database: string, tableName: string, schema?: string): QueryTab {
       const existing = this.tabs.find(
         t => t.tableView
           && t.tableView.tableName === tableName
@@ -136,6 +136,14 @@ export const useTabStore = defineStore('tabs', {
     closeAllTabs() {
       this.tabs = []
       this.activeTabId = null
+    },
+
+    closeTabsForConnection(connectionId: string) {
+      const remaining = this.tabs.filter(t => t.connectionId !== connectionId)
+      this.tabs = remaining
+      if (this.activeTabId && !remaining.find(t => t.id === this.activeTabId)) {
+        this.activeTabId = remaining[0]?.id ?? null
+      }
     },
 
     closeNonOrphanTabs() {
@@ -233,7 +241,7 @@ export const useTabStore = defineStore('tabs', {
       }
     },
 
-    async executeQuery(tabId: string, activeConnectionId: string, sqlToExecute?: string) {
+    async executeQuery(tabId: string, sqlToExecute?: string) {
       const tab = this.tabs.find(t => t.id === tabId)
       if (!tab || tab.orphanFromConnectionId) {
         return
@@ -242,6 +250,11 @@ export const useTabStore = defineStore('tabs', {
       const sql = sqlToExecute !== undefined ? sqlToExecute : tab.content
 
       if (typeof sql !== 'string' || sql.trim() === '') {
+        return
+      }
+
+      const activeConnectionId = tab.connectionId
+      if (!activeConnectionId) {
         return
       }
 
