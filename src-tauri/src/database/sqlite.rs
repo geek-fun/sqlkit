@@ -442,6 +442,43 @@ impl DatabaseAdapter for SQLiteAdapter {
         self.execute_query_internal(query).await
     }
 
+    async fn execute_batch_with_params(
+        &self,
+        statement: &str,
+        column_count: usize,
+        values: Vec<Vec<String>>,
+    ) -> DbResult<u64> {
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let conn = pool.get_conn().await?;
+        let conn_guard = conn
+            .lock()
+            .map_err(|e| DbError::QueryExecution(format!("Failed to lock connection: {}", e)))?;
+
+        let mut total_affected = 0u64;
+        for row in values {
+            if row.len() != column_count {
+                return Err(DbError::InvalidQuery(format!(
+                    "Expected {} values per row, got {}",
+                    column_count,
+                    row.len()
+                )));
+            }
+
+            let affected = conn_guard
+                .execute(statement, rusqlite::params_from_iter(row.iter()))
+                .map_err(|e| DbError::QueryExecution(format!("Failed to execute query: {}", e)))?;
+            total_affected += affected as u64;
+        }
+
+        drop(conn_guard);
+        pool.return_conn(conn)?;
+        Ok(total_affected)
+    }
+
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
         Ok(vec![DatabaseSchema {
             name: self

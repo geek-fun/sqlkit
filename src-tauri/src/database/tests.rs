@@ -1,6 +1,7 @@
 //! Tests for the database adapter module.
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use crate::database::*;
 

@@ -223,7 +223,7 @@ export const useTransferStore = defineStore('transfer', () => {
           job.id === jobId
             ? {
                 ...job,
-                status: payload.status as any,
+                status: payload.status as TransferJob['status'],
                 progress: payload.progress,
                 error: payload.error,
                 finishedAt: ['completed', 'failed', 'cancelled'].includes(payload.status) ? Date.now() : job.finishedAt,
@@ -273,6 +273,79 @@ export const useTransferStore = defineStore('transfer', () => {
       args.format,
       args.destination,
       args.options,
+      requestedJobId,
+    )
+
+    return jobId
+  }
+
+  const startExport = async (args: {
+    connectionId: string
+    name: string
+    selection: ObjectSelection
+    format: ExportFormat
+    destination: string
+    options: Record<string, unknown>
+  }) => {
+    const requestedJobId = crypto.randomUUID()
+    await subscribeToJob(requestedJobId)
+
+    const newJob: TransferJob = {
+      id: requestedJobId,
+      name: args.name,
+      kind: 'export',
+      scope: 'table',
+      connectionId: args.connectionId,
+      status: 'queued',
+      progress: { stage: 'Initializing...', current: 0, total: 1 },
+      startedAt: Date.now(),
+    }
+    jobs.value = [...jobs.value, newJob]
+
+    const jobId = await backupServer(
+      args.connectionId,
+      args.selection,
+      args.format,
+      args.destination,
+      args.options,
+      requestedJobId,
+    )
+
+    return jobId
+  }
+
+  const startRestore = async (args: {
+    connectionId: string
+    name: string
+    targetDatabase: string | undefined
+    filePath: string
+    fileFormat: 'sql' | 'csv' | 'excel'
+    targetTable: string | undefined
+    dropTargetFirst: boolean
+  }) => {
+    const requestedJobId = crypto.randomUUID()
+    await subscribeToJob(requestedJobId)
+
+    const newJob: TransferJob = {
+      id: requestedJobId,
+      name: args.name,
+      kind: 'import',
+      scope: 'server',
+      connectionId: args.connectionId,
+      status: 'queued',
+      progress: { stage: 'Initializing...', current: 0, total: 1 },
+      startedAt: Date.now(),
+    }
+    jobs.value = [...jobs.value, newJob]
+
+    const { restoreBackup } = await import('@/datasources/transferApi')
+    const jobId = await restoreBackup(
+      args.connectionId,
+      args.targetDatabase,
+      args.filePath,
+      args.fileFormat,
+      args.targetTable,
+      args.dropTargetFirst,
       requestedJobId,
     )
 
@@ -403,6 +476,8 @@ export const useTransferStore = defineStore('transfer', () => {
     savedProfiles,
     subscribeToJob,
     startBackupServer,
+    startExport,
+    startRestore,
     startMigrateServer,
     saveProfile,
     loadProfiles,

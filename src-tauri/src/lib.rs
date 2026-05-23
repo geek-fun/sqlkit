@@ -137,6 +137,7 @@ pub fn run() {
             commands::generate_ddl_for_objects,
             commands::execute_sql_content,
             commands::backup_server,
+            commands::restore_backup,
             commands::migrate_server,
             commands::save_transfer_profile,
             commands::list_transfer_profiles,

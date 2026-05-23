@@ -416,6 +416,39 @@ impl DatabaseAdapter for MySQLAdapter {
         }
     }
 
+    async fn execute_batch_with_params(
+        &self,
+        statement: &str,
+        column_count: usize,
+        values: Vec<Vec<String>>,
+    ) -> DbResult<u64> {
+        let mut conn = self.get_conn().await?;
+        let mut total_affected = 0u64;
+
+        for row in values {
+            if row.len() != column_count {
+                return Err(DbError::InvalidQuery(format!(
+                    "Expected {} values per row, got {}",
+                    column_count,
+                    row.len()
+                )));
+            }
+
+            let params = mysql_async::Params::Positional(
+                row.into_iter()
+                    .map(|value| Value::Bytes(value.into_bytes()))
+                    .collect::<Vec<_>>(),
+            );
+
+            conn.exec_drop(statement, params)
+                .await
+                .map_err(mysql_error_to_db_error)?;
+            total_affected += conn.affected_rows();
+        }
+
+        Ok(total_affected)
+    }
+
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
         let mut conn = self.get_conn().await?;
 

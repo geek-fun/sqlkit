@@ -109,6 +109,15 @@ pub trait DatabaseAdapter: Send + Sync {
     /// - The connection is not active
     async fn execute_query(&self, query: &str) -> DbResult<QueryResult>;
 
+    /// Execute a parameterized statement with N rows of M values each.
+    /// Implementations MUST bind via the driver's native parameter API.
+    async fn execute_batch_with_params(
+        &self,
+        statement: &str,
+        column_count: usize,
+        values: Vec<Vec<String>>,
+    ) -> DbResult<u64>;
+
     /// List all databases on the server.
     ///
     /// This method retrieves a list of all databases accessible to the current user.

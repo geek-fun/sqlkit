@@ -3,11 +3,12 @@ use crate::state::{ActiveConnection, AppState};
 use crate::transfer::{
     auto_map_columns, detect_file, execute_export, execute_import, execute_migration,
     generate_ddl_for_engine, load_profiles, preview_export, preview_import, preview_migration,
-    save_profiles, DdlRequest, ExportFormat, ExportPreview, ExportRequest, ExportSource,
-    FileDetectionResult, ImportFormat, ImportRequest, JobEventPayload, JobProgress,
-    MigrationPreview, MigrationRequest, MigrationTablePlan, ObjectSelection, TransferError,
-    TransferJob, TransferJobStatus, TransferProfile, TransferProfileKind, TransferResult,
-    TransferScope,
+    restore_csv_file_with_progress, restore_sql_file_with_progress,
+    restore_xlsx_file_with_progress, save_profiles, DdlRequest, ExportFormat, ExportPreview,
+    ExportRequest, ExportSource, FileDetectionResult, ImportFormat, ImportRequest, JobEventPayload,
+    JobProgress, MigrationPreview, MigrationRequest, MigrationTablePlan, ObjectSelection,
+    RestoreOptions, RestoreStats, TransferError, TransferJob, TransferJobStatus, TransferProfile,
+    TransferProfileKind, TransferResult, TransferScope,
 };
 use chrono::Utc;
 use serde_json::Value as JsonValue;
@@ -1656,7 +1657,355 @@ fn summarize_backup_outcome(
     }
 }
 
+fn summarize_restore_outcome(stats: &RestoreStats) -> (TransferJobStatus, Option<String>) {
+    let failed_units = stats
+        .statements_total
+        .saturating_sub(stats.statements_succeeded);
+
+    let summary = if stats.errors.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "Restore summary: {} succeeded, {} failed [{}]",
+            stats.statements_succeeded,
+            failed_units,
+            stats.errors.join("; ")
+        ))
+    };
+
+    if stats.statements_succeeded > 0 {
+        (TransferJobStatus::Completed, summary)
+    } else {
+        (
+            TransferJobStatus::Failed,
+            summary.or_else(|| Some("Restore failed".to_string())),
+        )
+    }
+}
+
+async fn restore_with_connection(
+    connection: ActiveConnection,
+    target_database: Option<String>,
+    file_path: String,
+    file_format: String,
+    target_table: Option<String>,
+    drop_target_first: bool,
+    on_progress: impl FnMut(u64, u64),
+) -> Result<RestoreStats, String> {
+    let format = file_format.to_lowercase();
+    let options = RestoreOptions::default();
+
+    fn split_target_table(target_table: &str) -> (Option<String>, String) {
+        target_table
+            .split_once('.')
+            .map(|(schema, table)| (Some(schema.to_string()), table.to_string()))
+            .unwrap_or_else(|| (None, target_table.to_string()))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn run_restore<A: DatabaseAdapter>(
+        adapter: &A,
+        target_database: Option<&str>,
+        file_path: &str,
+        format: &str,
+        target_table: Option<&str>,
+        _drop_target_first: bool,
+        options: &RestoreOptions,
+        mut on_progress: impl FnMut(u64, u64),
+    ) -> Result<RestoreStats, String> {
+        if let Some(database) = target_database {
+            match adapter.get_config().db_type {
+                DatabaseType::MySQL => {
+                    adapter
+                        .execute_query(&format!("USE `{}`", database.replace('`', "``")))
+                        .await
+                        .map_err(|e| e.to_string())?;
+                }
+                DatabaseType::SqlServer => {
+                    adapter
+                        .execute_query(&format!("USE [{}]", database.replace(']', "]]")))
+                        .await
+                        .map_err(|e| e.to_string())?;
+                }
+                _ => {}
+            }
+        }
+
+        match format {
+            "sql" => {
+                restore_sql_file_with_progress(adapter, file_path, options, |current, total| {
+                    on_progress(current, total)
+                })
+                .await
+                .map_err(|e| e.to_string())
+            }
+            "csv" => {
+                let table = target_table
+                    .ok_or_else(|| "targetTable is required for csv restore format".to_string())?;
+
+                let (target_schema, target_table_name) = split_target_table(table);
+
+                restore_csv_file_with_progress(
+                    adapter,
+                    file_path,
+                    target_schema.as_deref(),
+                    &target_table_name,
+                    options,
+                    &mut on_progress,
+                )
+                .await
+                .map_err(|e| e.to_string())
+            }
+            "xlsx" | "excel" => {
+                let table = target_table
+                    .ok_or_else(|| "targetTable is required for xlsx restore format".to_string())?;
+
+                let (target_schema, target_table_name) = split_target_table(table);
+
+                restore_xlsx_file_with_progress(
+                    adapter,
+                    file_path,
+                    target_schema.as_deref(),
+                    &target_table_name,
+                    options,
+                    &mut on_progress,
+                )
+                .await
+                .map_err(|e| e.to_string())
+            }
+            _ => Err(format!(
+                "Unsupported restore file format '{}'. Use sql, csv, xlsx, or excel.",
+                format
+            )),
+        }
+    }
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            if let Some(database) = target_database.as_deref() {
+                if Some(database) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(database.to_string());
+                    let mut temp = PostgresAdapter::new(temp_config);
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to '{}': {}", database, e))?;
+                    return run_restore(
+                        &temp,
+                        None,
+                        &file_path,
+                        &format,
+                        target_table.as_deref(),
+                        drop_target_first,
+                        &options,
+                        on_progress,
+                    )
+                    .await;
+                }
+            }
+
+            run_restore(
+                &*adapter,
+                None,
+                &file_path,
+                &format,
+                target_table.as_deref(),
+                drop_target_first,
+                &options,
+                on_progress,
+            )
+            .await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            run_restore(
+                &*adapter,
+                target_database.as_deref(),
+                &file_path,
+                &format,
+                target_table.as_deref(),
+                drop_target_first,
+                &options,
+                on_progress,
+            )
+            .await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            if let Some(database) = target_database.as_deref() {
+                if Some(database) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(database.to_string());
+                    let mut temp = SqlServerAdapter::new(temp_config);
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to '{}': {}", database, e))?;
+                    return run_restore(
+                        &temp,
+                        target_database.as_deref(),
+                        &file_path,
+                        &format,
+                        target_table.as_deref(),
+                        drop_target_first,
+                        &options,
+                        on_progress,
+                    )
+                    .await;
+                }
+            }
+
+            run_restore(
+                &*adapter,
+                target_database.as_deref(),
+                &file_path,
+                &format,
+                target_table.as_deref(),
+                drop_target_first,
+                &options,
+                on_progress,
+            )
+            .await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            run_restore(
+                &*adapter,
+                None,
+                &file_path,
+                &format,
+                target_table.as_deref(),
+                drop_target_first,
+                &options,
+                on_progress,
+            )
+            .await
+        }
+    }
+}
+
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
+pub async fn restore_backup(
+    connection_id: String,
+    target_database: Option<String>,
+    file_path: String,
+    file_format: String,
+    target_table: Option<String>,
+    drop_target_first: bool,
+    job_id: Option<String>,
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let job_id = job_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+    let job_id_clone = job_id.clone();
+    let app_clone = app.clone();
+    let connections = state.connections.clone();
+
+    tokio::spawn(async move {
+        let _ = emit_job_event(
+            &app_clone,
+            &job_id_clone,
+            TransferJobStatus::Queued,
+            "queued",
+            0,
+            0,
+            None,
+            None,
+        );
+
+        let connection = match get_connection(&connection_id, &connections).await {
+            Ok(connection) => connection,
+            Err(error) => {
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    TransferJobStatus::Failed,
+                    "failed",
+                    0,
+                    0,
+                    None,
+                    Some(error),
+                );
+                return;
+            }
+        };
+
+        let _ = emit_job_event(
+            &app_clone,
+            &job_id_clone,
+            TransferJobStatus::Running,
+            "running",
+            0,
+            0,
+            None,
+            None,
+        );
+
+        let restore_result = restore_with_connection(
+            connection,
+            target_database,
+            file_path,
+            file_format,
+            target_table,
+            drop_target_first,
+            |current, total| {
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    TransferJobStatus::Running,
+                    "processing",
+                    current,
+                    total,
+                    None,
+                    None,
+                );
+            },
+        )
+        .await;
+
+        match restore_result {
+            Ok(stats) => {
+                let (status, summary) = summarize_restore_outcome(&stats);
+                let stage = if status == TransferJobStatus::Completed {
+                    "completed"
+                } else {
+                    "failed"
+                };
+
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    status,
+                    stage,
+                    stats.statements_total,
+                    stats.statements_total,
+                    None,
+                    summary,
+                );
+            }
+            Err(error) => {
+                let _ = emit_job_event(
+                    &app_clone,
+                    &job_id_clone,
+                    TransferJobStatus::Failed,
+                    "failed",
+                    0,
+                    0,
+                    None,
+                    Some(error),
+                );
+            }
+        }
+    });
+
+    Ok(job_id)
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn backup_server(
     connection_id: String,
     selection: ObjectSelection,

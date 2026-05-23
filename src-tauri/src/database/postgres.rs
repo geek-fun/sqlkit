@@ -24,7 +24,7 @@ use std::fs;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio_postgres::{
-    types::{FromSql, Kind, Type},
+    types::{FromSql, Kind, ToSql, Type},
     Client, NoTls, Row,
 };
 
@@ -732,6 +732,49 @@ impl DatabaseAdapter for PostgresAdapter {
 
             Ok(QueryResult::affected(affected).with_execution_time(execution_time))
         }
+    }
+
+    async fn execute_batch_with_params(
+        &self,
+        statement: &str,
+        column_count: usize,
+        values: Vec<Vec<String>>,
+    ) -> DbResult<u64> {
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let mut total_affected = 0u64;
+        for row in values {
+            if row.len() != column_count {
+                return Err(DbError::InvalidQuery(format!(
+                    "Expected {} values per row, got {}",
+                    column_count,
+                    row.len()
+                )));
+            }
+
+            let params = row.iter().map(|value| value.as_str()).collect::<Vec<_>>();
+            let params_refs = params
+                .iter()
+                .map(|value| value as &(dyn ToSql + Sync))
+                .collect::<Vec<_>>();
+
+            let affected = client
+                .execute(statement, &params_refs)
+                .await
+                .map_err(postgres_error_to_db_error)?;
+            total_affected += affected;
+        }
+
+        Ok(total_affected)
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {

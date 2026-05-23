@@ -170,9 +170,9 @@ mod tests {
 
     #[test]
     fn test_convert_query_value_float() {
-        let value = QueryValue::Float(3.14);
+        let value = QueryValue::Float(std::f64::consts::PI);
         let json = convert_query_value_to_json(&value);
-        assert_eq!(json, json!(3.14));
+        assert_eq!(json, json!(std::f64::consts::PI));
     }
 
     #[test]

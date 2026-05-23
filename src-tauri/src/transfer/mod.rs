@@ -9,6 +9,7 @@ pub mod import;
 pub mod migration;
 pub mod profile_store;
 pub mod progress;
+pub mod restore;
 pub mod types;
 
 pub use ddl::*;
@@ -18,6 +19,7 @@ pub use import::*;
 pub use migration::*;
 pub use profile_store::*;
 pub use progress::*;
+pub use restore::*;
 pub use types::*;
 
 /// Returns the pagination clause for a given DB type.

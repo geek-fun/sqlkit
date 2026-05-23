@@ -60,14 +60,7 @@ export function generateDdl(request: DdlRequest) {
   return invoke<string>('generate_ddl_for_objects', { request })
 }
 
-export function backupServer(
-  connectionId: string,
-  selection: ObjectSelection,
-  format: ExportFormat,
-  destination: string,
-  options: Record<string, unknown>,
-  jobId?: string,
-) {
+export function backupServer(connectionId: string, selection: ObjectSelection, format: ExportFormat, destination: string, options: Record<string, unknown>, jobId?: string) {
   return invoke<string>('backup_server', {
     connectionId,
     selection,
@@ -78,19 +71,25 @@ export function backupServer(
   })
 }
 
-export function migrateServer(
-  sourceConnectionId: string,
-  targetConnectionId: string,
-  selection: ObjectSelection,
-  options: Record<string, unknown>,
-  jobId?: string,
-) {
+export function migrateServer(sourceConnectionId: string, targetConnectionId: string, selection: ObjectSelection, options: Record<string, unknown>, jobId?: string) {
   return invoke<string>('migrate_server', {
     sourceConnectionId,
     targetConnectionId,
     selection,
     options,
     jobId,
+  })
+}
+
+export function restoreBackup(connectionId: string, targetDatabase: string | undefined, filePath: string, fileFormat: 'sql' | 'csv' | 'excel', targetTable: string | undefined, dropTargetFirst: boolean, jobId?: string) {
+  return invoke<string>('restore_backup', {
+    connectionId,
+    jobId,
+    targetDatabase,
+    filePath,
+    fileFormat,
+    targetTable,
+    dropTargetFirst,
   })
 }
 

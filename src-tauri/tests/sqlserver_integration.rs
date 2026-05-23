@@ -298,7 +298,7 @@ async fn test_xml_and_complex_types() {
         match row.get("unique_id").unwrap() {
             QueryValue::String(s) => {
                 println!("GUID: {}", s);
-                assert!(s.len() > 0);
+                assert!(!s.is_empty());
             }
             _ => panic!("Expected String for GUID"),
         }

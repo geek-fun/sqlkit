@@ -471,6 +471,40 @@ impl DatabaseAdapter for SqlServerAdapter {
         }
     }
 
+    async fn execute_batch_with_params(
+        &self,
+        statement: &str,
+        column_count: usize,
+        values: Vec<Vec<String>>,
+    ) -> DbResult<u64> {
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+        let mut total_affected = 0u64;
+
+        for row in values {
+            if row.len() != column_count {
+                return Err(DbError::InvalidQuery(format!(
+                    "Expected {} values per row, got {}",
+                    column_count,
+                    row.len()
+                )));
+            }
+
+            let params = row
+                .iter()
+                .map(|value| value as &dyn tiberius::ToSql)
+                .collect::<Vec<_>>();
+
+            client
+                .execute(statement, &params)
+                .await
+                .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            total_affected += 1;
+        }
+
+        Ok(total_affected)
+    }
+
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
         let query = r#"
             SELECT 
