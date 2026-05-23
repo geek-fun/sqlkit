@@ -9,6 +9,64 @@ use crate::database::{DatabaseAdapter, QueryValue};
 use super::progress::*;
 use super::types::*;
 
+fn quote_ident(name: &str, db_type: DatabaseType) -> String {
+    match db_type {
+        DatabaseType::MySQL => format!("`{}`", name.replace('`', "``")),
+        DatabaseType::SqlServer => format!("[{}]", name.replace(']', "]]")),
+        _ => format!("\"{}\"", name.replace('"', "\"\"")),
+    }
+}
+
+fn source_table_reference(
+    request: &MigrationRequest,
+    db_type: DatabaseType,
+    table: &str,
+) -> String {
+    match db_type {
+        DatabaseType::MySQL => {
+            let database_prefix = request
+                .source_database
+                .as_ref()
+                .map(|db| format!("{}.", quote_ident(db, db_type)))
+                .unwrap_or_default();
+            format!("{}{}", database_prefix, quote_ident(table, db_type))
+        }
+        _ => {
+            let schema_prefix = request
+                .source_schema
+                .as_ref()
+                .map(|schema| format!("{}.", quote_ident(schema, db_type)))
+                .unwrap_or_default();
+            format!("{}{}", schema_prefix, quote_ident(table, db_type))
+        }
+    }
+}
+
+fn target_table_reference(
+    request: &MigrationRequest,
+    db_type: DatabaseType,
+    table: &str,
+) -> String {
+    match db_type {
+        DatabaseType::MySQL => {
+            let database_prefix = request
+                .target_database
+                .as_ref()
+                .map(|db| format!("{}.", quote_ident(db, db_type)))
+                .unwrap_or_default();
+            format!("{}{}", database_prefix, quote_ident(table, db_type))
+        }
+        _ => {
+            let schema_prefix = request
+                .target_schema
+                .as_ref()
+                .map(|schema| format!("{}.", quote_ident(schema, db_type)))
+                .unwrap_or_default();
+            format!("{}{}", schema_prefix, quote_ident(table, db_type))
+        }
+    }
+}
+
 pub async fn execute_migration<A1: DatabaseAdapter, A2: DatabaseAdapter>(
     source_adapter: &A1,
     target_adapter: &A2,
@@ -127,21 +185,11 @@ async fn migrate_table<A1: DatabaseAdapter, A2: DatabaseAdapter>(
         .map(|m| m.target_column.clone())
         .collect();
 
-    let _schema_prefix = request
-        .target_schema
-        .as_ref()
-        .map(|s| format!("\"{}\".", s))
-        .unwrap_or_default();
+    let source_db_type = source_adapter.get_config().db_type;
+    let source_table_ref =
+        source_table_reference(request, source_db_type, &table_plan.source_table);
 
-    let count_query = format!(
-        "SELECT COUNT(*) AS count FROM {}\"{}\"",
-        request
-            .source_schema
-            .as_ref()
-            .map(|s| format!("\"{}\".", s))
-            .unwrap_or_default(),
-        table_plan.source_table
-    );
+    let count_query = format!("SELECT COUNT(*) AS count FROM {}", source_table_ref);
 
     let count_result = source_adapter
         .execute_query(&count_query)
@@ -159,20 +207,11 @@ async fn migrate_table<A1: DatabaseAdapter, A2: DatabaseAdapter>(
 
     let col_list = source_columns
         .iter()
-        .map(|c| format!("\"{}\"", c))
+        .map(|column| quote_ident(column, source_db_type))
         .collect::<Vec<_>>()
         .join(", ");
 
-    let base_query = format!(
-        "SELECT {} FROM {}\"{}\"",
-        col_list,
-        request
-            .source_schema
-            .as_ref()
-            .map(|s| format!("\"{}\".", s))
-            .unwrap_or_default(),
-        table_plan.source_table
-    );
+    let base_query = format!("SELECT {} FROM {}", col_list, source_table_ref);
 
     let batch_size = request.batch_size as u64;
     let mut offset = 0u64;
@@ -216,8 +255,8 @@ async fn migrate_table<A1: DatabaseAdapter, A2: DatabaseAdapter>(
                 phase: "processing".to_string(),
                 current_table: Some(table_plan.source_table.clone()),
                 total_rows: Some(total_rows),
-                processed_rows: processed_rows,
-                skipped_rows: skipped_rows,
+                processed_rows,
+                skipped_rows,
                 error_count: errors.len() as u64,
                 percent: if total_rows > 0 {
                     (processed_rows as f32 / total_rows as f32) * 100.0
@@ -256,15 +295,13 @@ async fn insert_batch_to_target<A: DatabaseAdapter>(
         return Ok(0);
     }
 
-    let schema_prefix = request
-        .target_schema
-        .as_ref()
-        .map(|s| format!("\"{}\".", s))
-        .unwrap_or_default();
+    let target_db_type = target_adapter.get_config().db_type;
+    let target_table_ref =
+        target_table_reference(request, target_db_type, &table_plan.target_table);
 
     let col_list = target_columns
         .iter()
-        .map(|c| format!("\"{}\"", c))
+        .map(|column| quote_ident(column, target_db_type))
         .collect::<Vec<_>>()
         .join(", ");
 
@@ -289,9 +326,8 @@ async fn insert_batch_to_target<A: DatabaseAdapter>(
         .collect();
 
     let sql = format!(
-        "INSERT INTO {}\"{}\" ({}) VALUES {}",
-        schema_prefix,
-        table_plan.target_table,
+        "INSERT INTO {} ({}) VALUES {}",
+        target_table_ref,
         col_list,
         values_list.join(", ")
     );
@@ -312,15 +348,11 @@ pub async fn preview_migration<A: DatabaseAdapter>(
     let mut type_conversions: u64 = 0;
 
     for table_plan in &request.table_plans {
-        let count_query = format!(
-            "SELECT COUNT(*) AS count FROM {}\"{}\"",
-            request
-                .source_schema
-                .as_ref()
-                .map(|s| format!("\"{}\".", s))
-                .unwrap_or_default(),
-            table_plan.source_table
-        );
+        let source_db_type = source_adapter.get_config().db_type;
+        let source_table_ref =
+            source_table_reference(request, source_db_type, &table_plan.source_table);
+
+        let count_query = format!("SELECT COUNT(*) AS count FROM {}", source_table_ref);
 
         let count_result = source_adapter
             .execute_query(&count_query)

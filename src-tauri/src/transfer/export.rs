@@ -11,7 +11,7 @@ use serde_json::Value as JsonValue;
 use super::defaults::*;
 use super::progress::*;
 use super::types::*;
-use crate::database::{DatabaseAdapter, QueryValue};
+use crate::database::{DatabaseAdapter, DatabaseType, QueryValue};
 
 /// Executes a data export operation.
 pub async fn execute_export<A: DatabaseAdapter>(
@@ -43,9 +43,24 @@ pub async fn execute_export<A: DatabaseAdapter>(
         .clone()
         .unwrap_or_else(excel_export_defaults);
 
-    let base_query = build_export_query(&schema, &table, &columns, &request.source);
+    let db_type = adapter.get_config().db_type;
 
-    let count_query = build_count_query(&schema, &table, &request.source.where_clause);
+    let base_query = build_export_query(
+        db_type,
+        request.database.as_deref(),
+        &schema,
+        &table,
+        &columns,
+        &request.source,
+    );
+
+    let count_query = build_count_query(
+        db_type,
+        request.database.as_deref(),
+        &schema,
+        &table,
+        &request.source.where_clause,
+    );
     let count_result = adapter
         .execute_query(&count_query)
         .await
@@ -312,23 +327,44 @@ pub async fn execute_export<A: DatabaseAdapter>(
     })
 }
 
+fn quote_ident(name: &str, db_type: DatabaseType) -> String {
+    match db_type {
+        DatabaseType::MySQL => format!("`{}`", name.replace('`', "``")),
+        DatabaseType::SqlServer => format!("[{}]", name.replace(']', "]]")),
+        _ => format!("\"{}\"", name.replace('"', "\"\"")),
+    }
+}
+
 fn build_export_query(
+    db_type: DatabaseType,
+    database: Option<&str>,
     schema: &Option<String>,
     table: &str,
     columns: &[String],
     source: &ExportSource,
 ) -> String {
-    let schema_prefix = schema
-        .as_ref()
-        .map(|s| format!("\"{}\".", s))
-        .unwrap_or_default();
+    let qualifier = match db_type {
+        DatabaseType::MySQL => database
+            .map(|db| format!("{}.", quote_ident(db, db_type)))
+            .unwrap_or_default(),
+        _ => schema
+            .as_ref()
+            .map(|s| format!("{}.", quote_ident(s, db_type)))
+            .unwrap_or_default(),
+    };
+
     let cols = columns
         .iter()
-        .map(|c| format!("\"{}\"", c))
+        .map(|c| quote_ident(c, db_type))
         .collect::<Vec<_>>()
         .join(", ");
 
-    let mut query = format!("SELECT {} FROM {}\"{}\"", cols, schema_prefix, table);
+    let mut query = format!(
+        "SELECT {} FROM {}{}",
+        cols,
+        qualifier,
+        quote_ident(table, db_type)
+    );
 
     if let Some(ref where_clause) = source.where_clause {
         query.push_str(&format!(" WHERE {}", where_clause));
@@ -342,17 +378,26 @@ fn build_export_query(
 }
 
 fn build_count_query(
+    db_type: DatabaseType,
+    database: Option<&str>,
     schema: &Option<String>,
     table: &str,
     where_clause: &Option<String>,
 ) -> String {
-    let schema_prefix = schema
-        .as_ref()
-        .map(|s| format!("\"{}\".", s))
-        .unwrap_or_default();
+    let qualifier = match db_type {
+        DatabaseType::MySQL => database
+            .map(|db| format!("{}.", quote_ident(db, db_type)))
+            .unwrap_or_default(),
+        _ => schema
+            .as_ref()
+            .map(|s| format!("{}.", quote_ident(s, db_type)))
+            .unwrap_or_default(),
+    };
+
     let mut query = format!(
-        "SELECT COUNT(*) AS count FROM {}\"{}\"",
-        schema_prefix, table
+        "SELECT COUNT(*) AS count FROM {}{}",
+        qualifier,
+        quote_ident(table, db_type)
     );
 
     if let Some(ref where_clause) = where_clause {
@@ -506,7 +551,16 @@ pub async fn preview_export<A: DatabaseAdapter>(
     let table = request.source.table.clone();
     let schema = request.schema.clone();
 
-    let base_query = build_export_query(&schema, &table, &columns, &request.source);
+    let db_type = adapter.get_config().db_type;
+
+    let base_query = build_export_query(
+        db_type,
+        request.database.as_deref(),
+        &schema,
+        &table,
+        &columns,
+        &request.source,
+    );
     let query = format!("{} LIMIT {}", base_query, preview_rows);
 
     let result = adapter
@@ -534,7 +588,13 @@ pub async fn preview_export<A: DatabaseAdapter>(
         })
         .collect();
 
-    let count_query = build_count_query(&schema, &table, &request.source.where_clause);
+    let count_query = build_count_query(
+        db_type,
+        request.database.as_deref(),
+        &schema,
+        &table,
+        &request.source.where_clause,
+    );
     let count_result = adapter
         .execute_query(&count_query)
         .await
@@ -655,7 +715,7 @@ fn write_excel_cell(
         }
         QueryValue::Bytes(b) => {
             worksheet
-                .write_string(row, col, &hex::encode(b))
+                .write_string(row, col, hex::encode(b))
                 .map_err(|e| e.to_string())?;
             Ok(())
         }
@@ -665,5 +725,47 @@ fn write_excel_cell(
                 .map_err(|e| e.to_string())?;
             Ok(())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{build_count_query, build_export_query};
+    use crate::database::DatabaseType;
+    use crate::transfer::ExportSource;
+
+    #[test]
+    fn build_export_query_qualifies_mysql_database_and_table() {
+        let source = ExportSource {
+            table: "users".to_string(),
+            columns: vec!["id".to_string()],
+            where_clause: None,
+            order_by: None,
+            limit: None,
+        };
+
+        let query = build_export_query(
+            DatabaseType::MySQL,
+            Some("analytics"),
+            &None,
+            "users",
+            &["id".to_string()],
+            &source,
+        );
+
+        assert!(query.contains("FROM `analytics`.`users`"));
+    }
+
+    #[test]
+    fn build_count_query_qualifies_mysql_database_and_table() {
+        let query = build_count_query(
+            DatabaseType::MySQL,
+            Some("analytics"),
+            &None,
+            "users",
+            &None,
+        );
+
+        assert_eq!(query, "SELECT COUNT(*) AS count FROM `analytics`.`users`");
     }
 }

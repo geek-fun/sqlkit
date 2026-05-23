@@ -136,6 +136,11 @@ pub fn run() {
             commands::auto_map_migration_columns,
             commands::generate_ddl_for_objects,
             commands::execute_sql_content,
+            commands::backup_server,
+            commands::migrate_server,
+            commands::save_transfer_profile,
+            commands::list_transfer_profiles,
+            commands::run_transfer_profile,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
