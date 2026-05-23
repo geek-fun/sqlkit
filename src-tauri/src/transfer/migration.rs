@@ -6,6 +6,7 @@ use crate::database::types::ColumnInfo;
 use crate::database::DatabaseType;
 use crate::database::{DatabaseAdapter, QueryValue};
 
+use super::paginate_clause;
 use super::progress::*;
 use super::types::*;
 
@@ -217,7 +218,11 @@ async fn migrate_table<A1: DatabaseAdapter, A2: DatabaseAdapter>(
     let mut offset = 0u64;
 
     while offset < total_rows {
-        let query = format!("{} LIMIT {} OFFSET {}", base_query, batch_size, offset);
+        let query = format!(
+            "{} {}",
+            base_query,
+            paginate_clause(source_db_type, offset as usize, batch_size as usize, false)
+        );
         let result = source_adapter
             .execute_query(&query)
             .await

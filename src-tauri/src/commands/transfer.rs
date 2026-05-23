@@ -20,6 +20,13 @@ use tauri::{AppHandle, Emitter, State};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+const MYSQL_SYSTEM_DATABASES: &[&str] =
+    &["mysql", "information_schema", "performance_schema", "sys"];
+// PostgreSQL: template databases are not openable and should always be skipped.
+// Keep `postgres` available because users may intentionally store data there.
+const POSTGRES_SYSTEM_DATABASES: &[&str] = &["template0", "template1"];
+const SQLSERVER_SYSTEM_DATABASES: &[&str] = &["master", "msdb", "tempdb", "model"];
+
 #[tauri::command]
 pub async fn preview_export_data(
     request: ExportRequest,
@@ -610,44 +617,86 @@ async fn get_connection(
 async fn list_databases_for_connection(
     connection_id: &str,
     connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
+    exclude_system_databases: bool,
 ) -> Result<Vec<String>, String> {
     let connection = get_connection(connection_id, connections).await?;
 
-    let databases = match connection {
+    let (db_type, databases) = match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter
-                .list_databases()
-                .await
-                .map_err(|e| e.to_string())?
-                .into_iter()
-                .map(|db| db.name)
-                .collect::<Vec<_>>()
+            (
+                Some(DatabaseType::PostgreSQL),
+                adapter
+                    .list_databases()
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .into_iter()
+                    .map(|db| db.name)
+                    .collect::<Vec<_>>(),
+            )
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter
-                .list_databases()
-                .await
-                .map_err(|e| e.to_string())?
-                .into_iter()
-                .map(|db| db.name)
-                .collect::<Vec<_>>()
+            (
+                Some(DatabaseType::MySQL),
+                adapter
+                    .list_databases()
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .into_iter()
+                    .map(|db| db.name)
+                    .collect::<Vec<_>>(),
+            )
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter
-                .list_databases()
-                .await
-                .map_err(|e| e.to_string())?
-                .into_iter()
-                .map(|db| db.name)
-                .collect::<Vec<_>>()
+            (
+                Some(DatabaseType::SqlServer),
+                adapter
+                    .list_databases()
+                    .await
+                    .map_err(|e| e.to_string())?
+                    .into_iter()
+                    .map(|db| db.name)
+                    .collect::<Vec<_>>(),
+            )
         }
-        ActiveConnection::SQLite(_) => vec!["main".to_string()],
+        ActiveConnection::SQLite(_) => (None, vec!["main".to_string()]),
+    };
+
+    let databases = if exclude_system_databases {
+        filter_system_databases_for_whole_server(db_type, databases)
+    } else {
+        databases
     };
 
     Ok(databases)
+}
+
+fn should_exclude_system_database(db_type: DatabaseType, database: &str) -> bool {
+    let deny_list = match db_type {
+        DatabaseType::MySQL => MYSQL_SYSTEM_DATABASES,
+        DatabaseType::PostgreSQL => POSTGRES_SYSTEM_DATABASES,
+        DatabaseType::SqlServer => SQLSERVER_SYSTEM_DATABASES,
+        _ => &[],
+    };
+
+    deny_list
+        .iter()
+        .any(|system_db| database.eq_ignore_ascii_case(system_db))
+}
+
+fn filter_system_databases_for_whole_server(
+    db_type: Option<DatabaseType>,
+    databases: Vec<String>,
+) -> Vec<String> {
+    match db_type {
+        Some(database_type) => databases
+            .into_iter()
+            .filter(|database| !should_exclude_system_database(database_type, database))
+            .collect::<Vec<_>>(),
+        None => databases,
+    }
 }
 
 async fn list_schemas_for_database(
@@ -750,7 +799,8 @@ async fn expand_selection(
         databases_to_expand = selection.schemas.keys().cloned().collect();
     }
     if databases_to_expand.is_empty() {
-        databases_to_expand = list_databases_for_connection(connection_id, connections).await?;
+        databases_to_expand =
+            list_databases_for_connection(connection_id, connections, true).await?;
     }
 
     for database in databases_to_expand {
@@ -985,6 +1035,8 @@ async fn ensure_target_database(
     match connection {
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
+            // MySQL uses CREATE DATABASE IF NOT EXISTS and continues with the same
+            // server connection, so an additional per-database probe is unnecessary here.
             adapter
                 .execute_query(&format!(
                     "CREATE DATABASE IF NOT EXISTS {}",
@@ -997,8 +1049,10 @@ async fn ensure_target_database(
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
             let mut system_config = adapter.config.clone();
+            let mut target_config = adapter.config.clone();
             drop(adapter);
             system_config.database = Some("postgres".to_string());
+            target_config.database = Some(database_name.to_string());
 
             let mut system_adapter = PostgresAdapter::new(system_config);
             system_adapter
@@ -1020,19 +1074,24 @@ async fn ensure_target_database(
                     ))
                     .await
                     .map_err(|e| e.to_string())?;
-
-                let mut target_config = system_adapter.get_config().clone();
-                target_config.database = Some(database_name.to_string());
-                let mut target_adapter = PostgresAdapter::new(target_config);
-                target_adapter
-                    .connect()
-                    .await
-                    .map_err(|e| format!("Failed to connect to '{}': {}", database_name, e))?;
             }
+
+            let mut target_adapter = PostgresAdapter::new(target_config);
+            target_adapter
+                .connect()
+                .await
+                .map_err(|e| target_database_inaccessible_error(database_name, &e.to_string()))?;
+            target_adapter
+                .execute_query("SELECT 1")
+                .await
+                .map_err(|e| target_database_inaccessible_error(database_name, &e.to_string()))?;
+
             Ok(())
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
+            let mut target_config = adapter.config.clone();
+            target_config.database = Some(database_name.to_string());
             let exists = adapter
                 .list_databases()
                 .await
@@ -1048,10 +1107,30 @@ async fn ensure_target_database(
                     .await
                     .map_err(|e| e.to_string())?;
             }
+
+            drop(adapter);
+
+            let mut target_adapter = SqlServerAdapter::new(target_config);
+            target_adapter
+                .connect()
+                .await
+                .map_err(|e| target_database_inaccessible_error(database_name, &e.to_string()))?;
+            target_adapter
+                .execute_query("SELECT 1")
+                .await
+                .map_err(|e| target_database_inaccessible_error(database_name, &e.to_string()))?;
+
             Ok(())
         }
         _ => Ok(()),
     }
+}
+
+fn target_database_inaccessible_error(database_name: &str, error: &str) -> String {
+    format!(
+        "Target database '{}' is inaccessible: {}",
+        database_name, error
+    )
 }
 
 async fn execute_migration_request(
@@ -1551,6 +1630,32 @@ fn summarize_migration_outcome(
     }
 }
 
+fn summarize_backup_outcome(
+    succeeded_tables: u64,
+    failed_tables: u64,
+    failures: &[String],
+) -> (TransferJobStatus, Option<String>) {
+    let summary = if failures.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "Backup summary: {} succeeded, {} failed [{}]",
+            succeeded_tables,
+            failed_tables,
+            failures.join("; ")
+        ))
+    };
+
+    if succeeded_tables > 0 {
+        (TransferJobStatus::Completed, summary)
+    } else {
+        (
+            TransferJobStatus::Failed,
+            summary.or_else(|| Some("Backup failed".to_string())),
+        )
+    }
+}
+
 #[tauri::command]
 pub async fn backup_server(
     connection_id: String,
@@ -1612,23 +1717,24 @@ pub async fn backup_server(
                 None,
             );
 
-            let mut outcomes: Vec<(String, Result<(), String>)> = Vec::new();
+            let mut failed_tables = 0u64;
+            let mut failures: Vec<String> = Vec::new();
             let mut succeeded_tables = 0u64;
 
             for (index, (database, schema, table)) in selected_tables.iter().enumerate() {
                 let db_output_dir = PathBuf::from(&destination_clone).join(database);
+                let table_label = format!(
+                    "{}.{}.{}",
+                    database,
+                    schema.clone().unwrap_or_else(|| "default".to_string()),
+                    table
+                );
+
                 if let Err(error) = fs::create_dir_all(&db_output_dir)
                     .map_err(|e| format!("Failed to create backup directory: {}", e))
                 {
-                    outcomes.push((
-                        format!(
-                            "{}.{}.{}",
-                            database,
-                            schema.clone().unwrap_or_else(|| "default".to_string()),
-                            table
-                        ),
-                        Err(error),
-                    ));
+                    failed_tables += 1;
+                    failures.push(format!("{}: {}", table_label, error));
                     let _ = emit_job_event(
                         &app_clone,
                         &job_id_clone,
@@ -1655,15 +1761,8 @@ pub async fn backup_server(
                 {
                     Ok(columns) => columns,
                     Err(error) => {
-                        outcomes.push((
-                            format!(
-                                "{}.{}.{}",
-                                database,
-                                schema.clone().unwrap_or_else(|| "default".to_string()),
-                                table
-                            ),
-                            Err(error),
-                        ));
+                        failed_tables += 1;
+                        failures.push(format!("{}: {}", table_label, error));
                         let _ = emit_job_event(
                             &app_clone,
                             &job_id_clone,
@@ -1704,28 +1803,23 @@ pub async fn backup_server(
                     &connections_clone,
                 )
                 .await;
-                let table_label = format!(
-                    "{}.{}.{}",
-                    database,
-                    schema.clone().unwrap_or_else(|| "default".to_string()),
-                    table
-                );
 
                 match export_result {
                     Ok(result) if result.success => {
-                        outcomes.push((table_label, Ok(())));
                         succeeded_tables += 1;
                     }
                     Ok(result) => {
+                        failed_tables += 1;
                         let first_error = result
                             .errors
                             .first()
                             .map(|error| error.message.clone())
                             .unwrap_or_else(|| "Export failed".to_string());
-                        outcomes.push((table_label, Err(first_error)));
+                        failures.push(format!("{}: {}", table_label, first_error));
                     }
                     Err(error) => {
-                        outcomes.push((table_label, Err(error)));
+                        failed_tables += 1;
+                        failures.push(format!("{}: {}", table_label, error));
                     }
                 }
 
@@ -1741,34 +1835,10 @@ pub async fn backup_server(
                 );
             }
 
-            let failed_tables = outcomes
-                .iter()
-                .filter_map(|(name, result)| result.as_ref().err().map(|_| name.clone()))
-                .collect::<Vec<_>>();
+            let (status, summary) =
+                summarize_backup_outcome(succeeded_tables, failed_tables, &failures);
 
-            let status_text = if succeeded_tables > 0 {
-                "completed"
-            } else {
-                "failed"
-            };
-
-            let summary = format!(
-                "Backup {}: {} succeeded, {} failed{}",
-                status_text,
-                succeeded_tables,
-                failed_tables.len(),
-                if failed_tables.is_empty() {
-                    String::new()
-                } else {
-                    format!(" [{}]", failed_tables.join(", "))
-                }
-            );
-
-            if succeeded_tables > 0 {
-                Ok((TransferJobStatus::Completed, None, total_tables))
-            } else {
-                Ok((TransferJobStatus::Failed, Some(summary), total_tables))
-            }
+            Ok((status, summary, total_tables))
         }
         .await;
 
@@ -2220,7 +2290,11 @@ pub async fn run_transfer_profile(
 
 #[cfg(test)]
 mod tests {
-    use super::{quote_ident_mysql, quote_ident_pg, summarize_migration_outcome};
+    use super::{
+        filter_system_databases_for_whole_server, quote_ident_mysql, quote_ident_pg,
+        summarize_backup_outcome, summarize_migration_outcome,
+    };
+    use crate::database::DatabaseType;
     use crate::transfer::TransferJobStatus;
 
     #[test]
@@ -2273,5 +2347,87 @@ mod tests {
 
         assert_eq!(status, TransferJobStatus::Failed);
         assert!(summary.unwrap_or_default().contains("2 failed"));
+    }
+
+    #[test]
+    fn summarize_backup_outcome_all_succeeded_has_no_summary() {
+        let (status, summary) = summarize_backup_outcome(3, 0, &[]);
+
+        assert_eq!(status, TransferJobStatus::Completed);
+        assert!(summary.is_none());
+    }
+
+    #[test]
+    fn summarize_backup_outcome_partial_failures_is_completed_with_summary() {
+        let (status, summary) =
+            summarize_backup_outcome(2, 1, &["db.public.users: disk full".to_string()]);
+
+        assert_eq!(status, TransferJobStatus::Completed);
+        assert!(summary.unwrap_or_default().contains("1 failed"));
+    }
+
+    #[test]
+    fn summarize_backup_outcome_all_failed_is_failed_with_summary() {
+        let (status, summary) =
+            summarize_backup_outcome(0, 2, &["db.public.orders: timeout".to_string()]);
+
+        assert_eq!(status, TransferJobStatus::Failed);
+        assert!(summary.unwrap_or_default().contains("2 failed"));
+    }
+
+    #[test]
+    fn filter_system_databases_mysql_excludes_known_system_databases() {
+        let filtered = filter_system_databases_for_whole_server(
+            Some(DatabaseType::MySQL),
+            vec![
+                "app_db".to_string(),
+                "mysql".to_string(),
+                "information_schema".to_string(),
+                "sys".to_string(),
+            ],
+        );
+
+        assert_eq!(filtered, vec!["app_db".to_string()]);
+    }
+
+    #[test]
+    fn filter_system_databases_postgres_excludes_templates_only() {
+        let filtered = filter_system_databases_for_whole_server(
+            Some(DatabaseType::PostgreSQL),
+            vec![
+                "postgres".to_string(),
+                "template0".to_string(),
+                "template1".to_string(),
+                "app_db".to_string(),
+            ],
+        );
+
+        assert_eq!(filtered, vec!["postgres".to_string(), "app_db".to_string()]);
+    }
+
+    #[test]
+    fn filter_system_databases_sqlserver_excludes_system_databases() {
+        let filtered = filter_system_databases_for_whole_server(
+            Some(DatabaseType::SqlServer),
+            vec![
+                "master".to_string(),
+                "msdb".to_string(),
+                "tempdb".to_string(),
+                "model".to_string(),
+                "tenant_db".to_string(),
+            ],
+        );
+
+        assert_eq!(filtered, vec!["tenant_db".to_string()]);
+    }
+
+    #[test]
+    fn filter_system_databases_sqlite_is_unchanged() {
+        let filtered = filter_system_databases_for_whole_server(
+            Some(DatabaseType::SQLite),
+            vec!["main".to_string()],
+        );
+
+        assert_eq!(filtered, vec!["main".to_string()]);
     }
 }

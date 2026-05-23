@@ -9,6 +9,7 @@ use rust_xlsxwriter::{Workbook, Worksheet};
 use serde_json::Value as JsonValue;
 
 use super::defaults::*;
+use super::paginate_clause;
 use super::progress::*;
 use super::types::*;
 use crate::database::{DatabaseAdapter, DatabaseType, QueryValue};
@@ -53,6 +54,7 @@ pub async fn execute_export<A: DatabaseAdapter>(
         &columns,
         &request.source,
     );
+    let base_has_order_by = request.source.order_by.is_some();
 
     let count_query = build_count_query(
         db_type,
@@ -97,7 +99,16 @@ pub async fn execute_export<A: DatabaseAdapter>(
 
             let mut offset = 0u64;
             while offset < total_rows {
-                let query = format!("{} LIMIT {} OFFSET {}", base_query, batch_size, offset);
+                let query = format!(
+                    "{} {}",
+                    base_query,
+                    paginate_clause(
+                        db_type,
+                        offset as usize,
+                        batch_size as usize,
+                        base_has_order_by
+                    )
+                );
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -133,7 +144,16 @@ pub async fn execute_export<A: DatabaseAdapter>(
         ExportFormat::Jsonl => {
             let mut offset = 0u64;
             while offset < total_rows {
-                let query = format!("{} LIMIT {} OFFSET {}", base_query, batch_size, offset);
+                let query = format!(
+                    "{} {}",
+                    base_query,
+                    paginate_clause(
+                        db_type,
+                        offset as usize,
+                        batch_size as usize,
+                        base_has_order_by
+                    )
+                );
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -181,7 +201,16 @@ pub async fn execute_export<A: DatabaseAdapter>(
             let mut offset = 0u64;
 
             while offset < total_rows {
-                let query = format!("{} LIMIT {} OFFSET {}", base_query, batch_size, offset);
+                let query = format!(
+                    "{} {}",
+                    base_query,
+                    paginate_clause(
+                        db_type,
+                        offset as usize,
+                        batch_size as usize,
+                        base_has_order_by
+                    )
+                );
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -254,7 +283,16 @@ pub async fn execute_export<A: DatabaseAdapter>(
             let mut row_idx = header_row_offset;
 
             while offset < total_rows {
-                let query = format!("{} LIMIT {} OFFSET {}", base_query, batch_size, offset);
+                let query = format!(
+                    "{} {}",
+                    base_query,
+                    paginate_clause(
+                        db_type,
+                        offset as usize,
+                        batch_size as usize,
+                        base_has_order_by
+                    )
+                );
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -561,7 +599,12 @@ pub async fn preview_export<A: DatabaseAdapter>(
         &columns,
         &request.source,
     );
-    let query = format!("{} LIMIT {}", base_query, preview_rows);
+    let base_has_order_by = request.source.order_by.is_some();
+    let query = format!(
+        "{} {}",
+        base_query,
+        paginate_clause(db_type, 0, preview_rows as usize, base_has_order_by)
+    );
 
     let result = adapter
         .execute_query(&query)
