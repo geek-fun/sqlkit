@@ -252,16 +252,11 @@ export const useTransferStore = defineStore('transfer', () => {
     destination: string
     options: Record<string, unknown>
   }) => {
-    const jobId = await backupServer(
-      args.connectionId,
-      args.selection,
-      args.format,
-      args.destination,
-      args.options,
-    )
+    const requestedJobId = crypto.randomUUID()
+    await subscribeToJob(requestedJobId)
 
     const newJob: TransferJob = {
-      id: jobId,
+      id: requestedJobId,
       name: args.name,
       kind: 'backup',
       scope: 'server',
@@ -271,7 +266,16 @@ export const useTransferStore = defineStore('transfer', () => {
       startedAt: Date.now(),
     }
     jobs.value = [...jobs.value, newJob]
-    await subscribeToJob(jobId)
+
+    const jobId = await backupServer(
+      args.connectionId,
+      args.selection,
+      args.format,
+      args.destination,
+      args.options,
+      requestedJobId,
+    )
+
     return jobId
   }
 
@@ -282,15 +286,11 @@ export const useTransferStore = defineStore('transfer', () => {
     selection: ObjectSelection
     options: Record<string, unknown>
   }) => {
-    const jobId = await migrateServer(
-      args.sourceConnectionId,
-      args.targetConnectionId,
-      args.selection,
-      args.options,
-    )
+    const requestedJobId = crypto.randomUUID()
+    await subscribeToJob(requestedJobId)
 
     const newJob: TransferJob = {
-      id: jobId,
+      id: requestedJobId,
       name: args.name,
       kind: 'migrate',
       scope: 'server',
@@ -300,7 +300,15 @@ export const useTransferStore = defineStore('transfer', () => {
       startedAt: Date.now(),
     }
     jobs.value = [...jobs.value, newJob]
-    await subscribeToJob(jobId)
+
+    const jobId = await migrateServer(
+      args.sourceConnectionId,
+      args.targetConnectionId,
+      args.selection,
+      args.options,
+      requestedJobId,
+    )
+
     return jobId
   }
 

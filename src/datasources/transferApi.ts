@@ -66,6 +66,7 @@ export function backupServer(
   format: ExportFormat,
   destination: string,
   options: Record<string, unknown>,
+  jobId?: string,
 ) {
   return invoke<string>('backup_server', {
     connectionId,
@@ -73,6 +74,7 @@ export function backupServer(
     format,
     destination,
     options,
+    jobId,
   })
 }
 
@@ -81,12 +83,14 @@ export function migrateServer(
   targetConnectionId: string,
   selection: ObjectSelection,
   options: Record<string, unknown>,
+  jobId?: string,
 ) {
   return invoke<string>('migrate_server', {
     sourceConnectionId,
     targetConnectionId,
     selection,
     options,
+    jobId,
   })
 }
 

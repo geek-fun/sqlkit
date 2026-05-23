@@ -607,6 +607,49 @@ async fn get_connection(
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))
 }
 
+async fn list_databases_for_connection(
+    connection_id: &str,
+    connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
+) -> Result<Vec<String>, String> {
+    let connection = get_connection(connection_id, connections).await?;
+
+    let databases = match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .map(|db| db.name)
+                .collect::<Vec<_>>()
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .map(|db| db.name)
+                .collect::<Vec<_>>()
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .map(|db| db.name)
+                .collect::<Vec<_>>()
+        }
+        ActiveConnection::SQLite(_) => vec!["main".to_string()],
+    };
+
+    Ok(databases)
+}
+
 async fn list_schemas_for_database(
     connection_id: &str,
     database: &str,
@@ -705,6 +748,9 @@ async fn expand_selection(
     let mut databases_to_expand = selection.databases.clone();
     if databases_to_expand.is_empty() && !selection.schemas.is_empty() {
         databases_to_expand = selection.schemas.keys().cloned().collect();
+    }
+    if databases_to_expand.is_empty() {
+        databases_to_expand = list_databases_for_connection(connection_id, connections).await?;
     }
 
     for database in databases_to_expand {
@@ -838,22 +884,56 @@ async fn list_columns_for_table(
 
 async fn execute_export_request(
     request: ExportRequest,
+    target_database: Option<&str>,
     app: &AppHandle,
     connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
 ) -> Result<TransferResult, String> {
+    let request_database = request.database.clone();
+    let effective_database = target_database.or(request_database.as_deref());
+
     let connection = get_connection(&request.connection_id, connections).await?;
 
     match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
+            if let Some(database) = effective_database {
+                if Some(database) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(database.to_string());
+                    let mut temp = PostgresAdapter::new(temp_config);
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to '{}': {}", database, e))?;
+                    return execute_export(&temp, request, app).await;
+                }
+            }
+
             execute_export(&*adapter, request, app).await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            execute_export(&*adapter, request, app).await
+            let mut adjusted_request = request;
+            if let Some(database) = effective_database {
+                adjusted_request.database = Some(database.to_string());
+            }
+            execute_export(&*adapter, adjusted_request, app).await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
+            if let Some(database) = effective_database {
+                if Some(database) != adapter.config.database.as_deref() {
+                    let mut temp_config = adapter.config.clone();
+                    drop(adapter);
+                    temp_config.database = Some(database.to_string());
+                    let mut temp = SqlServerAdapter::new(temp_config);
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to '{}': {}", database, e))?;
+                    return execute_export(&temp, request, app).await;
+                }
+            }
+
             execute_export(&*adapter, request, app).await
         }
         ActiveConnection::SQLite(adapter) => {
@@ -916,20 +996,38 @@ async fn ensure_target_database(
         }
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            let exists = adapter
+            let mut system_config = adapter.config.clone();
+            drop(adapter);
+            system_config.database = Some("postgres".to_string());
+
+            let mut system_adapter = PostgresAdapter::new(system_config);
+            system_adapter
+                .connect()
+                .await
+                .map_err(|e| format!("Failed to connect to 'postgres': {}", e))?;
+
+            let exists = system_adapter
                 .list_databases()
                 .await
                 .map_err(|e| e.to_string())?
                 .iter()
                 .any(|db| db.name == database_name);
             if !exists {
-                adapter
+                system_adapter
                     .execute_query(&format!(
                         "CREATE DATABASE {}",
                         quote_ident_pg(database_name)?
                     ))
                     .await
                     .map_err(|e| e.to_string())?;
+
+                let mut target_config = system_adapter.get_config().clone();
+                target_config.database = Some(database_name.to_string());
+                let mut target_adapter = PostgresAdapter::new(target_config);
+                target_adapter
+                    .connect()
+                    .await
+                    .map_err(|e| format!("Failed to connect to '{}': {}", database_name, e))?;
             }
             Ok(())
         }
@@ -958,9 +1056,16 @@ async fn ensure_target_database(
 
 async fn execute_migration_request(
     request: MigrationRequest,
+    source_database: Option<&str>,
+    target_database: Option<&str>,
     app: &AppHandle,
     connections: &Arc<Mutex<HashMap<String, ActiveConnection>>>,
 ) -> Result<TransferResult, String> {
+    let request_source_database = request.source_database.clone();
+    let request_target_database = request.target_database.clone();
+    let effective_source_database = source_database.or(request_source_database.as_deref());
+    let effective_target_database = target_database.or(request_target_database.as_deref());
+
     let source_connection = get_connection(&request.source_connection_id, connections)
         .await
         .map_err(|_| "No source connection found".to_string())?;
@@ -979,26 +1084,150 @@ async fn execute_migration_request(
         (ActiveConnection::Postgres(src), ActiveConnection::Postgres(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(source_db) = effective_source_database {
+                if Some(source_db) != src.config.database.as_deref() {
+                    let mut src_config = src.config.clone();
+                    drop(src);
+                    src_config.database = Some(source_db.to_string());
+                    let mut src_temp = PostgresAdapter::new(src_config);
+                    src_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to source '{}': {}", source_db, e)
+                    })?;
+
+                    if let Some(target_db) = effective_target_database {
+                        if Some(target_db) != tgt.config.database.as_deref() {
+                            let mut tgt_config = tgt.config.clone();
+                            drop(tgt);
+                            tgt_config.database = Some(target_db.to_string());
+                            let mut tgt_temp = PostgresAdapter::new(tgt_config);
+                            tgt_temp.connect().await.map_err(|e| {
+                                format!("Failed to connect to target '{}': {}", target_db, e)
+                            })?;
+                            return execute_migration(&src_temp, &tgt_temp, request, app).await;
+                        }
+                    }
+
+                    return execute_migration(&src_temp, &*tgt, request, app).await;
+                }
+            }
+
+            if let Some(target_db) = effective_target_database {
+                if Some(target_db) != tgt.config.database.as_deref() {
+                    let mut tgt_config = tgt.config.clone();
+                    drop(tgt);
+                    tgt_config.database = Some(target_db.to_string());
+                    let mut tgt_temp = PostgresAdapter::new(tgt_config);
+                    tgt_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to target '{}': {}", target_db, e)
+                    })?;
+                    return execute_migration(&*src, &tgt_temp, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::Postgres(src), ActiveConnection::MySQL(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(source_db) = effective_source_database {
+                if Some(source_db) != src.config.database.as_deref() {
+                    let mut src_config = src.config.clone();
+                    drop(src);
+                    src_config.database = Some(source_db.to_string());
+                    let mut src_temp = PostgresAdapter::new(src_config);
+                    src_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to source '{}': {}", source_db, e)
+                    })?;
+                    return execute_migration(&src_temp, &*tgt, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::Postgres(src), ActiveConnection::SQLServer(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(source_db) = effective_source_database {
+                if Some(source_db) != src.config.database.as_deref() {
+                    let mut src_config = src.config.clone();
+                    drop(src);
+                    src_config.database = Some(source_db.to_string());
+                    let mut src_temp = PostgresAdapter::new(src_config);
+                    src_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to source '{}': {}", source_db, e)
+                    })?;
+
+                    if let Some(target_db) = effective_target_database {
+                        if Some(target_db) != tgt.config.database.as_deref() {
+                            let mut tgt_config = tgt.config.clone();
+                            drop(tgt);
+                            tgt_config.database = Some(target_db.to_string());
+                            let mut tgt_temp = SqlServerAdapter::new(tgt_config);
+                            tgt_temp.connect().await.map_err(|e| {
+                                format!("Failed to connect to target '{}': {}", target_db, e)
+                            })?;
+                            return execute_migration(&src_temp, &tgt_temp, request, app).await;
+                        }
+                    }
+
+                    return execute_migration(&src_temp, &*tgt, request, app).await;
+                }
+            }
+
+            if let Some(target_db) = effective_target_database {
+                if Some(target_db) != tgt.config.database.as_deref() {
+                    let mut tgt_config = tgt.config.clone();
+                    drop(tgt);
+                    tgt_config.database = Some(target_db.to_string());
+                    let mut tgt_temp = SqlServerAdapter::new(tgt_config);
+                    tgt_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to target '{}': {}", target_db, e)
+                    })?;
+                    return execute_migration(&*src, &tgt_temp, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::Postgres(src), ActiveConnection::SQLite(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(source_db) = effective_source_database {
+                if Some(source_db) != src.config.database.as_deref() {
+                    let mut src_config = src.config.clone();
+                    drop(src);
+                    src_config.database = Some(source_db.to_string());
+                    let mut src_temp = PostgresAdapter::new(src_config);
+                    src_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to source '{}': {}", source_db, e)
+                    })?;
+                    return execute_migration(&src_temp, &*tgt, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::MySQL(src), ActiveConnection::Postgres(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(target_db) = effective_target_database {
+                if Some(target_db) != tgt.config.database.as_deref() {
+                    let mut tgt_config = tgt.config.clone();
+                    drop(tgt);
+                    tgt_config.database = Some(target_db.to_string());
+                    let mut tgt_temp = PostgresAdapter::new(tgt_config);
+                    tgt_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to target '{}': {}", target_db, e)
+                    })?;
+                    return execute_migration(&*src, &tgt_temp, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::MySQL(src), ActiveConnection::MySQL(tgt)) => {
@@ -1009,6 +1238,20 @@ async fn execute_migration_request(
         (ActiveConnection::MySQL(src), ActiveConnection::SQLServer(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(target_db) = effective_target_database {
+                if Some(target_db) != tgt.config.database.as_deref() {
+                    let mut tgt_config = tgt.config.clone();
+                    drop(tgt);
+                    tgt_config.database = Some(target_db.to_string());
+                    let mut tgt_temp = SqlServerAdapter::new(tgt_config);
+                    tgt_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to target '{}': {}", target_db, e)
+                    })?;
+                    return execute_migration(&*src, &tgt_temp, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::MySQL(src), ActiveConnection::SQLite(tgt)) => {
@@ -1019,21 +1262,131 @@ async fn execute_migration_request(
         (ActiveConnection::SQLServer(src), ActiveConnection::Postgres(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(source_db) = effective_source_database {
+                if Some(source_db) != src.config.database.as_deref() {
+                    let mut src_config = src.config.clone();
+                    drop(src);
+                    src_config.database = Some(source_db.to_string());
+                    let mut src_temp = SqlServerAdapter::new(src_config);
+                    src_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to source '{}': {}", source_db, e)
+                    })?;
+
+                    if let Some(target_db) = effective_target_database {
+                        if Some(target_db) != tgt.config.database.as_deref() {
+                            let mut tgt_config = tgt.config.clone();
+                            drop(tgt);
+                            tgt_config.database = Some(target_db.to_string());
+                            let mut tgt_temp = PostgresAdapter::new(tgt_config);
+                            tgt_temp.connect().await.map_err(|e| {
+                                format!("Failed to connect to target '{}': {}", target_db, e)
+                            })?;
+                            return execute_migration(&src_temp, &tgt_temp, request, app).await;
+                        }
+                    }
+
+                    return execute_migration(&src_temp, &*tgt, request, app).await;
+                }
+            }
+
+            if let Some(target_db) = effective_target_database {
+                if Some(target_db) != tgt.config.database.as_deref() {
+                    let mut tgt_config = tgt.config.clone();
+                    drop(tgt);
+                    tgt_config.database = Some(target_db.to_string());
+                    let mut tgt_temp = PostgresAdapter::new(tgt_config);
+                    tgt_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to target '{}': {}", target_db, e)
+                    })?;
+                    return execute_migration(&*src, &tgt_temp, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::SQLServer(src), ActiveConnection::MySQL(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(source_db) = effective_source_database {
+                if Some(source_db) != src.config.database.as_deref() {
+                    let mut src_config = src.config.clone();
+                    drop(src);
+                    src_config.database = Some(source_db.to_string());
+                    let mut src_temp = SqlServerAdapter::new(src_config);
+                    src_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to source '{}': {}", source_db, e)
+                    })?;
+                    return execute_migration(&src_temp, &*tgt, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::SQLServer(src), ActiveConnection::SQLServer(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(source_db) = effective_source_database {
+                if Some(source_db) != src.config.database.as_deref() {
+                    let mut src_config = src.config.clone();
+                    drop(src);
+                    src_config.database = Some(source_db.to_string());
+                    let mut src_temp = SqlServerAdapter::new(src_config);
+                    src_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to source '{}': {}", source_db, e)
+                    })?;
+
+                    if let Some(target_db) = effective_target_database {
+                        if Some(target_db) != tgt.config.database.as_deref() {
+                            let mut tgt_config = tgt.config.clone();
+                            drop(tgt);
+                            tgt_config.database = Some(target_db.to_string());
+                            let mut tgt_temp = SqlServerAdapter::new(tgt_config);
+                            tgt_temp.connect().await.map_err(|e| {
+                                format!("Failed to connect to target '{}': {}", target_db, e)
+                            })?;
+                            return execute_migration(&src_temp, &tgt_temp, request, app).await;
+                        }
+                    }
+
+                    return execute_migration(&src_temp, &*tgt, request, app).await;
+                }
+            }
+
+            if let Some(target_db) = effective_target_database {
+                if Some(target_db) != tgt.config.database.as_deref() {
+                    let mut tgt_config = tgt.config.clone();
+                    drop(tgt);
+                    tgt_config.database = Some(target_db.to_string());
+                    let mut tgt_temp = SqlServerAdapter::new(tgt_config);
+                    tgt_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to target '{}': {}", target_db, e)
+                    })?;
+                    return execute_migration(&*src, &tgt_temp, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::SQLServer(src), ActiveConnection::SQLite(tgt)) => {
             let src = src.lock().await;
             let tgt = tgt.lock().await;
+
+            if let Some(source_db) = effective_source_database {
+                if Some(source_db) != src.config.database.as_deref() {
+                    let mut src_config = src.config.clone();
+                    drop(src);
+                    src_config.database = Some(source_db.to_string());
+                    let mut src_temp = SqlServerAdapter::new(src_config);
+                    src_temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to source '{}': {}", source_db, e)
+                    })?;
+                    return execute_migration(&src_temp, &*tgt, request, app).await;
+                }
+            }
+
             run_migration!(src, tgt)
         }
         (ActiveConnection::SQLite(src), ActiveConnection::Postgres(tgt)) => {
@@ -1172,6 +1525,32 @@ fn profile_to_transfer_job(profile: &TransferProfile) -> TransferJob {
     }
 }
 
+fn summarize_migration_outcome(
+    succeeded_tables: u64,
+    failed_tables: u64,
+    failures: &[String],
+) -> (TransferJobStatus, Option<String>) {
+    let summary = if failures.is_empty() {
+        None
+    } else {
+        Some(format!(
+            "Migration summary: {} succeeded, {} failed [{}]",
+            succeeded_tables,
+            failed_tables,
+            failures.join("; ")
+        ))
+    };
+
+    if succeeded_tables > 0 {
+        (TransferJobStatus::Completed, summary)
+    } else {
+        (
+            TransferJobStatus::Failed,
+            summary.or_else(|| Some("Migration failed".to_string())),
+        )
+    }
+}
+
 #[tauri::command]
 pub async fn backup_server(
     connection_id: String,
@@ -1179,40 +1558,60 @@ pub async fn backup_server(
     format: ExportFormat,
     destination: String,
     options: JsonValue,
+    job_id: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
     let _ = &options;
-    let job_id = Uuid::new_v4().to_string();
+    let job_id = job_id.unwrap_or_else(|| Uuid::new_v4().to_string());
     let connections = state.connections.clone();
-    let selected_tables = expand_selection(&connection_id, &selection, &connections).await?;
-    let total_tables = selected_tables.len() as u64;
-
-    if total_tables == 0 {
-        return Err("No tables selected for server backup".to_string());
-    }
-
-    emit_job_event(
-        &app,
-        &job_id,
-        TransferJobStatus::Queued,
-        "preparing",
-        0,
-        total_tables,
-        None,
-        None,
-    )?;
 
     let app_clone = app.clone();
     let job_id_clone = job_id.clone();
     let connection_id_clone = connection_id.clone();
+    let selection_clone = selection.clone();
     let format_clone = format.clone();
     let destination_clone = destination.clone();
     let connections_clone = connections.clone();
 
     tokio::spawn(async move {
         let started_at = Instant::now();
-        let outcome: Result<(TransferJobStatus, Option<String>), String> = async {
+        let outcome: Result<(TransferJobStatus, Option<String>, u64), String> = async {
+            let _ = emit_job_event(
+                &app_clone,
+                &job_id_clone,
+                TransferJobStatus::Queued,
+                "queued",
+                0,
+                0,
+                None,
+                None,
+            );
+
+            let selected_tables =
+                expand_selection(&connection_id_clone, &selection_clone, &connections_clone)
+                    .await?;
+
+            let total_tables = selected_tables.len() as u64;
+            if total_tables == 0 {
+                return Ok((
+                    TransferJobStatus::Failed,
+                    Some("No tables selected for server backup".to_string()),
+                    0,
+                ));
+            }
+
+            let _ = emit_job_event(
+                &app_clone,
+                &job_id_clone,
+                TransferJobStatus::Running,
+                "running",
+                0,
+                total_tables,
+                None,
+                None,
+            );
+
             let mut outcomes: Vec<(String, Result<(), String>)> = Vec::new();
             let mut succeeded_tables = 0u64;
 
@@ -1298,8 +1697,13 @@ pub async fn backup_server(
                     output_path: output_path.to_string_lossy().to_string(),
                 };
 
-                let export_result =
-                    execute_export_request(request, &app_clone, &connections_clone).await;
+                let export_result = execute_export_request(
+                    request,
+                    Some(database.as_str()),
+                    &app_clone,
+                    &connections_clone,
+                )
+                .await;
                 let table_label = format!(
                     "{}.{}.{}",
                     database,
@@ -1361,15 +1765,15 @@ pub async fn backup_server(
             );
 
             if succeeded_tables > 0 {
-                Ok((TransferJobStatus::Completed, None))
+                Ok((TransferJobStatus::Completed, None, total_tables))
             } else {
-                Ok((TransferJobStatus::Failed, Some(summary)))
+                Ok((TransferJobStatus::Failed, Some(summary), total_tables))
             }
         }
         .await;
 
         match outcome {
-            Ok((status, error)) => {
+            Ok((status, error, total_tables)) => {
                 let stage = if status == TransferJobStatus::Completed {
                     "completed"
                 } else {
@@ -1393,7 +1797,7 @@ pub async fn backup_server(
                     TransferJobStatus::Failed,
                     "failed",
                     0,
-                    total_tables,
+                    0,
                     None,
                     Some(error),
                 );
@@ -1412,69 +1816,129 @@ pub async fn migrate_server(
     target_connection_id: String,
     selection: ObjectSelection,
     options: JsonValue,
+    job_id: Option<String>,
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let job_id = Uuid::new_v4().to_string();
+    let job_id = job_id.unwrap_or_else(|| Uuid::new_v4().to_string());
     let connections = state.connections.clone();
-    let selected_tables = expand_selection(&source_connection_id, &selection, &connections).await?;
-    let total_tables = selected_tables.len() as u64;
-
-    if total_tables == 0 {
-        return Err("No tables selected for server migration".to_string());
-    }
-
-    emit_job_event(
-        &app,
-        &job_id,
-        TransferJobStatus::Queued,
-        "preparing",
-        0,
-        total_tables,
-        None,
-        None,
-    )?;
-
-    let grouped = selected_tables.into_iter().fold(
-        HashMap::<(String, Option<String>), Vec<String>>::new(),
-        |mut acc, (database, schema, table)| {
-            acc.entry((database, schema)).or_default().push(table);
-            acc
-        },
-    );
 
     let app_clone = app.clone();
     let job_id_clone = job_id.clone();
     let source_connection_id_clone = source_connection_id.clone();
     let target_connection_id_clone = target_connection_id.clone();
+    let selection_clone = selection.clone();
     let options_clone = options.clone();
     let connections_clone = connections.clone();
 
     tokio::spawn(async move {
-        let outcome: Result<(TransferJobStatus, Option<String>), String> = async {
-            let mut outcomes: Vec<(String, Result<(), String>)> = Vec::new();
-            let mut migrated_rows = 0u64;
+        let outcome: Result<(TransferJobStatus, Option<String>, u64), String> = async {
+            let _ = emit_job_event(
+                &app_clone,
+                &job_id_clone,
+                TransferJobStatus::Queued,
+                "queued",
+                0,
+                0,
+                None,
+                None,
+            );
+
+            let selected_tables = expand_selection(
+                &source_connection_id_clone,
+                &selection_clone,
+                &connections_clone,
+            )
+            .await?;
+
+            let total_tables = selected_tables.len() as u64;
+            if total_tables == 0 {
+                return Ok((
+                    TransferJobStatus::Failed,
+                    Some("No tables selected for server migration".to_string()),
+                    0,
+                ));
+            }
+
+            let _ = emit_job_event(
+                &app_clone,
+                &job_id_clone,
+                TransferJobStatus::Running,
+                "running",
+                0,
+                total_tables,
+                None,
+                None,
+            );
+
             let mut processed_tables = 0u64;
-            let mut succeeded_groups = 0u64;
+            let mut succeeded_tables = 0u64;
+            let mut failed_tables = 0u64;
+            let mut failures: Vec<String> = Vec::new();
 
-            for ((database, schema), tables) in grouped {
-                let group_label = format!(
-                    "{}.{}",
-                    database,
-                    schema.clone().unwrap_or_else(|| "default".to_string())
-                );
-
-                match ensure_target_database(
+            for (database, schema, table) in selected_tables {
+                if let Err(error) = ensure_target_database(
                     &target_connection_id_clone,
                     &database,
                     &connections_clone,
                 )
                 .await
                 {
-                    Ok(_) => {}
+                    failed_tables += 1;
+                    failures.push(format!(
+                        "{}.{}.{}: {}",
+                        database,
+                        schema.clone().unwrap_or_else(|| "default".to_string()),
+                        table,
+                        error
+                    ));
+                    processed_tables += 1;
+                    let _ = emit_job_event(
+                        &app_clone,
+                        &job_id_clone,
+                        TransferJobStatus::Running,
+                        "processing",
+                        processed_tables,
+                        total_tables,
+                        None,
+                        None,
+                    );
+                    continue;
+                }
+
+                let mapping_results = match list_columns_for_table(
+                    &source_connection_id_clone,
+                    &database,
+                    schema.as_deref(),
+                    &table,
+                    &connections_clone,
+                )
+                .await
+                {
+                    Ok(columns) => {
+                        let mapping = columns
+                            .into_iter()
+                            .map(|column| crate::transfer::MigrationMapping {
+                                source_column: column.clone(),
+                                source_type: "text".to_string(),
+                                target_column: column,
+                                target_type: "text".to_string(),
+                                conversion: crate::transfer::MigrationConversion::Direct,
+                            })
+                            .collect::<Vec<_>>();
+
+                        HashMap::from([(table.clone(), mapping)])
+                    }
                     Err(error) => {
-                        outcomes.push((group_label, Err(error)));
-                        processed_tables += tables.len() as u64;
+                        failed_tables += 1;
+                        failures.push(format!(
+                            "{}.{}.{}: {}",
+                            database,
+                            schema.clone().unwrap_or_else(|| "default".to_string()),
+                            table,
+                            error
+                        ));
+                        processed_tables += 1;
                         let _ = emit_job_event(
                             &app_clone,
                             &job_id_clone,
@@ -1487,120 +1951,59 @@ pub async fn migrate_server(
                         );
                         continue;
                     }
-                }
-
-                let mut mapping_results: HashMap<String, Vec<crate::transfer::MigrationMapping>> =
-                    HashMap::new();
-                let mut group_mapping_error: Option<String> = None;
-
-                for table in &tables {
-                    match list_columns_for_table(
-                        &source_connection_id_clone,
-                        &database,
-                        schema.as_deref(),
-                        table,
-                        &connections_clone,
-                    )
-                    .await
-                    {
-                        Ok(columns) => {
-                            let mapping = columns
-                                .into_iter()
-                                .map(|column| crate::transfer::MigrationMapping {
-                                    source_column: column.clone(),
-                                    source_type: "text".to_string(),
-                                    target_column: column,
-                                    target_type: "text".to_string(),
-                                    conversion: crate::transfer::MigrationConversion::Direct,
-                                })
-                                .collect::<Vec<_>>();
-                            mapping_results.insert(table.clone(), mapping);
-                        }
-                        Err(error) => {
-                            outcomes.push((
-                                format!(
-                                    "{}.{}.{}",
-                                    database,
-                                    schema.clone().unwrap_or_else(|| "default".to_string()),
-                                    table
-                                ),
-                                Err(error.clone()),
-                            ));
-                            group_mapping_error = Some(error);
-                            break;
-                        }
-                    }
-                }
-
-                if mapping_results.is_empty() {
-                    outcomes.push((
-                        group_label,
-                        Err(group_mapping_error
-                            .unwrap_or_else(|| "All table mappings failed".to_string())),
-                    ));
-                    processed_tables += tables.len() as u64;
-                    let _ = emit_job_event(
-                        &app_clone,
-                        &job_id_clone,
-                        TransferJobStatus::Running,
-                        "processing",
-                        processed_tables,
-                        total_tables,
-                        None,
-                        None,
-                    );
-                    continue;
-                }
-
-                if let Some(error) = group_mapping_error {
-                    outcomes.push((group_label, Err(error)));
-                    processed_tables += tables.len() as u64;
-                    let _ = emit_job_event(
-                        &app_clone,
-                        &job_id_clone,
-                        TransferJobStatus::Running,
-                        "processing",
-                        processed_tables,
-                        total_tables,
-                        None,
-                        None,
-                    );
-                    continue;
-                }
+                };
 
                 let request = build_migration_request(
                     source_connection_id_clone.clone(),
                     target_connection_id_clone.clone(),
                     database.clone(),
                     schema.clone(),
-                    tables.clone(),
+                    vec![table.clone()],
                     mapping_results,
                     &options_clone,
                 );
 
-                let migration_result =
-                    execute_migration_request(request, &app_clone, &connections_clone).await;
+                let migration_result = execute_migration_request(
+                    request,
+                    Some(database.as_str()),
+                    Some(database.as_str()),
+                    &app_clone,
+                    &connections_clone,
+                )
+                .await;
 
                 match migration_result {
                     Ok(result) if result.success => {
-                        outcomes.push((group_label, Ok(())));
-                        migrated_rows += result.processed_rows;
-                        succeeded_groups += 1;
+                        succeeded_tables += 1;
                     }
                     Ok(result) => {
+                        failed_tables += 1;
                         let first_error = result
                             .errors
                             .first()
                             .map(|error| error.message.clone())
                             .unwrap_or_else(|| "Migration failed".to_string());
-                        outcomes.push((group_label, Err(first_error)));
+                        failures.push(format!(
+                            "{}.{}.{}: {}",
+                            database,
+                            schema.clone().unwrap_or_else(|| "default".to_string()),
+                            table,
+                            first_error
+                        ));
                     }
                     Err(error) => {
-                        outcomes.push((group_label, Err(error)));
+                        failed_tables += 1;
+                        failures.push(format!(
+                            "{}.{}.{}: {}",
+                            database,
+                            schema.clone().unwrap_or_else(|| "default".to_string()),
+                            table,
+                            error
+                        ));
                     }
                 }
 
-                processed_tables += tables.len() as u64;
+                processed_tables += 1;
                 let _ = emit_job_event(
                     &app_clone,
                     &job_id_clone,
@@ -1613,37 +2016,15 @@ pub async fn migrate_server(
                 );
             }
 
-            let failed_groups = outcomes
-                .iter()
-                .filter_map(|(name, result)| result.as_ref().err().map(|_| name.clone()))
-                .collect::<Vec<_>>();
+            let (status, summary) =
+                summarize_migration_outcome(succeeded_tables, failed_tables, &failures);
 
-            let summary = format!(
-                "Migration {}: {} rows migrated, {} groups failed{}",
-                if succeeded_groups > 0 {
-                    "completed"
-                } else {
-                    "failed"
-                },
-                migrated_rows,
-                failed_groups.len(),
-                if failed_groups.is_empty() {
-                    String::new()
-                } else {
-                    format!(" [{}]", failed_groups.join(", "))
-                }
-            );
-
-            if succeeded_groups > 0 {
-                Ok((TransferJobStatus::Completed, None))
-            } else {
-                Ok((TransferJobStatus::Failed, Some(summary)))
-            }
+            Ok((status, summary, total_tables))
         }
         .await;
 
         match outcome {
-            Ok((status, error)) => {
+            Ok((status, error, total_tables)) => {
                 let stage = if status == TransferJobStatus::Completed {
                     "completed"
                 } else {
@@ -1667,7 +2048,7 @@ pub async fn migrate_server(
                     TransferJobStatus::Failed,
                     "failed",
                     0,
-                    total_tables,
+                    0,
                     None,
                     Some(error),
                 );
@@ -1735,6 +2116,7 @@ pub async fn run_transfer_profile(
                 format,
                 destination,
                 profile.options,
+                None,
                 app,
                 state,
             )
@@ -1751,6 +2133,7 @@ pub async fn run_transfer_profile(
                 target_connection_id,
                 profile.selection,
                 profile.options,
+                None,
                 app,
                 state,
             )
@@ -1804,7 +2187,7 @@ pub async fn run_transfer_profile(
                 output_path: output_path.to_string_lossy().to_string(),
             };
 
-            execute_export_request(request, &app, &connections).await?;
+            execute_export_request(request, None, &app, &connections).await?;
             Ok(Uuid::new_v4().to_string())
         }
         (TransferProfileKind::Import, TransferScope::Server)
@@ -1837,7 +2220,8 @@ pub async fn run_transfer_profile(
 
 #[cfg(test)]
 mod tests {
-    use super::{quote_ident_mysql, quote_ident_pg};
+    use super::{quote_ident_mysql, quote_ident_pg, summarize_migration_outcome};
+    use crate::transfer::TransferJobStatus;
 
     #[test]
     fn quote_ident_mysql_quotes_simple_name() {
@@ -1871,5 +2255,23 @@ mod tests {
             quote_ident_pg("a; DROP TABLE x;--").unwrap_or_default(),
             "\"a; DROP TABLE x;--\""
         );
+    }
+
+    #[test]
+    fn summarize_migration_outcome_returns_completed_with_partial_failures() {
+        let (status, summary) =
+            summarize_migration_outcome(2, 1, &["db.public.users: duplicate key".to_string()]);
+
+        assert_eq!(status, TransferJobStatus::Completed);
+        assert!(summary.unwrap_or_default().contains("1 failed"));
+    }
+
+    #[test]
+    fn summarize_migration_outcome_returns_failed_when_no_success() {
+        let (status, summary) =
+            summarize_migration_outcome(0, 2, &["db.public.orders: timeout".to_string()]);
+
+        assert_eq!(status, TransferJobStatus::Failed);
+        assert!(summary.unwrap_or_default().contains("2 failed"));
     }
 }
