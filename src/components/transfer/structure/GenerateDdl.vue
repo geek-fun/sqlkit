@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { DdlOptions } from '@/types/transfer'
+import type { DdlOptions, TransferScope } from '@/types/transfer'
 
 import { invoke } from '@tauri-apps/api/core'
 import { save } from '@tauri-apps/plugin-dialog'
@@ -16,6 +16,7 @@ import TransferStepCard from '../shared/TransferStepCard.vue'
 
 const connectionStore = useConnectionStore()
 
+const scope = ref<TransferScope>('tables')
 const connectionId = ref('')
 const database = ref('')
 const schema = ref('')
@@ -107,7 +108,10 @@ function deselectAll() {
 
 // Generate DDL
 async function generateDdl() {
-  if (!connectionId.value || selectedObjects.value.length === 0)
+  if (!connectionId.value || !isConnected.value)
+    return
+
+  if (scope.value === 'tables' && selectedObjects.value.length === 0)
     return
 
   loadingDdl.value = true
@@ -116,8 +120,9 @@ async function generateDdl() {
       connectionId: connectionId.value,
       database: database.value || undefined,
       schema: schema.value || undefined,
+      scope: scope.value,
       objects: objects.value
-        .filter(o => selectedObjects.value.includes(o.name))
+        .filter(o => scope.value !== 'tables' || selectedObjects.value.includes(o.name))
         .map(o => ({ name: o.name, objectType: 'table' as const, schema: schema.value || undefined })),
       options: ddlOptions.value,
     })
@@ -152,9 +157,13 @@ async function saveToFile() {
   }
 }
 
-const canGenerate = computed(() =>
-  connectionId.value !== '' && isConnected.value && selectedObjects.value.length > 0,
-)
+const canGenerate = computed(() => {
+  if (!connectionId.value || !isConnected.value)
+    return false
+  if (scope.value === 'tables')
+    return selectedObjects.value.length > 0
+  return true
+})
 </script>
 
 <template>
@@ -166,16 +175,18 @@ const canGenerate = computed(() =>
       icon="i-carbon-data-base"
       icon-class="text-emerald-600 dark:text-emerald-500"
       :summary="selectionSummary"
+      :scope="scope"
+      @update:scope="scope = $event"
     >
       <ConnectionSelector
         v-model:connection-id="connectionId"
         v-model:database="database"
         v-model:schema="schema"
-        show-schema
+        :show-schema="scope === 'tables'"
       />
 
-      <!-- Objects List -->
-      <div class="mt-6 pt-4 border-t border-border/40">
+      <!-- Objects List (tables scope only) -->
+      <div v-if="scope === 'tables'" class="mt-6 pt-4 border-t border-border/40">
         <div class="mb-3 flex items-center justify-between">
           <Label class="text-[11px] text-muted-foreground tracking-wide font-semibold flex gap-1.5 uppercase items-center">
             <span class="i-carbon-list" />

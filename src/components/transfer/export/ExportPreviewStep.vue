@@ -29,17 +29,18 @@ const isLoading = ref(false)
 
 const sourceInfo = computed(() => {
   const req = transferStore.exportRequest
+  const firstSource = req.sources?.[0]
   return {
     connection: req.connectionId || 'Not selected',
     database: req.database || 'default',
-    table: req.source?.table || 'Not selected',
+    table: firstSource?.table || 'Not selected',
     format: req.format?.toUpperCase() || 'CSV',
-    columns: req.source?.columns?.length || 0,
+    columns: firstSource?.columns?.length || 0,
   }
 })
 
 async function loadPreview() {
-  if (!transferStore.exportRequest.connectionId || !transferStore.exportRequest.source?.table) {
+  if (!transferStore.exportRequest.connectionId || !transferStore.exportRequest.sources?.[0]?.table) {
     return
   }
 

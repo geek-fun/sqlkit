@@ -16,6 +16,16 @@ pub enum ExportFormat {
     Excel,
 }
 
+/// Scope of a transfer operation.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum TransferScope {
+    Server,
+    Database,
+    #[default]
+    Tables,
+}
+
 /// CSV export options with sensible defaults.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -71,15 +81,12 @@ pub struct ExcelExportOptions {
     pub freeze_header: bool,
 }
 
-/// Export source is always a table (Custom Query removed for simplicity).
+/// Export source is always a table.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportSource {
     pub table: String,
     pub columns: Vec<String>,
-    pub where_clause: Option<String>,
-    pub order_by: Option<String>,
-    pub limit: Option<u64>,
 }
 
 /// Export request payload.
@@ -89,7 +96,9 @@ pub struct ExportRequest {
     pub connection_id: String,
     pub database: Option<String>,
     pub schema: Option<String>,
-    pub source: ExportSource,
+    #[serde(default)]
+    pub scope: TransferScope,
+    pub sources: Vec<ExportSource>,
     pub format: ExportFormat,
     pub csv_options: Option<CsvExportOptions>,
     pub jsonl_options: Option<JsonlExportOptions>,
@@ -152,6 +161,18 @@ pub struct ExcelImportOptions {
     pub has_header: bool,
 }
 
+/// Import target table configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImportTarget {
+    pub table: String,
+    pub file_path: String,
+    pub format: ImportFormat,
+    pub column_mappings: Vec<ColumnMapping>,
+    pub csv_options: Option<CsvImportOptions>,
+    pub excel_options: Option<ExcelImportOptions>,
+}
+
 /// Import request payload.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -159,10 +180,9 @@ pub struct ImportRequest {
     pub connection_id: String,
     pub database: Option<String>,
     pub schema: Option<String>,
-    pub table: String,
-    pub file_path: String,
-    pub format: ImportFormat,
-    pub column_mappings: Vec<ColumnMapping>,
+    #[serde(default)]
+    pub scope: TransferScope,
+    pub tables: Vec<ImportTarget>,
     #[serde(default)]
     pub conflict_strategy: ConflictStrategy,
     #[serde(default = "default_import_batch_size")]
@@ -173,8 +193,8 @@ pub struct ImportRequest {
     pub truncate_before: bool,
     #[serde(default)]
     pub dry_run: bool,
-    pub csv_options: Option<CsvImportOptions>,
-    pub excel_options: Option<ExcelImportOptions>,
+    #[serde(default)]
+    pub create_database_if_not_exists: Option<bool>,
 }
 
 // ── Progress & Results ──────────────────────────────────────────
@@ -183,14 +203,15 @@ pub struct ImportRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TransferProgress {
-    pub operation: String, // "export" | "import" | "ddl" | "sql_file" | "migration"
-    pub phase: String,     // "preparing" | "processing" | "finalizing"
+    pub operation: String,
+    pub phase: String,
+    pub current_database: Option<String>,
     pub current_table: Option<String>,
     pub total_rows: Option<u64>,
     pub processed_rows: u64,
     pub skipped_rows: u64,
     pub error_count: u64,
-    pub percent: f32, // 0.0–100.0
+    pub percent: f32,
     pub elapsed_ms: u64,
     pub estimated_remaining_ms: Option<u64>,
     pub message: Option<String>,
@@ -312,6 +333,8 @@ pub struct DdlRequest {
     pub connection_id: String,
     pub database: Option<String>,
     pub schema: Option<String>,
+    #[serde(default)]
+    pub scope: TransferScope,
     pub objects: Vec<DdlObject>,
     pub options: DdlOptions,
 }
@@ -383,6 +406,8 @@ pub struct MigrationRequest {
     pub target_connection_id: String,
     pub target_database: Option<String>,
     pub target_schema: Option<String>,
+    #[serde(default)]
+    pub scope: TransferScope,
     pub table_plans: Vec<MigrationTablePlan>,
     #[serde(default = "default_migration_batch_size")]
     pub batch_size: u32,
@@ -400,6 +425,8 @@ pub struct MigrationRequest {
     pub migrate_constraints: bool,
     #[serde(default)]
     pub disable_fk_checks: bool,
+    #[serde(default)]
+    pub create_target_database_if_not_exists: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
@@ -431,4 +458,109 @@ pub struct MigrationTablePreview {
 
 fn default_migration_batch_size() -> u32 {
     5000
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_transfer_scope_serde_roundtrip_server() {
+        let scope = TransferScope::Server;
+        let json = serde_json::to_string(&scope).unwrap();
+        assert_eq!(json, "\"server\"");
+        let deserialized: TransferScope = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, TransferScope::Server);
+    }
+
+    #[test]
+    fn test_transfer_scope_serde_roundtrip_database() {
+        let scope = TransferScope::Database;
+        let json = serde_json::to_string(&scope).unwrap();
+        assert_eq!(json, "\"database\"");
+        let deserialized: TransferScope = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, TransferScope::Database);
+    }
+
+    #[test]
+    fn test_transfer_scope_serde_roundtrip_tables() {
+        let scope = TransferScope::Tables;
+        let json = serde_json::to_string(&scope).unwrap();
+        assert_eq!(json, "\"tables\"");
+        let deserialized: TransferScope = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized, TransferScope::Tables);
+    }
+
+    #[test]
+    fn test_transfer_scope_default_is_tables() {
+        let default_scope: TransferScope = Default::default();
+        assert_eq!(default_scope, TransferScope::Tables);
+    }
+
+    #[test]
+    fn test_transfer_scope_serde_default_on_missing() {
+        #[derive(Serialize, Deserialize)]
+        struct Container {
+            #[serde(default)]
+            scope: TransferScope,
+        }
+        let json = r#"{}"#;
+        let container: Container = serde_json::from_str(json).unwrap();
+        assert_eq!(container.scope, TransferScope::Tables);
+    }
+
+    #[test]
+    fn test_export_format_serde_roundtrip() {
+        let formats = [
+            ExportFormat::Csv,
+            ExportFormat::Jsonl,
+            ExportFormat::Sql,
+            ExportFormat::Excel,
+        ];
+        for format in &formats {
+            let json = serde_json::to_string(format).unwrap();
+            let deserialized: ExportFormat = serde_json::from_str(&json).unwrap();
+            assert_eq!(&deserialized, format);
+        }
+    }
+
+    #[test]
+    fn test_export_request_serde_roundtrip() {
+        let request = ExportRequest {
+            connection_id: "test-conn".into(),
+            database: Some("test_db".into()),
+            schema: None,
+            scope: TransferScope::Tables,
+            sources: vec![ExportSource {
+                table: "users".into(),
+                columns: vec!["id".into(), "name".into()],
+            }],
+            format: ExportFormat::Csv,
+            csv_options: None,
+            jsonl_options: None,
+            sql_options: None,
+            excel_options: None,
+            output_path: "/tmp/export.csv".into(),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let deserialized: ExportRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.connection_id, request.connection_id);
+        assert_eq!(deserialized.database, request.database);
+        assert_eq!(deserialized.scope, TransferScope::Tables);
+        assert_eq!(deserialized.sources.len(), 1);
+        assert_eq!(deserialized.sources[0].table, "users");
+        assert_eq!(deserialized.format, ExportFormat::Csv);
+    }
+
+    #[test]
+    fn test_export_request_default_scope_is_tables() {
+        let json = r#"{
+            "connectionId": "test",
+            "sources": [],
+            "format": "csv",
+            "outputPath": "/tmp/test.csv"
+        }"#;
+        let request: ExportRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.scope, TransferScope::Tables);
+    }
 }

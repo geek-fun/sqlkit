@@ -3,8 +3,10 @@
   Provides a clean, compact header with optional icon/step number and hairline borders.
 -->
 <script setup lang="ts">
+import type { TransferScope } from '@/types/transfer'
 import { computed } from 'vue'
 import { Card, CardContent } from '@/components/ui/card'
+import ScopeSelector from './ScopeSelector.vue'
 
 const props = defineProps<{
   title: string
@@ -14,6 +16,12 @@ const props = defineProps<{
   summary?: string
   variant?: 'default' | 'highlight' | 'ghost'
   minHeight?: string
+  scope?: TransferScope
+  scopeDisabled?: boolean
+}>()
+
+const emit = defineEmits<{
+  'update:scope': [value: TransferScope]
 }>()
 
 const cardClasses = computed(() => {
@@ -41,7 +49,8 @@ const stepLabel = computed(() =>
       <span v-if="stepLabel" class="text-[10px] text-muted-foreground tracking-wide font-mono px-1.5 rounded-sm bg-muted">
         {{ stepLabel }}
       </span>
-      <span class="text-xs text-foreground tracking-wide font-medium flex-1 uppercase">{{ title }}</span>
+      <span class="text-xs text-foreground tracking-wide font-medium uppercase" :class="{ 'flex-1': !scope }">{{ title }}</span>
+      <ScopeSelector v-if="scope" class="ml-2" :scope="props.scope ?? 'tables'" :disabled="props.scopeDisabled" @update:scope="emit('update:scope', $event)" />
       <span v-if="summary" class="text-[11px] text-muted-foreground font-mono">
         {{ summary }}
       </span>

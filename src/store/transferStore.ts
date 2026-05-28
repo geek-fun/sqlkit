@@ -169,7 +169,8 @@ export const useTransferStore = defineStore('transfer', () => {
     switch (kind) {
       case 'export': {
         const cfg = config as ExportTaskConfig
-        return `Export ${cfg.table} → ${cfg.format.toUpperCase()}`
+        const tableName = cfg.sources?.[0]?.table || 'unknown'
+        return `Export ${tableName} → ${cfg.format.toUpperCase()}`
       }
       case 'import': {
         const cfg = config as ImportTaskConfig

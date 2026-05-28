@@ -1,5 +1,7 @@
 export type ExportFormat = 'csv' | 'jsonl' | 'sql' | 'excel'
 
+export type TransferScope = 'server' | 'database' | 'tables'
+
 export type ColumnInfo = {
   name: string
   data_type?: string
@@ -17,9 +19,6 @@ export type TableColumns = {
 export type ExportSource = {
   table: string
   columns: string[]
-  whereClause?: string
-  orderBy?: string
-  limit?: number
 }
 
 export type CsvExportOptions = {
@@ -54,7 +53,8 @@ export type ExportRequest = {
   connectionId: string
   database?: string
   schema?: string
-  source: ExportSource
+  scope: TransferScope
+  sources: ExportSource[]
   format: ExportFormat
   csvOptions?: CsvExportOptions
   jsonlOptions?: JsonlExportOptions
@@ -79,11 +79,19 @@ export type CsvImportOptions = {
   hasHeader?: boolean
 }
 
+export type ImportTarget = {
+  sourceTable?: string
+  targetTable: string
+  columnMappings?: ColumnMapping[]
+}
+
 export type ImportRequest = {
   connectionId: string
   database?: string
   schema?: string
-  table: string
+  scope: TransferScope
+  createDatabaseIfNotExists?: boolean
+  tables: ImportTarget[]
   filePath: string
   format: ImportFormat
   columnMappings: ColumnMapping[]
@@ -161,11 +169,8 @@ export type ExportTaskConfig = {
   connectionId: string
   database?: string
   schema?: string
-  table: string
-  columns: string[]
-  whereClause?: string
-  orderBy?: string
-  limit?: number
+  scope: TransferScope
+  sources: ExportSource[]
   format: ExportFormat
   outputPath: string
 }
@@ -174,15 +179,18 @@ export type ImportTaskConfig = {
   connectionId: string
   database?: string
   schema?: string
-  table: string
+  scope: TransferScope
+  tables: ImportTarget[]
   filePath: string
   format: ImportFormat
   conflictStrategy?: ConflictStrategy
+  createDatabaseIfNotExists?: boolean
 }
 
 export type SqlFileTaskConfig = {
   connectionId: string
   database?: string
+  scope: TransferScope
   filePath: string
   onError: 'rollback' | 'skipAndContinue' | 'stop'
 }
@@ -192,7 +200,9 @@ export type MigrationTaskConfig = {
   sourceDatabase?: string
   targetConnectionId: string
   targetDatabase?: string
-  tables: string[]
+  scope: TransferScope
+  tablePlans: MigrationTablePlan[]
+  createTargetDatabaseIfNotExists?: boolean
 }
 
 export type TaskConfig = ExportTaskConfig | ImportTaskConfig | SqlFileTaskConfig | MigrationTaskConfig
@@ -236,6 +246,7 @@ export type DdlRequest = {
   connectionId: string
   database?: string
   schema?: string
+  scope: TransferScope
   objects: DdlObject[]
   options: DdlOptions
 }
@@ -270,6 +281,8 @@ export type MigrationRequest = {
   targetConnectionId: string
   targetDatabase?: string
   targetSchema?: string
+  scope: TransferScope
+  createTargetDatabaseIfNotExists?: boolean
   tablePlans: MigrationTablePlan[]
   batchSize?: number
   onError?: MigrationErrorStrategy

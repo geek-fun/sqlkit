@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import type { TransferProgress, TransferResult } from '@/types/transfer'
+import type { TransferProgress, TransferResult, TransferScope } from '@/types/transfer'
 
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref } from 'vue'
 
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -17,11 +18,13 @@ import TransferStepCard from '../shared/TransferStepCard.vue'
 const { t } = useI18n()
 const connectionStore = useConnectionStore()
 
+const scope = ref<TransferScope>('tables')
 const connectionId = ref('')
 const database = ref('')
 const filePath = ref('')
 const fileContent = ref('')
 const onError = ref<'rollback' | 'skipAndContinue' | 'stop'>('stop')
+const createDatabaseIfNotExists = ref(false)
 
 const executing = ref(false)
 const progress = ref<TransferProgress | null>(null)
@@ -114,11 +117,24 @@ const canExecute = computed(() =>
       :step-number="1"
       icon="i-carbon-data-base"
       icon-class="text-emerald-600 dark:text-emerald-500"
+      :scope="scope"
+      @update:scope="scope = $event"
     >
       <ConnectionSelector
         v-model:connection-id="connectionId"
         v-model:database="database"
       />
+
+      <!-- Create Database Option (database scope) -->
+      <div v-if="scope === 'database'" class="mt-4 pt-4 border-t border-border/40">
+        <label class="px-3 py-2 border border-border/40 rounded-md flex cursor-pointer transition-colors items-center space-x-3 hover:bg-muted/50" :class="createDatabaseIfNotExists ? 'border-primary/30 bg-primary/5' : 'bg-transparent'">
+          <Checkbox id="run-sql-create-db" v-model="createDatabaseIfNotExists" />
+          <div class="flex flex-col">
+            <span class="text-xs leading-none font-medium">Create database if not exists</span>
+            <span class="text-[10px] text-muted-foreground mt-0.5">Automatically create the target database before executing SQL</span>
+          </div>
+        </label>
+      </div>
     </TransferStepCard>
 
     <!-- File -->

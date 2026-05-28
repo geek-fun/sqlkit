@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { MigrationMapping, MigrationPreview, MigrationRequest, MigrationTablePlan } from '@/types/transfer'
+import type { MigrationMapping, MigrationPreview, MigrationRequest, MigrationTablePlan, TransferScope } from '@/types/transfer'
 
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
@@ -25,6 +25,9 @@ const sourceSchema = ref('')
 const targetConnectionId = ref('')
 const targetDatabase = ref('')
 const targetSchema = ref('')
+
+const scope = ref<TransferScope>('tables')
+const createTargetDatabaseIfNotExists = ref(false)
 
 const availableTables = ref<{ name: string, rowCount?: number }[]>([])
 const selectedTables = ref<string[]>([])
@@ -67,9 +70,20 @@ const targetEngine = computed(() => {
 
 // Summaries
 const sourceSummary = computed(() => {
-  if (sourceConnectionId.value && selectedTables.value.length)
-    return `${selectedTables.value.length} tables`
-  return ''
+  if (!sourceConnectionId.value)
+    return ''
+
+  switch (scope.value) {
+    case 'server':
+      return 'All databases will be migrated'
+    case 'database':
+      return sourceDatabase.value ? `All tables in ${sourceDatabase.value}` : 'Select a database'
+    case 'tables':
+    default:
+      return selectedTables.value.length > 0
+        ? `${selectedTables.value.length} tables`
+        : ''
+  }
 })
 
 const targetSummary = computed(() => {
@@ -80,6 +94,11 @@ const targetSummary = computed(() => {
 
 // Load tables
 async function loadTables() {
+  if (scope.value !== 'tables') {
+    availableTables.value = []
+    return
+  }
+
   if (!sourceConnectionId.value || !sourceDatabase.value || !isSourceConnected.value)
     return
 
@@ -186,6 +205,8 @@ function buildRequest(): MigrationRequest {
     targetConnectionId: targetConnectionId.value,
     targetDatabase: targetDatabase.value || undefined,
     targetSchema: targetSchema.value || undefined,
+    scope: scope.value,
+    createTargetDatabaseIfNotExists: createTargetDatabaseIfNotExists.value,
     tablePlans: tablePlans.value,
     batchSize: batchSize.value,
     onError: onError.value,
@@ -217,6 +238,8 @@ function deselectAllTables() {
 
 // Watch for source changes
 const sourceParams = computed(() => {
+  if (scope.value !== 'tables')
+    return null
   if (!isSourceConnected.value || !sourceDatabase.value)
     return null
   return {
@@ -234,6 +257,8 @@ watch(sourceParams, (params, oldParams) => {
 
 // Watch for target changes
 const targetMigrationParams = computed(() => {
+  if (scope.value !== 'tables')
+    return null
   if (!isTargetConnected.value || !targetDatabase.value || !selectedTables.value.length)
     return null
   return {
@@ -251,12 +276,17 @@ watch(targetMigrationParams, async (params, oldParams) => {
   }
 }, { deep: true })
 
-const canExecute = computed(() =>
-  isSourceConnected.value
-  && isTargetConnected.value
-  && selectedTables.value.length > 0
-  && tablePlans.value.length > 0,
-)
+const canExecute = computed(() => {
+  // For server and database scopes, we don't need table plans - just connections
+  if (scope.value === 'server' || scope.value === 'database') {
+    return isSourceConnected.value && isTargetConnected.value && tablePlans.value.length >= 0
+  }
+  // For tables scope, require selected tables and table plans
+  return isSourceConnected.value
+    && isTargetConnected.value
+    && selectedTables.value.length > 0
+    && tablePlans.value.length > 0
+})
 </script>
 
 <template>
@@ -268,16 +298,29 @@ const canExecute = computed(() =>
       icon="i-carbon-data-base"
       icon-class="text-emerald-600 dark:text-emerald-500"
       :summary="sourceSummary"
+      :scope="scope"
+      @update:scope="scope = $event"
     >
       <ConnectionSelector
         v-model:connection-id="sourceConnectionId"
         v-model:database="sourceDatabase"
         v-model:schema="sourceSchema"
-        show-schema
+        :show-schema="scope === 'tables'"
       />
 
-      <!-- Tables -->
-      <div class="mt-4 pt-4 border-t border-border/40">
+      <!-- Scope-specific badges -->
+      <div v-if="scope === 'server' && sourceConnectionId" class="mt-3 px-3 py-2 border border-emerald-500/20 rounded-md bg-emerald-500/5 flex gap-2 items-center">
+        <span class="i-carbon-information text-emerald-600 h-4 w-4 dark:text-emerald-500" />
+        <span class="text-xs text-emerald-700 font-medium dark:text-emerald-400">All databases will be migrated</span>
+      </div>
+
+      <div v-if="scope === 'database' && sourceDatabase" class="mt-3 px-3 py-2 border border-emerald-500/20 rounded-md bg-emerald-500/5 flex gap-2 items-center">
+        <span class="i-carbon-information text-emerald-600 h-4 w-4 dark:text-emerald-500" />
+        <span class="text-xs text-emerald-700 font-mono dark:text-emerald-400">All tables in <span class="font-semibold">{{ sourceDatabase }}</span> will be migrated</span>
+      </div>
+
+      <!-- Tables grid (only for 'tables' scope) -->
+      <div v-if="scope === 'tables'" class="mt-4 pt-4 border-t border-border/40">
         <div class="mb-3 flex items-center justify-between">
           <Label class="text-[11px] text-muted-foreground tracking-wide font-semibold flex gap-1.5 uppercase items-center">
             <span class="i-carbon-table" />
@@ -365,6 +408,14 @@ const canExecute = computed(() =>
 
       <!-- Options -->
       <div class="mt-5 pt-4 border-t border-border/40">
+        <!-- Create database if not exists (database scope) -->
+        <div v-if="scope === 'database'" class="mb-4">
+          <label class="flex cursor-pointer items-center space-x-1.5">
+            <Checkbox id="mig-opt-create-db" v-model:checked="createTargetDatabaseIfNotExists" class="h-3.5 w-3.5" />
+            <span class="text-[11px] leading-none font-medium">Create target database if not exists</span>
+          </label>
+        </div>
+
         <div class="gap-4 grid grid-cols-1 md:grid-cols-2">
           <div class="space-y-1.5">
             <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Batch Size</Label>

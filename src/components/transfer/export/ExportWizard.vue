@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ExportFormat, TableColumns } from '@/types/transfer'
+import type { ExportFormat, ExportSource, TransferResult, TransferScope } from '@/types/transfer'
 
 import { open } from '@tauri-apps/plugin-dialog'
 import { computed, ref, watch } from 'vue'
@@ -11,28 +11,27 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { executeExport } from '@/datasources/transferApi'
 import { useTransferStore } from '@/store/transferStore'
 import ConnectionSelector from '../shared/ConnectionSelector.vue'
 import MultiTableSelector from '../shared/MultiTableSelector.vue'
-import TabbedColumnSelector from '../shared/TabbedColumnSelector.vue'
 import TransferStepCard from '../shared/TransferStepCard.vue'
 
 const { t } = useI18n()
 const transferStore = useTransferStore()
 
 // Local state for all inputs
+const scope = ref<TransferScope>('tables')
 const connectionId = ref('')
 const database = ref('')
 const schema = ref('')
 const selectedTables = ref<string[]>([])
-const tableColumns = ref<TableColumns[]>([])
 const selectedFormat = ref<ExportFormat>('csv')
 
-// Reset tables and columns when connection or database changes
+// Reset tables when connection or database changes
 watch([connectionId, database], ([newConnId, newDb], [oldConnId, oldDb]) => {
   if (newConnId !== oldConnId || newDb !== oldDb) {
     selectedTables.value = []
-    tableColumns.value = []
   }
 })
 
@@ -51,13 +50,20 @@ const outputPath = ref('')
 
 // Source summary for display
 const sourceSummary = computed(() => {
-  if (connectionId.value && selectedTables.value.length > 0) {
-    const colCount = tableColumns.value.reduce((sum, tc) => sum + tc.selectedColumns.length, 0)
-    return `${selectedTables.value.length} tables (${colCount} cols)`
+  if (!connectionId.value)
+    return ''
+
+  switch (scope.value) {
+    case 'server':
+      return 'All databases on this server'
+    case 'database':
+      return database.value ? `All tables in ${database.value}` : 'Select a database'
+    case 'tables':
+    default:
+      return selectedTables.value.length > 0
+        ? `${selectedTables.value.length} tables`
+        : 'Select tables'
   }
-  if (connectionId.value)
-    return connectionId.value
-  return ''
 })
 
 // Format options
@@ -68,52 +74,71 @@ const formatOptions: { value: ExportFormat, label: string, icon: string }[] = [
   { value: 'sql', label: 'SQL', icon: 'i-carbon-document-sql' },
 ]
 
-// Browse output file
+// Browse output file or directory
 async function handleBrowse() {
-  const extension = selectedFormat.value === 'excel' ? 'xlsx' : selectedFormat.value
-  const selected = await open({
-    multiple: false,
-    directory: false,
-    save: true,
-    filters: [
-      { name: 'Export File', extensions: [extension] },
-    ],
-  })
-  if (selected) {
-    outputPath.value = selected as string
+  if (scope.value === 'tables') {
+    const extension = selectedFormat.value === 'excel' ? 'xlsx' : selectedFormat.value
+    const selected = await open({
+      multiple: false,
+      directory: false,
+      save: true,
+      filters: [
+        { name: 'Export File', extensions: [extension] },
+      ],
+    })
+    if (selected) {
+      outputPath.value = selected as string
+    }
+  }
+  else {
+    const selected = await open({
+      directory: true,
+      multiple: false,
+    })
+    if (selected) {
+      outputPath.value = selected as string
+    }
   }
 }
 
 // Check if can export
-const canExport = computed(() =>
-  connectionId.value !== ''
-  && selectedTables.value.length > 0
-  && tableColumns.value.some(tc => tc.selectedColumns.length > 0)
-  && outputPath.value !== '',
-)
+const canExport = computed(() => {
+  if (!connectionId.value || !outputPath.value)
+    return false
 
-// Sync to store (simplified for MVP - single table export from first selected)
+  switch (scope.value) {
+    case 'server':
+      return true
+    case 'database':
+      return !!database.value
+    case 'tables':
+    default:
+      return selectedTables.value.length > 0
+  }
+})
+
+// Sync to store
 watch([
+  scope,
   connectionId,
   database,
   schema,
   selectedTables,
-  tableColumns,
   selectedFormat,
   outputPath,
 ], () => {
-  // For MVP, we'll export the first selected table
+  const sources: ExportSource[] = scope.value === 'tables'
+    ? selectedTables.value.map(t => ({ table: t, columns: [] }))
+    : []
+
   const firstTable = selectedTables.value[0]
-  const firstTableColumns = tableColumns.value.find(tc => tc.tableName === firstTable)
 
   transferStore.exportRequest = {
     connectionId: connectionId.value || undefined,
     database: database.value || undefined,
     schema: schema.value || undefined,
-    source: {
-      table: firstTable || '',
-      columns: firstTableColumns?.selectedColumns || [],
-    },
+    scope: scope.value,
+    sources,
     format: selectedFormat.value,
     outputPath: outputPath.value || undefined,
     csvOptions: selectedFormat.value === 'csv'
@@ -146,10 +171,30 @@ watch([
   }
 })
 
-// Start export (placeholder - actual implementation via background task)
-function startExport() {
-  // TODO: Implement actual export execution
-  console.log('Starting export:', transferStore.exportRequest)
+// Start export
+async function startExport() {
+  const request = transferStore.exportRequest
+  if (!request.connectionId || !request.outputPath)
+    return
+
+  transferStore.startOperation()
+  try {
+    const result = await executeExport(request as any)
+    transferStore.completeOperation(result)
+  }
+  catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    const errorResult: TransferResult = {
+      success: false,
+      totalRows: 0,
+      processedRows: 0,
+      skippedRows: 0,
+      errorCount: 1,
+      durationMs: 0,
+      errors: [{ message }],
+    }
+    transferStore.completeOperation(errorResult)
+  }
 }
 </script>
 
@@ -163,8 +208,35 @@ function startExport() {
       icon-class="text-emerald-600 dark:text-emerald-500"
       :summary="sourceSummary"
       min-height="340px"
+      :scope="scope"
+      @update:scope="scope = $event"
     >
-      <div class="gap-3 grid grid-cols-1 h-[280px] items-stretch overflow-hidden lg:grid-cols-3">
+      <!-- 'server' scope: connection only -->
+      <div v-if="scope === 'server'" class="h-[280px]">
+        <ConnectionSelector
+          v-model:connection-id="connectionId"
+          v-model:database="database"
+          v-model:schema="schema"
+        />
+        <Badge variant="secondary" class="text-[10px] font-mono mt-3 px-1.5 py-0.5 border-border/40 bg-muted/30">
+          All databases on this server
+        </Badge>
+      </div>
+
+      <!-- 'database' scope: connection + database (required) -->
+      <div v-else-if="scope === 'database'" class="h-[280px]">
+        <ConnectionSelector
+          v-model:connection-id="connectionId"
+          v-model:database="database"
+          v-model:schema="schema"
+        />
+        <Badge v-if="database" variant="secondary" class="text-[10px] font-mono mt-3 px-1.5 py-0.5 border-border/40 bg-muted/30">
+          All tables in {{ database }}
+        </Badge>
+      </div>
+
+      <!-- 'tables' scope: connection + database + schema + table selection -->
+      <div v-else class="gap-3 grid grid-cols-1 h-[280px] items-stretch overflow-hidden lg:grid-cols-3">
         <!-- Left: Connection, Database, Schema (1/3) -->
         <div class="lg:col-span-1">
           <ConnectionSelector
@@ -175,21 +247,13 @@ function startExport() {
           />
         </div>
 
-        <!-- Right: Tables and Columns (2/3) -->
-        <div class="gap-3 grid grid-cols-1 h-full overflow-hidden lg:col-span-2 lg:grid-cols-2">
+        <!-- Right: Table Selection (2/3) -->
+        <div class="h-full overflow-hidden lg:col-span-2">
           <MultiTableSelector
             v-model:selected-tables="selectedTables"
             :connection-id="connectionId"
             :database="database"
             :schema="schema"
-          />
-
-          <TabbedColumnSelector
-            v-model:table-columns="tableColumns"
-            :connection-id="connectionId"
-            :database="database"
-            :schema="schema"
-            :selected-tables="selectedTables"
           />
         </div>
       </div>
@@ -331,7 +395,7 @@ function startExport() {
                 <span class="i-carbon-document text-muted-foreground left-2.5 top-1/2 absolute -translate-y-1/2" />
                 <Input
                   v-model="outputPath"
-                  :placeholder="`/path/to/output.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}`"
+                  :placeholder="scope === 'tables' ? `/path/to/output.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}` : '/path/to/export/directory'"
                   class="text-[11px] font-mono pl-8 h-8"
                 />
               </div>
@@ -351,12 +415,9 @@ function startExport() {
       </div>
 
       <!-- Selection Summary -->
-      <div v-if="selectedTables.length > 0" class="mt-2 pt-2 border-t border-border/40 flex gap-2 items-center">
+      <div v-if="connectionId" class="mt-2 pt-2 border-t border-border/40 flex gap-2 items-center">
         <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
-          {{ selectedTables.length }} {{ t('transfer.migration.tablesSelected', 'tables') }}
-        </Badge>
-        <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
-          {{ tableColumns.reduce((sum, tc) => sum + tc.selectedColumns.length, 0) }} cols
+          {{ scope === 'server' ? 'All databases' : scope === 'database' ? (database || 'Select database') : `${selectedTables.length} tables` }}
         </Badge>
         <Badge variant="outline" class="text-[10px] font-mono px-1.5 py-0.5 uppercase">
           {{ selectedFormat }}

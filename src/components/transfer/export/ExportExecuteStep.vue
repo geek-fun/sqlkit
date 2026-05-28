@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { TransferProgress, TransferResult } from '@/types/transfer'
+import type { ExportTaskConfig, TransferProgress, TransferResult } from '@/types/transfer'
 
 import { listen } from '@tauri-apps/api/event'
 
@@ -55,11 +55,10 @@ function handleRunInBackground() {
     'export',
     {
       connectionId: transferStore.exportRequest.connectionId!,
-      table: transferStore.exportRequest.source?.table || '',
-      columns: transferStore.exportRequest.source?.columns || [],
+      sources: transferStore.exportRequest.sources || [],
       format: transferStore.exportRequest.format!,
       outputPath: transferStore.exportRequest.outputPath!,
-    },
+    } as ExportTaskConfig,
     progress.value?.totalRows || 0,
   )
   transferStore.addRunningTask(task)

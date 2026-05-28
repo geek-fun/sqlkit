@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ColumnMapping, ConflictStrategy, FileDetectionResult, TransferProgress, TransferResult } from '@/types/transfer'
+import type { ColumnMapping, ConflictStrategy, FileDetectionResult, ImportTarget, TransferProgress, TransferResult, TransferScope } from '@/types/transfer'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open } from '@tauri-apps/plugin-dialog'
@@ -33,6 +33,10 @@ export type ColumnInfo = {
 
 const { t } = useI18n()
 const transferStore = useTransferStore()
+
+// --- Scope ---
+const scope = ref<TransferScope>('tables')
+const createDatabaseIfNotExists = ref(false)
 
 // --- Step 1: File ---
 const filePath = ref('')
@@ -168,16 +172,24 @@ const targetParams = computed(() => {
     database: database.value,
     schema: schema.value,
     table: table.value,
+    scope: scope.value,
+    createDatabaseIfNotExists: createDatabaseIfNotExists.value,
   }
 })
 
 watch(targetParams, (params, oldParams) => {
+  const tables: ImportTarget[] | undefined = params.table
+    ? [{ targetTable: params.table, columnMappings: mappings.value }]
+    : undefined
+
   transferStore.importRequest = {
     ...transferStore.importRequest,
     connectionId: params.connectionId || undefined,
     database: params.database || undefined,
     schema: params.schema || undefined,
-    table: params.table,
+    scope: params.scope,
+    createDatabaseIfNotExists: params.createDatabaseIfNotExists,
+    tables,
     columnMappings: mappings.value,
   }
 
@@ -190,6 +202,12 @@ watch(targetParams, (params, oldParams) => {
 
 watch(table, () => {
   autoMap()
+})
+
+watch(scope, () => {
+  table.value = ''
+  targetColumns.value = []
+  mappings.value = []
 })
 
 watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
@@ -265,7 +283,18 @@ const result = ref<TransferResult | null>(null)
 let unlistenProgress: (() => void) | null = null
 
 const canImport = computed(() => {
-  return filePath.value && connectionId.value && table.value && mappings.value.some(m => m.targetColumn)
+  if (!filePath.value || !connectionId.value)
+    return false
+
+  switch (scope.value) {
+    case 'server':
+      return true
+    case 'database':
+      return !!database.value
+    case 'tables':
+    default:
+      return table.value && mappings.value.some(m => m.targetColumn)
+  }
 })
 
 async function startImport() {
@@ -304,10 +333,12 @@ function handleRunInBackground() {
     'import',
     {
       connectionId: transferStore.importRequest.connectionId || '',
-      table: transferStore.importRequest.table || '',
+      scope: transferStore.importRequest.scope || 'tables',
+      tables: transferStore.importRequest.tables || [],
       filePath: transferStore.importRequest.filePath || '',
       format: transferStore.importRequest.format || 'csv',
       conflictStrategy: transferStore.importRequest.conflictStrategy,
+      createDatabaseIfNotExists: transferStore.importRequest.createDatabaseIfNotExists,
     },
     progress.value?.totalRows || 0,
   )
@@ -416,8 +447,42 @@ onUnmounted(() => {
       icon="i-carbon-data-base"
       icon-class="text-blue-600 dark:text-blue-500"
       :summary="targetSummary"
+      :scope="scope"
+      @update:scope="scope = $event"
     >
-      <div class="space-y-4">
+      <!-- 'server' scope: connection only -->
+      <div v-if="scope === 'server'" class="space-y-3">
+        <ConnectionSelector
+          v-model:connection-id="connectionId"
+          v-model:database="database"
+          v-model:schema="schema"
+        />
+        <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
+          SQL can CREATE DATABASE
+        </Badge>
+      </div>
+
+      <!-- 'database' scope: connection + database + auto-create option -->
+      <div v-else-if="scope === 'database'" class="space-y-3">
+        <ConnectionSelector
+          v-model:connection-id="connectionId"
+          v-model:database="database"
+          v-model:schema="schema"
+          show-schema
+        />
+
+        <div class="px-2 py-1.5 rounded-sm flex transition-colors items-center space-x-2 hover:bg-muted/40">
+          <Checkbox id="import-create-db" v-model:checked="createDatabaseIfNotExists" class="h-3.5 w-3.5" />
+          <Label for="import-create-db" class="text-xs cursor-pointer select-none">Create database if not exists</Label>
+        </div>
+
+        <Badge v-if="database" variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
+          Tables will be auto-created
+        </Badge>
+      </div>
+
+      <!-- 'tables' scope: original behavior -->
+      <div v-else class="space-y-4">
         <div class="gap-2.5 grid grid-cols-2">
           <div class="col-span-2">
             <ConnectionSelector
