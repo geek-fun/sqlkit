@@ -65,148 +65,159 @@ async function handlePickSourceFile() {
 </script>
 
 <template>
-  <div class="p-4 border rounded-md bg-background">
-    <div v-if="action === 'backup' || action === 'export'" class="space-y-4">
-      <div class="gap-4 grid grid-cols-[120px_1fr] items-center">
-        <Label class="text-muted-foreground text-right">{{ t('transfer.launcher.format') }}</Label>
-        <Select :model-value="options.format || 'sql'" @update:model-value="(v) => updateOption('format', v as LauncherFormat)">
-          <SelectTrigger class="w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="sql">
-              SQL Dump (.sql)
-            </SelectItem>
-            <SelectItem value="csv">
-              CSV (.csv)
-            </SelectItem>
-            <SelectItem value="excel">
-              Excel (.xlsx)
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+  <div class="transfer-card transfer-console-section">
+    <div class="transfer-console-section-header">
+      <span class="i-carbon-settings text-xs" />
+      {{ t('transfer.launcher.options') }}
+    </div>
+    <div class="transfer-console-section-body">
+      <!-- Backup / Export -->
+      <div v-if="action === 'backup' || action === 'export'" class="space-y-3">
+        <div class="space-y-1.5">
+          <Label class="transfer-mono-label text-muted-foreground">{{ t('transfer.launcher.format') }}</Label>
+          <Select :model-value="options.format || 'sql'" @update:model-value="(v) => updateOption('format', v as LauncherFormat)">
+            <SelectTrigger class="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sql">
+                SQL Dump (.sql)
+              </SelectItem>
+              <SelectItem value="csv">
+                CSV (.csv)
+              </SelectItem>
+              <SelectItem value="excel">
+                Excel (.xlsx)
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
 
-      <div class="gap-4 grid grid-cols-[120px_1fr] items-center">
-        <Label class="text-muted-foreground text-right">{{ t('transfer.launcher.destination') }}</Label>
-        <div class="flex gap-2 max-w-md items-center">
-          <Input
-            :model-value="options.destination || ''"
-            readonly
-            class="flex-1"
-            placeholder="/path/to/backup.sql"
-          />
-          <Button variant="outline" @click="handlePickDestination">
-            {{ t('common.buttons.browse') }}
-          </Button>
+        <div class="space-y-1.5">
+          <Label class="transfer-mono-label text-muted-foreground">{{ t('transfer.launcher.destination') }}</Label>
+          <div class="flex gap-2 items-center">
+            <Input
+              :model-value="options.destination || ''"
+              readonly
+              class="flex-1"
+              placeholder="/path/to/backup.sql"
+            />
+            <Button variant="outline" size="sm" @click="handlePickDestination">
+              {{ t('common.buttons.browse') }}
+            </Button>
+          </div>
+        </div>
+
+        <div class="space-y-1.5">
+          <Label class="transfer-mono-label text-muted-foreground">{{ t('transfer.launcher.parallelism') }}</Label>
+          <Select :model-value="String(options.parallelism || 4)" @update:model-value="(v) => updateOption('parallelism', Number(v))">
+            <SelectTrigger class="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">
+                1 thread
+              </SelectItem>
+              <SelectItem value="2">
+                2 threads
+              </SelectItem>
+              <SelectItem value="4">
+                4 threads
+              </SelectItem>
+              <SelectItem value="8">
+                8 threads
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      <div class="gap-4 grid grid-cols-[120px_1fr] items-center">
-        <Label class="text-muted-foreground text-right">{{ t('transfer.launcher.parallelism') }}</Label>
-        <Select :model-value="String(options.parallelism || 4)" @update:model-value="(v) => updateOption('parallelism', Number(v))">
-          <SelectTrigger class="w-[100px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1">
-              1 thread
-            </SelectItem>
-            <SelectItem value="2">
-              2 threads
-            </SelectItem>
-            <SelectItem value="4">
-              4 threads
-            </SelectItem>
-            <SelectItem value="8">
-              8 threads
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
+      <!-- Migrate -->
+      <div v-else-if="action === 'migrate'" class="space-y-3">
+        <div class="space-y-1.5">
+          <label class="flex gap-2 cursor-pointer items-center">
+            <Checkbox
+              :checked="options.dropTargetFirst ?? false"
+              @update:checked="(v) => updateOption('dropTargetFirst', !!v)"
+            />
+            <span class="text-sm">{{ t('transfer.launcher.dropTargetFirst') }}</span>
+          </label>
+        </div>
 
-    <div v-else-if="action === 'migrate'" class="space-y-4">
-      <div class="gap-4 grid grid-cols-[120px_1fr] items-center">
-        <div class="text-muted-foreground text-right" />
-        <label class="flex gap-2 cursor-pointer items-center">
-          <Checkbox
-            :checked="options.dropTargetFirst ?? false"
-            @update:checked="(v) => updateOption('dropTargetFirst', !!v)"
-          />
-          <span class="text-sm">{{ t('transfer.launcher.dropTargetFirst') }}</span>
-        </label>
-      </div>
-
-      <div class="gap-4 grid grid-cols-[120px_1fr] items-center">
-        <Label class="text-muted-foreground text-right">{{ t('transfer.launcher.parallelism') }}</Label>
-        <Select :model-value="String(options.parallelism || 4)" @update:model-value="(v) => updateOption('parallelism', Number(v))">
-          <SelectTrigger class="w-[100px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1">
-              1 thread
-            </SelectItem>
-            <SelectItem value="2">
-              2 threads
-            </SelectItem>
-            <SelectItem value="4">
-              4 threads
-            </SelectItem>
-            <SelectItem value="8">
-              8 threads
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-    </div>
-
-    <div v-else-if="action === 'restore'" class="space-y-4">
-      <div class="gap-4 grid grid-cols-[120px_1fr] items-center">
-        <Label class="text-muted-foreground text-right">{{ t('transfer.launcher.fileFormat') }}</Label>
-        <Select :model-value="options.fileFormat || 'sql'" @update:model-value="(v) => updateOption('fileFormat', v as LauncherFormat)">
-          <SelectTrigger class="w-[200px]">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="sql">
-              SQL Dump (.sql)
-            </SelectItem>
-            <SelectItem value="csv">
-              CSV (.csv)
-            </SelectItem>
-            <SelectItem value="excel">
-              Excel (.xlsx)
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div class="gap-4 grid grid-cols-[120px_1fr] items-center">
-        <Label class="text-muted-foreground text-right">{{ t('transfer.launcher.sourceFile') }}</Label>
-        <div class="flex gap-2 max-w-md items-center">
-          <Input
-            :model-value="options.filePath || ''"
-            readonly
-            class="flex-1"
-            placeholder="/path/to/backup.sql"
-          />
-          <Button variant="outline" @click="handlePickSourceFile">
-            {{ t('common.buttons.browse') }}
-          </Button>
+        <div class="space-y-1.5">
+          <Label class="transfer-mono-label text-muted-foreground">{{ t('transfer.launcher.parallelism') }}</Label>
+          <Select :model-value="String(options.parallelism || 4)" @update:model-value="(v) => updateOption('parallelism', Number(v))">
+            <SelectTrigger class="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1">
+                1 thread
+              </SelectItem>
+              <SelectItem value="2">
+                2 threads
+              </SelectItem>
+              <SelectItem value="4">
+                4 threads
+              </SelectItem>
+              <SelectItem value="8">
+                8 threads
+              </SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
-      <div v-if="options.fileFormat === 'csv' || options.fileFormat === 'excel'" class="gap-4 grid grid-cols-[120px_1fr] items-center">
-        <Label class="text-muted-foreground text-right">{{ t('transfer.launcher.targetTable') }}</Label>
-        <Input
-          :model-value="options.targetTable || ''"
-          class="max-w-md"
-          :placeholder="t('transfer.launcher.targetTablePlaceholder')"
-          @update:model-value="(v) => updateOption('targetTable', String(v))"
-        />
+      <!-- Restore -->
+      <div v-else-if="action === 'restore'" class="space-y-3">
+        <div class="space-y-1.5">
+          <Label class="transfer-mono-label text-muted-foreground">{{ t('transfer.launcher.fileFormat') }}</Label>
+          <Select :model-value="options.fileFormat || 'sql'" @update:model-value="(v) => updateOption('fileFormat', v as LauncherFormat)">
+            <SelectTrigger class="w-[200px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sql">
+                SQL Dump (.sql)
+              </SelectItem>
+              <SelectItem value="csv">
+                CSV (.csv)
+              </SelectItem>
+              <SelectItem value="excel">
+                Excel (.xlsx)
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div class="space-y-1.5">
+          <Label class="transfer-mono-label text-muted-foreground">{{ t('transfer.launcher.sourceFile') }}</Label>
+          <div class="flex gap-2 items-center">
+            <Input
+              :model-value="options.filePath || ''"
+              readonly
+              class="flex-1"
+              placeholder="/path/to/backup.sql"
+            />
+            <Button variant="outline" size="sm" @click="handlePickSourceFile">
+              {{ t('common.buttons.browse') }}
+            </Button>
+          </div>
+        </div>
+
+        <div v-if="options.fileFormat === 'csv' || options.fileFormat === 'excel'" class="space-y-1.5">
+          <Label class="transfer-mono-label text-muted-foreground">{{ t('transfer.launcher.targetTable') }}</Label>
+          <Input
+            :model-value="options.targetTable || ''"
+            class="max-w-md"
+            :placeholder="t('transfer.launcher.targetTablePlaceholder')"
+            @update:model-value="(v) => updateOption('targetTable', String(v))"
+          />
+        </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+</style>

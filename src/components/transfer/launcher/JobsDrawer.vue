@@ -57,29 +57,12 @@ function toggleExpanded() {
 
 <template>
   <div v-if="activeJobs.length > 0 || historyJobs.length > 0" class="flex pointer-events-none bottom-0 left-0 right-0 justify-center fixed z-50">
-    <div class="border border-b-0 rounded-t-xl bg-background flex flex-col max-w-4xl w-full pointer-events-auto shadow-lg transition-all duration-300 overflow-hidden" :class="isExpanded ? 'h-[320px]' : 'h-10'">
-      <!-- Collapsed Bar (Header) -->
-      <div class="px-4 flex shrink-0 h-10 cursor-pointer transition-colors items-center justify-between hover:bg-muted/50" @click="toggleExpanded">
-        <div class="flex gap-3 items-center">
-          <span class="text-sm font-medium">
-            <template v-if="activeJobs.length">
-              {{ t('transfer.launcher.jobsRunning', { count: activeJobs.length }) }} · {{ overallProgress }}%
-            </template>
-            <template v-else>
-              {{ t('transfer.launcher.allJobsCompleted') }}
-            </template>
-          </span>
-        </div>
-        <div class="flex gap-2 items-center">
-          <span class="transition-transform duration-200" :class="isExpanded ? 'rotate-180 i-carbon-chevron-down' : 'i-carbon-chevron-up'" />
-        </div>
-      </div>
-
-      <!-- Expanded Content -->
-      <div v-if="isExpanded" class="border-t flex flex-1 flex-col min-h-0">
+    <div class="flex flex-col max-w-4xl w-full pointer-events-auto" :class="isExpanded ? 'h-[320px]' : 'h-auto'">
+      <!-- Expanded Panel -->
+      <div v-if="isExpanded" class="transfer-activity-drawer border border-b-0 rounded-t-lg flex flex-1 flex-col min-h-0 transition-all duration-300 overflow-hidden">
         <Tabs v-model="activeTab" class="flex flex-col h-full">
-          <div class="px-4 py-2 border-b bg-muted/20 shrink-0">
-            <TabsList class="grid grid-cols-2 w-[300px]">
+          <div class="px-3 py-1.5 border-b flex shrink-0 items-center justify-between">
+            <TabsList class="grid grid-cols-2 w-[240px]">
               <TabsTrigger value="running">
                 {{ t('transfer.launcher.tabs.running') }}
                 <Badge v-if="activeJobs.length" variant="secondary" class="text-[10px] ml-2 px-1 py-0 h-4">
@@ -93,18 +76,22 @@ function toggleExpanded() {
                 </Badge>
               </TabsTrigger>
             </TabsList>
+            <button class="transfer-action-btn p-1 flex h-6 w-6 items-center justify-center" @click="toggleExpanded">
+              <span class="i-carbon-chevron-up text-xs" />
+            </button>
           </div>
 
-          <div class="p-4 flex-1 overflow-y-auto">
+          <div class="transfer-scroll p-3 flex-1 overflow-y-auto">
             <!-- Running Tab -->
             <TabsContent value="running" class="m-0 h-full">
               <div v-if="activeJobs.length === 0" class="text-sm text-muted-foreground flex h-full items-center justify-center">
                 {{ t('transfer.launcher.noRunningJobs') }}
               </div>
-              <div v-else class="space-y-3">
-                <div v-for="job in activeJobs" :key="job.id" class="p-3 border rounded-md">
+              <div v-else class="space-y-2">
+                <div v-for="job in activeJobs" :key="job.id" class="transfer-card p-3">
                   <div class="mb-2 flex items-center justify-between">
                     <div class="flex gap-2 items-center">
+                      <span class="transfer-status-dot running" />
                       <span class="text-sm font-medium max-w-[300px] truncate">{{ job.name }}</span>
                       <Badge variant="outline" class="text-[10px] h-5 uppercase">
                         {{ job.kind }}
@@ -134,18 +121,15 @@ function toggleExpanded() {
               <div v-if="historyJobs.length === 0" class="text-sm text-muted-foreground flex h-full items-center justify-center">
                 {{ t('transfer.launcher.noHistoryJobs') }}
               </div>
-              <div v-else class="space-y-2">
-                <div v-for="job in historyJobs" :key="job.id" class="p-2 border rounded-md flex gap-3 items-center hover:bg-muted/10">
-                  <div
-                    class="rounded-full flex shrink-0 h-8 w-8 items-center justify-center" :class="{
-                      'bg-green-100 text-green-600': job.status === 'completed',
-                      'bg-red-100 text-red-600': job.status === 'failed',
-                      'bg-gray-100 text-gray-600': job.status === 'cancelled',
-                    }"
-                  >
-                    <span v-if="job.status === 'completed'" class="i-carbon-checkmark" />
-                    <span v-else-if="job.status === 'failed'" class="i-carbon-close" />
-                    <span v-else class="i-carbon-stop-sign" />
+              <div v-else class="space-y-1.5">
+                <div v-for="job in historyJobs" :key="job.id" class="transfer-card p-2.5 flex gap-3 items-center">
+                  <div class="flex shrink-0 h-6 w-6 items-center justify-center">
+                    <span v-if="job.status === 'completed'" class="transfer-status-dot completed text-sm" />
+                    <span v-else-if="job.status === 'failed'" class="transfer-status-dot failed text-sm" />
+                    <span v-else class="transfer-status-dot text-sm text-muted-foreground" />
+                    <span v-if="job.status === 'completed'" class="i-carbon-checkmark absolute" />
+                    <span v-else-if="job.status === 'failed'" class="i-carbon-close text-[10px] absolute" />
+                    <span v-else class="i-carbon-stop-sign text-[10px] absolute" />
                   </div>
                   <div class="flex-1 min-w-0">
                     <div class="flex gap-2 items-center">
@@ -162,6 +146,42 @@ function toggleExpanded() {
           </div>
         </Tabs>
       </div>
+
+      <!-- Activity Bar (always visible handle) -->
+      <div class="transfer-activity-bar px-4 rounded-t-lg flex shrink-0 h-9 cursor-pointer transition-colors items-center justify-between" :class="{ 'rounded-t-none rounded-b-lg': isExpanded }" @click="toggleExpanded">
+        <div class="flex gap-2 items-center">
+          <template v-if="activeJobs.length">
+            <span class="transfer-status-dot running animate-pulse" />
+            <span class="text-xs font-medium font-mono">
+              {{ t('transfer.launcher.jobsRunning', { count: activeJobs.length }) }}
+            </span>
+            <span class="text-xs text-muted-foreground font-mono">{{ overallProgress }}%</span>
+          </template>
+          <template v-else>
+            <span class="transfer-status-dot completed" />
+            <span class="text-xs font-medium font-mono">
+              {{ t('transfer.launcher.allJobsCompleted') }}
+            </span>
+          </template>
+        </div>
+        <div class="flex gap-2 items-center">
+          <span class="text-xs transition-transform duration-200" :class="isExpanded ? 'rotate-180 i-carbon-chevron-down' : 'i-carbon-chevron-up'" />
+        </div>
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.transfer-status-dot.text-sm {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  position: relative;
+}
+.transfer-status-dot.text-sm[class*="i-carbon"] {
+  display: inline;
+}
+</style>

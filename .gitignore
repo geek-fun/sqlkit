@@ -29,3 +29,6 @@ coverage/
 
 # TypeScript build info
 *.tsbuildinfo
+
+# Agent runtime data
+.omo/

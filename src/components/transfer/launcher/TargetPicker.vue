@@ -62,36 +62,45 @@ watch(() => state.value.connectionId, (newId) => {
 </script>
 
 <template>
-  <div class="p-4 border rounded-md bg-muted/10 space-y-4">
-    <div class="gap-4 grid grid-cols-[120px_1fr] items-center">
-      <Label class="text-muted-foreground text-right">{{ t('transfer.launcher.connection') }}</Label>
-      <Select :model-value="state.connectionId || ''" @update:model-value="(v) => state = { ...state, connectionId: v }">
-        <SelectTrigger class="w-[300px]">
-          <SelectValue :placeholder="t('transfer.launcher.selectConnection')" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem v-for="conn in connections" :key="conn.id" :value="conn.id || ''">
-            {{ conn.name }}
-          </SelectItem>
-        </SelectContent>
-      </Select>
+  <div class="transfer-console-section">
+    <div class="transfer-console-section-header">
+      <span class="i-carbon-data-base text-xs" />
+      Target Destination
     </div>
-
-    <div class="gap-4 grid grid-cols-[120px_1fr] items-center">
-      <Label class="text-muted-foreground text-right">{{ t('transfer.launcher.database') }}</Label>
-      <div class="flex gap-2 items-center">
-        <Select :model-value="state.database || ''" :disabled="!state.connectionId || isLoadingDb" @update:model-value="(v) => state = { ...state, database: v }">
-          <SelectTrigger class="w-[300px]">
-            <SelectValue :placeholder="t('transfer.launcher.selectDatabase')" />
+    <div class="transfer-console-section-body space-y-3">
+      <div class="space-y-1.5">
+        <Label class="transfer-mono-label text-muted-foreground">{{ t('transfer.launcher.connection') }}</Label>
+        <Select :model-value="state.connectionId || ''" @update:model-value="(v) => state = { ...state, connectionId: v }">
+          <SelectTrigger>
+            <SelectValue :placeholder="t('transfer.launcher.selectConnection')" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem v-for="db in databases" :key="db.name" :value="db.name">
-              {{ db.name }}
+            <SelectItem v-for="conn in connections" :key="conn.id" :value="conn.id || ''">
+              {{ conn.name }}
             </SelectItem>
           </SelectContent>
         </Select>
-        <span v-if="isLoadingDb" class="i-carbon-circle-dash text-muted-foreground animate-spin" />
+      </div>
+
+      <div class="space-y-1.5">
+        <Label class="transfer-mono-label text-muted-foreground">{{ t('transfer.launcher.database') }}</Label>
+        <div class="flex gap-2 items-center">
+          <Select :model-value="state.database || ''" :disabled="!state.connectionId || isLoadingDb" @update:model-value="(v) => state = { ...state, database: v }">
+            <SelectTrigger>
+              <SelectValue :placeholder="t('transfer.launcher.selectDatabase')" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem v-for="db in databases" :key="db.name" :value="db.name">
+                {{ db.name }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <span v-if="isLoadingDb" class="i-carbon-circle-dash text-muted-foreground animate-spin" />
+        </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+</style>

@@ -228,6 +228,30 @@ git commit -m "feat: description of changes"
 git push
 ```
 
+## Transfer Module
+
+The transfer module spans frontend and backend with a **console → wizard → background job** architecture:
+
+**Frontend** (`src/components/transfer/`):
+- `TransferPage.vue` - Console-style main page with context bar + operation panel + activity bar
+- `components/transfer/launcher/` - Quick operation launcher (action picker, source/target picker, options)
+- `components/transfer/export/`, `import/`, `migration/`, `structure/` - Detailed step wizards (4-step: source → config → preview → execute)
+- `components/transfer/shared/` - Shared selectors (ConnectionSelector, TableSelector, ColumnSelector, etc.)
+- `components/transfer/tasks/` - Task manager panel/cards
+- `store/transferStore.ts` - Pinia store (jobs, profiles, progress, event subscriptions)
+- `types/transfer.ts` - All transfer types (ExportRequest, ImportRequest, MigrationRequest, TransferJob, etc.)
+- `datasources/transferApi.ts` - Tauri invoke wrappers (16+ commands)
+
+**Backend** (`src-tauri/src/transfer/`):
+- `commands/transfer.rs` - 16 Tauri commands (preview/execute export/import/migration, backup/restore, DDL gen, profiles)
+- `transfer/export.rs` - CSV/JSONL/SQL/Excel export with pagination
+- `transfer/import.rs` - CSV/JSONL/SQL/Excel import with batch inserts
+- `transfer/migration.rs` - Cross-engine migration with type mapping (16 source×target combinations)
+- `transfer/restore.rs` - SQL/CSV/Excel restore
+- `transfer/types.rs` - Rust types mirroring frontend types
+
+**Pattern**: Commands dispatch by `ActiveConnection` variant (Postgres/MySQL/SQLServer/SQLite). Progress emitted via Tauri events (`transfer://progress/{jobId}`). Profiles persisted via `profile_store.rs`.
+
 ## Common Tasks
 
 **Adding a Tauri Command**:

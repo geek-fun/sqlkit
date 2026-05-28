@@ -26,26 +26,23 @@ function handleSelect(id: LauncherAction) {
 
 <template>
   <div class="gap-3 grid grid-cols-2 md:grid-cols-4">
-    <div
+    <button
       v-for="action in actions"
       :key="action.id"
-      class="p-4 border rounded-lg cursor-pointer transition-all hover:bg-muted/50"
-      :class="[
-        props.modelValue === action.id
-          ? 'border-primary ring-1 ring-primary bg-primary/5'
-          : 'border-border',
-      ]"
+      class="transfer-action-tile"
+      :class="{ 'transfer-action-tile-active': props.modelValue === action.id }"
       @click="handleSelect(action.id)"
     >
-      <div class="mb-1 flex gap-2 items-center">
-        <span class="text-xl" :class="[action.icon, props.modelValue === action.id ? 'text-primary' : 'text-muted-foreground']" />
-        <h4 class="text-sm font-medium">
-          {{ t(`transfer.launcher.actions.${action.id}.title`) || action.title }}
-        </h4>
-      </div>
-      <p class="text-xs text-muted-foreground">
+      <span class="transfer-action-tile-icon text-lg" :class="action.icon" />
+      <span class="transfer-action-tile-title">
+        {{ t(`transfer.launcher.actions.${action.id}.title`) || action.title }}
+      </span>
+      <span class="transfer-action-tile-desc">
         {{ t(`transfer.launcher.actions.${action.id}.desc`) || action.desc }}
-      </p>
-    </div>
+      </span>
+    </button>
   </div>
 </template>
+
+<style scoped>
+</style>

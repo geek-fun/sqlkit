@@ -5,7 +5,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+
 import { toast } from '@/composables/useNotifications'
 import { useTransferStore } from '@/store/transferStore'
 import ActionPicker from './ActionPicker.vue'
@@ -130,49 +130,129 @@ async function handleStart() {
 </script>
 
 <template>
-  <div class="mx-auto pb-32 flex flex-col gap-6 max-w-4xl w-full">
+  <div class="mx-auto pb-32 flex flex-col gap-4 max-w-5xl w-full">
+    <!-- Presets Bar -->
     <PresetsBar v-model="state" />
 
-    <Card class="shadow-sm">
-      <CardHeader class="pb-4">
-        <CardTitle class="text-xl">
-          {{ t('transfer.launcher.whatDoYouWant') }}
-        </CardTitle>
-      </CardHeader>
-      <CardContent class="flex flex-col gap-8">
-        <ActionPicker v-model="state.action" />
+    <hr class="transfer-divider">
 
-        <div class="space-y-4">
-          <h3 class="text-sm text-muted-foreground font-medium">
-            {{ t('transfer.launcher.source') }}
-          </h3>
+    <!-- Context Bar -->
+    <div class="transfer-context-bar rounded-md">
+      <div class="transfer-context-segment">
+        <span class="i-carbon-server text-xs" />
+        <span>CONN</span>
+        <strong>{{ state.source.connectionId ? 'connected' : '—' }}</strong>
+      </div>
+      <span class="transfer-context-separator">▸</span>
+      <div class="transfer-context-segment">
+        <span>SCOPE</span>
+        <strong>{{ state.source.scope || '—' }}</strong>
+      </div>
+      <span v-if="state.source.database" class="transfer-context-separator">▸</span>
+      <div v-if="state.source.database" class="transfer-context-segment">
+        <span>DB</span>
+        <strong>{{ state.source.database }}</strong>
+      </div>
+      <span v-if="state.source.schema" class="transfer-context-separator">▸</span>
+      <div v-if="state.source.schema" class="transfer-context-segment">
+        <span>SCHEMA</span>
+        <strong>{{ state.source.schema }}</strong>
+      </div>
+
+      <span class="flex-1" />
+
+      <div class="transfer-context-segment">
+        <span class="i-carbon-arrow-right text-[10px]" />
+        <span>{{ state.action }}</span>
+      </div>
+      <span class="transfer-context-separator">▸</span>
+      <div class="transfer-context-segment">
+        <span>FMT</span>
+        <strong>{{ state.options.format || state.options.fileFormat || '—' }}</strong>
+      </div>
+    </div>
+
+    <!-- Action Tiles -->
+    <ActionPicker v-model="state.action" />
+
+    <!-- Split Console Panels -->
+    <div class="transfer-console-split">
+      <!-- Source Panel -->
+      <div class="transfer-console-section">
+        <div class="transfer-console-section-header">
+          <span class="i-carbon-arrow-down-left text-xs" />
+          Source
+        </div>
+        <div class="transfer-console-section-body">
           <SourcePicker v-model="state.source" />
         </div>
+      </div>
 
-        <div v-if="state.action === 'migrate' || state.action === 'restore'" class="space-y-4">
-          <h3 class="text-sm text-muted-foreground font-medium">
-            {{ t('transfer.launcher.target') }}
-          </h3>
-          <TargetPicker v-model="state.target" :source-connection-id="state.source.connectionId" />
+      <!-- Destination / Target Panel -->
+      <div class="transfer-console-section">
+        <div class="transfer-console-section-header">
+          <span class="i-carbon-arrow-up-right text-xs" />
+          Destination
         </div>
-
-        <div class="space-y-4">
-          <h3 class="text-sm text-muted-foreground font-medium">
-            {{ t('transfer.launcher.options') }}
-          </h3>
+        <div class="transfer-console-section-body space-y-3">
+          <TargetPicker
+            v-if="state.action === 'migrate' || state.action === 'restore'"
+            v-model="state.target"
+            :source-connection-id="state.source.connectionId"
+          />
           <OptionsPanel v-model="state.options" :action="state.action" />
         </div>
+      </div>
+    </div>
 
-        <div class="pt-4 border-t flex gap-3 justify-end">
-          <Button variant="outline">
-            {{ t('common.cancel') }}
-          </Button>
-          <Button :disabled="!isActionValid" @click="handleStart">
-            {{ t(`transfer.launcher.actions.${state.action}.start`) }}
-            <span class="i-carbon-arrow-right ml-2" />
-          </Button>
+    <!-- Summary Bar -->
+    <div class="transfer-summary-bar">
+      <div class="flex flex-wrap gap-6 items-center">
+        <div class="transfer-summary-stat">
+          <span>ACTION</span>
+          <strong>{{ state.action }}</strong>
         </div>
-      </CardContent>
-    </Card>
+        <div class="transfer-summary-stat">
+          <span>SCOPE</span>
+          <strong>{{ state.source.scope || '—' }}</strong>
+        </div>
+        <div v-if="state.source.database" class="transfer-summary-stat">
+          <span>DB</span>
+          <strong>{{ state.source.database }}</strong>
+        </div>
+        <div v-if="state.source.tables?.length" class="transfer-summary-stat">
+          <span>TABLES</span>
+          <strong>{{ state.source.tables.length }}</strong>
+        </div>
+        <div v-if="state.options.format || state.options.fileFormat" class="transfer-summary-stat">
+          <span>FORMAT</span>
+          <strong>{{ state.options.format || state.options.fileFormat }}</strong>
+        </div>
+        <div v-if="state.options.destination" class="transfer-summary-stat">
+          <span>DEST</span>
+          <strong>{{ state.options.destination.split('/').pop() || state.options.destination }}</strong>
+        </div>
+      </div>
+      <div class="transfer-summary-stat">
+        <span>STATUS</span>
+        <strong :class="isActionValid ? 'text-green-500' : 'text-muted-foreground'">
+          {{ isActionValid ? 'READY' : 'INCOMPLETE' }}
+        </strong>
+      </div>
+    </div>
+
+    <!-- Start Button Row -->
+    <div class="pt-2 flex gap-3 justify-end">
+      <Button variant="outline">
+        {{ t('common.cancel') }}
+      </Button>
+      <Button :disabled="!isActionValid" @click="handleStart">
+        {{ t(`transfer.launcher.actions.${state.action}.start`) }}
+        <span class="i-carbon-arrow-right ml-2" />
+      </Button>
+    </div>
   </div>
 </template>
+
+<style scoped>
+</style>
