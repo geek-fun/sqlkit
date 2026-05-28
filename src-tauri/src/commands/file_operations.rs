@@ -166,7 +166,7 @@ fn collect_sql_files(
 
         if let Ok(file_type) = entry.file_type() {
             if file_type.is_file() {
-                if path.extension().is_some_and(|ext| ext == "sql") {
+                if path.extension().map_or(false, |ext| ext == "sql") {
                     let metadata = fs::metadata(&path)
                         .map_err(|e| format!("Failed to read file metadata: {}", e))?;
 
@@ -182,7 +182,7 @@ fn collect_sql_files(
                         .map(|n| n.to_string_lossy().to_string())
                         .unwrap_or_default();
 
-                    let parent = path.parent().unwrap_or(Path::new(""));
+                    let parent = path.parent().unwrap_or(&Path::new(""));
                     let folder = parent
                         .strip_prefix(queries_dir_str)
                         .map(|p| p.to_string_lossy().to_string())

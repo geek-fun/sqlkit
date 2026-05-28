@@ -1,33 +1,19 @@
-import type { UnlistenFn } from '@tauri-apps/api/event'
 import type {
   BackgroundTask,
-  ExportFormat,
   ExportRequest,
   ExportTaskConfig,
   ImportRequest,
   ImportTaskConfig,
-  JobProgress,
-  ObjectSelection,
   TaskConfig,
   TaskKind,
   TaskRuntime,
   TaskStatus,
-  TransferJob,
-  TransferProfile,
   TransferProgress,
   TransferResult,
 } from '@/types/transfer'
-import { listen } from '@tauri-apps/api/event'
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
 
-import {
-  backupServer,
-  listTransferProfiles,
-  migrateServer,
-  runTransferProfile,
-  saveTransferProfile,
-} from '@/datasources/transferApi'
+import { computed, ref } from 'vue'
 
 export const useTransferStore = defineStore('transfer', () => {
   const activeTab = ref<'export' | 'import' | 'migration' | 'structure'>('export')
@@ -45,10 +31,6 @@ export const useTransferStore = defineStore('transfer', () => {
   const runningTasks = ref<BackgroundTask[]>([])
   const activeExportTaskId = ref<string | null>(null)
   const activeImportTaskId = ref<string | null>(null)
-
-  const jobs = ref<TransferJob[]>([])
-  const savedProfiles = ref<TransferProfile[]>([])
-  const unlistenMap = new Map<string, UnlistenFn>()
 
   const progressPercent = computed(() => progress.value?.percent ?? 0)
 
@@ -214,160 +196,6 @@ export const useTransferStore = defineStore('transfer', () => {
     }
   }
 
-  const subscribeToJob = async (jobId: string) => {
-    const unlisten = await listen<{ status: string, progress: JobProgress, error?: string }>(
-      `transfer://progress/${jobId}`,
-      (event) => {
-        const payload = event.payload
-        jobs.value = jobs.value.map(job =>
-          job.id === jobId
-            ? {
-                ...job,
-                status: payload.status as any,
-                progress: payload.progress,
-                error: payload.error,
-                finishedAt: ['completed', 'failed', 'cancelled'].includes(payload.status) ? Date.now() : job.finishedAt,
-              }
-            : job,
-        )
-
-        if (['completed', 'failed', 'cancelled'].includes(payload.status)) {
-          const fn = unlistenMap.get(jobId)
-          if (fn) {
-            fn()
-            unlistenMap.delete(jobId)
-          }
-        }
-      },
-    )
-    unlistenMap.set(jobId, unlisten)
-    return unlisten
-  }
-
-  const startBackupServer = async (args: {
-    connectionId: string
-    name: string
-    selection: ObjectSelection
-    format: ExportFormat
-    destination: string
-    options: Record<string, unknown>
-  }) => {
-    const requestedJobId = crypto.randomUUID()
-    await subscribeToJob(requestedJobId)
-
-    const newJob: TransferJob = {
-      id: requestedJobId,
-      name: args.name,
-      kind: 'backup',
-      scope: 'server',
-      connectionId: args.connectionId,
-      status: 'queued',
-      progress: { stage: 'Initializing...', current: 0, total: 1 },
-      startedAt: Date.now(),
-    }
-    jobs.value = [...jobs.value, newJob]
-
-    const jobId = await backupServer(
-      args.connectionId,
-      args.selection,
-      args.format,
-      args.destination,
-      args.options,
-      requestedJobId,
-    )
-
-    return jobId
-  }
-
-  const startMigrateServer = async (args: {
-    sourceConnectionId: string
-    targetConnectionId: string
-    name: string
-    selection: ObjectSelection
-    options: Record<string, unknown>
-  }) => {
-    const requestedJobId = crypto.randomUUID()
-    await subscribeToJob(requestedJobId)
-
-    const newJob: TransferJob = {
-      id: requestedJobId,
-      name: args.name,
-      kind: 'migrate',
-      scope: 'server',
-      connectionId: args.sourceConnectionId,
-      status: 'queued',
-      progress: { stage: 'Initializing...', current: 0, total: 1 },
-      startedAt: Date.now(),
-    }
-    jobs.value = [...jobs.value, newJob]
-
-    const jobId = await migrateServer(
-      args.sourceConnectionId,
-      args.targetConnectionId,
-      args.selection,
-      args.options,
-      requestedJobId,
-    )
-
-    return jobId
-  }
-
-  const saveProfile = async (profile: TransferProfile) => {
-    const profileId = await saveTransferProfile(profile)
-    const newProfile = { ...profile, id: profileId }
-    savedProfiles.value = [...savedProfiles.value, newProfile]
-    return profileId
-  }
-
-  const loadProfiles = async () => {
-    const profiles = await listTransferProfiles()
-    savedProfiles.value = profiles
-  }
-
-  const runProfile = async (profileId: string) => {
-    const profile = savedProfiles.value.find(p => p.id === profileId)
-    if (!profile)
-      throw new Error('Profile not found')
-
-    const jobId = await runTransferProfile(profileId)
-    const newJob: TransferJob = {
-      id: jobId,
-      name: `Run ${profile.name}`,
-      kind: profile.kind,
-      scope: profile.scope,
-      connectionId: profile.connectionId,
-      status: 'queued',
-      progress: { stage: 'Initializing...', current: 0, total: 1 },
-      startedAt: Date.now(),
-    }
-    jobs.value = [...jobs.value, newJob]
-    await subscribeToJob(jobId)
-    return jobId
-  }
-
-  const cancelJob = (jobId: string) => {
-    jobs.value = jobs.value.map(job =>
-      job.id === jobId
-        ? { ...job, status: 'cancelled', finishedAt: Date.now() }
-        : job,
-    )
-
-    const fn = unlistenMap.get(jobId)
-    if (fn) {
-      fn()
-      unlistenMap.delete(jobId)
-    }
-  }
-
-  const dismissJob = (jobId: string) => {
-    jobs.value = jobs.value.filter(job => job.id !== jobId)
-    const fn = unlistenMap.get(jobId)
-    if (fn) {
-      fn()
-      unlistenMap.delete(jobId)
-    }
-  }
-
   return {
     activeTab,
     setActiveTab,
@@ -399,15 +227,5 @@ export const useTransferStore = defineStore('transfer', () => {
     detachActiveTask,
     openTask,
     createTask,
-    jobs,
-    savedProfiles,
-    subscribeToJob,
-    startBackupServer,
-    startMigrateServer,
-    saveProfile,
-    loadProfiles,
-    runProfile,
-    cancelJob,
-    dismissJob,
   }
 })

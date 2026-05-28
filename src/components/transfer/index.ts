@@ -11,14 +11,13 @@ export { default as ImportOptionsStep } from './import/ImportOptionsStep.vue'
 export { default as ImportWizard } from './import/ImportWizard.vue'
 
 export { default as MigrationWizard } from './migration/MigrationWizard.vue'
-export { default as ServerObjectTree } from './ServerObjectTree.vue'
 export { default as ColumnSelector } from './shared/ColumnSelector.vue'
-
 export { default as ConnectionSelector } from './shared/ConnectionSelector.vue'
+
 export { default as FileDropZone } from './shared/FileDropZone.vue'
 export { default as ProgressPanel } from './shared/ProgressPanel.vue'
-
 export { default as ResultPanel } from './shared/ResultPanel.vue'
+
 export { default as TableSelector } from './shared/TableSelector.vue'
 export { default as WizardStepper } from './shared/WizardStepper.vue'
 export { default as GenerateDdl } from './structure/GenerateDdl.vue'

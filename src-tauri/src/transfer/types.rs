@@ -3,7 +3,6 @@
 //! This module defines all types for data export, import, and migration operations.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 // ── Export Types ────────────────────────────────────────────────
 
@@ -432,100 +431,4 @@ pub struct MigrationTablePreview {
 
 fn default_migration_batch_size() -> u32 {
     5000
-}
-
-// ── Transfer Redesign Foundation Types ───────────────────────────
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ObjectSelection {
-    pub server_id: String,
-    pub databases: Vec<String>,
-    pub schemas: HashMap<String, Vec<String>>,
-    pub tables: HashMap<String, Vec<String>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum TransferScope {
-    Table,
-    Database,
-    Server,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum TransferProfileKind {
-    Backup,
-    Migrate,
-    Export,
-    Import,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TransferProfile {
-    pub id: String,
-    pub name: String,
-    pub kind: TransferProfileKind,
-    pub scope: TransferScope,
-    pub connection_id: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub target_connection_id: Option<String>,
-    pub selection: ObjectSelection,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub format: Option<ExportFormat>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub destination: Option<String>,
-    pub options: serde_json::Value,
-    pub created_at: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_run_at: Option<i64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub enum TransferJobStatus {
-    Queued,
-    Running,
-    Paused,
-    Completed,
-    Failed,
-    Cancelled,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct JobProgress {
-    pub stage: String,
-    pub current: u64,
-    pub total: u64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub eta_ms: Option<u64>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct JobEventPayload {
-    pub status: TransferJobStatus,
-    pub progress: JobProgress,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct TransferJob {
-    pub id: String,
-    pub name: String,
-    pub kind: TransferProfileKind,
-    pub scope: TransferScope,
-    pub connection_id: String,
-    pub status: TransferJobStatus,
-    pub progress: JobProgress,
-    pub started_at: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub finished_at: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
 }

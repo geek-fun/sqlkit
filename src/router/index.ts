@@ -16,11 +16,6 @@ const routes = [
     component: () => import('@/pages/TransferPage.vue'),
   },
   {
-    path: '/transfer/backup/:serverId',
-    name: 'transfer-backup-server',
-    component: () => import('@/pages/BackupServerPage.vue'),
-  },
-  {
     path: '/data-studio',
     name: 'data-studio',
     component: () => import('@/pages/DataStudioPage.vue'),

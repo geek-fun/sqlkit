@@ -92,12 +92,10 @@ fn format_column_postgres(col: &ColumnInfo, options: &DdlOptions) -> String {
         def.push_str(" NOT NULL");
     }
 
-    if col.is_primary_key
-        && options.include_primary_keys
-        && col.is_auto_increment
-        && col.data_type.to_lowercase().contains("int")
-    {
-        def.push_str(" PRIMARY KEY");
+    if col.is_primary_key && options.include_primary_keys {
+        if col.is_auto_increment && col.data_type.to_lowercase().contains("int") {
+            def.push_str(" PRIMARY KEY");
+        }
     }
 
     if let Some(ref default) = col.default_value {
@@ -142,7 +140,7 @@ fn generate_mysql_ddl(
 
         sql.push_str(&format!("{} {} (\n", create_keyword, table_ref));
 
-        let col_defs: Vec<String> = columns.iter().map(format_column_mysql).collect();
+        let col_defs: Vec<String> = columns.iter().map(|c| format_column_mysql(c)).collect();
 
         let pk_cols: Vec<String> = columns
             .iter()
@@ -234,7 +232,7 @@ fn generate_sqlite_ddl(
 
         sql.push_str(&format!("{} \"{}\" (\n", create_keyword, table));
 
-        let col_defs: Vec<String> = columns.iter().map(format_column_sqlite).collect();
+        let col_defs: Vec<String> = columns.iter().map(|c| format_column_sqlite(c)).collect();
 
         let pk_cols: Vec<String> = columns
             .iter()
@@ -295,7 +293,7 @@ fn generate_sqlserver_ddl(
     if options.include_create_table {
         sql.push_str(&format!("CREATE TABLE {} (\n", table_ref));
 
-        let col_defs: Vec<String> = columns.iter().map(format_column_sqlserver).collect();
+        let col_defs: Vec<String> = columns.iter().map(|c| format_column_sqlserver(c)).collect();
 
         let pk_cols: Vec<String> = columns
             .iter()
