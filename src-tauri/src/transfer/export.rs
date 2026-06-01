@@ -1,15 +1,13 @@
 //! Export implementation for CSV, JSONL, SQL, and Excel formats.
-//! Supports scope-based export with ZIP creation for Server, Database, and Tables scopes.
+//! Supports scope-based export with folder output for Server, Database, and Tables scopes.
 
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::time::Instant;
 
 use rust_xlsxwriter::{Workbook, Worksheet};
 use serde_json::Value as JsonValue;
-use zip::write::FileOptions;
-use zip::ZipWriter;
 
 use super::defaults::*;
 use super::progress::*;
@@ -41,9 +39,9 @@ fn format_extension(format: &ExportFormat) -> &'static str {
 /// Executes a data export operation.
 ///
 /// Supports three scopes:
-/// - `Tables`: Export specified sources. Single source → single file, multiple → ZIP.
-/// - `Database`: List all tables in the database, export each to ZIP.
-/// - `Server`: List all databases + tables, export each with nested paths to ZIP.
+/// - `Tables`: Export specified sources. Single source → single file, multiple → folder with files.
+/// - `Database`: List all tables in the database, export each to folder.
+/// - `Server`: List all databases + tables, export each with nested folders.
 pub async fn execute_export<A: DatabaseAdapter>(
     adapter: &A,
     request: ExportRequest,
@@ -56,13 +54,13 @@ pub async fn execute_export<A: DatabaseAdapter>(
             execute_single_table_export(adapter, request, app_handle, start_time).await
         }
         TransferScope::Tables => {
-            // Multiple sources → ZIP with flat paths
+            // Multiple sources → folder with flat file paths
             let sources_with_paths: Vec<(Option<String>, ExportSource)> = request
                 .sources
                 .iter()
                 .map(|s| (None, s.clone()))
                 .collect();
-            execute_zip_export(
+            execute_folder_export(
                 adapter,
                 request,
                 sources_with_paths,
@@ -104,15 +102,15 @@ pub async fn execute_export<A: DatabaseAdapter>(
                 });
             }
 
-            // Database scope uses flat paths ({table}.{ext}) in ZIP,
+            // Database scope uses flat paths ({table}.{ext}) in folder,
             // but we still pass the db name for progress tracking.
-            // The execute_zip_export uses the Option for path nesting,
+            // The execute_folder_export uses the Option for path nesting,
             // so we pass None here for flat entries.
             let sources_flat: Vec<ExportSource> = sources;
             let sources_with_paths: Vec<(Option<String>, ExportSource)> =
                 sources_flat.into_iter().map(|s| (None, s)).collect();
 
-            execute_zip_export(adapter, request, sources_with_paths, app_handle, start_time).await
+            execute_folder_export(adapter, request, sources_with_paths, app_handle, start_time).await
         }
         TransferScope::Server => {
             emit_progress(
@@ -169,7 +167,7 @@ pub async fn execute_export<A: DatabaseAdapter>(
                 }
             }
 
-            execute_zip_export(adapter, request, sources_with_paths, app_handle, start_time).await
+            execute_folder_export(adapter, request, sources_with_paths, app_handle, start_time).await
         }
     }
 }
@@ -482,14 +480,14 @@ async fn execute_single_table_export<A: DatabaseAdapter>(
     })
 }
 
-// ── ZIP-based multi-table export ─────────────────────────────────
+// ── Folder-based multi-table export ──────────────────────────────
 
-/// Execute export for multiple tables into a single ZIP file.
+/// Execute export for multiple tables into a folder.
 ///
 /// Each source is accompanied by an optional database name.
-/// When `Some(db)`, the ZIP entry path is `{db}/{chat2db_name}`.
-/// When `None`, the entry path is `{chat2db_name}` (flat).
-async fn execute_zip_export<A: DatabaseAdapter>(
+/// When `Some(db)`, the file path is `{output_folder}/{db}/{chat2db_name}`.
+/// When `None`, the file path is `{output_folder}/{chat2db_name}` (flat).
+async fn execute_folder_export<A: DatabaseAdapter>(
     adapter: &A,
     request: ExportRequest,
     sources_with_db: Vec<(Option<String>, ExportSource)>,
@@ -511,13 +509,16 @@ async fn execute_zip_export<A: DatabaseAdapter>(
     let ext = format_extension(&request.format);
     let schema = request.schema.as_deref();
 
-    let output_path = Path::new(&request.output_path);
-    let file = File::create(output_path).map_err(|e| format!("Failed to create ZIP file: {}", e))?;
-    let mut zip = ZipWriter::new(file);
+    let output_folder = Path::new(&request.output_path);
+
+    // Create the output folder if it doesn't exist
+    fs::create_dir_all(output_folder)
+        .map_err(|e| format!("Failed to create output folder: {}", e))?;
 
     let mut grand_total: u64 = 0;
     let mut grand_processed: u64 = 0;
     let mut errors: Vec<TransferError> = Vec::new();
+    let mut total_size: u64 = 0;
 
     let total_sources = sources_with_db.len() as u64;
 
@@ -543,21 +544,26 @@ async fn execute_zip_export<A: DatabaseAdapter>(
             emit_progress(app_handle, &progress);
         }
 
-        // Determine ZIP entry path
+        // Determine file path
         let chat2db_name = format_chat2db_filename(table, ext);
-        let zip_path = match db_name_opt {
-            Some(db) => format!("{}/{}", db, chat2db_name),
-            None => chat2db_name,
+        let file_path = match db_name_opt {
+            Some(db) => {
+                let db_folder = output_folder.join(db);
+                fs::create_dir_all(&db_folder)
+                    .map_err(|e| format!("Failed to create database folder '{}': {}", db, e))?;
+                db_folder.join(chat2db_name)
+            }
+            None => output_folder.join(chat2db_name),
         };
 
-        // Export this table to a byte buffer
+        // Export this table to the file
         // Build the SqlExportOptions for each table (some options reference the table name)
         let sql_opts = request
             .sql_options
             .clone()
             .unwrap_or_else(|| sql_export_defaults(table));
 
-        let data = export_table_to_bytes(
+        export_table_to_file(
             adapter,
             source,
             schema,
@@ -567,6 +573,7 @@ async fn execute_zip_export<A: DatabaseAdapter>(
             &jsonl_opts,
             &sql_opts,
             &excel_opts,
+            &file_path,
             app_handle,
             &mut grand_total,
             &mut grand_processed,
@@ -575,21 +582,8 @@ async fn execute_zip_export<A: DatabaseAdapter>(
         )
         .await?;
 
-        // Add entry to ZIP
-        let options = FileOptions::default()
-            .compression_method(zip::CompressionMethod::Deflated);
-        zip.start_file(&zip_path, options)
-            .map_err(|e| format!("ZIP error: {}", e))?;
-        zip.write_all(&data)
-            .map_err(|e| format!("ZIP write error: {}", e))?;
+        total_size += fs::metadata(&file_path).map(|m| m.len()).unwrap_or(0);
     }
-
-    // Finalize ZIP
-    let _zip_output = zip
-        .finish()
-        .map_err(|e| format!("ZIP finalize error: {}", e))?;
-
-    let file_size = std::fs::metadata(output_path).map(|m| m.len()).unwrap_or(0);
 
     emit_progress(
         app_handle,
@@ -610,14 +604,14 @@ async fn execute_zip_export<A: DatabaseAdapter>(
         error_count: errors.len() as u64,
         duration_ms: start_time.elapsed().as_millis() as u64,
         output_path: Some(request.output_path),
-        output_size_bytes: Some(file_size),
+        output_size_bytes: Some(total_size),
         errors,
     })
 }
 
-/// Export a single table's data to a byte vector, suitable for ZIP inclusion.
+/// Export a single table's data directly to a file.
 #[allow(clippy::too_many_arguments)]
-async fn export_table_to_bytes<A: DatabaseAdapter>(
+async fn export_table_to_file<A: DatabaseAdapter>(
     adapter: &A,
     source: &ExportSource,
     schema: Option<&str>,
@@ -627,12 +621,13 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
     jsonl_opts: &JsonlExportOptions,
     sql_opts: &SqlExportOptions,
     excel_opts: &ExcelExportOptions,
+    file_path: &Path,
     app_handle: &tauri::AppHandle,
     accumulated_total: &mut u64,
     accumulated_processed: &mut u64,
     errors: &mut Vec<TransferError>,
     start_time: Instant,
-) -> Result<Vec<u8>, String> {
+) -> Result<(), String> {
     let columns = &source.columns;
     let table = &source.table;
 
@@ -656,15 +651,15 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
 
     let mut local_processed: u64 = 0;
 
+    let file = File::create(file_path)
+        .map_err(|e| format!("Failed to create file '{}': {}", file_path.display(), e))?;
+    let mut writer = BufWriter::new(file);
+
     match format {
         ExportFormat::Csv => {
-            let mut buffer = Vec::new();
-
             if csv_opts.include_header {
-                let mut buf = BufWriter::new(&mut buffer);
-                write_csv_header(&mut buf, columns, csv_opts.delimiter)
+                write_csv_header(&mut writer, columns, csv_opts.delimiter)
                     .map_err(|e| e.to_string())?;
-                buf.flush().map_err(|e| e.to_string())?;
             }
 
             let mut offset = 0u64;
@@ -677,8 +672,7 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
                     .map_err(|e| e.to_string())?;
 
                 for row in &result.rows {
-                    let mut buf = BufWriter::new(&mut buffer);
-                    write_csv_row(&mut buf, columns, row, csv_opts).map_err(|e| {
+                    write_csv_row(&mut writer, columns, row, csv_opts).map_err(|e| {
                         errors.push(TransferError {
                             row_number: Some(*accumulated_processed + local_processed + 1),
                             statement_number: None,
@@ -687,7 +681,6 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
                         });
                         String::new()
                     })?;
-                    buf.flush().map_err(|e| e.to_string())?;
                     local_processed += 1;
                 }
 
@@ -704,13 +697,12 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
                 emit_progress(app_handle, &progress);
             }
 
+            writer.flush().map_err(|e| format!("Failed to flush CSV file: {}", e))?;
             *accumulated_processed += local_processed;
-            Ok(buffer)
+            Ok(())
         }
 
         ExportFormat::Jsonl => {
-            let mut buffer = Vec::new();
-
             let mut offset = 0u64;
             while offset < total_rows {
                 let query =
@@ -724,8 +716,10 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
                     let json_obj = row_to_json_object(row, &jsonl_opts.date_format);
                     let json_line =
                         serde_json::to_string(&json_obj).map_err(|e| e.to_string())?;
-                    buffer.extend_from_slice(json_line.as_bytes());
-                    buffer.push(b'\n');
+                    writer
+                        .write_all(json_line.as_bytes())
+                        .map_err(|e| e.to_string())?;
+                    writer.write_all(b"\n").map_err(|e| e.to_string())?;
                     local_processed += 1;
                 }
 
@@ -742,12 +736,12 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
                 emit_progress(app_handle, &progress);
             }
 
+            writer.flush().map_err(|e| format!("Failed to flush JSONL file: {}", e))?;
             *accumulated_processed += local_processed;
-            Ok(buffer)
+            Ok(())
         }
 
         ExportFormat::Sql => {
-            let mut buffer = Vec::new();
             let schema_ref = schema.map(|s| s.to_string());
 
             if sql_opts.include_create_table {
@@ -757,8 +751,10 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
                     .map_err(|e| e.to_string())?;
                 let create_stmt =
                     generate_create_table_sql(table, &table_info, sql_opts.include_drop_table);
-                buffer.extend_from_slice(create_stmt.as_bytes());
-                buffer.extend_from_slice(b"\n\n");
+                writer
+                    .write_all(create_stmt.as_bytes())
+                    .map_err(|e| e.to_string())?;
+                writer.write_all(b"\n\n").map_err(|e| e.to_string())?;
             }
 
             let mut batch_rows: Vec<Vec<QueryValue>> = Vec::new();
@@ -783,8 +779,10 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
                     if batch_rows.len() >= sql_opts.batch_size as usize {
                         let insert_stmt =
                             generate_insert_sql(&schema_ref, table, columns, &batch_rows);
-                        buffer.extend_from_slice(insert_stmt.as_bytes());
-                        buffer.push(b'\n');
+                        writer
+                            .write_all(insert_stmt.as_bytes())
+                            .map_err(|e| e.to_string())?;
+                        writer.write_all(b"\n").map_err(|e| e.to_string())?;
                         batch_rows.clear();
                     }
                 }
@@ -804,11 +802,14 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
 
             if !batch_rows.is_empty() {
                 let insert_stmt = generate_insert_sql(&schema_ref, table, columns, &batch_rows);
-                buffer.extend_from_slice(insert_stmt.as_bytes());
+                writer
+                    .write_all(insert_stmt.as_bytes())
+                    .map_err(|e| e.to_string())?;
             }
 
+            writer.flush().map_err(|e| format!("Failed to flush SQL file: {}", e))?;
             *accumulated_processed += local_processed;
-            Ok(buffer)
+            Ok(())
         }
 
         ExportFormat::Excel => {
@@ -877,8 +878,8 @@ async fn export_table_to_bytes<A: DatabaseAdapter>(
 
             *accumulated_processed += local_processed;
             workbook
-                .save_to_buffer()
-                .map_err(|e| format!("Failed to save Excel to buffer: {}", e))
+                .save(file_path)
+                .map_err(|e| format!("Failed to save Excel file '{}': {}", file_path.display(), e))
         }
     }
 }

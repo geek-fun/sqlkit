@@ -90,6 +90,7 @@ pub struct ExportSource {
 }
 
 /// Export request payload.
+/// `output_path`: File path for Tables scope (single file), folder path for Database/Server scope.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ExportRequest {
