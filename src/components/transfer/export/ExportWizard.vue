@@ -269,50 +269,33 @@ async function startExport() {
       icon-class="text-blue-600 dark:text-blue-500"
       min-height="200px"
     >
-      <div class="flex flex-col gap-4">
-        <!-- Format: 4 items in one row -->
-        <div class="space-y-2">
-          <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">
-            {{ t('transfer.format.label', 'Format') }}
-          </Label>
-          <div class="gap-2 grid grid-cols-4">
-            <button
-              v-for="opt in formatOptions"
-              :key="opt.value"
-              class="px-3 py-2.5 border rounded-md flex gap-2 cursor-pointer transition-all duration-150 items-center justify-center"
-              :class="selectedFormat === opt.value
-                ? 'border-primary/60 bg-primary/[0.04] ring-1 ring-primary/20'
-                : 'border-border/40 bg-card hover:bg-muted/40'"
-              @click="selectedFormat = opt.value"
-            >
-              <span :class="[opt.icon, selectedFormat === opt.value ? 'h-4 w-4 text-primary' : 'h-4 w-4 text-muted-foreground']" />
-              <span class="text-xs font-semibold" :class="selectedFormat === opt.value ? 'text-primary' : ''">
-                {{ opt.label }}
-              </span>
-            </button>
-          </div>
-        </div>
-
-        <!-- Output Path (left side) -->
-        <div class="space-y-1.5">
-          <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Output Path</Label>
-          <div class="flex gap-2 items-center">
-            <Button variant="outline" size="sm" class="text-xs px-3 h-8" @click="handleBrowse">
-              <span class="i-carbon-folder mr-1.5" /> {{ t('common.buttons.browse') }}
-            </Button>
-            <div class="flex-1 relative">
-              <span class="i-carbon-document text-muted-foreground left-2.5 top-1/2 absolute -translate-y-1/2" />
-              <Input
-                v-model="outputPath"
-                :placeholder="scope === 'tables' ? `/path/to/output.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}` : '/path/to/export/directory'"
-                class="text-[11px] font-mono pl-8 h-8"
-              />
+      <div class="flex flex-row gap-4">
+        <!-- Left: Format + Format-specific Options -->
+        <div class="flex-1 min-w-0 space-y-3">
+          <!-- Format: 4 items in one row -->
+          <div class="space-y-2">
+            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">
+              {{ t('transfer.format.label', 'Format') }}
+            </Label>
+            <div class="gap-2 grid grid-cols-4">
+              <button
+                v-for="opt in formatOptions"
+                :key="opt.value"
+                class="px-3 py-2.5 border rounded-md flex gap-2 cursor-pointer transition-all duration-150 items-center justify-center"
+                :class="selectedFormat === opt.value
+                  ? 'border-primary/60 bg-primary/[0.04] ring-1 ring-primary/20'
+                  : 'border-border/40 bg-card hover:bg-muted/40'"
+                @click="selectedFormat = opt.value"
+              >
+                <span :class="[opt.icon, selectedFormat === opt.value ? 'h-4 w-4 text-primary' : 'h-4 w-4 text-muted-foreground']" />
+                <span class="text-xs font-semibold" :class="selectedFormat === opt.value ? 'text-primary' : ''">
+                  {{ opt.label }}
+                </span>
+              </button>
             </div>
           </div>
-        </div>
 
-        <!-- Format-specific Config -->
-        <div class="space-y-3">
+          <!-- Format-specific Config -->
           <!-- CSV Options -->
           <div v-if="selectedFormat === 'csv'" class="space-y-3">
             <div class="gap-3 grid grid-cols-2 items-center">
@@ -397,6 +380,24 @@ async function startExport() {
                   <Label for="sql-drop" class="text-xs cursor-pointer">Include DROP TABLE</Label>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Output Path -->
+        <div class="pl-4 border-l border-border/40 flex-1 min-w-0 space-y-1.5">
+          <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Output Path</Label>
+          <div class="flex gap-2 items-center">
+            <Button variant="outline" size="sm" class="text-xs px-3 h-8" @click="handleBrowse">
+              <span class="i-carbon-folder mr-1.5" /> {{ t('common.buttons.browse') }}
+            </Button>
+            <div class="flex-1 relative">
+              <span class="i-carbon-document text-muted-foreground left-2.5 top-1/2 absolute -translate-y-1/2" />
+              <Input
+                v-model="outputPath"
+                :placeholder="scope === 'tables' ? `/path/to/output.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}` : '/path/to/export/directory'"
+                class="text-[11px] font-mono pl-8 h-8"
+              />
             </div>
           </div>
         </div>
