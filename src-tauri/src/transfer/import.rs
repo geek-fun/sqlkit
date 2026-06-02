@@ -111,7 +111,7 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
 /// Import SQL file at server level (can contain CREATE DATABASE statements).
 async fn import_sql_at_server_level<A: crate::database::DatabaseAdapter>(
     adapter: &A,
-    request: &ImportRequest,
+    _request: &ImportRequest,
     target: &ImportTarget,
     app_handle: &tauri::AppHandle,
     start_time: &Instant,
