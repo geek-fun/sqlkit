@@ -15,6 +15,7 @@ import { executeExport } from '@/datasources/transferApi'
 import { useTransferStore } from '@/store/transferStore'
 import ConnectionSelector from '../shared/ConnectionSelector.vue'
 import MultiTableSelector from '../shared/MultiTableSelector.vue'
+import ScopeSelector from '../shared/ScopeSelector.vue'
 import TransferStepCard from '../shared/TransferStepCard.vue'
 
 const { t } = useI18n()
@@ -208,38 +209,44 @@ async function startExport() {
       icon-class="text-emerald-600 dark:text-emerald-500"
       :summary="sourceSummary"
       min-height="340px"
-      :scope="scope"
-      @update:scope="scope = $event"
     >
-      <!-- 'server' scope: connection only (no database selector) -->
-      <div v-if="scope === 'server'" class="h-[280px]">
+      <!-- 'server' scope: connection + scope selector -->
+      <div v-if="scope === 'server'" class="h-[280px] space-y-4">
         <ConnectionSelector
           v-model:connection-id="connectionId"
           v-model:database="database"
           v-model:schema="schema"
         />
-        <Badge variant="secondary" class="text-[10px] font-mono mt-3 px-1.5 py-0.5 border-border/40 bg-muted/30">
+        <div class="space-y-1.5">
+          <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Scope</Label>
+          <ScopeSelector :scope="scope" @update:scope="scope = $event" />
+        </div>
+        <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
           All databases on this server
         </Badge>
       </div>
 
-      <!-- 'database' scope: connection + database (show database selector) -->
-      <div v-else-if="scope === 'database'" class="h-[280px]">
+      <!-- 'database' scope: connection + scope selector + database -->
+      <div v-else-if="scope === 'database'" class="h-[280px] space-y-4">
         <ConnectionSelector
           v-model:connection-id="connectionId"
           v-model:database="database"
           v-model:schema="schema"
           show-database
         />
-        <Badge v-if="database" variant="secondary" class="text-[10px] font-mono mt-3 px-1.5 py-0.5 border-border/40 bg-muted/30">
+        <div class="space-y-1.5">
+          <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Scope</Label>
+          <ScopeSelector :scope="scope" @update:scope="scope = $event" />
+        </div>
+        <Badge v-if="database" variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
           All tables in {{ database }}
         </Badge>
       </div>
 
-      <!-- 'tables' scope: connection + database + schema + table selection -->
+      <!-- 'tables' scope: connection + scope selector + database + schema + table selection -->
       <div v-else class="gap-3 grid grid-cols-1 h-[280px] items-stretch overflow-hidden lg:grid-cols-3">
-        <!-- Left: Connection, Database, Schema (1/3) -->
-        <div class="lg:col-span-1">
+        <!-- Left: Connection, Scope, Database, Schema (1/3) -->
+        <div class="lg:col-span-1 space-y-4">
           <ConnectionSelector
             v-model:connection-id="connectionId"
             v-model:database="database"
@@ -247,6 +254,10 @@ async function startExport() {
             show-database
             show-schema
           />
+          <div class="space-y-1.5">
+            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Scope</Label>
+            <ScopeSelector :scope="scope" @update:scope="scope = $event" />
+          </div>
         </div>
 
         <!-- Right: Table Selection (2/3) -->
