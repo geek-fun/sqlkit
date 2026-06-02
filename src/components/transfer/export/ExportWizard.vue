@@ -22,7 +22,7 @@ const { t } = useI18n()
 const transferStore = useTransferStore()
 
 // Local state for all inputs
-const scope = ref<TransferScope>('tables')
+const scope = ref<TransferScope>('server')
 const connectionId = ref('')
 const database = ref('')
 const schema = ref('')
@@ -210,58 +210,32 @@ async function startExport() {
       :summary="sourceSummary"
       min-height="340px"
     >
-      <!-- 'server' scope: connection + scope selector -->
-      <div v-if="scope === 'server'" class="h-[280px] space-y-4">
-        <ConnectionSelector
-          v-model:connection-id="connectionId"
-          v-model:database="database"
-          v-model:schema="schema"
-        />
-        <div class="space-y-1.5">
-          <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Scope</Label>
-          <ScopeSelector :scope="scope" @update:scope="scope = $event" />
-        </div>
-        <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
-          All databases on this server
-        </Badge>
-      </div>
-
-      <!-- 'database' scope: connection + scope selector + database -->
-      <div v-else-if="scope === 'database'" class="h-[280px] space-y-4">
-        <ConnectionSelector
-          v-model:connection-id="connectionId"
-          v-model:database="database"
-          v-model:schema="schema"
-          show-database
-        />
-        <div class="space-y-1.5">
-          <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Scope</Label>
-          <ScopeSelector :scope="scope" @update:scope="scope = $event" />
-        </div>
-        <Badge v-if="database" variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
-          All tables in {{ database }}
-        </Badge>
-      </div>
-
-      <!-- 'tables' scope: connection + scope selector + database + schema + table selection -->
-      <div v-else class="gap-3 grid grid-cols-1 h-[280px] items-stretch overflow-hidden lg:grid-cols-3">
-        <!-- Left: Connection, Scope, Database, Schema (1/3) -->
+      <div class="gap-3 grid grid-cols-1 h-[280px] items-stretch overflow-hidden lg:grid-cols-3">
+        <!-- Left: Connection + Scope + conditional selectors (1/3) -->
         <div class="lg:col-span-1 space-y-4">
+          <!-- Always show Connection selector -->
           <ConnectionSelector
             v-model:connection-id="connectionId"
             v-model:database="database"
             v-model:schema="schema"
-            show-database
-            show-schema
+            :show-database="scope === 'database' || scope === 'tables'"
+            :show-schema="scope === 'tables'"
           />
+
+          <!-- Always show Scope selector -->
           <div class="space-y-1.5">
             <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Scope</Label>
             <ScopeSelector :scope="scope" @update:scope="scope = $event" />
           </div>
+
+          <!-- Scope info badge -->
+          <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
+            {{ scope === 'server' ? 'All databases on this server' : scope === 'database' ? (database ? `All tables in ${database}` : 'Select a database') : (selectedTables.length > 0 ? `${selectedTables.length} tables` : 'Select tables') }}
+          </Badge>
         </div>
 
-        <!-- Right: Table Selection (2/3) -->
-        <div class="h-full overflow-hidden lg:col-span-2">
+        <!-- Right: Table Selection (2/3) - only for tables scope -->
+        <div v-if="scope === 'tables'" class="h-full overflow-hidden lg:col-span-2">
           <MultiTableSelector
             v-model:selected-tables="selectedTables"
             :connection-id="connectionId"
