@@ -211,7 +211,7 @@ async function startExport() {
       :scope="scope"
       @update:scope="scope = $event"
     >
-      <!-- 'server' scope: connection only -->
+      <!-- 'server' scope: connection only (no database selector) -->
       <div v-if="scope === 'server'" class="h-[280px]">
         <ConnectionSelector
           v-model:connection-id="connectionId"
@@ -223,12 +223,13 @@ async function startExport() {
         </Badge>
       </div>
 
-      <!-- 'database' scope: connection + database (required) -->
+      <!-- 'database' scope: connection + database (show database selector) -->
       <div v-else-if="scope === 'database'" class="h-[280px]">
         <ConnectionSelector
           v-model:connection-id="connectionId"
           v-model:database="database"
           v-model:schema="schema"
+          show-database
         />
         <Badge v-if="database" variant="secondary" class="text-[10px] font-mono mt-3 px-1.5 py-0.5 border-border/40 bg-muted/30">
           All tables in {{ database }}
@@ -243,6 +244,7 @@ async function startExport() {
             v-model:connection-id="connectionId"
             v-model:database="database"
             v-model:schema="schema"
+            show-database
             show-schema
           />
         </div>
@@ -267,17 +269,17 @@ async function startExport() {
       icon-class="text-blue-600 dark:text-blue-500"
       min-height="200px"
     >
-      <div class="flex flex-row gap-4 min-h-[120px]">
-        <!-- Left: Format Grid (2 items per row) -->
-        <div class="flex-1 min-w-0">
-          <Label class="text-[11px] text-muted-foreground tracking-wide font-medium mb-2 block uppercase">
+      <div class="flex flex-col gap-4">
+        <!-- Format: 4 items in one row -->
+        <div class="space-y-2">
+          <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">
             {{ t('transfer.format.label', 'Format') }}
           </Label>
-          <div class="gap-2 grid grid-cols-2">
+          <div class="gap-2 grid grid-cols-4">
             <button
               v-for="opt in formatOptions"
               :key="opt.value"
-              class="px-3 py-2.5 border rounded-md flex gap-2 cursor-pointer transition-all duration-150 items-center"
+              class="px-3 py-2.5 border rounded-md flex gap-2 cursor-pointer transition-all duration-150 items-center justify-center"
               :class="selectedFormat === opt.value
                 ? 'border-primary/60 bg-primary/[0.04] ring-1 ring-primary/20'
                 : 'border-border/40 bg-card hover:bg-muted/40'"
@@ -291,8 +293,26 @@ async function startExport() {
           </div>
         </div>
 
-        <!-- Right: Format-specific Config -->
-        <div class="pl-4 border-l border-border/40 flex-1 min-w-0 space-y-3">
+        <!-- Output Path (left side) -->
+        <div class="space-y-1.5">
+          <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Output Path</Label>
+          <div class="flex gap-2 items-center">
+            <Button variant="outline" size="sm" class="text-xs px-3 h-8" @click="handleBrowse">
+              <span class="i-carbon-folder mr-1.5" /> {{ t('common.buttons.browse') }}
+            </Button>
+            <div class="flex-1 relative">
+              <span class="i-carbon-document text-muted-foreground left-2.5 top-1/2 absolute -translate-y-1/2" />
+              <Input
+                v-model="outputPath"
+                :placeholder="scope === 'tables' ? `/path/to/output.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}` : '/path/to/export/directory'"
+                class="text-[11px] font-mono pl-8 h-8"
+              />
+            </div>
+          </div>
+        </div>
+
+        <!-- Format-specific Config -->
+        <div class="space-y-3">
           <!-- CSV Options -->
           <div v-if="selectedFormat === 'csv'" class="space-y-3">
             <div class="gap-3 grid grid-cols-2 items-center">
@@ -358,9 +378,6 @@ async function startExport() {
                 <Label for="excel-autofit" class="text-xs cursor-pointer">Auto-fit columns</Label>
               </div>
             </div>
-            <div class="text-[10px] text-muted-foreground italic">
-              Sheet names: db-schema-table (each table as a separate sheet)
-            </div>
           </div>
 
           <!-- SQL Options -->
@@ -380,28 +397,6 @@ async function startExport() {
                   <Label for="sql-drop" class="text-xs cursor-pointer">Include DROP TABLE</Label>
                 </div>
               </div>
-            </div>
-          </div>
-
-          <div v-if="!selectedFormat" class="text-[11px] text-muted-foreground py-4 text-center">
-            Select a format to configure options
-          </div>
-
-          <!-- Output Path (inside config container) -->
-          <div v-if="selectedFormat" class="pt-3 border-t border-border/40 space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Output Path</Label>
-            <div class="flex gap-2 items-center">
-              <div class="flex-1 relative">
-                <span class="i-carbon-document text-muted-foreground left-2.5 top-1/2 absolute -translate-y-1/2" />
-                <Input
-                  v-model="outputPath"
-                  :placeholder="scope === 'tables' ? `/path/to/output.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}` : '/path/to/export/directory'"
-                  class="text-[11px] font-mono pl-8 h-8"
-                />
-              </div>
-              <Button variant="outline" size="sm" class="text-xs px-3 h-8" @click="handleBrowse">
-                <span class="i-carbon-folder mr-1.5" /> {{ t('common.buttons.browse') }}
-              </Button>
             </div>
           </div>
         </div>

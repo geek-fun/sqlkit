@@ -18,6 +18,7 @@ const props = defineProps<{
   connectionId?: string
   database?: string
   schema?: string
+  showDatabase?: boolean
   showSchema?: boolean
 }>()
 
@@ -249,7 +250,7 @@ const shouldShowSchema = computed(() => {
         </Select>
       </div>
 
-      <div class="space-y-1.5">
+      <div v-if="props.showDatabase" class="space-y-1.5">
         <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Database</Label>
         <Select
           v-model="selectedDatabase"
