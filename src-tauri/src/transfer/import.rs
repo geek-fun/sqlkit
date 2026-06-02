@@ -36,7 +36,7 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
             if let Some(target) = request.tables.first() {
                 if target.format == ImportFormat::Sql {
                     let target_result =
-                        import_sql_at_server_level(adapter, &request, target, app_handle, &start_time)
+                        import_sql_at_server_level(adapter, target, app_handle, &start_time)
                             .await?;
                     total_processed += target_result.processed_rows;
                     total_skipped += target_result.skipped_rows;
@@ -111,7 +111,6 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
 /// Import SQL file at server level (can contain CREATE DATABASE statements).
 async fn import_sql_at_server_level<A: crate::database::DatabaseAdapter>(
     adapter: &A,
-    _request: &ImportRequest,
     target: &ImportTarget,
     app_handle: &tauri::AppHandle,
     start_time: &Instant,

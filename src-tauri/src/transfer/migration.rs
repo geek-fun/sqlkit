@@ -72,7 +72,7 @@ pub async fn execute_migration<A1: DatabaseAdapter, A2: DatabaseAdapter>(
                     req.source_database = Some(source_db.name.clone());
                     req.target_database = Some(source_db.name.clone());
                     req.table_plans = vec![table_plan];
-                    let _result = migrate_single_table_plan(
+                    migrate_single_table_plan(
                         source_adapter,
                         target_adapter,
                         &req,
@@ -133,8 +133,8 @@ pub async fn execute_migration<A1: DatabaseAdapter, A2: DatabaseAdapter>(
                 }
                 let mut req = request.clone();
                 req.table_plans = auto_plans;
-                for (_table_idx, _table_plan) in req.table_plans.iter().enumerate() {
-                    let _result = migrate_single_table_plan(
+                for _ in req.table_plans.iter() {
+                    migrate_single_table_plan(
                         source_adapter,
                         target_adapter,
                         &req,
@@ -147,8 +147,8 @@ pub async fn execute_migration<A1: DatabaseAdapter, A2: DatabaseAdapter>(
                     .await?;
                 }
             } else {
-                for (_table_idx, _table_plan) in request.table_plans.iter().enumerate() {
-                    let _result = migrate_single_table_plan(
+                for _ in request.table_plans.iter() {
+                    migrate_single_table_plan(
                         source_adapter,
                         target_adapter,
                         &request,
