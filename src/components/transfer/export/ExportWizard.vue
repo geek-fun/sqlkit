@@ -296,14 +296,16 @@ async function startExport() {
       icon-class="text-blue-600 dark:text-blue-500"
       min-height="180px"
     >
-      <div class="flex flex-row gap-4">
-        <!-- Left: Format + Format-specific Options + Start Export -->
-        <div class="flex-1 min-w-0 space-y-3">
-          <!-- Format: 4 items in one row -->
-          <div class="space-y-2">
+      <div class="flex flex-col gap-3">
+        <!-- Row 1: FORMAT + OUTPUT PATH side by side -->
+        <div class="flex flex-row gap-4">
+          <!-- Left: Format + Format-specific Options -->
+          <div class="flex-1 min-w-0 space-y-2">
             <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">
               {{ t('transfer.format.label', 'Format') }}
             </Label>
+
+            <!-- Row 1: Format buttons -->
             <div class="gap-2 grid grid-cols-4">
               <button
                 v-for="opt in formatOptions"
@@ -320,12 +322,9 @@ async function startExport() {
                 </span>
               </button>
             </div>
-          </div>
 
-          <!-- Format-specific Config + Start Export on same row -->
-          <div class="flex gap-4 items-center">
-            <!-- Format options area -->
-            <div class="flex-1 min-w-0">
+            <!-- Row 2: Format-specific config (fixed min-height prevents layout shift) -->
+            <div class="min-h-[60px] flex flex-col justify-start">
               <!-- CSV Options -->
               <div v-if="selectedFormat === 'csv'" class="gap-3 flex items-center">
                 <div class="space-y-1.5">
@@ -363,22 +362,6 @@ async function startExport() {
                 </div>
               </div>
 
-              <!-- Excel Options -->
-              <div v-if="selectedFormat === 'excel'" class="gap-3 flex items-center flex-wrap">
-                <div class="flex items-center space-x-2">
-                  <Checkbox id="excel-header" v-model:checked="excelIncludeHeader" class="h-3.5 w-3.5" />
-                  <Label for="excel-header" class="text-xs cursor-pointer">Header</Label>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <Checkbox id="excel-freeze" v-model:checked="excelFreezeHeader" class="h-3.5 w-3.5" />
-                  <Label for="excel-freeze" class="text-xs cursor-pointer">Freeze</Label>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <Checkbox id="excel-autofit" v-model:checked="excelAutoFit" class="h-3.5 w-3.5" />
-                  <Label for="excel-autofit" class="text-xs cursor-pointer">Auto-fit</Label>
-                </div>
-              </div>
-
               <!-- SQL Options -->
               <div v-if="selectedFormat === 'sql'" class="gap-3 flex items-center flex-wrap">
                 <div class="space-y-1.5">
@@ -394,41 +377,62 @@ async function startExport() {
                   <Label for="sql-drop" class="text-xs cursor-pointer">DROP TABLE</Label>
                 </div>
               </div>
-            </div>
 
-            <!-- Selection Summary + Start Export Button on same row -->
-            <div class="flex gap-3 items-center shrink-0">
-              <div v-if="connectionId" class="flex gap-2 items-center">
-                <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
-                  {{ scope === 'server' ? 'All databases' : scope === 'database' ? (database || 'Select db') : `${selectedTables.length} tables` }}
-                </Badge>
-                <Badge variant="outline" class="text-[10px] font-mono px-1.5 py-0.5 uppercase">
-                  {{ selectedFormat }}
-                </Badge>
+              <!-- Excel Options -->
+              <div v-if="selectedFormat === 'excel'" class="gap-3 flex items-center">
+                <div class="space-y-1.5">
+                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Worksheet</Label>
+                  <div class="gap-3 flex items-center">
+                    <div class="flex items-center space-x-2">
+                      <Checkbox id="excel-header" v-model:checked="excelIncludeHeader" class="h-3.5 w-3.5" />
+                      <Label for="excel-header" class="text-xs cursor-pointer">Header</Label>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                      <Checkbox id="excel-freeze" v-model:checked="excelFreezeHeader" class="h-3.5 w-3.5" />
+                      <Label for="excel-freeze" class="text-xs cursor-pointer">Freeze</Label>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                      <Checkbox id="excel-autofit" v-model:checked="excelAutoFit" class="h-3.5 w-3.5" />
+                      <Label for="excel-autofit" class="text-xs cursor-pointer">Auto-fit</Label>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <Button size="sm" class="text-xs font-semibold px-5 h-8" :disabled="!canExport" @click="startExport">
-                <span class="i-carbon-play mr-1.5" /> {{ t('transfer.export.step.execute', 'Start Export') }}
+            </div>
+          </div>
+
+          <!-- Right: Output Path -->
+          <div class="pl-4 border-l border-border/40 flex-1 min-w-0 space-y-1.5">
+            <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Output Path</Label>
+            <div class="flex gap-2 items-center">
+              <Button variant="outline" size="sm" class="text-xs px-3 h-8" @click="handleBrowse">
+                <span class="i-carbon-folder mr-1.5" /> {{ t('common.buttons.browse') }}
               </Button>
+              <div class="flex-1 relative">
+                <span class="i-carbon-document text-muted-foreground left-2.5 top-1/2 absolute -translate-y-1/2" />
+                <Input
+                  v-model="outputPath"
+                  :placeholder="scope === 'tables' ? `/path/to/output.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}` : '/path/to/export/directory'"
+                  class="text-[11px] font-mono pl-8 h-8"
+                />
+              </div>
             </div>
           </div>
         </div>
 
-        <!-- Right: Output Path -->
-        <div class="pl-4 border-l border-border/40 flex-1 min-w-0 space-y-1.5">
-          <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Output Path</Label>
-          <div class="flex gap-2 items-center">
-            <Button variant="outline" size="sm" class="text-xs px-3 h-8" @click="handleBrowse">
-              <span class="i-carbon-folder mr-1.5" /> {{ t('common.buttons.browse') }}
-            </Button>
-            <div class="flex-1 relative">
-              <span class="i-carbon-document text-muted-foreground left-2.5 top-1/2 absolute -translate-y-1/2" />
-              <Input
-                v-model="outputPath"
-                :placeholder="scope === 'tables' ? `/path/to/output.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}` : '/path/to/export/directory'"
-                class="text-[11px] font-mono pl-8 h-8"
-              />
-            </div>
+        <!-- Row 2: Execute action bar (full width) -->
+        <div class="pt-3 border-t border-border/40 flex gap-3 items-center justify-end">
+          <div v-if="connectionId" class="flex gap-2 items-center mr-auto">
+            <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
+              {{ scope === 'server' ? 'All databases' : scope === 'database' ? (database || 'Select db') : `${selectedTables.length} tables` }}
+            </Badge>
+            <Badge variant="outline" class="text-[10px] font-mono px-1.5 py-0.5 uppercase">
+              {{ selectedFormat }}
+            </Badge>
           </div>
+          <Button size="sm" class="text-xs font-semibold px-5 h-8" :disabled="!canExport" @click="startExport">
+            <span class="i-carbon-play mr-1.5" /> {{ t('transfer.export.step.execute', 'Start Export') }}
+          </Button>
         </div>
       </div>
     </TransferStepCard>
