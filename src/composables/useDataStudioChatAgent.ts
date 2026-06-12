@@ -11,7 +11,6 @@ import type {
 } from '@/types/chat'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
-import { useAppStore } from '@/store/appStore'
 import { useConnectionStore } from '@/store/connectionStore'
 import {
 
@@ -43,7 +42,7 @@ function adaptDataStudioSession(session: AgentSession): ChatSession {
     status: session.status as ChatSessionStatus,
     sources: session.sources,
     permissionsMode: session.permissionsMode,
-    maxIterations: useAppStore().chatConfig.maxIterations,
+    maxIterations: 200,
     stopReason: session.stopReason,
     stopMessage: session.stopMessage,
   }

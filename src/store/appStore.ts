@@ -45,13 +45,6 @@ export type LlmProvider = {
   models?: string[]
 }
 
-export type ChatConfig = {
-  maxIterations: number
-  wallClockBudgetSecs: number
-  tokenBudget: number
-  compactThreshold: number
-}
-
 type AppStoreState = {
   themeType: ThemeType
   languageType: LanguageType
@@ -62,7 +55,6 @@ type AppStoreState = {
   llmSettings: {
     providers: LlmProvider[]
   }
-  chatConfig: ChatConfig
   featureModelRoutes: Record<string, { selectedModelId: string, useRecommendedModel: boolean }>
 }
 
@@ -107,12 +99,6 @@ export const useAppStore = defineStore('app', {
           models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022'],
         },
       ],
-    },
-    chatConfig: {
-      maxIterations: 25,
-      wallClockBudgetSecs: 1800,
-      tokenBudget: 20000000,
-      compactThreshold: 0.75,
     },
     featureModelRoutes: {},
   }),
