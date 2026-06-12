@@ -10,7 +10,6 @@ export { default as ImportMappingStep } from './import/ImportMappingStep.vue'
 export { default as ImportOptionsStep } from './import/ImportOptionsStep.vue'
 export { default as ImportWizard } from './import/ImportWizard.vue'
 
-export { default as MigrationWizard } from './migration/MigrationWizard.vue'
 export { default as ColumnSelector } from './shared/ColumnSelector.vue'
 export { default as ConnectionSelector } from './shared/ConnectionSelector.vue'
 
@@ -20,9 +19,7 @@ export { default as ResultPanel } from './shared/ResultPanel.vue'
 
 export { default as TableSelector } from './shared/TableSelector.vue'
 export { default as WizardStepper } from './shared/WizardStepper.vue'
-export { default as GenerateDdl } from './structure/GenerateDdl.vue'
-export { default as RunSqlFile } from './structure/RunSqlFile.vue'
-export { default as StructureWizard } from './structure/StructureWizard.vue'
+
 export { default as TaskCard } from './tasks/TaskCard.vue'
 export { default as TaskManagerButton } from './tasks/TaskManagerButton.vue'
 export { default as TaskManagerPanel } from './tasks/TaskManagerPanel.vue'
