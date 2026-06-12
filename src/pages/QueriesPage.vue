@@ -471,10 +471,7 @@ function closeResultPanel() {
                   :key="conn.id"
                   :value="conn.id!"
                 >
-                  <div class="flex gap-1 min-w-0 items-center">
-                    <span class="font-medium shrink-0">{{ conn.name }}</span>
-                    <span class="text-xs text-muted-foreground truncate">({{ conn.host }})</span>
-                  </div>
+                  <span>{{ conn.name }}</span>
                 </SelectItem>
               </SelectContent>
             </Select>
