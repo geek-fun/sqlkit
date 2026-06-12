@@ -225,7 +225,7 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
     </div>
 
     <!-- Selection Count Footer -->
-    <div v-if="selectionCount > 0" class="text-[10px] text-primary font-mono font-semibold mt-2 shrink-0 flex gap-1 items-center">
+    <div v-if="selectionCount > 0" class="text-[10px] text-primary font-mono font-semibold mt-2 flex shrink-0 gap-1 items-center">
       <span class="i-carbon-checkmark-filled h-3 w-3" />
       {{ selectionCount }} tables selected
     </div>

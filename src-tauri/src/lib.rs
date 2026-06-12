@@ -11,11 +11,35 @@ pub mod commands;
 // Menu setup
 pub mod menu;
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
+// Agent / AI modules
+pub mod agent;
+pub mod capabilities;
+pub mod common;
+pub mod db;
+
+use std::sync::OnceLock;
+use tauri::AppHandle;
+
+/// Global AppHandle, set once during app setup. Allows capability handlers
+/// and other background code to access the Tauri application handle.
+pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+
+use agent::executor::SqlKitToolExecutor;
+use agent::loop_runner::{
+    cancel_agent_loop, compact_agent_session, confirm_tool_call, get_agent_context_usage,
+    get_tool_full_result, run_agent_loop, CancelMap, ConfirmMap,
+};
+use agent::session_store::{
+    clear_agent_session_messages, clear_session_confirmation_rules, create_agent_session,
+    delete_agent_session, delete_attached_source, delete_confirmation_rule, load_agent_sessions,
+    load_attached_sources, load_confirmation_rules, load_session_messages,
+    migrate_session_metadata, save_attached_source,
+    save_confirmation_rule, update_session_meta, update_session_status,
+};
+use agent::tool_executor::ToolExecutor;
+use agent::{get_all_tools, list_llm_models, run_agent_step, validate_llm_config};
+use agent::query_history::{load_query_history, add_query_history_entry};
+use capabilities::commands::{get_available_tools, invoke_capability};
 
 #[derive(Clone, serde::Serialize)]
 struct AuthPayload {
@@ -58,10 +82,41 @@ pub fn run() {
         .manage(store.clone())
         .setup(move |app| {
             let handle = app.handle().clone();
+
+            // Store AppHandle globally for capability handlers and agent
+            let _ = APP_HANDLE.set(handle.clone());
+
             tauri::async_runtime::spawn(async move {
-                store.set_app_handle(handle).await;
+                store.set_app_handle(handle.clone()).await;
             });
             menu::create_menu(app)?;
+
+            // Initialize the capability registry
+            capabilities::registry::init_registry();
+
+            // Initialize agent SQLite database
+            use tauri::Manager;
+            let app_data_dir = app
+                .path()
+                .app_data_dir()
+                .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
+            let db_path = app_data_dir.join("agent.sqlite");
+            let agent_db = db::open(&db_path)?;
+            db::migrate(&agent_db)?;
+            {
+                let conn = agent_db.0.lock().map_err(|e| e.to_string())?;
+                recover_stuck_sessions_inner(&conn)?;
+            }
+            app.manage(agent_db);
+
+            use std::collections::HashMap;
+            use std::sync::{Arc, Mutex};
+            let confirm_map: ConfirmMap = Arc::new(Mutex::new(HashMap::new()));
+            let cancel_map: CancelMap = Arc::new(Mutex::new(HashMap::new()));
+            app.manage(confirm_map);
+            app.manage(cancel_map);
+            let executor: Arc<dyn ToolExecutor> = Arc::new(SqlKitToolExecutor);
+            app.manage(executor);
 
             use tauri::{Emitter, Listener};
 
@@ -91,7 +146,40 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            greet,
+            // Agent commands
+            invoke_capability,
+            get_available_tools,
+            run_agent_step,
+            validate_llm_config,
+            list_llm_models,
+            get_all_tools,
+            run_agent_loop,
+            cancel_agent_loop,
+            compact_agent_session,
+            get_agent_context_usage,
+            confirm_tool_call,
+            get_tool_full_result,
+            // Session management
+            load_agent_sessions,
+            create_agent_session,
+            update_session_status,
+            update_session_meta,
+            delete_agent_session,
+            clear_agent_session_messages,
+            load_session_messages,
+            // Confirmation rules
+            load_confirmation_rules,
+            save_confirmation_rule,
+            delete_confirmation_rule,
+            clear_session_confirmation_rules,
+            // Attached sources
+            load_attached_sources,
+            save_attached_source,
+            delete_attached_source,
+            migrate_session_metadata,
+            // Query history
+            load_query_history,
+            add_query_history_entry,
             // Store management (internal use)
             commands::store_get,
             commands::store_set,
@@ -139,4 +227,13 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+fn recover_stuck_sessions_inner(conn: &rusqlite::Connection) -> Result<(), String> {
+    conn.execute(
+        "UPDATE agent_sessions SET status = 'idle' WHERE status IN ('running', 'waiting_confirmation')",
+        [],
+    )
+    .map_err(|e| format!("Failed to recover sessions: {}", e))?;
+    Ok(())
 }
