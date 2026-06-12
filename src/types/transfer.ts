@@ -154,7 +154,7 @@ export type ExportPreview = {
   formattedPreview: string
 }
 
-export type TaskKind = 'export' | 'import' | 'sqlFile' | 'migration'
+export type TaskKind = 'export' | 'import'
 
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed'
 
@@ -187,25 +187,7 @@ export type ImportTaskConfig = {
   createDatabaseIfNotExists?: boolean
 }
 
-export type SqlFileTaskConfig = {
-  connectionId: string
-  database?: string
-  scope: TransferScope
-  filePath: string
-  onError: 'rollback' | 'skipAndContinue' | 'stop'
-}
-
-export type MigrationTaskConfig = {
-  sourceConnectionId: string
-  sourceDatabase?: string
-  targetConnectionId: string
-  targetDatabase?: string
-  scope: TransferScope
-  tablePlans: MigrationTablePlan[]
-  createTargetDatabaseIfNotExists?: boolean
-}
-
-export type TaskConfig = ExportTaskConfig | ImportTaskConfig | SqlFileTaskConfig | MigrationTaskConfig
+export type TaskConfig = ExportTaskConfig | ImportTaskConfig
 
 export type BackgroundTask = {
   id: string
@@ -220,90 +202,7 @@ export type BackgroundTask = {
   error?: string
 }
 
-export type DdlObjectType = 'table' | 'view' | 'index'
-
-export type DdlObject = {
-  name: string
-  objectType: DdlObjectType
-  schema?: string
-}
-
-export type DdlOptions = {
-  includeCreateTable?: boolean
-  includePrimaryKeys?: boolean
-  includeForeignKeys?: boolean
-  includeIndexes?: boolean
-  includeConstraints?: boolean
-  includeComments?: boolean
-  includeStorageOptions?: boolean
-  includeDropIfExists?: boolean
-  includeIfNotExists?: boolean
-  includeData?: boolean
-  targetEngine?: string
-}
-
-export type DdlRequest = {
-  connectionId: string
-  database?: string
-  schema?: string
-  scope: TransferScope
-  objects: DdlObject[]
-  options: DdlOptions
-}
-
 export type ExcelImportOptions = {
   sheetName?: string
   hasHeader?: boolean
-}
-
-export type MigrationConversion = 'direct' | 'mapped' | 'custom'
-
-export type MigrationMapping = {
-  sourceColumn: string
-  sourceType: string
-  targetColumn: string
-  targetType: string
-  conversion: MigrationConversion
-}
-
-export type MigrationTablePlan = {
-  sourceTable: string
-  targetTable: string
-  columnMappings: MigrationMapping[]
-}
-
-export type MigrationErrorStrategy = 'skipRow' | 'skipTable' | 'abort'
-
-export type MigrationRequest = {
-  sourceConnectionId: string
-  sourceDatabase?: string
-  sourceSchema?: string
-  targetConnectionId: string
-  targetDatabase?: string
-  targetSchema?: string
-  scope: TransferScope
-  createTargetDatabaseIfNotExists?: boolean
-  tablePlans: MigrationTablePlan[]
-  batchSize?: number
-  onError?: MigrationErrorStrategy
-  createTables?: boolean
-  dropTables?: boolean
-  migrateIndexes?: boolean
-  migrateForeignKeys?: boolean
-  migrateConstraints?: boolean
-  disableFkChecks?: boolean
-}
-
-export type MigrationTablePreview = {
-  sourceTable: string
-  targetTable: string
-  rowCount: number
-  columnCount: number
-  mappings: MigrationMapping[]
-}
-
-export type MigrationPreview = {
-  tables: MigrationTablePreview[]
-  totalRows: number
-  typeConversions: number
 }
