@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ColumnMapping } from '@/types/transfer'
+import type { ColumnMapping, ImportTarget } from '@/types/transfer'
 
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
@@ -78,12 +78,16 @@ const targetParams = computed(() => {
 })
 
 watch(targetParams, (params, oldParams) => {
+  const tables: ImportTarget[] | undefined = params.table
+    ? [{ targetTable: params.table, columnMappings: mappings.value }]
+    : undefined
+
   transferStore.importRequest = {
     ...transferStore.importRequest,
     connectionId: params.connectionId || undefined,
     database: params.database || undefined,
     schema: params.schema || undefined,
-    table: params.table,
+    tables,
     columnMappings: mappings.value,
   }
 

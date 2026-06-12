@@ -12,45 +12,198 @@ use super::progress::*;
 use super::types::*;
 
 /// Executes a data import operation.
+/// Supports Tables scope (import to specific tables), Database scope (create database if needed),
+/// and Server scope (execute SQL directly at connection level).
 pub async fn execute_import<A: crate::database::DatabaseAdapter>(
     adapter: &A,
     request: ImportRequest,
     app_handle: &tauri::AppHandle,
 ) -> Result<TransferResult, String> {
     let start_time = Instant::now();
+    let mut total_processed: u64 = 0;
+    let mut total_skipped: u64 = 0;
+    let mut total_errors: Vec<TransferError> = Vec::new();
 
     emit_progress(
         app_handle,
         &create_progress("import", "preparing", 0, None, 0),
     );
 
-    let csv_opts = request
+    match request.scope {
+        TransferScope::Server => {
+            // Server scope: execute SQL file directly at connection level
+            // SQL files may contain CREATE DATABASE statements
+            if let Some(target) = request.tables.first() {
+                if target.format == ImportFormat::Sql {
+                    let target_result =
+                        import_sql_at_server_level(adapter, target, app_handle, &start_time)
+                            .await?;
+                    total_processed += target_result.processed_rows;
+                    total_skipped += target_result.skipped_rows;
+                    total_errors.extend(target_result.errors);
+                } else {
+                    return Err("Server scope import only supports SQL files".to_string());
+                }
+            }
+        }
+        TransferScope::Database => {
+            // Database scope: create database if needed, then import tables
+            if request.create_database_if_not_exists.unwrap_or(false) {
+                if let Some(ref db_name) = request.database {
+                    let db_exists = adapter
+                        .list_databases()
+                        .await
+                        .map_err(|e| e.to_string())?
+                        .iter()
+                        .any(|d| &d.name == db_name);
+                    if !db_exists {
+                        adapter
+                            .execute_query(&format!("CREATE DATABASE \"{}\"", db_name))
+                            .await
+                            .map_err(|e| format!("Failed to create database: {}", e))?;
+                    }
+                }
+            }
+            for target in &request.tables {
+                let target_result =
+                    import_target(adapter, &request, target, app_handle, &start_time).await?;
+                total_processed += target_result.processed_rows;
+                total_skipped += target_result.skipped_rows;
+                total_errors.extend(target_result.errors);
+            }
+        }
+        TransferScope::Tables => {
+            // Tables scope: import to specific tables (current behavior)
+            for target in &request.tables {
+                let target_result =
+                    import_target(adapter, &request, target, app_handle, &start_time).await?;
+                total_processed += target_result.processed_rows;
+                total_skipped += target_result.skipped_rows;
+                total_errors.extend(target_result.errors);
+            }
+        }
+    }
+
+    emit_progress(
+        app_handle,
+        &create_progress(
+            "import",
+            "finalizing",
+            total_processed,
+            None,
+            start_time.elapsed().as_millis() as u64,
+        ),
+    );
+
+    Ok(TransferResult {
+        success: total_errors.is_empty(),
+        total_rows: total_processed + total_skipped,
+        processed_rows: total_processed,
+        skipped_rows: total_skipped,
+        error_count: total_errors.len() as u64,
+        duration_ms: start_time.elapsed().as_millis() as u64,
+        output_path: None,
+        output_size_bytes: None,
+        errors: total_errors,
+    })
+}
+
+/// Import SQL file at server level (can contain CREATE DATABASE statements).
+async fn import_sql_at_server_level<A: crate::database::DatabaseAdapter>(
+    adapter: &A,
+    target: &ImportTarget,
+    app_handle: &tauri::AppHandle,
+    start_time: &Instant,
+) -> Result<TransferResult, String> {
+    let file_path = Path::new(&target.file_path);
+    let content = std::fs::read_to_string(file_path)
+        .map_err(|e| format!("Failed to read SQL file: {}", e))?;
+
+    let mut processed_rows: u64 = 0;
+    let mut skipped_rows: u64 = 0;
+    let mut errors: Vec<TransferError> = Vec::new();
+
+    // Split by semicolon and execute each statement
+    for (idx, stmt) in content.split(';').filter(|s| !s.trim().is_empty()).enumerate() {
+        let stmt = stmt.trim();
+        if stmt.is_empty() {
+            continue;
+        }
+        let result = adapter.execute_query(stmt).await;
+        match result {
+            Ok(_) => {
+                processed_rows += 1;
+            }
+            Err(e) => {
+                errors.push(TransferError {
+                    row_number: None,
+                    statement_number: Some(idx as u64 + 1),
+                    message: e.to_string(),
+                    sql: Some(stmt.to_string()),
+                });
+                skipped_rows += 1;
+            }
+        }
+
+        emit_progress(
+            app_handle,
+            &create_progress(
+                "import",
+                "processing",
+                processed_rows,
+                None,
+                start_time.elapsed().as_millis() as u64,
+            ),
+        );
+    }
+
+    Ok(TransferResult {
+        success: errors.is_empty(),
+        total_rows: processed_rows + skipped_rows,
+        processed_rows,
+        skipped_rows,
+        error_count: errors.len() as u64,
+        duration_ms: start_time.elapsed().as_millis() as u64,
+        output_path: None,
+        output_size_bytes: None,
+        errors,
+    })
+}
+
+async fn import_target<A: crate::database::DatabaseAdapter>(
+    adapter: &A,
+    request: &ImportRequest,
+    target: &ImportTarget,
+    app_handle: &tauri::AppHandle,
+    start_time: &Instant,
+) -> Result<TransferResult, String> {
+    let csv_opts = target
         .csv_options
         .clone()
         .unwrap_or_else(csv_import_defaults);
 
-    let file_path = Path::new(&request.file_path);
+    let file_path = Path::new(&target.file_path);
     let file = File::open(file_path).map_err(|e| format!("Failed to open file: {}", e))?;
 
     let mut processed_rows: u64 = 0;
     let mut skipped_rows: u64 = 0;
     let mut errors: Vec<TransferError> = Vec::new();
 
-    match request.format {
+    match target.format {
         ImportFormat::Csv => {
             let reader = BufReader::new(file);
             let delimiter = csv_opts.delimiter;
 
             let mut lines = reader.lines().peekable();
 
-            let header_line = if csv_opts.has_header {
+            let _header_line = if csv_opts.has_header {
                 lines
                     .next()
                     .transpose()
                     .map_err(|e| format!("Failed to read header: {}", e))?
                     .unwrap_or_default()
             } else {
-                request
+                target
                     .column_mappings
                     .iter()
                     .map(|m| m.source_column.clone())
@@ -59,9 +212,9 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
             };
 
             let header_columns: Vec<String> = if csv_opts.has_header {
-                parse_csv_line(&header_line, delimiter)
+                parse_csv_line(&_header_line, delimiter)
             } else {
-                request
+                target
                     .column_mappings
                     .iter()
                     .map(|m| m.source_column.clone())
@@ -84,11 +237,7 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
                     .iter()
                     .enumerate()
                     .filter_map(|(i, col)| {
-                        let mapping = request
-                            .column_mappings
-                            .iter()
-                            .find(|m| m.source_column == *col);
-
+                        let mapping = target.column_mappings.iter().find(|m| m.source_column == *col);
                         if mapping.is_none()
                             || mapping.and_then(|m| m.target_column.as_ref()).is_none()
                         {
@@ -103,9 +252,10 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
                 processed_rows += 1;
 
                 if batch_values.len() >= request.batch_size as usize {
-                    let insert_result = execute_batch_insert(
+                    let insert_result = execute_batch_insert_for_target(
                         adapter,
-                        &request,
+                        request,
+                        target,
                         &batch_values,
                         processed_rows - batch_values.len() as u64,
                     )
@@ -141,9 +291,10 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
             }
 
             if !batch_values.is_empty() {
-                let insert_result = execute_batch_insert(
+                let insert_result = execute_batch_insert_for_target(
                     adapter,
-                    &request,
+                    request,
+                    target,
                     &batch_values,
                     processed_rows - batch_values.len() as u64,
                 )
@@ -169,7 +320,7 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
         ImportFormat::Jsonl => {
             let reader = BufReader::new(file);
             let mut batch_values: Vec<Vec<String>> = Vec::new();
-            let _target_columns: Vec<String> = request
+            let _target_columns: Vec<String> = target
                 .column_mappings
                 .iter()
                 .filter_map(|m| m.target_column.clone())
@@ -199,7 +350,7 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
                 }
 
                 let obj = json_obj.as_object().unwrap();
-                let values: Vec<String> = request
+                let values: Vec<String> = target
                     .column_mappings
                     .iter()
                     .filter_map(|m| {
@@ -225,9 +376,10 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
                 processed_rows += 1;
 
                 if batch_values.len() >= request.batch_size as usize {
-                    let insert_result = execute_batch_insert(
+                    let insert_result = execute_batch_insert_for_target(
                         adapter,
-                        &request,
+                        request,
+                        target,
                         &batch_values,
                         processed_rows - batch_values.len() as u64,
                     )
@@ -263,9 +415,10 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
             }
 
             if !batch_values.is_empty() {
-                execute_batch_insert(
+                execute_batch_insert_for_target(
                     adapter,
-                    &request,
+                    request,
+                    target,
                     &batch_values,
                     processed_rows - batch_values.len() as u64,
                 )
@@ -349,7 +502,7 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
             let mut workbook: Xlsx<_> = open_workbook(file_path)
                 .map_err(|e| format!("Failed to open Excel file: {}", e))?;
 
-            let sheet_name = request
+            let sheet_name = target
                 .excel_options
                 .as_ref()
                 .map(|o| o.sheet_name.clone())
@@ -360,7 +513,7 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
                 .ok_or_else(|| format!("Sheet '{}' not found", sheet_name))?
                 .map_err(|e| format!("Failed to read sheet '{}': {:?}", sheet_name, e))?;
 
-            let has_header = request
+            let has_header = target
                 .excel_options
                 .as_ref()
                 .map(|o| o.has_header)
@@ -377,7 +530,7 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
                     })
                     .unwrap_or_default()
             } else {
-                request
+                target
                     .column_mappings
                     .iter()
                     .map(|m| m.source_column.clone())
@@ -391,11 +544,7 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
                     .iter()
                     .enumerate()
                     .filter_map(|(col_idx, col)| {
-                        let mapping = request
-                            .column_mappings
-                            .iter()
-                            .find(|m| m.source_column == *col);
-
+                        let mapping = target.column_mappings.iter().find(|m| m.source_column == *col);
                         if mapping.is_none()
                             || mapping.and_then(|m| m.target_column.as_ref()).is_none()
                         {
@@ -414,9 +563,10 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
                 processed_rows += 1;
 
                 if batch_values.len() >= request.batch_size as usize {
-                    let insert_result = execute_batch_insert(
+                    let insert_result = execute_batch_insert_for_target(
                         adapter,
-                        &request,
+                        request,
+                        target,
                         &batch_values,
                         processed_rows - batch_values.len() as u64,
                     )
@@ -452,9 +602,10 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
             }
 
             if !batch_values.is_empty() {
-                let insert_result = execute_batch_insert(
+                let insert_result = execute_batch_insert_for_target(
                     adapter,
-                    &request,
+                    request,
+                    target,
                     &batch_values,
                     processed_rows - batch_values.len() as u64,
                 )
@@ -477,17 +628,6 @@ pub async fn execute_import<A: crate::database::DatabaseAdapter>(
             }
         }
     }
-
-    emit_progress(
-        app_handle,
-        &create_progress(
-            "import",
-            "finalizing",
-            processed_rows,
-            None,
-            start_time.elapsed().as_millis() as u64,
-        ),
-    );
 
     Ok(TransferResult {
         success: errors.is_empty(),
@@ -522,9 +662,10 @@ fn parse_csv_line(line: &str, delimiter: char) -> Vec<String> {
     values
 }
 
-async fn execute_batch_insert<A: crate::database::DatabaseAdapter>(
+async fn execute_batch_insert_for_target<A: crate::database::DatabaseAdapter>(
     adapter: &A,
     request: &ImportRequest,
+    target: &ImportTarget,
     batch: &[Vec<String>],
     _start_row: u64,
 ) -> Result<u64, String> {
@@ -537,7 +678,7 @@ async fn execute_batch_insert<A: crate::database::DatabaseAdapter>(
         .as_ref()
         .map(|s| format!("\"{}\".", s))
         .unwrap_or_default();
-    let target_columns: Vec<String> = request
+    let target_columns: Vec<String> = target
         .column_mappings
         .iter()
         .filter_map(|m| m.target_column.clone())
@@ -569,12 +710,11 @@ async fn execute_batch_insert<A: crate::database::DatabaseAdapter>(
     let sql = format!(
         "INSERT INTO {}\"{}\" ({}) VALUES {}",
         schema_prefix,
-        request.table,
+        target.table,
         col_list,
         values_list.join(", ")
     );
 
-    // Dry-run: validate INSERT statement was built but skip the write.
     if request.dry_run {
         return Ok(batch.len() as u64);
     }

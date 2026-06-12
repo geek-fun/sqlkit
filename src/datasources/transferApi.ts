@@ -1,13 +1,9 @@
 import type {
-  DdlRequest,
   ExportPreview,
   ExportRequest,
   FileDetectionResult,
   ImportFormat,
   ImportRequest,
-  MigrationMapping,
-  MigrationPreview,
-  MigrationRequest,
   TransferResult,
 } from '@/types/transfer'
 
@@ -31,28 +27,4 @@ export function previewImport(filePath: string, format: ImportFormat, previewRow
 
 export function executeImport(request: ImportRequest) {
   return invoke<TransferResult>('execute_import_data', { request })
-}
-
-export function previewMigration(request: MigrationRequest) {
-  return invoke<MigrationPreview>('preview_migration_data', { request })
-}
-
-export function executeMigration(request: MigrationRequest) {
-  return invoke<TransferResult>('execute_migration_data', { request })
-}
-
-type AutoMapParams = {
-  connectionId: string
-  database?: string
-  schema?: string
-  table: string
-  targetEngine: string
-}
-
-export function autoMapMigrationColumns(params: AutoMapParams) {
-  return invoke<MigrationMapping[]>('auto_map_migration_columns', params)
-}
-
-export function generateDdl(request: DdlRequest) {
-  return invoke<string>('generate_ddl_for_objects', { request })
 }

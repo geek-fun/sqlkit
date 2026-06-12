@@ -25,55 +25,196 @@ pub async fn execute_migration<A1: DatabaseAdapter, A2: DatabaseAdapter>(
         &create_progress("migration", "preparing", 0, None, 0),
     );
 
-    for (table_idx, table_plan) in request.table_plans.iter().enumerate() {
-        emit_progress(
-            app_handle,
-            &TransferProgress {
-                operation: "migration".to_string(),
-                phase: "processing".to_string(),
-                current_table: Some(table_plan.source_table.clone()),
-                total_rows: None,
-                processed_rows: total_processed,
-                skipped_rows: total_skipped,
-                error_count: total_errors.len() as u64,
-                percent: 0.0,
-                elapsed_ms: start_time.elapsed().as_millis() as u64,
-                estimated_remaining_ms: None,
-                message: Some(format!(
-                    "Migrating table {} of {}",
-                    table_idx + 1,
-                    request.table_plans.len()
-                )),
-            },
-        );
-
-        let table_result = migrate_table(
-            source_adapter,
-            target_adapter,
-            &request,
-            table_plan,
-            app_handle,
-            start_time,
-        )
-        .await;
-
-        match table_result {
-            Ok(result) => {
-                total_processed += result.processed_rows;
-                total_skipped += result.skipped_rows;
-                if !result.success {
-                    total_errors.extend(result.errors);
+    match request.scope {
+        TransferScope::Server => {
+            let source_databases = source_adapter
+                .list_databases()
+                .await
+                .map_err(|e| format!("Failed to list source databases: {}", e))?;
+            for source_db in source_databases {
+                if request.create_target_database_if_not_exists.unwrap_or(false) {
+                    let target_databases = target_adapter
+                        .list_databases()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if !target_databases.iter().any(|d| d.name == source_db.name) {
+                        target_adapter
+                            .execute_query(&format!("CREATE DATABASE \"{}\"", source_db.name))
+                            .await
+                            .map_err(|e| format!("Failed to create target database: {}", e))?;
+                    }
+                }
+                let tables = source_adapter
+                    .list_tables(Some(&source_db.name), None)
+                    .await
+                    .map_err(|e| e.to_string())?;
+                for table_info in tables {
+                    let columns = source_adapter
+                        .list_columns(Some(&source_db.name), None, &table_info.name)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let mappings: Vec<MigrationMapping> = columns
+                        .iter()
+                        .map(|c| MigrationMapping {
+                            source_column: c.name.clone(),
+                            source_type: c.data_type.clone(),
+                            target_column: c.name.clone(),
+                            target_type: c.data_type.clone(),
+                            conversion: MigrationConversion::Direct,
+                        })
+                        .collect();
+                    let table_plan = MigrationTablePlan {
+                        source_table: table_info.name.clone(),
+                        target_table: table_info.name.clone(),
+                        column_mappings: mappings,
+                    };
+                    let mut req = request.clone();
+                    req.source_database = Some(source_db.name.clone());
+                    req.target_database = Some(source_db.name.clone());
+                    req.table_plans = vec![table_plan];
+                    migrate_single_table_plan(
+                        source_adapter,
+                        target_adapter,
+                        &req,
+                        app_handle,
+                        start_time,
+                        &mut total_processed,
+                        &mut total_skipped,
+                        &mut total_errors,
+                    )
+                    .await?;
                 }
             }
-            Err(e) => {
-                total_errors.push(TransferError {
-                    row_number: None,
-                    statement_number: None,
-                    message: format!("Table {} failed: {}", table_plan.source_table, e),
-                    sql: None,
-                });
-                if request.on_error == MigrationErrorStrategy::Abort {
-                    break;
+        }
+        TransferScope::Database => {
+            if request.create_target_database_if_not_exists.unwrap_or(false) {
+                if let Some(ref target_db) = request.target_database {
+                    let target_databases = target_adapter
+                        .list_databases()
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    if !target_databases.iter().any(|d| d.name == *target_db) {
+                        target_adapter
+                            .execute_query(&format!("CREATE DATABASE \"{}\"", target_db))
+                            .await
+                            .map_err(|e| format!("Failed to create target database: {}", e))?;
+                    }
+                }
+            }
+            if request.table_plans.is_empty() {
+                let source_db = request.source_database.as_ref().ok_or_else(|| {
+                    "Source database required for Database scope with empty table_plans"
+                })?;
+                let tables = source_adapter
+                    .list_tables(Some(source_db), request.source_schema.as_deref())
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let mut auto_plans: Vec<MigrationTablePlan> = Vec::new();
+                for table_info in tables {
+                    let columns = source_adapter
+                        .list_columns(Some(source_db), request.source_schema.as_deref(), &table_info.name)
+                        .await
+                        .map_err(|e| e.to_string())?;
+                    let mappings: Vec<MigrationMapping> = columns
+                        .iter()
+                        .map(|c| MigrationMapping {
+                            source_column: c.name.clone(),
+                            source_type: c.data_type.clone(),
+                            target_column: c.name.clone(),
+                            target_type: c.data_type.clone(),
+                            conversion: MigrationConversion::Direct,
+                        })
+                        .collect();
+                    auto_plans.push(MigrationTablePlan {
+                        source_table: table_info.name.clone(),
+                        target_table: table_info.name.clone(),
+                        column_mappings: mappings,
+                    });
+                }
+                let mut req = request.clone();
+                req.table_plans = auto_plans;
+                for _ in req.table_plans.iter() {
+                    migrate_single_table_plan(
+                        source_adapter,
+                        target_adapter,
+                        &req,
+                        app_handle,
+                        start_time,
+                        &mut total_processed,
+                        &mut total_skipped,
+                        &mut total_errors,
+                    )
+                    .await?;
+                }
+            } else {
+                for _ in request.table_plans.iter() {
+                    migrate_single_table_plan(
+                        source_adapter,
+                        target_adapter,
+                        &request,
+                        app_handle,
+                        start_time,
+                        &mut total_processed,
+                        &mut total_skipped,
+                        &mut total_errors,
+                    )
+                    .await?;
+                }
+            }
+        }
+        TransferScope::Tables => {
+            for (table_idx, table_plan) in request.table_plans.iter().enumerate() {
+                emit_progress(
+                    app_handle,
+                    &TransferProgress {
+                        operation: "migration".to_string(),
+                        phase: "processing".to_string(),
+                        current_database: None,
+                        current_table: Some(table_plan.source_table.clone()),
+                        total_rows: None,
+                        processed_rows: total_processed,
+                        skipped_rows: total_skipped,
+                        error_count: total_errors.len() as u64,
+                        percent: 0.0,
+                        elapsed_ms: start_time.elapsed().as_millis() as u64,
+                        estimated_remaining_ms: None,
+                        message: Some(format!(
+                            "Migrating table {} of {}",
+                            table_idx + 1,
+                            request.table_plans.len()
+                        )),
+                    },
+                );
+
+                let table_result = migrate_table(
+                    source_adapter,
+                    target_adapter,
+                    &request,
+                    table_plan,
+                    app_handle,
+                    start_time,
+                )
+                .await;
+
+                match table_result {
+                    Ok(result) => {
+                        total_processed += result.processed_rows;
+                        total_skipped += result.skipped_rows;
+                        if !result.success {
+                            total_errors.extend(result.errors);
+                        }
+                    }
+                    Err(e) => {
+                        total_errors.push(TransferError {
+                            row_number: None,
+                            statement_number: None,
+                            message: format!("Table {} failed: {}", table_plan.source_table, e),
+                            sql: None,
+                        });
+                        if request.on_error == MigrationErrorStrategy::Abort {
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -101,6 +242,66 @@ pub async fn execute_migration<A1: DatabaseAdapter, A2: DatabaseAdapter>(
         output_size_bytes: None,
         errors: total_errors,
     })
+}
+
+async fn migrate_single_table_plan<A1: DatabaseAdapter, A2: DatabaseAdapter>(
+    source_adapter: &A1,
+    target_adapter: &A2,
+    request: &MigrationRequest,
+    app_handle: &tauri::AppHandle,
+    start_time: Instant,
+    total_processed: &mut u64,
+    total_skipped: &mut u64,
+    total_errors: &mut Vec<TransferError>,
+) -> Result<(), String> {
+    if let Some(table_plan) = request.table_plans.first() {
+        emit_progress(
+            app_handle,
+            &TransferProgress {
+                operation: "migration".to_string(),
+                phase: "processing".to_string(),
+                current_database: request.source_database.clone(),
+                current_table: Some(table_plan.source_table.clone()),
+                total_rows: None,
+                processed_rows: *total_processed,
+                skipped_rows: *total_skipped,
+                error_count: total_errors.len() as u64,
+                percent: 0.0,
+                elapsed_ms: start_time.elapsed().as_millis() as u64,
+                estimated_remaining_ms: None,
+                message: Some(format!("Migrating table {}", table_plan.source_table)),
+            },
+        );
+
+        let table_result = migrate_table(
+            source_adapter,
+            target_adapter,
+            request,
+            table_plan,
+            app_handle,
+            start_time,
+        )
+        .await;
+
+        match table_result {
+            Ok(result) => {
+                *total_processed += result.processed_rows;
+                *total_skipped += result.skipped_rows;
+                if !result.success {
+                    total_errors.extend(result.errors);
+                }
+            }
+            Err(e) => {
+                total_errors.push(TransferError {
+                    row_number: None,
+                    statement_number: None,
+                    message: format!("Table {} failed: {}", table_plan.source_table, e),
+                    sql: None,
+                });
+            }
+        }
+    }
+    Ok(())
 }
 
 async fn migrate_table<A1: DatabaseAdapter, A2: DatabaseAdapter>(
@@ -214,6 +415,7 @@ async fn migrate_table<A1: DatabaseAdapter, A2: DatabaseAdapter>(
             &TransferProgress {
                 operation: "migration".to_string(),
                 phase: "processing".to_string(),
+                current_database: None,
                 current_table: Some(table_plan.source_table.clone()),
                 total_rows: Some(total_rows),
                 processed_rows: processed_rows,

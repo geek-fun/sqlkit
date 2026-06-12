@@ -37,6 +37,7 @@ pub fn create_progress(
     TransferProgress {
         operation: operation.to_string(),
         phase: phase.to_string(),
+        current_database: None,
         current_table: None,
         total_rows,
         processed_rows,

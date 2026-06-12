@@ -26,3 +26,7 @@ dist-ssr
 
 # Test coverage
 coverage/
+
+# TypeScript build cache
+*.tsbuildinfo
+.omo/

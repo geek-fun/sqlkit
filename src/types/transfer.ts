@@ -1,5 +1,7 @@
 export type ExportFormat = 'csv' | 'jsonl' | 'sql' | 'excel'
 
+export type TransferScope = 'server' | 'database' | 'tables'
+
 export type ColumnInfo = {
   name: string
   data_type?: string
@@ -17,9 +19,6 @@ export type TableColumns = {
 export type ExportSource = {
   table: string
   columns: string[]
-  whereClause?: string
-  orderBy?: string
-  limit?: number
 }
 
 export type CsvExportOptions = {
@@ -54,7 +53,8 @@ export type ExportRequest = {
   connectionId: string
   database?: string
   schema?: string
-  source: ExportSource
+  scope: TransferScope
+  sources: ExportSource[]
   format: ExportFormat
   csvOptions?: CsvExportOptions
   jsonlOptions?: JsonlExportOptions
@@ -79,11 +79,19 @@ export type CsvImportOptions = {
   hasHeader?: boolean
 }
 
+export type ImportTarget = {
+  sourceTable?: string
+  targetTable: string
+  columnMappings?: ColumnMapping[]
+}
+
 export type ImportRequest = {
   connectionId: string
   database?: string
   schema?: string
-  table: string
+  scope: TransferScope
+  createDatabaseIfNotExists?: boolean
+  tables: ImportTarget[]
   filePath: string
   format: ImportFormat
   columnMappings: ColumnMapping[]
@@ -146,7 +154,7 @@ export type ExportPreview = {
   formattedPreview: string
 }
 
-export type TaskKind = 'export' | 'import' | 'sqlFile' | 'migration'
+export type TaskKind = 'export' | 'import'
 
 export type TaskStatus = 'pending' | 'running' | 'completed' | 'failed'
 
@@ -161,11 +169,8 @@ export type ExportTaskConfig = {
   connectionId: string
   database?: string
   schema?: string
-  table: string
-  columns: string[]
-  whereClause?: string
-  orderBy?: string
-  limit?: number
+  scope: TransferScope
+  sources: ExportSource[]
   format: ExportFormat
   outputPath: string
 }
@@ -174,28 +179,15 @@ export type ImportTaskConfig = {
   connectionId: string
   database?: string
   schema?: string
-  table: string
+  scope: TransferScope
+  tables: ImportTarget[]
   filePath: string
   format: ImportFormat
   conflictStrategy?: ConflictStrategy
+  createDatabaseIfNotExists?: boolean
 }
 
-export type SqlFileTaskConfig = {
-  connectionId: string
-  database?: string
-  filePath: string
-  onError: 'rollback' | 'skipAndContinue' | 'stop'
-}
-
-export type MigrationTaskConfig = {
-  sourceConnectionId: string
-  sourceDatabase?: string
-  targetConnectionId: string
-  targetDatabase?: string
-  tables: string[]
-}
-
-export type TaskConfig = ExportTaskConfig | ImportTaskConfig | SqlFileTaskConfig | MigrationTaskConfig
+export type TaskConfig = ExportTaskConfig | ImportTaskConfig
 
 export type BackgroundTask = {
   id: string
@@ -210,87 +202,7 @@ export type BackgroundTask = {
   error?: string
 }
 
-export type DdlObjectType = 'table' | 'view' | 'index'
-
-export type DdlObject = {
-  name: string
-  objectType: DdlObjectType
-  schema?: string
-}
-
-export type DdlOptions = {
-  includeCreateTable?: boolean
-  includePrimaryKeys?: boolean
-  includeForeignKeys?: boolean
-  includeIndexes?: boolean
-  includeConstraints?: boolean
-  includeComments?: boolean
-  includeStorageOptions?: boolean
-  includeDropIfExists?: boolean
-  includeIfNotExists?: boolean
-  includeData?: boolean
-  targetEngine?: string
-}
-
-export type DdlRequest = {
-  connectionId: string
-  database?: string
-  schema?: string
-  objects: DdlObject[]
-  options: DdlOptions
-}
-
 export type ExcelImportOptions = {
   sheetName?: string
   hasHeader?: boolean
-}
-
-export type MigrationConversion = 'direct' | 'mapped' | 'custom'
-
-export type MigrationMapping = {
-  sourceColumn: string
-  sourceType: string
-  targetColumn: string
-  targetType: string
-  conversion: MigrationConversion
-}
-
-export type MigrationTablePlan = {
-  sourceTable: string
-  targetTable: string
-  columnMappings: MigrationMapping[]
-}
-
-export type MigrationErrorStrategy = 'skipRow' | 'skipTable' | 'abort'
-
-export type MigrationRequest = {
-  sourceConnectionId: string
-  sourceDatabase?: string
-  sourceSchema?: string
-  targetConnectionId: string
-  targetDatabase?: string
-  targetSchema?: string
-  tablePlans: MigrationTablePlan[]
-  batchSize?: number
-  onError?: MigrationErrorStrategy
-  createTables?: boolean
-  dropTables?: boolean
-  migrateIndexes?: boolean
-  migrateForeignKeys?: boolean
-  migrateConstraints?: boolean
-  disableFkChecks?: boolean
-}
-
-export type MigrationTablePreview = {
-  sourceTable: string
-  targetTable: string
-  rowCount: number
-  columnCount: number
-  mappings: MigrationMapping[]
-}
-
-export type MigrationPreview = {
-  tables: MigrationTablePreview[]
-  totalRows: number
-  typeConversions: number
 }

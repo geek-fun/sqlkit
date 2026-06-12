@@ -16,7 +16,7 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 
 export const useTransferStore = defineStore('transfer', () => {
-  const activeTab = ref<'export' | 'import' | 'migration' | 'structure'>('export')
+  const activeTab = ref<'export' | 'import'>('export')
 
   const isRunning = ref(false)
   const progress = ref<TransferProgress | null>(null)
@@ -150,8 +150,6 @@ export const useTransferStore = defineStore('transfer', () => {
     const tabMap: Record<TaskKind, typeof activeTab.value> = {
       export: 'export',
       import: 'import',
-      sqlFile: 'structure',
-      migration: 'migration',
     }
     activeTab.value = tabMap[task.kind]
 
@@ -169,7 +167,8 @@ export const useTransferStore = defineStore('transfer', () => {
     switch (kind) {
       case 'export': {
         const cfg = config as ExportTaskConfig
-        return `Export ${cfg.table} → ${cfg.format.toUpperCase()}`
+        const tableName = cfg.sources?.[0]?.table || 'unknown'
+        return `Export ${tableName} → ${cfg.format.toUpperCase()}`
       }
       case 'import': {
         const cfg = config as ImportTaskConfig

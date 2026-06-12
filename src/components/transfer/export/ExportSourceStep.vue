@@ -34,13 +34,10 @@ watch([connectionId, database, schema, table, columns, whereClause, orderBy, lim
     connectionId: connectionId.value || undefined,
     database: database.value || undefined,
     schema: schema.value || undefined,
-    source: {
+    sources: [{
       table: table.value,
       columns: columns.value,
-      whereClause: whereClause.value || undefined,
-      orderBy: orderBy.value || undefined,
-      limit: limit.value || undefined,
-    },
+    }],
   })
 })
 
@@ -52,16 +49,10 @@ watch(() => props.modelValue, (newValue) => {
     database.value = newValue.database || ''
   if (newValue.schema !== schema.value)
     schema.value = newValue.schema || ''
-  if (newValue.source?.table !== table.value)
-    table.value = newValue.source?.table || ''
-  if (JSON.stringify(newValue.source?.columns) !== JSON.stringify(columns.value))
-    columns.value = newValue.source?.columns || []
-  if (newValue.source?.whereClause !== whereClause.value)
-    whereClause.value = newValue.source?.whereClause || ''
-  if (newValue.source?.orderBy !== orderBy.value)
-    orderBy.value = newValue.source?.orderBy || ''
-  if (newValue.source?.limit !== limit.value)
-    limit.value = newValue.source?.limit
+  if (newValue.sources?.[0]?.table !== table.value)
+    table.value = newValue.sources?.[0]?.table || ''
+  if (JSON.stringify(newValue.sources?.[0]?.columns) !== JSON.stringify(columns.value))
+    columns.value = newValue.sources?.[0]?.columns || []
 }, { deep: true })
 </script>
 

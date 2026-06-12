@@ -55,10 +55,12 @@ function handleRunInBackground() {
     'import',
     {
       connectionId: transferStore.importRequest.connectionId || '',
-      table: transferStore.importRequest.table || '',
+      scope: transferStore.importRequest.scope || 'tables',
+      tables: transferStore.importRequest.tables || [],
       filePath: transferStore.importRequest.filePath || '',
       format: transferStore.importRequest.format || 'csv',
       conflictStrategy: transferStore.importRequest.conflictStrategy,
+      createDatabaseIfNotExists: transferStore.importRequest.createDatabaseIfNotExists,
     },
     progress.value?.totalRows || 0,
   )
