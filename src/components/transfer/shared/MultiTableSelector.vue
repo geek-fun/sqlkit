@@ -183,8 +183,11 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
               <th scope="col" class="font-medium px-2 py-1.5 text-right">
                 Rows
               </th>
-              <th scope="col" class="font-medium px-2 py-1.5 text-right">
-                Type
+              <th scope="col" class="font-medium px-2 py-1.5 text-right w-20">
+                <span class="flex gap-1 items-center justify-end">
+                  <span v-if="selectionCount > 0" class="text-primary font-semibold">{{ selectionCount }}</span>
+                  <span v-else>Type</span>
+                </span>
               </th>
             </tr>
           </thead>
@@ -222,8 +225,12 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
     </div>
 
     <!-- Selection Count Footer -->
-    <div class="text-[10px] text-muted-foreground font-mono mt-2 shrink-0">
-      {{ selectionCount }} of {{ totalCount }} {{ t('transfer.migration.tablesSelected', 'tables selected') }}
+    <div v-if="selectionCount > 0" class="text-[10px] text-primary font-mono font-semibold mt-2 shrink-0 flex gap-1 items-center">
+      <span class="i-carbon-checkmark-filled h-3 w-3" />
+      {{ selectionCount }} tables selected
+    </div>
+    <div v-else class="text-[10px] text-muted-foreground mt-2 shrink-0">
+      Select tables to export
     </div>
   </div>
 </template>
