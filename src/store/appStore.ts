@@ -32,6 +32,26 @@ export type QueryConfig = {
   autoSave: boolean
 }
 
+export type LlmProvider = {
+  id: string
+  name: string
+  apiCompatibility: string
+  apiKey: string
+  baseUrl: string
+  enabled: boolean
+  proxy?: string
+  proxyMode?: string
+  contextWindowOverride?: number
+  models?: string[]
+}
+
+export type ChatConfig = {
+  maxIterations: number
+  wallClockBudgetSecs: number
+  tokenBudget: number
+  compactThreshold: number
+}
+
 type AppStoreState = {
   themeType: ThemeType
   languageType: LanguageType
@@ -39,6 +59,11 @@ type AppStoreState = {
   editorConfig: EditorConfig
   queryConfig: QueryConfig
   sidebarCollapsed: boolean
+  llmSettings: {
+    providers: LlmProvider[]
+  }
+  chatConfig: ChatConfig
+  featureModelRoutes: Record<string, { selectedModelId: string, useRecommendedModel: boolean }>
 }
 
 export const useAppStore = defineStore('app', {
@@ -61,6 +86,35 @@ export const useAppStore = defineStore('app', {
       autoSave: true,
     },
     sidebarCollapsed: false,
+    llmSettings: {
+      providers: [
+        {
+          id: 'openai',
+          name: 'OpenAI',
+          apiCompatibility: 'openai',
+          apiKey: '',
+          baseUrl: '',
+          enabled: true,
+          models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
+        },
+        {
+          id: 'anthropic',
+          name: 'Anthropic',
+          apiCompatibility: 'anthropic',
+          apiKey: '',
+          baseUrl: '',
+          enabled: false,
+          models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022'],
+        },
+      ],
+    },
+    chatConfig: {
+      maxIterations: 25,
+      wallClockBudgetSecs: 1800,
+      tokenBudget: 20000000,
+      compactThreshold: 0.75,
+    },
+    featureModelRoutes: {},
   }),
   persist: true,
   getters: {
@@ -146,6 +200,64 @@ export const useAppStore = defineStore('app', {
     },
     getEditorTheme() {
       return this.uiThemeType === ThemeType.DARK ? 'vs-dark' : 'vs-light'
+    },
+
+    // ── LLM/Agent configuration ──────────────────────────────────────────
+
+    async getFeatureModelConfig(feature: string): Promise<{ provider: LlmProvider, model: { label: string } }> {
+      const route = this.featureModelRoutes[feature]
+      const enabled = this.llmSettings.providers.filter(p => p.enabled)
+      const provider = enabled[0] || this.llmSettings.providers[0]
+
+      let modelId = route?.selectedModelId
+      if (!modelId || route?.useRecommendedModel) {
+        modelId = (provider.models ?? ['gpt-4o'])[0]
+      }
+
+      return {
+        provider,
+        model: { label: modelId },
+      }
+    },
+
+    async setFeatureModelRoute(feature: string, route: { selectedModelId: string, useRecommendedModel: boolean }) {
+      this.featureModelRoutes = {
+        ...this.featureModelRoutes,
+        [feature]: route,
+      }
+    },
+
+    async syncProviderModels(providerId: string) {
+      const idx = this.llmSettings.providers.findIndex(p => p.id === providerId)
+      if (idx === -1)
+        return
+      const provider = this.llmSettings.providers[idx]
+      if (!provider.apiKey)
+        return
+
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const result = await invoke<string>('list_llm_models', {
+          provider: provider.apiCompatibility,
+          apiKey: provider.apiKey,
+          baseUrl: provider.baseUrl || null,
+        })
+        const models = JSON.parse(result) as string[]
+        if (models.length > 0) {
+          const updated = [...this.llmSettings.providers]
+          updated[idx] = { ...updated[idx], models }
+          this.llmSettings = { ...this.llmSettings, providers: updated }
+        }
+      }
+      catch {
+        // Silently fail - models remain as defaults
+      }
+    },
+
+    async verifyModelAvailability(modelId: string): Promise<boolean> {
+      return this.llmSettings.providers.some(
+        p => p.enabled && (p.models ?? []).includes(modelId),
+      )
     },
   },
 })

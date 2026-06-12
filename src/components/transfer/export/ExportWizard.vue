@@ -324,9 +324,9 @@ async function startExport() {
             </div>
 
             <!-- Row 2: Format-specific config (fixed min-height prevents layout shift) -->
-            <div class="min-h-[60px] flex flex-col justify-start">
+            <div class="flex flex-col min-h-[60px] justify-start">
               <!-- CSV Options -->
-              <div v-if="selectedFormat === 'csv'" class="gap-3 flex items-center">
+              <div v-if="selectedFormat === 'csv'" class="flex gap-3 items-center">
                 <div class="space-y-1.5">
                   <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Delimiter</Label>
                   <Select v-model="csvDelimiter">
@@ -334,9 +334,15 @@ async function startExport() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value=",">Comma (,)</SelectItem>
-                      <SelectItem value=";">Semicolon (;)</SelectItem>
-                      <SelectItem value="\t">Tab</SelectItem>
+                      <SelectItem value=",">
+                        Comma (,)
+                      </SelectItem>
+                      <SelectItem value=";">
+                        Semicolon (;)
+                      </SelectItem>
+                      <SelectItem value="\t">
+                        Tab
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -347,7 +353,7 @@ async function startExport() {
               </div>
 
               <!-- JSONL Options -->
-              <div v-if="selectedFormat === 'jsonl'" class="gap-3 flex items-center">
+              <div v-if="selectedFormat === 'jsonl'" class="flex gap-3 items-center">
                 <div class="space-y-1.5">
                   <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Date Format</Label>
                   <Select v-model="jsonlDateFormat">
@@ -355,15 +361,19 @@ async function startExport() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="ISO8601">ISO 8601</SelectItem>
-                      <SelectItem value="Unix">Unix</SelectItem>
+                      <SelectItem value="ISO8601">
+                        ISO 8601
+                      </SelectItem>
+                      <SelectItem value="Unix">
+                        Unix
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
               </div>
 
               <!-- SQL Options -->
-              <div v-if="selectedFormat === 'sql'" class="gap-3 flex items-center flex-wrap">
+              <div v-if="selectedFormat === 'sql'" class="flex flex-wrap gap-3 items-center">
                 <div class="space-y-1.5">
                   <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Rows/Batch</Label>
                   <Input v-model.number="sqlBatchSize" type="number" min="1" max="10000" class="text-xs font-mono h-8 w-24" />
@@ -379,10 +389,10 @@ async function startExport() {
               </div>
 
               <!-- Excel Options -->
-              <div v-if="selectedFormat === 'excel'" class="gap-3 flex items-center">
+              <div v-if="selectedFormat === 'excel'" class="flex gap-3 items-center">
                 <div class="space-y-1.5">
                   <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Worksheet</Label>
-                  <div class="gap-3 flex items-center">
+                  <div class="flex gap-3 items-center">
                     <div class="flex items-center space-x-2">
                       <Checkbox id="excel-header" v-model:checked="excelIncludeHeader" class="h-3.5 w-3.5" />
                       <Label for="excel-header" class="text-xs cursor-pointer">Header</Label>
@@ -422,7 +432,7 @@ async function startExport() {
 
         <!-- Row 2: Execute action bar (full width) -->
         <div class="pt-3 border-t border-border/40 flex gap-3 items-center justify-end">
-          <div v-if="connectionId" class="flex gap-2 items-center mr-auto">
+          <div v-if="connectionId" class="mr-auto flex gap-2 items-center">
             <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
               {{ scope === 'server' ? 'All databases' : scope === 'database' ? (database || 'Select db') : `${selectedTables.length} tables` }}
             </Badge>

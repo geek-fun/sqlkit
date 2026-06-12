@@ -64,3 +64,15 @@ rust_decimal = { version = "1", features = [ "db-postgres" ] }
 hex = "0.4"
 rust_xlsxwriter = "0.64"
 calamine = "0.22"
+
+# Agent / LLM dependencies
+async-openai = "0.25"
+reqwest = { version = "0.12", default-features = false, features = [
+  "json",
+  "native-tls"
+] }
+tiktoken-rs = "0.5"
+http = "1"
+log = "0.4"
+futures = "0.3"
+rand = "0.8"

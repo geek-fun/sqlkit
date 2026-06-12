@@ -1,3 +1,5 @@
+export { agentApi, default as agentApiDefault } from './agentApi'
+export type { AgentMessage, AgentSession, AttachedSourceRow, ConfirmationRuleRow, ToolDefinition, ToolEnvelope, ToolMetadata, ToolsResponse } from './agentApi'
 export { connectionApi } from './connectionApi'
 export type { ConnectionStatus, ServerConfig } from './connectionApi'
 export * from './fileApi'
