@@ -12,6 +12,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { executeExport } from '@/datasources/transferApi'
+import { ConnectionStatus, useConnectionStore } from '@/store/connectionStore'
+import { useDatabaseStore } from '@/store/databaseStore'
 import { useTransferStore } from '@/store/transferStore'
 import ConnectionSelector from '../shared/ConnectionSelector.vue'
 import MultiTableSelector from '../shared/MultiTableSelector.vue'
@@ -20,6 +22,8 @@ import TransferStepCard from '../shared/TransferStepCard.vue'
 
 const { t } = useI18n()
 const transferStore = useTransferStore()
+const connectionStore = useConnectionStore()
+const databaseStore = useDatabaseStore()
 
 // Local state for all inputs
 const scope = ref<TransferScope>('server')
@@ -27,7 +31,17 @@ const connectionId = ref('')
 const database = ref('')
 const schema = ref('')
 const selectedTables = ref<string[]>([])
-const selectedFormat = ref<ExportFormat>('csv')
+const selectedFormat = ref<ExportFormat>('sql')
+
+// Available databases from the connected connection
+const availableDatabases = computed(() => {
+  if (!connectionId.value)
+    return []
+  const isConnected = connectionStore.getConnectionStatus(connectionId.value) === ConnectionStatus.CONNECTED
+  if (!isConnected)
+    return []
+  return databaseStore.metadata[connectionId.value]?.databases ?? []
+})
 
 // Reset tables when connection or database changes
 watch([connectionId, database], ([newConnId, newDb], [oldConnId, oldDb]) => {
@@ -69,10 +83,10 @@ const sourceSummary = computed(() => {
 
 // Format options
 const formatOptions: { value: ExportFormat, label: string, icon: string }[] = [
-  { value: 'csv', label: 'CSV', icon: 'i-carbon-document-csv' },
-  { value: 'jsonl', label: 'JSONL', icon: 'i-carbon-document-json' },
-  { value: 'excel', label: 'Excel', icon: 'i-carbon-document-xls' },
   { value: 'sql', label: 'SQL', icon: 'i-carbon-document-sql' },
+  { value: 'jsonl', label: 'JSONL', icon: 'i-carbon-document-json' },
+  { value: 'csv', label: 'CSV', icon: 'i-carbon-document-csv' },
+  { value: 'excel', label: 'XLS', icon: 'i-carbon-document-xls' },
 ]
 
 // Browse output file or directory
@@ -212,20 +226,48 @@ async function startExport() {
     >
       <div class="gap-3 grid grid-cols-1 h-[280px] items-stretch overflow-hidden lg:grid-cols-3">
         <!-- Left: Connection + Scope + conditional selectors (1/3) -->
-        <div class="lg:col-span-1 space-y-4">
-          <!-- Always show Connection selector -->
+        <div class="space-y-4 lg:col-span-1">
+          <!-- Step 1: Connection (Server) selector only -->
           <ConnectionSelector
             v-model:connection-id="connectionId"
             v-model:database="database"
             v-model:schema="schema"
-            :show-database="scope === 'database' || scope === 'tables'"
-            :show-schema="scope === 'tables'"
+            :show-database="false"
+            :show-schema="false"
           />
 
-          <!-- Always show Scope selector -->
+          <!-- Step 2: Scope selector -->
           <div class="space-y-1.5">
             <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Scope</Label>
             <ScopeSelector :scope="scope" @update:scope="scope = $event" />
+          </div>
+
+          <!-- Step 3: Database selector (only when scope is 'database' or 'tables') -->
+          <div v-if="scope === 'database' || scope === 'tables'" class="space-y-1.5">
+            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Database</Label>
+            <Select v-model="database" :disabled="!connectionId">
+              <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
+                <SelectValue placeholder="Select database" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="db in availableDatabases"
+                  :key="db.name"
+                  :value="db.name"
+                  class="text-xs"
+                >
+                  <div class="flex gap-2 w-full items-center">
+                    <span>{{ db.name }}</span>
+                    <span
+                      v-if="db.is_system"
+                      class="text-[10px] text-muted-foreground tracking-wide font-mono ml-auto px-1 rounded-sm bg-muted/60 uppercase"
+                    >
+                      System
+                    </span>
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <!-- Scope info badge -->
@@ -252,10 +294,10 @@ async function startExport() {
       :step-number="2"
       icon="i-carbon-document"
       icon-class="text-blue-600 dark:text-blue-500"
-      min-height="200px"
+      min-height="180px"
     >
       <div class="flex flex-row gap-4">
-        <!-- Left: Format + Format-specific Options -->
+        <!-- Left: Format + Format-specific Options + Start Export -->
         <div class="flex-1 min-w-0 space-y-3">
           <!-- Format: 4 items in one row -->
           <div class="space-y-2">
@@ -280,91 +322,93 @@ async function startExport() {
             </div>
           </div>
 
-          <!-- Format-specific Config -->
-          <!-- CSV Options -->
-          <div v-if="selectedFormat === 'csv'" class="space-y-3">
-            <div class="gap-3 grid grid-cols-2 items-center">
-              <div class="space-y-1.5">
-                <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Delimiter</Label>
-                <Select v-model="csvDelimiter">
-                  <SelectTrigger class="text-xs font-mono h-8">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value=",">
-                      Comma (,)
-                    </SelectItem>
-                    <SelectItem value=";">
-                      Semicolon (;)
-                    </SelectItem>
-                    <SelectItem value="\t">
-                      Tab
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
+          <!-- Format-specific Config + Start Export on same row -->
+          <div class="flex gap-4 items-center">
+            <!-- Format options area -->
+            <div class="flex-1 min-w-0">
+              <!-- CSV Options -->
+              <div v-if="selectedFormat === 'csv'" class="gap-3 flex items-center">
+                <div class="space-y-1.5">
+                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Delimiter</Label>
+                  <Select v-model="csvDelimiter">
+                    <SelectTrigger class="text-xs font-mono h-8 w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value=",">Comma (,)</SelectItem>
+                      <SelectItem value=";">Semicolon (;)</SelectItem>
+                      <SelectItem value="\t">Tab</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div class="flex items-center space-x-2 sm:mt-5">
+                  <Checkbox id="csv-header" v-model:checked="csvIncludeHeader" class="h-3.5 w-3.5" />
+                  <Label for="csv-header" class="text-xs cursor-pointer">Include header</Label>
+                </div>
               </div>
-              <div class="flex items-center space-x-2 sm:mt-5">
-                <Checkbox id="csv-header" v-model:checked="csvIncludeHeader" class="h-3.5 w-3.5" />
-                <Label for="csv-header" class="text-xs cursor-pointer">Include header row</Label>
-              </div>
-            </div>
-          </div>
 
-          <!-- JSONL Options -->
-          <div v-if="selectedFormat === 'jsonl'" class="space-y-3">
-            <div class="space-y-1.5">
-              <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Date Format</Label>
-              <Select v-model="jsonlDateFormat">
-                <SelectTrigger class="text-xs h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ISO8601">
-                    ISO 8601
-                  </SelectItem>
-                  <SelectItem value="Unix">
-                    Unix timestamp
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              <!-- JSONL Options -->
+              <div v-if="selectedFormat === 'jsonl'" class="gap-3 flex items-center">
+                <div class="space-y-1.5">
+                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Date Format</Label>
+                  <Select v-model="jsonlDateFormat">
+                    <SelectTrigger class="text-xs h-8 w-28">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ISO8601">ISO 8601</SelectItem>
+                      <SelectItem value="Unix">Unix</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <!-- Excel Options -->
-          <div v-if="selectedFormat === 'excel'" class="space-y-3">
-            <div class="flex flex-col gap-2">
-              <div class="flex items-center space-x-2">
-                <Checkbox id="excel-header" v-model:checked="excelIncludeHeader" class="h-3.5 w-3.5" />
-                <Label for="excel-header" class="text-xs cursor-pointer">Include header</Label>
-              </div>
-              <div class="flex items-center space-x-2">
-                <Checkbox id="excel-freeze" v-model:checked="excelFreezeHeader" class="h-3.5 w-3.5" />
-                <Label for="excel-freeze" class="text-xs cursor-pointer">Freeze header</Label>
-              </div>
-              <div class="flex items-center space-x-2">
-                <Checkbox id="excel-autofit" v-model:checked="excelAutoFit" class="h-3.5 w-3.5" />
-                <Label for="excel-autofit" class="text-xs cursor-pointer">Auto-fit columns</Label>
-              </div>
-            </div>
-          </div>
-
-          <!-- SQL Options -->
-          <div v-if="selectedFormat === 'sql'" class="space-y-3">
-            <div class="gap-3 grid grid-cols-2 items-start">
-              <div class="space-y-1.5">
-                <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Batch Size</Label>
-                <Input v-model.number="sqlBatchSize" type="number" min="1" max="10000" class="text-xs font-mono h-8" />
-              </div>
-              <div class="flex flex-col gap-2 sm:mt-5">
+              <!-- Excel Options -->
+              <div v-if="selectedFormat === 'excel'" class="gap-3 flex items-center flex-wrap">
                 <div class="flex items-center space-x-2">
+                  <Checkbox id="excel-header" v-model:checked="excelIncludeHeader" class="h-3.5 w-3.5" />
+                  <Label for="excel-header" class="text-xs cursor-pointer">Header</Label>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <Checkbox id="excel-freeze" v-model:checked="excelFreezeHeader" class="h-3.5 w-3.5" />
+                  <Label for="excel-freeze" class="text-xs cursor-pointer">Freeze</Label>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <Checkbox id="excel-autofit" v-model:checked="excelAutoFit" class="h-3.5 w-3.5" />
+                  <Label for="excel-autofit" class="text-xs cursor-pointer">Auto-fit</Label>
+                </div>
+              </div>
+
+              <!-- SQL Options -->
+              <div v-if="selectedFormat === 'sql'" class="gap-3 flex items-center flex-wrap">
+                <div class="space-y-1.5">
+                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Rows/Batch</Label>
+                  <Input v-model.number="sqlBatchSize" type="number" min="1" max="10000" class="text-xs font-mono h-8 w-24" />
+                </div>
+                <div class="flex items-center space-x-2 sm:mt-5">
                   <Checkbox id="sql-create" v-model:checked="sqlIncludeCreateTable" class="h-3.5 w-3.5" />
-                  <Label for="sql-create" class="text-xs cursor-pointer">Include CREATE TABLE</Label>
+                  <Label for="sql-create" class="text-xs cursor-pointer">CREATE TABLE</Label>
                 </div>
-                <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-2 sm:mt-5">
                   <Checkbox id="sql-drop" v-model:checked="sqlIncludeDropTable" class="h-3.5 w-3.5" />
-                  <Label for="sql-drop" class="text-xs cursor-pointer">Include DROP TABLE</Label>
+                  <Label for="sql-drop" class="text-xs cursor-pointer">DROP TABLE</Label>
                 </div>
               </div>
+            </div>
+
+            <!-- Selection Summary + Start Export Button on same row -->
+            <div class="flex gap-3 items-center shrink-0">
+              <div v-if="connectionId" class="flex gap-2 items-center">
+                <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
+                  {{ scope === 'server' ? 'All databases' : scope === 'database' ? (database || 'Select db') : `${selectedTables.length} tables` }}
+                </Badge>
+                <Badge variant="outline" class="text-[10px] font-mono px-1.5 py-0.5 uppercase">
+                  {{ selectedFormat }}
+                </Badge>
+              </div>
+              <Button size="sm" class="text-xs font-semibold px-5 h-8" :disabled="!canExport" @click="startExport">
+                <span class="i-carbon-play mr-1.5" /> {{ t('transfer.export.step.execute', 'Start Export') }}
+              </Button>
             </div>
           </div>
         </div>
@@ -386,23 +430,6 @@ async function startExport() {
             </div>
           </div>
         </div>
-      </div>
-
-      <!-- Start Export Button (at bottom) -->
-      <div class="mt-3 pt-3 border-t border-border/40 flex justify-end">
-        <Button size="sm" class="text-xs font-semibold px-5 h-8" :disabled="!canExport" @click="startExport">
-          <span class="i-carbon-play mr-1.5" /> {{ t('transfer.export.step.execute', 'Start Export') }}
-        </Button>
-      </div>
-
-      <!-- Selection Summary -->
-      <div v-if="connectionId" class="mt-2 pt-2 border-t border-border/40 flex gap-2 items-center">
-        <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
-          {{ scope === 'server' ? 'All databases' : scope === 'database' ? (database || 'Select database') : `${selectedTables.length} tables` }}
-        </Badge>
-        <Badge variant="outline" class="text-[10px] font-mono px-1.5 py-0.5 uppercase">
-          {{ selectedFormat }}
-        </Badge>
       </div>
     </TransferStepCard>
   </div>
