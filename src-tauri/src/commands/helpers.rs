@@ -1,7 +1,7 @@
 use crate::database::strategy::{resolve_effective_type, ConnectionStrategy, CoreDatabaseType};
 use crate::database::{
     clickhouse::ClickHouseAdapter, config::ConnectionConfig, duckdb::DuckDbAdapter,
-    http_sql::HttpSqlAdapter, odbc::OdbcAdapter, ConnectionStatus, DatabaseAdapter,
+    http_sql::HttpSqlAdapter, jdbc_bridge::JdbcBridgeAdapter, ConnectionStatus, DatabaseAdapter,
 };
 use crate::database::{
     mysql::MySQLAdapter, postgres::PostgresAdapter, sqlite::SQLiteAdapter,
@@ -52,12 +52,22 @@ pub async fn create_and_connect_adapter(
                 adapter.connect().await.map_err(|e| e.to_string())?;
                 Ok(ActiveConnection::ClickHouse(Arc::new(Mutex::new(adapter))))
             }
+            CoreDatabaseType::Oracle => {
+                #[cfg(feature = "oracle")]
+                {
+                    let mut adapter = crate::database::OracleAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    return Ok(ActiveConnection::Oracle(Arc::new(Mutex::new(adapter))));
+                }
+                #[cfg(not(feature = "oracle"))]
+                Err("Oracle support requires the 'oracle' feature: cargo build --features oracle".to_string())
+            }
             _ => Err(format!("Native adapter not yet implemented for {:?}", core)),
         },
-        ConnectionStrategy::Odbc => {
-            let mut adapter = OdbcAdapter::new(conn_config);
+        ConnectionStrategy::JdbcBridge => {
+            let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;
-            Ok(ActiveConnection::Odbc(Arc::new(Mutex::new(adapter))))
+            Ok(ActiveConnection::JdbcBridge(Arc::new(Mutex::new(adapter))))
         }
         ConnectionStrategy::Http => {
             let mut adapter = HttpSqlAdapter::new(conn_config);
@@ -107,10 +117,20 @@ pub async fn test_connection(
                 adapter.connect().await.map_err(|e| e.to_string())?;
                 adapter.test_connection().await.map_err(|e| e.to_string())
             }
+            CoreDatabaseType::Oracle => {
+                #[cfg(feature = "oracle")]
+                {
+                    let mut adapter = crate::database::OracleAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    return adapter.test_connection().await.map_err(|e| e.to_string());
+                }
+                #[cfg(not(feature = "oracle"))]
+                Err("Oracle support requires the 'oracle' feature".to_string())
+            }
             _ => Err("Native adapter not yet implemented".into()),
         },
-        ConnectionStrategy::Odbc => {
-            let mut adapter = OdbcAdapter::new(conn_config);
+        ConnectionStrategy::JdbcBridge => {
+            let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;
             adapter.test_connection().await.map_err(|e| e.to_string())
         }

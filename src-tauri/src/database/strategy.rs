@@ -28,8 +28,8 @@ pub enum CoreDatabaseType {
 pub enum ConnectionStrategy {
     /// Route to a native adapter via CoreDatabaseType.
     Native(CoreDatabaseType),
-    /// Route to ODBC bridge adapter.
-    Odbc,
+    /// Route to JDBC bridge adapter (Java subprocess).
+    JdbcBridge,
     /// Route to HTTP SQL bridge adapter.
     Http,
 }
@@ -61,14 +61,14 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         DuckDb => ConnectionStrategy::Native(CoreDatabaseType::DuckDb),
         ClickHouse => ConnectionStrategy::Native(CoreDatabaseType::ClickHouse),
 
-        // ODBC bridge
-        Oracle => ConnectionStrategy::Odbc,
-        DB2 => ConnectionStrategy::Odbc,
-        H2 => ConnectionStrategy::Odbc,
-        Snowflake => ConnectionStrategy::Odbc,
-        DM8Oracle => ConnectionStrategy::Odbc,
-        XuguDB => ConnectionStrategy::Odbc,
-        GBase8a => ConnectionStrategy::Odbc,
+        // JDBC bridge (Java subprocess)
+        Oracle => ConnectionStrategy::Native(CoreDatabaseType::Oracle),
+        DB2 => ConnectionStrategy::JdbcBridge,
+        H2 => ConnectionStrategy::JdbcBridge,
+        Snowflake => ConnectionStrategy::JdbcBridge,
+        DM8Oracle => ConnectionStrategy::JdbcBridge,
+        XuguDB => ConnectionStrategy::JdbcBridge,
+        GBase8a => ConnectionStrategy::JdbcBridge,
 
         // HTTP SQL bridge
         Trino | Presto => ConnectionStrategy::Http,
@@ -157,9 +157,17 @@ mod tests {
     }
 
     #[test]
-    fn test_odbc_types() {
+    fn test_oracle_routes_to_native() {
+        assert_eq!(
+            resolve_effective_type(DatabaseType::Oracle),
+            ConnectionStrategy::Native(CoreDatabaseType::Oracle),
+            "Oracle should route to native Oracle adapter"
+        );
+    }
+
+    #[test]
+    fn test_jdbc_bridge_types() {
         for db in [
-            DatabaseType::Oracle,
             DatabaseType::DB2,
             DatabaseType::H2,
             DatabaseType::Snowflake,
@@ -169,8 +177,8 @@ mod tests {
         ] {
             assert_eq!(
                 resolve_effective_type(db),
-                ConnectionStrategy::Odbc,
-                "{:?} should be ODBC bridge",
+                ConnectionStrategy::JdbcBridge,
+                "{:?} should be JDBC bridge",
                 db
             );
         }

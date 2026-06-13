@@ -13,9 +13,11 @@ use uuid::Uuid;
 /// Core adapter types used in dispatch logic.
 use crate::database::{
     clickhouse::ClickHouseAdapter, duckdb::DuckDbAdapter, http_sql::HttpSqlAdapter,
-    mysql::MySQLAdapter, odbc::OdbcAdapter, postgres::PostgresAdapter, sqlite::SQLiteAdapter,
-    sqlserver::SqlServerAdapter,
+    jdbc_bridge::JdbcBridgeAdapter, mysql::MySQLAdapter, postgres::PostgresAdapter,
+    sqlite::SQLiteAdapter, sqlserver::SqlServerAdapter,
 };
+#[cfg(feature = "oracle")]
+use crate::database::OracleAdapter;
 
 /// Server configuration with connection details.
 ///
@@ -155,7 +157,9 @@ pub enum ActiveConnection {
     SQLServer(Arc<Mutex<SqlServerAdapter>>),
     DuckDb(Arc<Mutex<DuckDbAdapter>>),
     ClickHouse(Arc<Mutex<ClickHouseAdapter>>),
-    Odbc(Arc<Mutex<OdbcAdapter>>),
+    #[cfg(feature = "oracle")]
+    Oracle(Arc<Mutex<OracleAdapter>>),
+    JdbcBridge(Arc<Mutex<JdbcBridgeAdapter>>),
     HttpSql(Arc<Mutex<HttpSqlAdapter>>),
 }
 

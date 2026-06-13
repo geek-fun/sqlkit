@@ -6,7 +6,7 @@
 use crate::api_response::{db_error_to_api_error, ApiResponse};
 use crate::database::{
     ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DuckDbAdapter, HttpSqlAdapter,
-    MySQLAdapter, OdbcAdapter, PostgresAdapter, QueryResult, SqlServerAdapter,
+    JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter,
 };
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
@@ -82,7 +82,7 @@ pub async fn execute_query(
             SQLServer(ConnectionConfig),
             DuckDb(ConnectionConfig),
             ClickHouse(ConnectionConfig),
-            Odbc(ConnectionConfig),
+            JdbcBridge(ConnectionConfig),
             HttpSql(ConnectionConfig),
         }
 
@@ -143,12 +143,12 @@ pub async fn execute_query(
                         None
                     }
                 }
-                ActiveConnection::Odbc(adapter) => {
+                ActiveConnection::JdbcBridge(adapter) => {
                     let adapter = adapter.lock().await;
                     if Some(db.as_str()) != adapter.config.database.as_deref() {
                         let mut cfg = adapter.config.clone();
                         cfg.database = Some(db.clone());
-                        Some(TempKind::Odbc(cfg))
+                        Some(TempKind::JdbcBridge(cfg))
                     } else {
                         None
                     }
@@ -185,7 +185,9 @@ pub async fn execute_query(
                 TempKind::ClickHouse(cfg) => {
                     execute_with_temp_adapter(ClickHouseAdapter::new(cfg), &sql).await
                 }
-                TempKind::Odbc(cfg) => execute_with_temp_adapter(OdbcAdapter::new(cfg), &sql).await,
+                TempKind::JdbcBridge(cfg) => {
+                    execute_with_temp_adapter(JdbcBridgeAdapter::new(cfg), &sql).await
+                }
                 TempKind::HttpSql(cfg) => {
                     execute_with_temp_adapter(HttpSqlAdapter::new(cfg), &sql).await
                 }
@@ -224,7 +226,7 @@ pub async fn execute_query(
             let adapter = adapter.lock().await;
             adapter.execute_query(&sql).await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             adapter.execute_query(&sql).await
         }
@@ -336,7 +338,7 @@ pub async fn explain_query(
             let explain_sql = format!("EXPLAIN {}", sql);
             adapter.execute_query(&explain_sql).await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
             adapter.execute_query(&explain_sql).await

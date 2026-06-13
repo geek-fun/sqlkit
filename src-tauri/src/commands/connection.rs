@@ -41,7 +41,7 @@ pub async fn connect_server(
             let a = adapter.lock().await;
             a.test_connection().await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let a = adapter.lock().await;
             a.test_connection().await
         }
@@ -70,7 +70,7 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
         ActiveConnection::SQLite(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::DuckDb(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::ClickHouse(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::Odbc(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::HttpSql(adapter) => adapter.lock().await.disconnect().await,
     };
 

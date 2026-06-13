@@ -5,7 +5,7 @@
 
 use crate::database::{
     ClickHouseAdapter, ColumnInfo, DatabaseAdapter, DatabaseSchema, DuckDbAdapter, HttpSqlAdapter,
-    MySQLAdapter, OdbcAdapter, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo,
+    JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo,
 };
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
@@ -42,7 +42,7 @@ fn quote_identifier(identifier: &str, db_type: &str) -> String {
         "sqlite" => format!("\"{}\"", identifier.replace("\"", "\"\"")),
         "duckdb" => format!("\"{}\"", identifier.replace("\"", "\"\"")),
         "clickhouse" => format!("`{}`", identifier.replace("`", "``")),
-        "odbc" => format!("\"{}\"", identifier.replace("\"", "\"\"")),
+        "jdbc" => format!("\"{}\"", identifier.replace("\"", "\"\"")),
         "trino" => identifier.to_string(),
         _ => identifier.to_string(),
     }
@@ -147,7 +147,7 @@ pub async fn list_databases(
             let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
@@ -213,7 +213,7 @@ pub async fn list_schemas(
             let adapter = adapter.lock().await;
             adapter.list_schemas(Some(&database)).await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_schemas(Some(&database)).await
         }
@@ -286,7 +286,7 @@ pub async fn list_tables(
                 .list_tables(Some(&database), schema.as_deref())
                 .await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_tables(Some(&database), schema.as_deref())
@@ -367,7 +367,7 @@ pub async fn get_table_info(
                 .get_table_info(Some(&database), None, &table_name)
                 .await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .get_table_info(Some(&database), schema.as_deref(), &table_name)
@@ -458,7 +458,7 @@ pub async fn list_columns(
                 .list_columns(Some(&database), None, &table_name)
                 .await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_columns(None, schema.as_deref(), &table_name)
@@ -582,10 +582,10 @@ pub async fn get_table_data(
                 build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "clickhouse");
             adapter.execute_query(&sql).await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "odbc");
-            let sql = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "odbc");
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "jdbc");
+            let sql = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "jdbc");
             adapter.execute_query(&sql).await
         }
         ActiveConnection::HttpSql(adapter) => {
@@ -700,9 +700,9 @@ pub async fn get_table_count(
             let query = build_count_query(&qualified, filter_ref);
             adapter.execute_query(&query).await
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "odbc");
+            let qualified = build_qualified_table(schema.as_deref(), &table, "jdbc");
             let query = build_count_query(&qualified, filter_ref);
             adapter.execute_query(&query).await
         }
@@ -910,9 +910,9 @@ pub async fn update_table_row(
                 .await
                 .map_err(|e| format!("Failed to update row: {}", e))?;
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            let sql = build_update_sql("odbc")?;
+            let sql = build_update_sql("jdbc")?;
             adapter
                 .execute_query(&sql)
                 .await
@@ -1061,9 +1061,9 @@ pub async fn delete_table_row(
                 .await
                 .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
-        ActiveConnection::Odbc(adapter) => {
+        ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            let sql = build_delete_sql("odbc");
+            let sql = build_delete_sql("jdbc");
             adapter
                 .execute_query(&sql)
                 .await

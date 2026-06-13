@@ -64,20 +64,20 @@ pub enum DatabaseType {
     /// 达梦 DM8 (MySQL mode, secondary) — MySQL wire protocol alias.
     DM8,
 
-    // ── ODBC bridge ──
-    /// Oracle Database — ODBC bridge / oracle-rs (optional feature).
+    // ── JDBC bridge (Java subprocess, lazy download) ──
+    /// Oracle Database — oracle-rs (native, optional feature).
     Oracle,
-    /// IBM DB2 — ODBC bridge.
+    /// IBM DB2 — JDBC bridge.
     DB2,
-    /// H2 — ODBC bridge.
+    /// H2 — JDBC bridge.
     H2,
-    /// Snowflake — ODBC bridge.
+    /// Snowflake — JDBC bridge.
     Snowflake,
-    /// 达梦 DM8 (Oracle mode, primary) — ODBC bridge with COMPATIBLE_MODE auto-detect.
+    /// 达梦 DM8 (Oracle mode, primary) — JDBC bridge.
     DM8Oracle,
-    /// 虚谷 XuguDB — ODBC bridge.
+    /// 虚谷 XuguDB — JDBC bridge.
     XuguDB,
-    /// 南大通用 GBase 8a — ODBC bridge.
+    /// 南大通用 GBase 8a — JDBC bridge.
     GBase8a,
 
     // ── HTTP SQL bridge ──

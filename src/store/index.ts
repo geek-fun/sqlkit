@@ -4,6 +4,7 @@ export type { EditorConfig, QueryConfig } from './appStore'
 export {
   ConnectionStatus,
   DatabaseType,
+  dbTypeToBackend,
   resolveDatabase,
   useConnectionStore,
 } from './connectionStore'

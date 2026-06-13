@@ -1,7 +1,7 @@
 import type { ServerConnection } from '@/store/connectionStore'
 import { createPinia, setActivePinia } from 'pinia'
 import { connectionApi } from '@/datasources/connectionApi'
-import { ConnectionStatus, DatabaseType, resolveDatabase, useConnectionStore } from '@/store/connectionStore'
+import { ConnectionStatus, DatabaseType, dbTypeToBackend, resolveDatabase, useConnectionStore } from '@/store/connectionStore'
 
 jest.mock('@/datasources/connectionApi', () => ({
   connectionApi: {
@@ -19,6 +19,64 @@ describe('connectionStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     jest.clearAllMocks()
+  })
+
+  describe('dbTypeToBackend', () => {
+    it('maps all DatabaseType variants to non-empty strings', () => {
+      const allTypes = Object.values(DatabaseType)
+      expect(allTypes.length).toBeGreaterThan(0)
+      for (const type of allTypes) {
+        const backend = dbTypeToBackend[type as DatabaseType]
+        expect(backend).toBeDefined()
+        expect(backend.length).toBeGreaterThan(0)
+      }
+    })
+
+    it('maps PG-family types to PostgreSQL', () => {
+      expect(dbTypeToBackend[DatabaseType.COCKROACHDB]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.REDSHIFT]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.YUGABYTEDB]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.TIMESCALEDB]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.KINGBASEES]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.GAUSSDB]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.HIGHGO]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.UXDB]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.OPENGAUSS]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.GBASE8C]).toBe('PostgreSQL')
+    })
+
+    it('maps MySQL-family types to MySQL', () => {
+      expect(dbTypeToBackend[DatabaseType.MARIADB]).toBe('MySQL')
+      expect(dbTypeToBackend[DatabaseType.TIDB]).toBe('MySQL')
+      expect(dbTypeToBackend[DatabaseType.OCEANBASE]).toBe('MySQL')
+      expect(dbTypeToBackend[DatabaseType.TDSQL]).toBe('MySQL')
+      expect(dbTypeToBackend[DatabaseType.POLARDB]).toBe('MySQL')
+      expect(dbTypeToBackend[DatabaseType.DM8]).toBe('MySQL')
+    })
+
+    it('maps standalone native types correctly', () => {
+      expect(dbTypeToBackend[DatabaseType.POSTGRESQL]).toBe('PostgreSQL')
+      expect(dbTypeToBackend[DatabaseType.MYSQL]).toBe('MySQL')
+      expect(dbTypeToBackend[DatabaseType.SQLSERVER]).toBe('SqlServer')
+      expect(dbTypeToBackend[DatabaseType.SQLITE]).toBe('SQLite')
+      expect(dbTypeToBackend[DatabaseType.DUCKDB]).toBe('duckdb')
+      expect(dbTypeToBackend[DatabaseType.CLICKHOUSE]).toBe('clickhouse')
+      expect(dbTypeToBackend[DatabaseType.ORACLE]).toBe('oracle')
+    })
+
+    it('maps JDBC bridge types correctly', () => {
+      expect(dbTypeToBackend[DatabaseType.DB2]).toBe('db2')
+      expect(dbTypeToBackend[DatabaseType.H2]).toBe('h2')
+      expect(dbTypeToBackend[DatabaseType.SNOWFLAKE]).toBe('snowflake')
+      expect(dbTypeToBackend[DatabaseType.DM8ORACLE]).toBe('dm8_oracle')
+      expect(dbTypeToBackend[DatabaseType.XUGUDB]).toBe('xugudb')
+      expect(dbTypeToBackend[DatabaseType.GBASE8A]).toBe('gbase8a')
+    })
+
+    it('maps HTTP bridge types correctly', () => {
+      expect(dbTypeToBackend[DatabaseType.TRINO]).toBe('trino')
+      expect(dbTypeToBackend[DatabaseType.PRESTO]).toBe('presto')
+    })
   })
 
   const createMockConnection = (overrides: Partial<ServerConnection> = {}): ServerConnection => ({
