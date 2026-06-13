@@ -188,17 +188,64 @@ export const useAppStore = defineStore('app', {
       return this.uiThemeType === ThemeType.DARK ? 'vs-dark' : 'vs-light'
     },
 
+    // ── Provider CRUD ────────────────────────────────────────────────────
+
+    addProvider(provider: LlmProvider) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        providers: [...this.llmSettings.providers, provider],
+      }
+    },
+
+    removeProvider(providerId: string) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        providers: this.llmSettings.providers.filter(p => p.id !== providerId),
+      }
+    },
+
+    updateProvider(providerId: string, updates: Partial<LlmProvider>) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        providers: this.llmSettings.providers.map(p =>
+          p.id === providerId ? { ...p, ...updates } : p,
+        ),
+      }
+    },
+
+    toggleProviderEnabled(providerId: string) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        providers: this.llmSettings.providers.map(p =>
+          p.id === providerId ? { ...p, enabled: !p.enabled } : p,
+        ),
+      }
+    },
+
+    reorderProviders(providers: LlmProvider[]) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        providers,
+      }
+    },
+
     // ── LLM/Agent configuration ──────────────────────────────────────────
 
     async getFeatureModelConfig(feature: string): Promise<{ provider: LlmProvider, model: { label: string } }> {
       const route = this.featureModelRoutes[feature]
       const enabled = this.llmSettings.providers.filter(p => p.enabled)
-      const provider = enabled[0] || this.llmSettings.providers[0]
 
-      let modelId = route?.selectedModelId
-      if (!modelId || route?.useRecommendedModel) {
-        modelId = (provider.models ?? ['gpt-4o'])[0]
+      // When a specific model is selected (not "recommended"), find the provider that owns it
+      if (route?.selectedModelId && !route?.useRecommendedModel) {
+        const owner = enabled.find(p => (p.models ?? []).includes(route.selectedModelId))
+        if (owner) {
+          return { provider: owner, model: { label: route.selectedModelId } }
+        }
       }
+
+      // Fallback: use first enabled provider's first model
+      const provider = enabled[0] || this.llmSettings.providers[0]
+      const modelId = (provider.models ?? ['gpt-4o'])[0]
 
       return {
         provider,
@@ -223,12 +270,11 @@ export const useAppStore = defineStore('app', {
 
       try {
         const { invoke } = await import('@tauri-apps/api/core')
-        const result = await invoke<string>('list_llm_models', {
+        const models = await invoke<string[]>('list_llm_models', {
           provider: provider.apiCompatibility,
           apiKey: provider.apiKey,
           baseUrl: provider.baseUrl || null,
         })
-        const models = JSON.parse(result) as string[]
         if (models.length > 0) {
           const updated = [...this.llmSettings.providers]
           updated[idx] = { ...updated[idx], models }
@@ -237,6 +283,32 @@ export const useAppStore = defineStore('app', {
       }
       catch {
         // Silently fail - models remain as defaults
+      }
+    },
+
+    async testProviderConnection(providerId: string): Promise<{ success: boolean, error?: string }> {
+      const provider = this.llmSettings.providers.find(p => p.id === providerId)
+      if (!provider) {
+        return { success: false, error: 'Provider not found' }
+      }
+      if (!provider.apiKey) {
+        return { success: false, error: 'API key is not configured' }
+      }
+
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        const valid = await invoke<boolean>('validate_llm_config', {
+          provider: provider.apiCompatibility,
+          apiKey: provider.apiKey,
+          model: (provider.models ?? ['gpt-4o'])[0],
+          httpProxy: provider.proxy || null,
+          proxyMode: provider.proxyMode || 'none',
+          baseUrl: provider.baseUrl || null,
+        })
+        return { success: valid }
+      }
+      catch (err) {
+        return { success: false, error: String(err) }
       }
     },
 

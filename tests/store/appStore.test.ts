@@ -249,4 +249,276 @@ describe('appStore', () => {
       expect(store.queryConfig.autoSave).toBe(false)
     })
   })
+
+  describe('llm initial state', () => {
+    it('should have default providers', () => {
+      const store = useAppStore()
+
+      expect(store.llmSettings.providers).toHaveLength(2)
+      expect(store.llmSettings.providers[0].id).toBe('openai')
+      expect(store.llmSettings.providers[0].name).toBe('OpenAI')
+      expect(store.llmSettings.providers[0].enabled).toBe(true)
+    })
+
+    it('should have empty feature model routes', () => {
+      const store = useAppStore()
+
+      expect(store.featureModelRoutes).toEqual({})
+    })
+  })
+
+  describe('addProvider', () => {
+    it('should add a provider to the list', () => {
+      const store = useAppStore()
+      const initialCount = store.llmSettings.providers.length
+      const newProvider = {
+        id: 'test-1',
+        name: 'Test Provider',
+        apiCompatibility: 'openai',
+        apiKey: 'sk-test',
+        baseUrl: 'https://api.openai.com/v1',
+        enabled: true,
+        models: ['gpt-4o'],
+      }
+
+      store.addProvider(newProvider)
+
+      expect(store.llmSettings.providers).toHaveLength(initialCount + 1)
+      expect(store.llmSettings.providers.find(p => p.id === 'test-1')).toBeTruthy()
+    })
+
+    it('should not mutate the original array reference', () => {
+      const store = useAppStore()
+      const originalProviders = store.llmSettings.providers
+      const newProvider = {
+        id: 'test-immutable',
+        name: 'Immutability Test',
+        apiCompatibility: 'anthropic',
+        apiKey: '',
+        baseUrl: '',
+        enabled: true,
+      }
+
+      store.addProvider(newProvider)
+
+      expect(store.llmSettings.providers).not.toBe(originalProviders)
+    })
+  })
+
+  describe('removeProvider', () => {
+    it('should remove a provider by id', () => {
+      const store = useAppStore()
+      store.addProvider({
+        id: 'to-remove',
+        name: 'To Remove',
+        apiCompatibility: 'openai',
+        apiKey: '',
+        baseUrl: '',
+        enabled: true,
+      })
+      expect(store.llmSettings.providers.find(p => p.id === 'to-remove')).toBeTruthy()
+
+      store.removeProvider('to-remove')
+
+      expect(store.llmSettings.providers.find(p => p.id === 'to-remove')).toBeUndefined()
+    })
+
+    it('should no-op when id is not found', () => {
+      const store = useAppStore()
+      const initialCount = store.llmSettings.providers.length
+
+      store.removeProvider('non-existent-id')
+
+      expect(store.llmSettings.providers).toHaveLength(initialCount)
+    })
+
+    it('should return a new array reference', () => {
+      const store = useAppStore()
+      const originalProviders = store.llmSettings.providers
+
+      store.removeProvider('non-existent-id')
+
+      // removeProvider should produce a new array even when no-op
+      expect(store.llmSettings.providers).not.toBe(originalProviders)
+    })
+  })
+
+  describe('updateProvider', () => {
+    it('should update partial fields of a provider', () => {
+      const store = useAppStore()
+
+      store.updateProvider('openai', { name: 'Updated OpenAI' })
+
+      const provider = store.llmSettings.providers.find(p => p.id === 'openai')
+      expect(provider?.name).toBe('Updated OpenAI')
+      expect(provider?.apiCompatibility).toBe('openai') // unchanged
+    })
+
+    it('should update apiKey and baseUrl', () => {
+      const store = useAppStore()
+
+      store.updateProvider('anthropic', { apiKey: 'sk-ant-new', baseUrl: 'https://custom.anthropic.com' })
+
+      const provider = store.llmSettings.providers.find(p => p.id === 'anthropic')
+      expect(provider?.apiKey).toBe('sk-ant-new')
+      expect(provider?.baseUrl).toBe('https://custom.anthropic.com')
+    })
+
+    it('should no-op when id is not found', () => {
+      const store = useAppStore()
+      const original = [...store.llmSettings.providers]
+
+      store.updateProvider('non-existent', { name: 'Changed' })
+
+      expect(store.llmSettings.providers).toEqual(original)
+    })
+
+    it('should not mutate the original provider object', () => {
+      const store = useAppStore()
+      const originalProvider = store.llmSettings.providers.find(p => p.id === 'openai')
+
+      store.updateProvider('openai', { name: 'Changed' })
+
+      const updatedProvider = store.llmSettings.providers.find(p => p.id === 'openai')
+      expect(updatedProvider).not.toBe(originalProvider)
+    })
+  })
+
+  describe('toggleProviderEnabled', () => {
+    it('should toggle enabled from true to false', () => {
+      const store = useAppStore()
+      expect(store.llmSettings.providers.find(p => p.id === 'openai')?.enabled).toBe(true)
+
+      store.toggleProviderEnabled('openai')
+
+      expect(store.llmSettings.providers.find(p => p.id === 'openai')?.enabled).toBe(false)
+    })
+
+    it('should toggle enabled from false to true', () => {
+      const store = useAppStore()
+      expect(store.llmSettings.providers.find(p => p.id === 'anthropic')?.enabled).toBe(false)
+
+      store.toggleProviderEnabled('anthropic')
+
+      expect(store.llmSettings.providers.find(p => p.id === 'anthropic')?.enabled).toBe(true)
+    })
+
+    it('should no-op when id is not found', () => {
+      const store = useAppStore()
+      const original = [...store.llmSettings.providers]
+
+      store.toggleProviderEnabled('non-existent')
+
+      expect(store.llmSettings.providers).toEqual(original)
+    })
+  })
+
+  describe('reorderProviders', () => {
+    it('should replace the providers array with new order', () => {
+      const store = useAppStore()
+      const reversed = [...store.llmSettings.providers].reverse()
+
+      store.reorderProviders(reversed)
+
+      expect(store.llmSettings.providers[0].id).toBe('anthropic')
+      expect(store.llmSettings.providers[1].id).toBe('openai')
+    })
+
+    it('should accept empty array', () => {
+      const store = useAppStore()
+
+      store.reorderProviders([])
+
+      expect(store.llmSettings.providers).toEqual([])
+    })
+  })
+
+  describe('getFeatureModelConfig', () => {
+    it('should return first enabled provider and its first model', async () => {
+      const store = useAppStore()
+
+      const config = await store.getFeatureModelConfig('dataStudio')
+
+      expect(config.provider.id).toBe('openai')
+      expect(config.model.label).toBeTruthy()
+    })
+
+    it('should use feature model route if set', async () => {
+      const store = useAppStore()
+      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o-mini', useRecommendedModel: false })
+
+      const config = await store.getFeatureModelConfig('dataStudio')
+
+      expect(config.model.label).toBe('gpt-4o-mini')
+    })
+
+    it('should fall back to first provider when no routes exist', async () => {
+      const store = useAppStore()
+
+      const config = await store.getFeatureModelConfig('nonExistent')
+
+      expect(config.provider).toBeTruthy()
+      expect(config.model.label).toBeTruthy()
+    })
+  })
+
+  describe('setFeatureModelRoute', () => {
+    it('should store a feature model route', async () => {
+      const store = useAppStore()
+
+      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o', useRecommendedModel: false })
+
+      expect(store.featureModelRoutes.dataStudio).toEqual({
+        selectedModelId: 'gpt-4o',
+        useRecommendedModel: false,
+      })
+    })
+
+    it('should override existing route for the same feature', async () => {
+      const store = useAppStore()
+      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o', useRecommendedModel: false })
+
+      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o-mini', useRecommendedModel: true })
+
+      expect(store.featureModelRoutes.dataStudio.selectedModelId).toBe('gpt-4o-mini')
+      expect(store.featureModelRoutes.dataStudio.useRecommendedModel).toBe(true)
+    })
+
+    it('should store multiple features independently', async () => {
+      const store = useAppStore()
+
+      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o', useRecommendedModel: false })
+      await store.setFeatureModelRoute('sidebarAssistant', { selectedModelId: 'gpt-4o-mini', useRecommendedModel: true })
+
+      expect(store.featureModelRoutes.dataStudio.selectedModelId).toBe('gpt-4o')
+      expect(store.featureModelRoutes.sidebarAssistant.selectedModelId).toBe('gpt-4o-mini')
+    })
+  })
+
+  describe('verifyModelAvailability', () => {
+    it('should return true for an enabled provider model', async () => {
+      const store = useAppStore()
+
+      const available = await store.verifyModelAvailability('gpt-4o')
+
+      expect(available).toBe(true)
+    })
+
+    it('should return false for a non-existent model', async () => {
+      const store = useAppStore()
+
+      const available = await store.verifyModelAvailability('non-existent-model')
+
+      expect(available).toBe(false)
+    })
+
+    it('should return false when the provider is disabled', async () => {
+      const store = useAppStore()
+      store.toggleProviderEnabled('openai')
+
+      const available = await store.verifyModelAvailability('gpt-4o')
+
+      expect(available).toBe(false)
+    })
+  })
 })
