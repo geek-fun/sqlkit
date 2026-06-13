@@ -42,12 +42,38 @@ const isOpen = computed({
 
 const isEditing = computed(() => !!props.connection?.id)
 
-const defaultPorts: Record<DatabaseType, number> = {
+const defaultPorts: Record<string, number> = {
   [DatabaseType.POSTGRESQL]: 5432,
   [DatabaseType.MYSQL]: 3306,
   [DatabaseType.MARIADB]: 3306,
   [DatabaseType.SQLITE]: 0,
   [DatabaseType.SQLSERVER]: 1433,
+  [DatabaseType.DUCKDB]: 0,
+  [DatabaseType.CLICKHOUSE]: 8123,
+  [DatabaseType.COCKROACHDB]: 5432,
+  [DatabaseType.REDSHIFT]: 5439,
+  [DatabaseType.YUGABYTEDB]: 5433,
+  [DatabaseType.TIMESCALEDB]: 5432,
+  [DatabaseType.KINGBASEES]: 54321,
+  [DatabaseType.GAUSSDB]: 5432,
+  [DatabaseType.HIGHGO]: 5432,
+  [DatabaseType.UXDB]: 5432,
+  [DatabaseType.OPENGAUSS]: 5432,
+  [DatabaseType.GBASE8C]: 5432,
+  [DatabaseType.TIDB]: 4000,
+  [DatabaseType.OCEANBASE]: 2883,
+  [DatabaseType.TDSQL]: 3306,
+  [DatabaseType.POLARDB]: 3306,
+  [DatabaseType.DM8]: 5236,
+  [DatabaseType.ORACLE]: 1521,
+  [DatabaseType.DB2]: 50000,
+  [DatabaseType.H2]: 9092,
+  [DatabaseType.SNOWFLAKE]: 443,
+  [DatabaseType.DM8ORACLE]: 5236,
+  [DatabaseType.XUGUDB]: 5138,
+  [DatabaseType.GBASE8A]: 5258,
+  [DatabaseType.TRINO]: 8080,
+  [DatabaseType.PRESTO]: 8080,
 }
 
 const defaultConnection: ServerConnection = {

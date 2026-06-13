@@ -84,6 +84,6 @@ odbc = "0.17"
 oracle-rs = { version = "0.1", optional = true }
 
 [features]
-default = []
+default = ["duckdb"]
 duckdb = ["dep:duckdb"]
 oracle = ["dep:oracle-rs"]

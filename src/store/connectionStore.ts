@@ -9,14 +9,69 @@ export enum DatabaseType {
   MARIADB = 'MARIADB',
   SQLITE = 'SQLITE',
   SQLSERVER = 'SQLSERVER',
+  DUCKDB = 'DUCKDB',
+  CLICKHOUSE = 'CLICKHOUSE',
+  COCKROACHDB = 'COCKROACHDB',
+  REDSHIFT = 'REDSHIFT',
+  YUGABYTEDB = 'YUGABYTEDB',
+  TIMESCALEDB = 'TIMESCALEDB',
+  KINGBASEES = 'KINGBASEES',
+  GAUSSDB = 'GAUSSDB',
+  HIGHGO = 'HIGHGO',
+  UXDB = 'UXDB',
+  OPENGAUSS = 'OPENGAUSS',
+  GBASE8C = 'GBASE8C',
+  TIDB = 'TIDB',
+  OCEANBASE = 'OCEANBASE',
+  TDSQL = 'TDSQL',
+  POLARDB = 'POLARDB',
+  DM8 = 'DM8',
+  ORACLE = 'ORACLE',
+  DB2 = 'DB2',
+  H2 = 'H2',
+  SNOWFLAKE = 'SNOWFLAKE',
+  DM8ORACLE = 'DM8ORACLE',
+  XUGUDB = 'XUGUDB',
+  GBASE8A = 'GBASE8A',
+  TRINO = 'TRINO',
+  PRESTO = 'PRESTO',
 }
 
+const PG_BACKEND = 'PostgreSQL'
+const MYSQL_BACKEND = 'MySQL'
+
 const dbTypeToBackend: Record<DatabaseType, string> = {
-  [DatabaseType.POSTGRESQL]: 'PostgreSQL',
-  [DatabaseType.MYSQL]: 'MySQL',
-  [DatabaseType.MARIADB]: 'MySQL',
+  [DatabaseType.POSTGRESQL]: PG_BACKEND,
+  [DatabaseType.MYSQL]: MYSQL_BACKEND,
+  [DatabaseType.MARIADB]: MYSQL_BACKEND,
   [DatabaseType.SQLITE]: 'SQLite',
   [DatabaseType.SQLSERVER]: 'SqlServer',
+  [DatabaseType.DUCKDB]: 'duckdb',
+  [DatabaseType.CLICKHOUSE]: 'clickhouse',
+  [DatabaseType.COCKROACHDB]: PG_BACKEND,
+  [DatabaseType.REDSHIFT]: PG_BACKEND,
+  [DatabaseType.YUGABYTEDB]: PG_BACKEND,
+  [DatabaseType.TIMESCALEDB]: PG_BACKEND,
+  [DatabaseType.KINGBASEES]: PG_BACKEND,
+  [DatabaseType.GAUSSDB]: PG_BACKEND,
+  [DatabaseType.HIGHGO]: PG_BACKEND,
+  [DatabaseType.UXDB]: PG_BACKEND,
+  [DatabaseType.OPENGAUSS]: PG_BACKEND,
+  [DatabaseType.GBASE8C]: PG_BACKEND,
+  [DatabaseType.TIDB]: MYSQL_BACKEND,
+  [DatabaseType.OCEANBASE]: MYSQL_BACKEND,
+  [DatabaseType.TDSQL]: MYSQL_BACKEND,
+  [DatabaseType.POLARDB]: MYSQL_BACKEND,
+  [DatabaseType.DM8]: MYSQL_BACKEND,
+  [DatabaseType.ORACLE]: 'oracle',
+  [DatabaseType.DB2]: 'db2',
+  [DatabaseType.H2]: 'h2',
+  [DatabaseType.SNOWFLAKE]: 'snowflake',
+  [DatabaseType.DM8ORACLE]: 'dm8_oracle',
+  [DatabaseType.XUGUDB]: 'xugudb',
+  [DatabaseType.GBASE8A]: 'gbase8a',
+  [DatabaseType.TRINO]: 'trino',
+  [DatabaseType.PRESTO]: 'presto',
 }
 
 const dbTypeFromBackend: Record<string, DatabaseType> = {
@@ -24,11 +79,25 @@ const dbTypeFromBackend: Record<string, DatabaseType> = {
   MySQL: DatabaseType.MYSQL,
   SqlServer: DatabaseType.SQLSERVER,
   SQLite: DatabaseType.SQLITE,
+  duckdb: DatabaseType.DUCKDB,
+  clickhouse: DatabaseType.CLICKHOUSE,
+  oracle: DatabaseType.ORACLE,
+  db2: DatabaseType.DB2,
+  h2: DatabaseType.H2,
+  snowflake: DatabaseType.SNOWFLAKE,
+  dm8_oracle: DatabaseType.DM8ORACLE,
+  xugudb: DatabaseType.XUGUDB,
+  gbase8a: DatabaseType.GBASE8A,
+  trino: DatabaseType.TRINO,
+  presto: DatabaseType.PRESTO,
 }
 
 const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
   [DatabaseType.POSTGRESQL]: 'postgres',
   [DatabaseType.SQLSERVER]: 'master',
+  [DatabaseType.DUCKDB]: ':memory:',
+  [DatabaseType.CLICKHOUSE]: 'default',
+  [DatabaseType.HIGHGO]: 'highgo',
 }
 
 function resolveDatabase(type: DatabaseType, database?: string): string | null {
@@ -78,207 +147,3 @@ type ConnectionStoreState = {
 
 export const useConnectionStore = defineStore('connectionStore', {
   state: (): ConnectionStoreState => ({
-    connections: [],
-    activeConnectionId: null,
-    connectionStatus: {},
-    currentDatabases: {},
-  }),
-  getters: {
-    activeConnection: (state): ServerConnection | undefined =>
-      state.connections.find(c => c.id === state.activeConnectionId),
-
-    connectedConnections: (state): ServerConnection[] =>
-      state.connections.filter(c => c.isConnected),
-
-    connectionOptions(state) {
-      return state.connections.map(({ name }) => ({ label: name, value: name }))
-    },
-    getConnectionById: state => (id: string) => {
-      return state.connections.find(c => c.id === id)
-    },
-    getConnectionByName: state => (name: string) => {
-      return state.connections.find(c => c.name === name)
-    },
-    getConnectionStatus: state => (id: string): ConnectionStatus =>
-      state.connectionStatus[id] ?? ConnectionStatus.DISCONNECTED,
-    /** Returns the currently active database for a connection: backend-resolved default or configured value. */
-    getCurrentDatabase: state => (id: string): string =>
-      state.currentDatabases[id] ?? state.connections.find(c => c.id === id)?.database ?? '',
-  },
-  actions: {
-    async fetchConnections() {
-      try {
-        const backendConnections = await connectionApi.list()
-
-        this.connections = backendConnections.map(conn => ({
-          id: conn.id,
-          name: conn.name,
-          type: dbTypeFromBackend[conn.db_type] || DatabaseType.POSTGRESQL,
-          host: conn.host,
-          port: conn.port,
-          username: conn.username,
-          password: conn.password || undefined,
-          database: conn.database || undefined,
-          ssl: sslModeFromBackend(conn.ssl_mode),
-          isConnected: false,
-        }))
-      }
-      catch (error) {
-        console.error('Failed to fetch connections:', error)
-        this.connections = []
-      }
-    },
-
-    async saveConnection(connection: ServerConnection): Promise<{ success: boolean, message: string }> {
-      try {
-        const id = connection.id || crypto.randomUUID()
-
-        const serverConfig = {
-          id,
-          name: connection.name,
-          db_type: dbTypeToBackend[connection.type] || 'PostgreSQL',
-          host: connection.host,
-          port: connection.port,
-          username: connection.username || '',
-          password: connection.password || null,
-          database: connection.database || null,
-          ssl_mode: sslModeToBackend(connection.ssl),
-          ssl_ca_cert: connection.ssl.caCertPath || null,
-          ssl_client_cert: connection.ssl.clientCertPath || null,
-          ssl_client_key: connection.ssl.clientKeyPath || null,
-          trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
-        }
-
-        await connectionApi.save(serverConfig)
-
-        // Update local state
-        const newConnection = { ...connection, id }
-        if (connection.id) {
-          const index = this.connections.findIndex(c => c.id === connection.id)
-          if (index !== -1) {
-            this.connections = [
-              ...this.connections.slice(0, index),
-              newConnection,
-              ...this.connections.slice(index + 1),
-            ]
-          }
-        }
-        else {
-          this.connections = [...this.connections, newConnection]
-        }
-
-        return { success: true, message: 'Connection saved successfully' }
-      }
-      catch (error) {
-        return {
-          success: false,
-          message: error instanceof Error ? error.message : 'Unknown error',
-        }
-      }
-    },
-
-    async removeConnection(connection: ServerConnection) {
-      if (connection.id) {
-        await connectionApi.delete(connection.id)
-        this.connections = this.connections.filter(c => c.id !== connection.id)
-      }
-    },
-
-    async testConnection(connection: ServerConnection): Promise<boolean> {
-      try {
-        const serverConfig = {
-          id: connection.id || crypto.randomUUID(),
-          name: connection.name,
-          db_type: dbTypeToBackend[connection.type] || 'PostgreSQL',
-          host: connection.host,
-          port: connection.port,
-          username: connection.username || '',
-          password: connection.password || null,
-          database: resolveDatabase(connection.type, connection.database),
-          ssl_mode: sslModeToBackend(connection.ssl),
-          ssl_ca_cert: connection.ssl.caCertPath || null,
-          ssl_client_cert: connection.ssl.clientCertPath || null,
-          ssl_client_key: connection.ssl.clientKeyPath || null,
-          trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
-        }
-
-        const result = await connectionApi.test(serverConfig)
-        return result.is_connected
-      }
-      catch (error) {
-        console.error('Connection test failed:', error)
-        return false
-      }
-    },
-
-    async connect(connectionId: string) {
-      const connection = this.getConnectionById(connectionId)
-      if (!connection) {
-        throw new Error(`Connection not found: ${connectionId}`)
-      }
-
-      this.connectionStatus[connectionId] = ConnectionStatus.CONNECTING
-
-      try {
-        const serverConfig = {
-          id: connection.id!,
-          name: connection.name,
-          db_type: dbTypeToBackend[connection.type] || 'PostgreSQL',
-          host: connection.host,
-          port: connection.port,
-          username: connection.username || '',
-          password: connection.password || null,
-          database: resolveDatabase(connection.type, connection.database),
-          ssl_mode: sslModeToBackend(connection.ssl),
-          ssl_ca_cert: connection.ssl.caCertPath || null,
-          ssl_client_cert: connection.ssl.clientCertPath || null,
-          ssl_client_key: connection.ssl.clientKeyPath || null,
-          trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
-        }
-
-        const result = await connectionApi.connect(serverConfig)
-
-        connection.isConnected = true
-        connection.lastUsed = new Date()
-        this.connectionStatus[connectionId] = ConnectionStatus.CONNECTED
-        this.activeConnectionId = connectionId
-        // Persist the actual connected database (may be the resolved default).
-        const resolvedDb = result.current_database || resolveDatabase(connection.type, connection.database)
-        if (resolvedDb) {
-          this.currentDatabases[connectionId] = resolvedDb
-        }
-        return result
-      }
-      catch (error) {
-        this.connectionStatus[connectionId] = ConnectionStatus.ERROR
-        throw new Error(`Failed to connect: ${error}`)
-      }
-    },
-
-    async disconnect(connectionId: string) {
-      try {
-        await connectionApi.disconnect(connectionId)
-      }
-      finally {
-        const connection = this.getConnectionById(connectionId)
-        if (connection) {
-          connection.isConnected = false
-        }
-        this.connectionStatus[connectionId] = ConnectionStatus.DISCONNECTED
-        delete this.currentDatabases[connectionId]
-        if (this.activeConnectionId === connectionId) {
-          this.activeConnectionId = null
-        }
-      }
-    },
-
-    setActiveConnection(connectionId: string | null) {
-      this.activeConnectionId = connectionId
-    },
-
-    /** Persist the user-selected database for a connection so it survives navigation. */
-    setCurrentDatabase(connectionId: string, database: string) {
-      this.currentDatabases[connectionId] = database
-    },
-  },
-})

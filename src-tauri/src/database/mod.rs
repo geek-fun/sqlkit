@@ -74,6 +74,8 @@ pub mod sqlite;
 pub mod sqlserver;
 pub mod strategy;
 pub mod types;
+#[cfg(feature = "oracle")]
+pub mod oracle;
 
 #[cfg(test)]
 mod tests;
