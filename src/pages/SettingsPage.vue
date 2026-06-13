@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { ThemeType, useAppStore } from '@/store/appStore'
+import AiSettings from '@/views/setting/ai-settings.vue'
 
 const appStore = useAppStore()
 const { t, locale: _locale } = useI18n()
@@ -391,6 +392,9 @@ async function handleCheckUpdates() {
               </div>
             </CardContent>
           </Card>
+
+          <!-- AI Settings -->
+          <AiSettings />
 
           <!-- Query Card -->
           <Card>
