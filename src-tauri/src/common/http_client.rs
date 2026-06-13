@@ -13,7 +13,9 @@ fn get_proxy(http_proxy: Option<String>) -> Option<String> {
         .or_else(|| env::var("HTTP_PROXY").ok())
         .or_else(|| env::var("http_proxy").ok())
         .or_else(|| {
-            env::var("all_proxy").ok().filter(|p| p.starts_with("http://"))
+            env::var("all_proxy")
+                .ok()
+                .filter(|p| p.starts_with("http://"))
         })
 }
 

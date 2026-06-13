@@ -55,19 +55,10 @@ pub async fn execute_export<A: DatabaseAdapter>(
         }
         TransferScope::Tables => {
             // Multiple sources → folder with flat file paths
-            let sources_with_paths: Vec<(Option<String>, ExportSource)> = request
-                .sources
-                .iter()
-                .map(|s| (None, s.clone()))
-                .collect();
-            execute_folder_export(
-                adapter,
-                request,
-                sources_with_paths,
-                app_handle,
-                start_time,
-            )
-            .await
+            let sources_with_paths: Vec<(Option<String>, ExportSource)> =
+                request.sources.iter().map(|s| (None, s.clone())).collect();
+            execute_folder_export(adapter, request, sources_with_paths, app_handle, start_time)
+                .await
         }
         TransferScope::Database => {
             let db_name = request
@@ -95,7 +86,9 @@ pub async fn execute_export<A: DatabaseAdapter>(
                 let columns = adapter
                     .list_columns(Some(&db_name), request.schema.as_deref(), &table_info.name)
                     .await
-                    .map_err(|e| format!("Failed to list columns for '{}': {}", table_info.name, e))?;
+                    .map_err(|e| {
+                        format!("Failed to list columns for '{}': {}", table_info.name, e)
+                    })?;
                 sources.push(ExportSource {
                     table: table_info.name.clone(),
                     columns: columns.iter().map(|c| c.name.clone()).collect(),
@@ -110,7 +103,8 @@ pub async fn execute_export<A: DatabaseAdapter>(
             let sources_with_paths: Vec<(Option<String>, ExportSource)> =
                 sources_flat.into_iter().map(|s| (None, s)).collect();
 
-            execute_folder_export(adapter, request, sources_with_paths, app_handle, start_time).await
+            execute_folder_export(adapter, request, sources_with_paths, app_handle, start_time)
+                .await
         }
         TransferScope::Server => {
             emit_progress(
@@ -167,7 +161,8 @@ pub async fn execute_export<A: DatabaseAdapter>(
                 }
             }
 
-            execute_folder_export(adapter, request, sources_with_paths, app_handle, start_time).await
+            execute_folder_export(adapter, request, sources_with_paths, app_handle, start_time)
+                .await
         }
     }
 }
@@ -245,8 +240,7 @@ async fn execute_single_table_export<A: DatabaseAdapter>(
 
             let mut offset = 0u64;
             while offset < total_rows {
-                let query =
-                    format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
+                let query = format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -282,8 +276,7 @@ async fn execute_single_table_export<A: DatabaseAdapter>(
         ExportFormat::Jsonl => {
             let mut offset = 0u64;
             while offset < total_rows {
-                let query =
-                    format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
+                let query = format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -291,8 +284,7 @@ async fn execute_single_table_export<A: DatabaseAdapter>(
 
                 for row in &result.rows {
                     let json_obj = row_to_json_object(row, &jsonl_opts.date_format);
-                    let json_line =
-                        serde_json::to_string(&json_obj).map_err(|e| e.to_string())?;
+                    let json_line = serde_json::to_string(&json_obj).map_err(|e| e.to_string())?;
                     writer
                         .write_all(json_line.as_bytes())
                         .map_err(|e| e.to_string())?;
@@ -332,8 +324,7 @@ async fn execute_single_table_export<A: DatabaseAdapter>(
             let mut offset = 0u64;
 
             while offset < total_rows {
-                let query =
-                    format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
+                let query = format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -406,8 +397,7 @@ async fn execute_single_table_export<A: DatabaseAdapter>(
             let mut row_idx = header_row_offset;
 
             while offset < total_rows {
-                let query =
-                    format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
+                let query = format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -664,8 +654,7 @@ async fn export_table_to_file<A: DatabaseAdapter>(
 
             let mut offset = 0u64;
             while offset < total_rows {
-                let query =
-                    format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
+                let query = format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -697,7 +686,9 @@ async fn export_table_to_file<A: DatabaseAdapter>(
                 emit_progress(app_handle, &progress);
             }
 
-            writer.flush().map_err(|e| format!("Failed to flush CSV file: {}", e))?;
+            writer
+                .flush()
+                .map_err(|e| format!("Failed to flush CSV file: {}", e))?;
             *accumulated_processed += local_processed;
             Ok(())
         }
@@ -705,8 +696,7 @@ async fn export_table_to_file<A: DatabaseAdapter>(
         ExportFormat::Jsonl => {
             let mut offset = 0u64;
             while offset < total_rows {
-                let query =
-                    format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
+                let query = format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -714,8 +704,7 @@ async fn export_table_to_file<A: DatabaseAdapter>(
 
                 for row in &result.rows {
                     let json_obj = row_to_json_object(row, &jsonl_opts.date_format);
-                    let json_line =
-                        serde_json::to_string(&json_obj).map_err(|e| e.to_string())?;
+                    let json_line = serde_json::to_string(&json_obj).map_err(|e| e.to_string())?;
                     writer
                         .write_all(json_line.as_bytes())
                         .map_err(|e| e.to_string())?;
@@ -736,7 +725,9 @@ async fn export_table_to_file<A: DatabaseAdapter>(
                 emit_progress(app_handle, &progress);
             }
 
-            writer.flush().map_err(|e| format!("Failed to flush JSONL file: {}", e))?;
+            writer
+                .flush()
+                .map_err(|e| format!("Failed to flush JSONL file: {}", e))?;
             *accumulated_processed += local_processed;
             Ok(())
         }
@@ -761,8 +752,7 @@ async fn export_table_to_file<A: DatabaseAdapter>(
             let mut offset = 0u64;
 
             while offset < total_rows {
-                let query =
-                    format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
+                let query = format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -807,7 +797,9 @@ async fn export_table_to_file<A: DatabaseAdapter>(
                     .map_err(|e| e.to_string())?;
             }
 
-            writer.flush().map_err(|e| format!("Failed to flush SQL file: {}", e))?;
+            writer
+                .flush()
+                .map_err(|e| format!("Failed to flush SQL file: {}", e))?;
             *accumulated_processed += local_processed;
             Ok(())
         }
@@ -838,8 +830,7 @@ async fn export_table_to_file<A: DatabaseAdapter>(
             let mut row_idx = header_row_offset;
 
             while offset < total_rows {
-                let query =
-                    format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
+                let query = format!("{} LIMIT {} OFFSET {}", base_query, BATCH_SIZE, offset);
                 let result = adapter
                     .execute_query(&query)
                     .await
@@ -948,8 +939,7 @@ fn write_csv_row<W: Write>(
                     || s.contains('\n')
                 {
                     format!("\"{}\"", s.replace('"', "\"\""))
-                }
-                else {
+                } else {
                     s.clone()
                 }
             }
@@ -1161,8 +1151,7 @@ fn format_preview(
                         .map(|v| {
                             if v.is_empty() {
                                 "NULL".to_string()
-                            }
-                            else {
+                            } else {
                                 format!("'{}'", v)
                             }
                         })

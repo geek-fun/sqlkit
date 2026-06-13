@@ -53,8 +53,7 @@ impl ChatFormatter for OpenAIChatFormatter {
                         let function = tc.get("function")?;
                         let name = function.get("name")?.as_str()?.to_string();
                         let args_str = function.get("arguments")?.as_str().unwrap_or("{}");
-                        let arguments: Value =
-                            serde_json::from_str(args_str).unwrap_or(json!({}));
+                        let arguments: Value = serde_json::from_str(args_str).unwrap_or(json!({}));
                         Some(LlmToolCall {
                             id,
                             name,
@@ -121,8 +120,7 @@ impl ChatFormatter for OpenAIChatFormatter {
                             .and_then(|f| f.get("arguments"))
                             .and_then(|v| v.as_str())
                             .unwrap_or("{}");
-                        let arguments: Value =
-                            serde_json::from_str(args_str).unwrap_or(json!({}));
+                        let arguments: Value = serde_json::from_str(args_str).unwrap_or(json!({}));
                         tool_calls.push(LlmToolCall {
                             id: id.to_string(),
                             name: name.to_string(),

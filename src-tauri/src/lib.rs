@@ -29,16 +29,16 @@ use agent::loop_runner::{
     cancel_agent_loop, compact_agent_session, confirm_tool_call, get_agent_context_usage,
     get_tool_full_result, run_agent_loop, CancelMap, ConfirmMap,
 };
+use agent::query_history::{add_query_history_entry, load_query_history};
 use agent::session_store::{
     clear_agent_session_messages, clear_session_confirmation_rules, create_agent_session,
     delete_agent_session, delete_attached_source, delete_confirmation_rule, load_agent_sessions,
     load_attached_sources, load_confirmation_rules, load_session_messages,
-    migrate_session_metadata, save_attached_source,
-    save_confirmation_rule, update_session_meta, update_session_status,
+    migrate_session_metadata, save_attached_source, save_confirmation_rule, update_session_meta,
+    update_session_status,
 };
 use agent::tool_executor::ToolExecutor;
 use agent::{get_all_tools, list_llm_models, run_agent_step, validate_llm_config};
-use agent::query_history::{load_query_history, add_query_history_entry};
 use capabilities::commands::{get_available_tools, invoke_capability};
 
 #[derive(Clone, serde::Serialize)]

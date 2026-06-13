@@ -11,7 +11,11 @@ struct GetStoreValueHandler;
 
 #[async_trait]
 impl CapabilityHandler for ListConnectionsHandler {
-    async fn handle(&self, _args: &Value, _connection_config: Option<&Value>) -> Result<String, String> {
+    async fn handle(
+        &self,
+        _args: &Value,
+        _connection_config: Option<&Value>,
+    ) -> Result<String, String> {
         // The frontend provides the connections list; this is a placeholder
         // that tells the LLM what connections are available to attach.
         Ok(json!({
@@ -22,7 +26,11 @@ impl CapabilityHandler for ListConnectionsHandler {
 
 #[async_trait]
 impl CapabilityHandler for GetStoreValueHandler {
-    async fn handle(&self, args: &Value, _connection_config: Option<&Value>) -> Result<String, String> {
+    async fn handle(
+        &self,
+        args: &Value,
+        _connection_config: Option<&Value>,
+    ) -> Result<String, String> {
         let key = args
             .get("key")
             .and_then(|v| v.as_str())

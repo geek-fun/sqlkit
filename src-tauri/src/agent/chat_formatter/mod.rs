@@ -39,7 +39,7 @@ pub struct ChunkResult {
     pub finish_reason: Option<String>,
 }
 
-pub mod openai;
 pub mod anthropic;
-pub use openai::OpenAIChatFormatter;
+pub mod openai;
 pub use anthropic::AnthropicChatFormatter;
+pub use openai::OpenAIChatFormatter;

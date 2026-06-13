@@ -56,7 +56,10 @@ fn now_ms() -> i64 {
 
 #[tauri::command]
 pub fn load_agent_sessions(agent_db: State<'_, AgentDb>) -> Result<Vec<AgentSessionRow>, String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
     let mut stmt = conn
         .prepare("SELECT id, title, status, sources, permissions_mode, model_id, created_at, updated_at FROM agent_sessions ORDER BY updated_at DESC")
         .map_err(|e| format!("Failed to prepare: {}", e))?;
@@ -94,7 +97,10 @@ pub fn create_agent_session(
     let sources_str = sources.unwrap_or_else(|| "[]".to_string());
     let perm_mode = permissions_mode.unwrap_or_else(|| "Ask".to_string());
 
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
     conn.execute(
         "INSERT INTO agent_sessions (id, title, status, sources, permissions_mode, model_id, created_at, updated_at) VALUES (?1, ?2, 'idle', ?3, ?4, ?5, ?6, ?7)",
         rusqlite::params![id, title, sources_str, perm_mode, model_id, now, now],
@@ -120,7 +126,10 @@ pub fn update_session_status(
     status: String,
 ) -> Result<(), String> {
     let now = now_ms();
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
     conn.execute(
         "UPDATE agent_sessions SET status = ?1, updated_at = ?2 WHERE id = ?3",
         rusqlite::params![status, now, session_id],
@@ -138,7 +147,10 @@ pub fn update_session_meta(
     model_id: Option<String>,
 ) -> Result<(), String> {
     let now = now_ms();
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
 
     if let Some(ref s) = sources {
         conn.execute(
@@ -166,10 +178,19 @@ pub fn update_session_meta(
 }
 
 #[tauri::command]
-pub fn delete_agent_session(agent_db: State<'_, AgentDb>, session_id: String) -> Result<(), String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
-    conn.execute("DELETE FROM agent_sessions WHERE id = ?1", rusqlite::params![session_id])
-        .map_err(|e| format!("Failed to delete: {}", e))?;
+pub fn delete_agent_session(
+    agent_db: State<'_, AgentDb>,
+    session_id: String,
+) -> Result<(), String> {
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
+    conn.execute(
+        "DELETE FROM agent_sessions WHERE id = ?1",
+        rusqlite::params![session_id],
+    )
+    .map_err(|e| format!("Failed to delete: {}", e))?;
     Ok(())
 }
 
@@ -178,10 +199,16 @@ pub fn clear_agent_session_messages(
     agent_db: State<'_, AgentDb>,
     session_id: String,
 ) -> Result<(), String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
     // CASCADE will handle tool_calls and tool_result_store
-    conn.execute("DELETE FROM agent_messages WHERE session_id = ?1", rusqlite::params![session_id])
-        .map_err(|e| format!("Failed to clear messages: {}", e))?;
+    conn.execute(
+        "DELETE FROM agent_messages WHERE session_id = ?1",
+        rusqlite::params![session_id],
+    )
+    .map_err(|e| format!("Failed to clear messages: {}", e))?;
     Ok(())
 }
 
@@ -190,7 +217,10 @@ pub fn load_session_messages(
     agent_db: State<'_, AgentDb>,
     session_id: String,
 ) -> Result<Vec<AgentMessageRow>, String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
     let mut stmt = conn
         .prepare("SELECT id, session_id, role, content, created_at FROM agent_messages WHERE session_id = ?1 ORDER BY created_at ASC")
         .map_err(|e| format!("Failed to prepare: {}", e))?;
@@ -217,7 +247,10 @@ pub fn load_confirmation_rules(
     agent_db: State<'_, AgentDb>,
     session_id: String,
 ) -> Result<Vec<ConfirmationRuleRow>, String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
     let mut stmt = conn
         .prepare("SELECT id, session_id, tool_name, action, created_at FROM confirmation_rules WHERE session_id = ?1 ORDER BY created_at")
         .map_err(|e| format!("Failed to prepare: {}", e))?;
@@ -248,7 +281,10 @@ pub fn save_confirmation_rule(
 ) -> Result<ConfirmationRuleRow, String> {
     let id = uuid::Uuid::new_v4().to_string();
     let now = now_ms();
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
 
     conn.execute(
         "INSERT OR REPLACE INTO confirmation_rules (id, session_id, tool_name, action, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -267,9 +303,15 @@ pub fn save_confirmation_rule(
 
 #[tauri::command]
 pub fn delete_confirmation_rule(agent_db: State<'_, AgentDb>, id: String) -> Result<(), String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
-    conn.execute("DELETE FROM confirmation_rules WHERE id = ?1", rusqlite::params![id])
-        .map_err(|e| format!("Failed to delete: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
+    conn.execute(
+        "DELETE FROM confirmation_rules WHERE id = ?1",
+        rusqlite::params![id],
+    )
+    .map_err(|e| format!("Failed to delete: {}", e))?;
     Ok(())
 }
 
@@ -278,15 +320,26 @@ pub fn clear_session_confirmation_rules(
     agent_db: State<'_, AgentDb>,
     session_id: String,
 ) -> Result<(), String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
-    conn.execute("DELETE FROM confirmation_rules WHERE session_id = ?1", rusqlite::params![session_id])
-        .map_err(|e| format!("Failed to clear: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
+    conn.execute(
+        "DELETE FROM confirmation_rules WHERE session_id = ?1",
+        rusqlite::params![session_id],
+    )
+    .map_err(|e| format!("Failed to clear: {}", e))?;
     Ok(())
 }
 
 #[tauri::command]
-pub fn load_attached_sources(agent_db: State<'_, AgentDb>) -> Result<Vec<AttachedSourceRow>, String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+pub fn load_attached_sources(
+    agent_db: State<'_, AgentDb>,
+) -> Result<Vec<AttachedSourceRow>, String> {
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
     let mut stmt = conn
         .prepare("SELECT id, kind, alias, name, database_type, file_type, file_path, connection_id, created_at, updated_at FROM attached_sources ORDER BY updated_at DESC")
         .map_err(|e| format!("Failed to prepare: {}", e))?;
@@ -326,7 +379,10 @@ pub fn save_attached_source(
     connection_id: Option<i64>,
 ) -> Result<AttachedSourceRow, String> {
     let now = now_ms();
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
 
     conn.execute(
         "INSERT OR REPLACE INTO attached_sources (id, kind, alias, name, database_type, file_type, file_path, connection_id, created_at, updated_at) \
@@ -351,9 +407,15 @@ pub fn save_attached_source(
 
 #[tauri::command]
 pub fn delete_attached_source(agent_db: State<'_, AgentDb>, id: String) -> Result<(), String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
-    conn.execute("DELETE FROM attached_sources WHERE id = ?1", rusqlite::params![id])
-        .map_err(|e| format!("Failed to delete: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
+    conn.execute(
+        "DELETE FROM attached_sources WHERE id = ?1",
+        rusqlite::params![id],
+    )
+    .map_err(|e| format!("Failed to delete: {}", e))?;
     Ok(())
 }
 
@@ -364,13 +426,24 @@ pub fn migrate_session_metadata(
     confirmation_rules: String,
     attached_sources: String,
 ) -> Result<(), String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
 
     // Parse and migrate session metadata from localStorage format
-    if let Ok(meta) = serde_json::from_str::<std::collections::HashMap<String, serde_json::Value>>(&session_meta) {
+    if let Ok(meta) =
+        serde_json::from_str::<std::collections::HashMap<String, serde_json::Value>>(&session_meta)
+    {
         for (session_id, data) in &meta {
-            let title = data.get("title").and_then(|v| v.as_str()).unwrap_or("Migrated Session");
-            let sources = data.get("sources").map(|v| v.to_string()).unwrap_or_else(|| "[]".to_string());
+            let title = data
+                .get("title")
+                .and_then(|v| v.as_str())
+                .unwrap_or("Migrated Session");
+            let sources = data
+                .get("sources")
+                .map(|v| v.to_string())
+                .unwrap_or_else(|| "[]".to_string());
             let now = now_ms();
             let _ = conn.execute(
                 "INSERT OR IGNORE INTO agent_sessions (id, title, status, sources, created_at, updated_at) VALUES (?1, ?2, 'idle', ?3, ?4, ?5)",
@@ -384,7 +457,10 @@ pub fn migrate_session_metadata(
         for rule in &rules {
             let session_id = rule.get("sessionId").and_then(|v| v.as_str()).unwrap_or("");
             let tool_name = rule.get("toolName").and_then(|v| v.as_str()).unwrap_or("");
-            let action = rule.get("action").and_then(|v| v.as_str()).unwrap_or("deny_always");
+            let action = rule
+                .get("action")
+                .and_then(|v| v.as_str())
+                .unwrap_or("deny_always");
             let now = now_ms();
             let id = uuid::Uuid::new_v4().to_string();
             let _ = conn.execute(
@@ -399,7 +475,10 @@ pub fn migrate_session_metadata(
 
 #[tauri::command]
 pub fn recover_stuck_sessions(agent_db: State<'_, AgentDb>) -> Result<(), String> {
-    let conn = agent_db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn = agent_db
+        .0
+        .lock()
+        .map_err(|e| format!("Failed to lock db: {}", e))?;
     conn.execute(
         "UPDATE agent_sessions SET status = 'idle' WHERE status IN ('running', 'waiting_confirmation')",
         [],

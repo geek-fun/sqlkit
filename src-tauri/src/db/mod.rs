@@ -21,10 +21,9 @@ pub fn open(path: &Path) -> Result<AgentDb, String> {
 }
 
 pub fn migrate(db: &AgentDb) -> Result<(), String> {
-    let conn = db
-        .0
-        .lock()
-        .map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn =
+        db.0.lock()
+            .map_err(|e| format!("Failed to lock db: {}", e))?;
 
     conn.execute_batch(
         r#"

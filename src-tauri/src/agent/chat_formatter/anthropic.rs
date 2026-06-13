@@ -56,10 +56,7 @@ impl ChatFormatter for AnthropicChatFormatter {
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .to_string(),
-                        arguments: block
-                            .get("input")
-                            .cloned()
-                            .unwrap_or(json!({})),
+                        arguments: block.get("input").cloned().unwrap_or(json!({})),
                     }];
                     return Ok(ParseResult::ToolCalls(tool_calls));
                 }
@@ -86,10 +83,22 @@ impl ChatFormatter for AnthropicChatFormatter {
                 if let Some(b) = block {
                     match b.get("type").and_then(|v| v.as_str()) {
                         Some("tool_use") => {
-                            let id = b.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                            let name = b.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                            let id = b
+                                .get("id")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
+                            let name = b
+                                .get("name")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("")
+                                .to_string();
                             let input = b.get("input").cloned().unwrap_or(json!({}));
-                            tool_calls.push(LlmToolCall { id, name, arguments: input });
+                            tool_calls.push(LlmToolCall {
+                                id,
+                                name,
+                                arguments: input,
+                            });
                         }
                         _ => {
                             if let Some(text) = b.get("text").and_then(|v| v.as_str()) {
@@ -146,10 +155,22 @@ impl ChatFormatter for AnthropicChatFormatter {
                     if let Some(content) = m.get("content").and_then(|c| c.as_array()) {
                         for block in content {
                             if block.get("type") == Some(&json!("tool_use")) {
-                                let id = block.get("id").and_then(|v| v.as_str()).unwrap_or("").to_string();
-                                let name = block.get("name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+                                let id = block
+                                    .get("id")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
+                                let name = block
+                                    .get("name")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string();
                                 let args = block.get("input").cloned().unwrap_or(json!({}));
-                                tool_calls.push(LlmToolCall { id, name, arguments: args });
+                                tool_calls.push(LlmToolCall {
+                                    id,
+                                    name,
+                                    arguments: args,
+                                });
                             }
                         }
                     }

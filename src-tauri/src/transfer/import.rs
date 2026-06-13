@@ -124,7 +124,11 @@ async fn import_sql_at_server_level<A: crate::database::DatabaseAdapter>(
     let mut errors: Vec<TransferError> = Vec::new();
 
     // Split by semicolon and execute each statement
-    for (idx, stmt) in content.split(';').filter(|s| !s.trim().is_empty()).enumerate() {
+    for (idx, stmt) in content
+        .split(';')
+        .filter(|s| !s.trim().is_empty())
+        .enumerate()
+    {
         let stmt = stmt.trim();
         if stmt.is_empty() {
             continue;
@@ -237,7 +241,10 @@ async fn import_target<A: crate::database::DatabaseAdapter>(
                     .iter()
                     .enumerate()
                     .filter_map(|(i, col)| {
-                        let mapping = target.column_mappings.iter().find(|m| m.source_column == *col);
+                        let mapping = target
+                            .column_mappings
+                            .iter()
+                            .find(|m| m.source_column == *col);
                         if mapping.is_none()
                             || mapping.and_then(|m| m.target_column.as_ref()).is_none()
                         {
@@ -544,7 +551,10 @@ async fn import_target<A: crate::database::DatabaseAdapter>(
                     .iter()
                     .enumerate()
                     .filter_map(|(col_idx, col)| {
-                        let mapping = target.column_mappings.iter().find(|m| m.source_column == *col);
+                        let mapping = target
+                            .column_mappings
+                            .iter()
+                            .find(|m| m.source_column == *col);
                         if mapping.is_none()
                             || mapping.and_then(|m| m.target_column.as_ref()).is_none()
                         {

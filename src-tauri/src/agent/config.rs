@@ -5,10 +5,7 @@ use crate::agent::provider_adapter;
 pub fn build_headers(api_key: &str) -> reqwest::header::HeaderMap {
     use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION, CONTENT_TYPE};
     let mut headers = HeaderMap::new();
-    headers.insert(
-        CONTENT_TYPE,
-        HeaderValue::from_static("application/json"),
-    );
+    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     if !api_key.is_empty() {
         let bearer = format!("Bearer {}", api_key);
         if let Ok(val) = HeaderValue::from_str(&bearer) {
