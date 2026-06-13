@@ -1,10 +1,7 @@
-//! Connection lifecycle management commands.
-
 use crate::database::{ConnectionStatus, DatabaseAdapter};
 use crate::state::{ActiveConnection, AppState};
 use tauri::State;
 
-/// Connect to a server using the provided configuration.
 #[tauri::command]
 pub async fn connect_server(
     config: crate::state::ServerConfig,
@@ -21,20 +18,36 @@ pub async fn connect_server(
 
     let status = match &connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.test_connection().await
+            let a = adapter.lock().await;
+            a.test_connection().await
         }
         ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.test_connection().await
+            let a = adapter.lock().await;
+            a.test_connection().await
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.test_connection().await
+            let a = adapter.lock().await;
+            a.test_connection().await
         }
         ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.test_connection().await
+            let a = adapter.lock().await;
+            a.test_connection().await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let a = adapter.lock().await;
+            a.test_connection().await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let a = adapter.lock().await;
+            a.test_connection().await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let a = adapter.lock().await;
+            a.test_connection().await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let a = adapter.lock().await;
+            a.test_connection().await
         }
     }
     .map_err(|e| format!("Failed to get connection status: {}", e))?;
@@ -42,7 +55,6 @@ pub async fn connect_server(
     Ok(status)
 }
 
-/// Disconnect from a server.
 #[tauri::command]
 pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result<(), String> {
     let mut connections = state.connections.lock().await;
@@ -52,22 +64,14 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
         .ok_or_else(|| format!("No active connection found for server '{}'", id))?;
 
     let disconnect_result = match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let mut adapter = adapter.lock().await;
-            adapter.disconnect().await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let mut adapter = adapter.lock().await;
-            adapter.disconnect().await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let mut adapter = adapter.lock().await;
-            adapter.disconnect().await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let mut adapter = adapter.lock().await;
-            adapter.disconnect().await
-        }
+        ActiveConnection::Postgres(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::MySQL(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::SQLServer(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::SQLite(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::DuckDb(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::ClickHouse(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::HttpSql(adapter) => adapter.lock().await.disconnect().await,
     };
 
     if let Err(e) = disconnect_result {
@@ -80,14 +84,12 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
     Ok(())
 }
 
-/// Get the connection status for a server.
 #[tauri::command]
 pub async fn get_connection_status(
     id: String,
     state: State<'_, AppState>,
 ) -> Result<ConnectionStatus, String> {
     let connections = state.connections.lock().await;
-
     let is_connected = connections.contains_key(&id);
 
     Ok(ConnectionStatus {
@@ -99,10 +101,6 @@ pub async fn get_connection_status(
     })
 }
 
-// Tests for connection commands are temporarily disabled.
-// TODO: Convert to integration tests with full Tauri context support.
-// The tests below require a Tauri State which cannot be created in unit tests.
-// Integration tests should be added in src-tauri/tests/ directory.
 #[cfg(test)]
 mod tests {
     #[test]

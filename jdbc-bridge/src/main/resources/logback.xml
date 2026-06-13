@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- Suppress HikariCP debug logging to stdout -->
+    <logger name="com.zaxxer.hikari" level="WARN"/>
+    <logger name="com.zaxxer.hikari.pool" level="WARN"/>
+    <logger name="com.zaxxer.hikari.hikari" level="WARN"/>
+
+    <!-- Only log errors to stderr (stdout is reserved for JSON-RPC) -->
+    <root level="ERROR">
+        <appender name="STDERR" class="ch.qos.logback.core.ConsoleAppender">
+            <target>System.err</target>
+            <encoder>
+                <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
+    </root>
+</configuration>

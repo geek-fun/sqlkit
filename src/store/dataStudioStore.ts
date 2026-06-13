@@ -21,7 +21,7 @@ export type DatabaseSource = {
   sourceId: string
   connectionId: number
   name: string
-  databaseType: 'POSTGRESQL' | 'MYSQL' | 'SQLSERVER' | 'SQLITE'
+  databaseType: 'POSTGRESQL' | 'MYSQL' | 'SQLSERVER' | 'SQLITE' | 'DUCKDB' | 'CLICKHOUSE' | 'ORACLE' | 'DB2' | 'H2' | 'SNOWFLAKE' | 'TRINO' | 'PRESTO' | 'COCKROACHDB' | 'REDSHIFT' | 'MARIADB' | 'TIDB' | 'OCEANBASE' | 'TDSQL'
   permissions: DataSourcePermissions
 }
 

@@ -10,6 +10,15 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+/// Core adapter types used in dispatch logic.
+use crate::database::{
+    clickhouse::ClickHouseAdapter, duckdb::DuckDbAdapter, http_sql::HttpSqlAdapter,
+    jdbc_bridge::JdbcBridgeAdapter, mysql::MySQLAdapter, postgres::PostgresAdapter,
+    sqlite::SQLiteAdapter, sqlserver::SqlServerAdapter,
+};
+#[cfg(feature = "oracle")]
+use crate::database::OracleAdapter;
+
 /// Server configuration with connection details.
 ///
 /// # Security Warning
@@ -71,15 +80,46 @@ impl ServerConfig {
         }
     }
 
+    /// Parse database type string to DatabaseType enum.
+    pub fn parse_db_type(&self) -> Result<crate::database::DatabaseType, String> {
+        use crate::database::DatabaseType;
+        match self.db_type.to_lowercase().as_str() {
+            "postgresql" | "postgres" => Ok(DatabaseType::PostgreSQL),
+            "mysql" => Ok(DatabaseType::MySQL),
+            "sqlserver" | "mssql" => Ok(DatabaseType::SqlServer),
+            "sqlite" => Ok(DatabaseType::SQLite),
+            "duckdb" | "duck" => Ok(DatabaseType::DuckDb),
+            "clickhouse" => Ok(DatabaseType::ClickHouse),
+            "oracle" => Ok(DatabaseType::Oracle),
+            "db2" => Ok(DatabaseType::DB2),
+            "h2" => Ok(DatabaseType::H2),
+            "snowflake" => Ok(DatabaseType::Snowflake),
+            "dm8" | "dm" => Ok(DatabaseType::DM8),
+            "dm8_oracle" => Ok(DatabaseType::DM8Oracle),
+            "trino" => Ok(DatabaseType::Trino),
+            "presto" => Ok(DatabaseType::Presto),
+            "cockroachdb" => Ok(DatabaseType::CockroachDB),
+            "redshift" => Ok(DatabaseType::Redshift),
+            "mariadb" => Ok(DatabaseType::MariaDB),
+            "tidb" => Ok(DatabaseType::TiDB),
+            "oceanbase" => Ok(DatabaseType::OceanBase),
+            "tdsql" => Ok(DatabaseType::TDSQL),
+            "polardb" => Ok(DatabaseType::PolarDB),
+            "kingbasees" | "kingbase" => Ok(DatabaseType::KingbaseES),
+            "gaussdb" => Ok(DatabaseType::GaussDB),
+            "highgo" => Ok(DatabaseType::HighGo),
+            "uxdb" => Ok(DatabaseType::UXDB),
+            "opengauss" => Ok(DatabaseType::OpenGauss),
+            "gbase8c" => Ok(DatabaseType::GBase8c),
+            "xugudb" | "xugu" => Ok(DatabaseType::XuguDB),
+            "gbase8a" => Ok(DatabaseType::GBase8a),
+            _ => Err(format!("Unsupported database type: {}", self.db_type)),
+        }
+    }
+
     /// Convert to ConnectionConfig for database operations.
     pub fn to_connection_config(&self) -> Result<ConnectionConfig, String> {
-        let db_type = match self.db_type.to_lowercase().as_str() {
-            "postgresql" | "postgres" => crate::database::DatabaseType::PostgreSQL,
-            "mysql" => crate::database::DatabaseType::MySQL,
-            "sqlserver" | "mssql" => crate::database::DatabaseType::SqlServer,
-            "sqlite" => crate::database::DatabaseType::SQLite,
-            _ => return Err(format!("Unsupported database type: {}", self.db_type)),
-        };
+        let db_type = self.parse_db_type()?;
 
         let mut config = ConnectionConfig::new(db_type, &self.host, self.port, &self.username);
 
@@ -87,7 +127,8 @@ impl ServerConfig {
             config = config.with_password(password);
         }
 
-        if self.db_type.to_lowercase() == "sqlite" {
+        let db_lower = self.db_type.to_lowercase();
+        if db_lower == "sqlite" || db_lower == "duckdb" || db_lower == "duck" {
             config = config.with_database(&self.host);
         } else if let Some(ref database) = self.database {
             config = config.with_database(database);
@@ -108,59 +149,18 @@ impl ServerConfig {
 }
 
 /// Active database connection wrapper used by the application state.
-///
-/// This enum holds the currently active database adapters for a given connection
-/// ID (see [`AppState::connections`]). Each variant corresponds to a concrete
-/// database adapter implementation that conforms to the `DatabaseAdapter` trait
-/// in `crate::database`.
-///
-/// Adapters are wrapped in `Arc<Mutex<...>>` so they can be:
-///
-/// - **Shared** across multiple Tauri commands and async tasks (`Arc`)
-/// - **Mutably accessed** in an async context while preserving thread safety
-///   (`tokio::sync::Mutex`)
-///
-/// This allows commands to clone an `ActiveConnection`, lock the underlying
-/// adapter, and perform queries without needing to re-establish connections
-/// or manage lifetimes manually.
-///
-/// # Example
-///
-/// ```ignore
-/// let connections = state.connections.lock().await;
-/// if let Some(ActiveConnection::Postgres(adapter)) = connections.get(&conn_id) {
-///     let adapter = adapter.lock().await;
-///     let result = adapter.execute_query("SELECT 1").await?;
-/// }
-/// ```
 #[derive(Clone)]
 pub enum ActiveConnection {
-    /// Active PostgreSQL connection backed by a [`PostgresAdapter`](crate::database::postgres::PostgresAdapter).
-    ///
-    /// The adapter is wrapped in `Arc<Mutex<_>>` so that multiple commands can
-    /// share the same PostgreSQL connection pool/adapter instance and perform
-    /// concurrent operations by acquiring the async mutex lock when needed.
-    Postgres(Arc<Mutex<crate::database::postgres::PostgresAdapter>>),
-
-    /// Active MySQL connection backed by a [`MySQLAdapter`](crate::database::mysql::MySQLAdapter).
-    ///
-    /// Stored inside `Arc<Mutex<_>>` for shared, synchronized access to the
-    /// underlying MySQL connection pool/adapter from different Tauri commands.
-    MySQL(Arc<Mutex<crate::database::mysql::MySQLAdapter>>),
-
-    /// Active SQLite connection backed by a [`SQLiteAdapter`](crate::database::sqlite::SQLiteAdapter).
-    ///
-    /// The `Arc<Mutex<_>>` wrapper allows safe mutable access to the adapter
-    /// even when it is shared across async tasks, which is important because
-    /// SQLite connections are often single-threaded and must be coordinated.
-    SQLite(Arc<Mutex<crate::database::sqlite::SQLiteAdapter>>),
-
-    /// Active SQL Server connection backed by a [`SqlServerAdapter`](crate::database::sqlserver::SqlServerAdapter).
-    ///
-    /// As with the other variants, `Arc<Mutex<_>>` enables concurrent commands
-    /// to share a single SQL Server adapter instance while serializing mutable
-    /// access through the async mutex.
-    SQLServer(Arc<Mutex<crate::database::sqlserver::SqlServerAdapter>>),
+    Postgres(Arc<Mutex<PostgresAdapter>>),
+    MySQL(Arc<Mutex<MySQLAdapter>>),
+    SQLite(Arc<Mutex<SQLiteAdapter>>),
+    SQLServer(Arc<Mutex<SqlServerAdapter>>),
+    DuckDb(Arc<Mutex<DuckDbAdapter>>),
+    ClickHouse(Arc<Mutex<ClickHouseAdapter>>),
+    #[cfg(feature = "oracle")]
+    Oracle(Arc<Mutex<OracleAdapter>>),
+    JdbcBridge(Arc<Mutex<JdbcBridgeAdapter>>),
+    HttpSql(Arc<Mutex<HttpSqlAdapter>>),
 }
 
 /// Application configuration.

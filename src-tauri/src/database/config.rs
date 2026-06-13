@@ -7,24 +7,84 @@ use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
 /// Database type enumeration.
+///
+/// This enum covers all supported databases, including protocol-compatible aliases.
+/// Use [`resolve_effective_type()`](super::strategy::resolve_effective_type) to map
+/// protocol-compatible variants to their native adapter type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
 pub enum DatabaseType {
-    /// PostgreSQL database.
+    // ── Native adapters (have dedicated implementations) ──
+    /// PostgreSQL.
     PostgreSQL,
-    /// MySQL database.
+    /// MySQL.
     MySQL,
-    /// Oracle database.
-    Oracle,
-    /// SQL Server database.
+    /// SQL Server.
     SqlServer,
-    /// IBM DB2 database.
-    DB2,
-    /// SQLite database.
+    /// SQLite.
     SQLite,
-    /// H2 database.
-    H2,
-    /// ClickHouse database.
+    /// DuckDB (embedded, bundled C lib via `duckdb` crate).
+    DuckDb,
+    /// ClickHouse (HTTP protocol).
     ClickHouse,
+
+    // ── PG wire protocol compatible (reuse PostgresAdapter) ──
+    /// CockroachDB — PG wire protocol.
+    CockroachDB,
+    /// Amazon Redshift — PG wire protocol.
+    Redshift,
+    /// YugabyteDB — PG wire protocol.
+    YugabyteDB,
+    /// TimescaleDB — PG wire protocol.
+    TimescaleDB,
+    /// 人大金仓 KingbaseES — PG wire protocol.
+    KingbaseES,
+    /// 华为 GaussDB — PG wire protocol.
+    GaussDB,
+    /// 瀚高 HighGo — PG wire protocol.
+    HighGo,
+    /// 优炫 UXDB — PG wire protocol.
+    UXDB,
+    /// openGauss — PG wire protocol.
+    OpenGauss,
+    /// 南大通用 GBase 8c — PG wire protocol.
+    GBase8c,
+
+    // ── MySQL wire protocol compatible (reuse MySQLAdapter) ──
+    /// MariaDB — MySQL wire protocol.
+    MariaDB,
+    /// TiDB — MySQL wire protocol.
+    TiDB,
+    ///  OceanBase (MySQL mode) — MySQL wire protocol.
+    OceanBase,
+    /// 腾讯 TDSQL — MySQL wire protocol.
+    TDSQL,
+    /// 阿里云 PolarDB (MySQL mode) — MySQL wire protocol.
+    PolarDB,
+    /// 达梦 DM8 (MySQL mode, secondary) — MySQL wire protocol alias.
+    DM8,
+
+    // ── JDBC bridge (Java subprocess, lazy download) ──
+    /// Oracle Database — oracle-rs (native, optional feature).
+    Oracle,
+    /// IBM DB2 — JDBC bridge.
+    DB2,
+    /// H2 — JDBC bridge.
+    H2,
+    /// Snowflake — JDBC bridge.
+    Snowflake,
+    /// 达梦 DM8 (Oracle mode, primary) — JDBC bridge.
+    DM8Oracle,
+    /// 虚谷 XuguDB — JDBC bridge.
+    XuguDB,
+    /// 南大通用 GBase 8a — JDBC bridge.
+    GBase8a,
+
+    // ── HTTP SQL bridge ──
+    /// Trino — HTTP SQL API.
+    Trino,
+    /// Presto — HTTP SQL API.
+    Presto,
 }
 
 /// SSL/TLS mode for connections.

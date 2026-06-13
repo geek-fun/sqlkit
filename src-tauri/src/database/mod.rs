@@ -60,23 +60,34 @@
 //! ```
 
 pub mod adapter;
+pub mod clickhouse;
 pub mod config;
+pub mod duckdb;
 pub mod error;
+pub mod http_sql;
+pub mod jdbc_bridge;
 pub mod manager;
 pub mod mysql;
 pub mod pool;
 pub mod postgres;
 pub mod sqlite;
 pub mod sqlserver;
+pub mod strategy;
 pub mod types;
+#[cfg(feature = "oracle")]
+pub mod oracle;
 
 #[cfg(test)]
 mod tests;
 
 // Re-export main types for convenience
 pub use adapter::DatabaseAdapter;
+pub use clickhouse::{ClickHouseAdapter, ClickHousePool};
 pub use config::{ConnectionConfig, DatabaseType, PoolConfig, SslMode};
+pub use duckdb::{DuckDbAdapter, DuckDbPool};
 pub use error::{DbError, DbResult};
+pub use http_sql::{HttpSqlAdapter, HttpSqlPool};
+pub use jdbc_bridge::{JdbcBridgeAdapter, JdbcBridgeLauncher, JdbcBridgePool};
 pub use manager::{ConnectionManager, ConnectionMetadata, ManagerStats};
 pub use mysql::{MySQLAdapter, MySQLPool};
 pub use pool::{ConnectionPool, PoolStats};
@@ -86,3 +97,5 @@ pub use sqlserver::{SqlServerAdapter, SqlServerPool};
 pub use types::{
     ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
 };
+#[cfg(feature = "oracle")]
+pub use oracle::OracleAdapter;

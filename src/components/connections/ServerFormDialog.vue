@@ -18,7 +18,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { toast } from '@/composables/useNotifications'
-import { DatabaseType, resolveDatabase } from '@/store'
+import { DatabaseType, dbTypeToBackend, resolveDatabase } from '@/store'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import SslConfigSection from './ssl/SslConfigSection.vue'
 
@@ -42,12 +42,38 @@ const isOpen = computed({
 
 const isEditing = computed(() => !!props.connection?.id)
 
-const defaultPorts: Record<DatabaseType, number> = {
+const defaultPorts: Record<string, number> = {
   [DatabaseType.POSTGRESQL]: 5432,
   [DatabaseType.MYSQL]: 3306,
   [DatabaseType.MARIADB]: 3306,
   [DatabaseType.SQLITE]: 0,
   [DatabaseType.SQLSERVER]: 1433,
+  [DatabaseType.DUCKDB]: 0,
+  [DatabaseType.CLICKHOUSE]: 8123,
+  [DatabaseType.COCKROACHDB]: 5432,
+  [DatabaseType.REDSHIFT]: 5439,
+  [DatabaseType.YUGABYTEDB]: 5433,
+  [DatabaseType.TIMESCALEDB]: 5432,
+  [DatabaseType.KINGBASEES]: 54321,
+  [DatabaseType.GAUSSDB]: 5432,
+  [DatabaseType.HIGHGO]: 5432,
+  [DatabaseType.UXDB]: 5432,
+  [DatabaseType.OPENGAUSS]: 5432,
+  [DatabaseType.GBASE8C]: 5432,
+  [DatabaseType.TIDB]: 4000,
+  [DatabaseType.OCEANBASE]: 2883,
+  [DatabaseType.TDSQL]: 3306,
+  [DatabaseType.POLARDB]: 3306,
+  [DatabaseType.DM8]: 5236,
+  [DatabaseType.ORACLE]: 1521,
+  [DatabaseType.DB2]: 50000,
+  [DatabaseType.H2]: 9092,
+  [DatabaseType.SNOWFLAKE]: 443,
+  [DatabaseType.DM8ORACLE]: 5236,
+  [DatabaseType.XUGUDB]: 5138,
+  [DatabaseType.GBASE8A]: 5258,
+  [DatabaseType.TRINO]: 8080,
+  [DatabaseType.PRESTO]: 8080,
 }
 
 const defaultConnection: ServerConnection = {
@@ -162,7 +188,7 @@ function handleDatabaseTypeChange(value: string) {
   if (!props.connection || formData.value.port === defaultPorts[props.connection.type]) {
     formData.value.port = defaultPorts[type]
   }
-  if (type === DatabaseType.SQLITE) {
+  if (type === DatabaseType.SQLITE || type === DatabaseType.DUCKDB) {
     formData.value.host = ''
     formData.value.port = 0
     formData.value.username = ''
@@ -172,13 +198,19 @@ function handleDatabaseTypeChange(value: string) {
   }
 }
 
+const isFileBased = computed(() =>
+  formData.value.type === DatabaseType.SQLITE
+  || formData.value.type === DatabaseType.DUCKDB,
+)
+
 // SQLite file picker function - handles both open existing and create new
 async function selectDatabaseFile() {
   try {
     const selected = await open({
       multiple: false,
       filters: [
-        { name: 'SQLite Database', extensions: ['db', 'sqlite', 'sqlite3'] },
+        { name: 'SQLite', extensions: ['db', 'sqlite', 'sqlite3'] },
+        { name: 'DuckDB', extensions: ['duckdb', 'db'] },
         { name: 'All Files', extensions: ['*'] },
       ],
     })
@@ -205,7 +237,7 @@ function validateForm(): boolean {
     errors.name = t('components.serverForm.errors.nameRequired')
   }
 
-  if (formData.value.type === DatabaseType.SQLITE) {
+  if (isFileBased.value) {
     if (formData.value.host !== ':memory:' && !formData.value.host.trim()) {
       errors.host = t('components.serverForm.errors.filePathRequired')
     }
@@ -271,20 +303,7 @@ async function handleTestConnection() {
 }
 
 function mapDatabaseTypeToBackend(type: DatabaseType): string {
-  switch (type) {
-    case DatabaseType.POSTGRESQL:
-      return 'postgresql'
-    case DatabaseType.MYSQL:
-      return 'mysql'
-    case DatabaseType.MARIADB:
-      return 'mysql'
-    case DatabaseType.SQLITE:
-      return 'sqlite'
-    case DatabaseType.SQLSERVER:
-      return 'sqlserver'
-    default:
-      return 'postgresql'
-  }
+  return dbTypeToBackend[type] ?? 'PostgreSQL'
 }
 
 function handleSave() {
@@ -300,8 +319,6 @@ function handleSave() {
   emit('save', { ...formData.value })
   isOpen.value = false
 }
-
-const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
 </script>
 
 <template>
@@ -337,34 +354,199 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
               <SelectValue :placeholder="t('components.serverForm.placeholders.selectType')" />
             </SelectTrigger>
             <SelectContent>
+              <!-- === PG Family === -->
               <SelectItem :value="DatabaseType.POSTGRESQL">
                 <div class="flex gap-2 items-center">
-                  <img :src="getDatabaseIcon(DatabaseType.POSTGRESQL)" alt="PostgreSQL" class="h-5 w-5 object-contain">
+                  <img :src="getDatabaseIcon(DatabaseType.POSTGRESQL)" alt="" class="h-5 w-5 object-contain">
                   {{ t('components.serverForm.databaseTypes.postgresql') }}
                 </div>
               </SelectItem>
-              <SelectItem :value="DatabaseType.SQLSERVER">
+              <SelectItem :value="DatabaseType.COCKROACHDB">
                 <div class="flex gap-2 items-center">
-                  <img :src="getDatabaseIcon(DatabaseType.SQLSERVER)" alt="SQL Server" class="h-5 w-5 object-contain">
-                  {{ t('components.serverForm.databaseTypes.sqlserver') }}
+                  <img :src="getDatabaseIcon(DatabaseType.COCKROACHDB)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.cockroachdb') }}
                 </div>
               </SelectItem>
+              <SelectItem :value="DatabaseType.REDSHIFT">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.REDSHIFT)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.redshift') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.YUGABYTEDB">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.YUGABYTEDB)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.yugabytedb') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.TIMESCALEDB">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.TIMESCALEDB)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.timescaledb') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.KINGBASEES">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.KINGBASEES)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.kingbasees') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.GAUSSDB">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.GAUSSDB)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.gaussdb') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.HIGHGO">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.HIGHGO)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.highgo') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.UXDB">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.UXDB)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.uxdb') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.OPENGAUSS">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.OPENGAUSS)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.opengauss') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.GBASE8C">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.GBASE8C)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.gbase8c') }}
+                </div>
+              </SelectItem>
+
+              <!-- === MySQL Family === -->
               <SelectItem :value="DatabaseType.MYSQL">
                 <div class="flex gap-2 items-center">
-                  <img :src="getDatabaseIcon(DatabaseType.MYSQL)" alt="MySQL" class="h-5 w-5 object-contain">
+                  <img :src="getDatabaseIcon(DatabaseType.MYSQL)" alt="" class="h-5 w-5 object-contain">
                   {{ t('components.serverForm.databaseTypes.mysql') }}
                 </div>
               </SelectItem>
               <SelectItem :value="DatabaseType.MARIADB">
                 <div class="flex gap-2 items-center">
-                  <img :src="getDatabaseIcon(DatabaseType.MARIADB)" alt="MariaDB" class="h-5 w-5 object-contain">
+                  <img :src="getDatabaseIcon(DatabaseType.MARIADB)" alt="" class="h-5 w-5 object-contain">
                   {{ t('components.serverForm.databaseTypes.mariadb') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.TIDB">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.TIDB)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.tidb') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.OCEANBASE">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.OCEANBASE)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.oceanbase') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.TDSQL">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.TDSQL)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.tdsql') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.POLARDB">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.POLARDB)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.polardb') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.DM8">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.DM8)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.dm8') }}
+                </div>
+              </SelectItem>
+
+              <!-- === Other Native === -->
+              <SelectItem :value="DatabaseType.SQLSERVER">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.SQLSERVER)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.sqlserver') }}
                 </div>
               </SelectItem>
               <SelectItem :value="DatabaseType.SQLITE">
                 <div class="flex gap-2 items-center">
-                  <img :src="getDatabaseIcon(DatabaseType.SQLITE)" alt="SQLite" class="h-5 w-5 object-contain">
+                  <img :src="getDatabaseIcon(DatabaseType.SQLITE)" alt="" class="h-5 w-5 object-contain">
                   {{ t('components.serverForm.databaseTypes.sqlite') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.DUCKDB">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.DUCKDB)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.duckdb') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.CLICKHOUSE">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.CLICKHOUSE)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.clickhouse') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.ORACLE">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.ORACLE)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.oracle') }}
+                </div>
+              </SelectItem>
+
+              <!-- === JDBC Bridge === -->
+              <SelectItem :value="DatabaseType.DB2">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.DB2)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.db2') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.H2">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.H2)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.h2') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.SNOWFLAKE">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.SNOWFLAKE)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.snowflake') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.DM8ORACLE">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.DM8ORACLE)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.dm8oracle') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.XUGUDB">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.XUGUDB)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.xugudb') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.GBASE8A">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.GBASE8A)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.gbase8a') }}
+                </div>
+              </SelectItem>
+
+              <!-- === HTTP Bridge === -->
+              <SelectItem :value="DatabaseType.TRINO">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.TRINO)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.trino') }}
+                </div>
+              </SelectItem>
+              <SelectItem :value="DatabaseType.PRESTO">
+                <div class="flex gap-2 items-center">
+                  <img :src="getDatabaseIcon(DatabaseType.PRESTO)" alt="" class="h-5 w-5 object-contain">
+                  {{ t('components.serverForm.databaseTypes.presto') }}
                 </div>
               </SelectItem>
             </SelectContent>
@@ -372,7 +554,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
         </div>
 
         <!-- SQLite-specific fields -->
-        <div v-if="isSqlite" class="space-y-4">
+        <div v-if="isFileBased" class="space-y-4">
           <!-- SQLite Mode Tabs -->
           <Tabs
             v-model="sqliteTab"
@@ -458,7 +640,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
         </div>
 
         <!-- Host field for non-SQLite databases -->
-        <div v-if="!isSqlite" class="space-y-2">
+        <div v-if="!isFileBased" class="space-y-2">
           <Label for="host">{{ t('components.serverForm.labels.host') }}</Label>
           <Input
             id="host"
@@ -472,7 +654,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
         </div>
 
         <!-- Port and Database (not for SQLite) -->
-        <div v-if="!isSqlite" class="gap-4 grid grid-cols-2">
+        <div v-if="!isFileBased" class="gap-4 grid grid-cols-2">
           <div class="space-y-2">
             <Label for="port">{{ t('components.serverForm.labels.port') }}</Label>
             <Input
@@ -496,7 +678,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
         </div>
 
         <!-- Username and Password (not for SQLite) -->
-        <div v-if="!isSqlite" class="gap-4 grid grid-cols-2">
+        <div v-if="!isFileBased" class="gap-4 grid grid-cols-2">
           <div class="space-y-2">
             <Label for="username">{{ t('components.serverForm.labels.username') }}</Label>
             <Input
@@ -520,7 +702,7 @@ const isSqlite = computed(() => formData.value.type === DatabaseType.SQLITE)
 
         <!-- SSL Configuration (not for SQLite) -->
         <SslConfigSection
-          v-if="!isSqlite"
+          v-if="!isFileBased"
           v-model="formData.ssl"
           :db-type="formData.type"
           :errors="formErrors"

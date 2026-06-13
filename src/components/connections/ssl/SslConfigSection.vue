@@ -21,12 +21,38 @@ const sslConfig = defineModel<SslConfig>({
   default: () => ({ mode: DEFAULT_SSL_MODE }),
 })
 
-const SSL_DB_TYPE_LABELS: Record<DatabaseType, string> = {
+const SSL_DB_TYPE_LABELS: Record<string, string> = {
   [DatabaseType.POSTGRESQL]: 'PostgreSQL',
   [DatabaseType.MYSQL]: 'MySQL',
   [DatabaseType.MARIADB]: 'MariaDB',
   [DatabaseType.SQLSERVER]: 'SQLServer',
   [DatabaseType.SQLITE]: 'SQLite',
+  [DatabaseType.DUCKDB]: 'DuckDB',
+  [DatabaseType.CLICKHOUSE]: 'ClickHouse',
+  [DatabaseType.COCKROACHDB]: 'CockroachDB',
+  [DatabaseType.REDSHIFT]: 'Redshift',
+  [DatabaseType.YUGABYTEDB]: 'YugabyteDB',
+  [DatabaseType.TIMESCALEDB]: 'TimescaleDB',
+  [DatabaseType.KINGBASEES]: 'KingbaseES',
+  [DatabaseType.GAUSSDB]: 'GaussDB',
+  [DatabaseType.HIGHGO]: 'HighGo',
+  [DatabaseType.UXDB]: 'UXDB',
+  [DatabaseType.OPENGAUSS]: 'openGauss',
+  [DatabaseType.GBASE8C]: 'GBase 8c',
+  [DatabaseType.TIDB]: 'TiDB',
+  [DatabaseType.OCEANBASE]: 'OceanBase',
+  [DatabaseType.TDSQL]: 'TDSQL',
+  [DatabaseType.POLARDB]: 'PolarDB',
+  [DatabaseType.DM8]: 'DM8',
+  [DatabaseType.ORACLE]: 'Oracle',
+  [DatabaseType.DB2]: 'DB2',
+  [DatabaseType.H2]: 'H2',
+  [DatabaseType.SNOWFLAKE]: 'Snowflake',
+  [DatabaseType.DM8ORACLE]: 'DM8',
+  [DatabaseType.XUGUDB]: 'XuguDB',
+  [DatabaseType.GBASE8A]: 'GBase 8a',
+  [DatabaseType.TRINO]: 'Trino',
+  [DatabaseType.PRESTO]: 'Presto',
 }
 
 const dbTypeLabel = computed(() => SSL_DB_TYPE_LABELS[props.dbType] || props.dbType)
