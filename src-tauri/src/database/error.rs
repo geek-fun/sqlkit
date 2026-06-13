@@ -81,6 +81,13 @@ pub enum DbError {
 }
 
 impl DbError {
+    /// Convenience constructor for `UnsupportedOperation`.
+    pub fn unsupported(operation: impl Into<String>) -> Self {
+        DbError::UnsupportedOperation(operation.into())
+    }
+}
+
+impl DbError {
     /// Create a new error with a message and optional source.
     pub fn new(message: impl Into<String>) -> Self {
         Self::Other {

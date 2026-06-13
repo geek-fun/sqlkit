@@ -5,7 +5,7 @@
 
 use crate::database::{
     config::ConnectionConfig,
-    error::DbResult,
+    error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, TableInfo},
 };
@@ -110,114 +110,43 @@ pub trait DatabaseAdapter: Send + Sync {
     async fn execute_query(&self, query: &str) -> DbResult<QueryResult>;
 
     /// List all databases on the server.
-    ///
-    /// This method retrieves a list of all databases accessible to the current user.
-    ///
-    /// # Returns
-    ///
-    /// A vector of `DatabaseSchema` objects representing available databases.
-    ///
-    /// # Errors
-    ///
-    /// This method will return an error if the metadata query fails or if the
-    /// operation is not supported by the database.
-    async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>>;
+    async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
+        Err(DbError::unsupported("list_databases"))
+    }
 
     /// List all schemas in a database.
-    ///
-    /// This method retrieves a list of all schemas in the specified database.
-    /// For databases that don't support schemas, this may return an empty list
-    /// or a single default schema.
-    ///
-    /// # Arguments
-    ///
-    /// * `database` - The database name, or None for the current database
-    ///
-    /// # Returns
-    ///
-    /// A vector of schema names.
-    ///
-    /// # Errors
-    ///
-    /// This method will return an error if the database doesn't exist or if
-    /// the metadata query fails.
-    async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>>;
+    async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
+        Err(DbError::unsupported("list_schemas"))
+    }
 
     /// List all tables in a schema.
-    ///
-    /// This method retrieves a list of all tables (and optionally views) in the
-    /// specified schema.
-    ///
-    /// # Arguments
-    ///
-    /// * `database` - The database name, or None for the current database
-    /// * `schema` - The schema name, or None for the default schema
-    ///
-    /// # Returns
-    ///
-    /// A vector of `TableInfo` objects representing available tables.
-    ///
-    /// # Errors
-    ///
-    /// This method will return an error if the schema doesn't exist or if
-    /// the metadata query fails.
     async fn list_tables(
         &self,
         database: Option<&str>,
         schema: Option<&str>,
-    ) -> DbResult<Vec<TableInfo>>;
+    ) -> DbResult<Vec<TableInfo>> {
+        Err(DbError::unsupported("list_tables"))
+    }
 
     /// List all columns in a table.
-    ///
-    /// This method retrieves detailed information about all columns in the
-    /// specified table.
-    ///
-    /// # Arguments
-    ///
-    /// * `database` - The database name, or None for the current database
-    /// * `schema` - The schema name, or None for the default schema
-    /// * `table` - The table name
-    ///
-    /// # Returns
-    ///
-    /// A vector of `ColumnInfo` objects representing the table's columns.
-    ///
-    /// # Errors
-    ///
-    /// This method will return an error if the table doesn't exist or if
-    /// the metadata query fails.
     async fn list_columns(
         &self,
         database: Option<&str>,
         schema: Option<&str>,
         table: &str,
-    ) -> DbResult<Vec<ColumnInfo>>;
+    ) -> DbResult<Vec<ColumnInfo>> {
+        Err(DbError::unsupported("list_columns"))
+    }
 
     /// Get detailed information about a table.
-    ///
-    /// This method retrieves comprehensive information about a specific table,
-    /// including its schema, metadata, and statistics.
-    ///
-    /// # Arguments
-    ///
-    /// * `database` - The database name, or None for the current database
-    /// * `schema` - The schema name, or None for the default schema
-    /// * `table` - The table name
-    ///
-    /// # Returns
-    ///
-    /// A `TableInfo` object with detailed table information.
-    ///
-    /// # Errors
-    ///
-    /// This method will return an error if the table doesn't exist or if
-    /// the metadata query fails.
     async fn get_table_info(
         &self,
         database: Option<&str>,
         schema: Option<&str>,
         table: &str,
-    ) -> DbResult<TableInfo>;
+    ) -> DbResult<TableInfo> {
+        Err(DbError::unsupported("get_table_info"))
+    }
 
     /// Get the connection pool.
     ///

@@ -37,6 +37,7 @@ pub async fn preview_export_data(
             let adapter = adapter.lock().await;
             preview_export(&*adapter, request, preview_rows).await
         }
+        _ => return Err("Transfer not supported for this database type".to_string()),
     }
 }
 
@@ -68,6 +69,7 @@ pub async fn execute_export_data(
             let adapter = adapter.lock().await;
             execute_export(&*adapter, request, &app_handle).await
         }
+        _ => return Err("Transfer not supported for this database type".to_string()),
     }
 }
 
@@ -113,6 +115,7 @@ pub async fn execute_import_data(
             let adapter = adapter.lock().await;
             execute_import(&*adapter, request, &app_handle).await
         }
+        _ => return Err("Transfer not supported for this database type".to_string()),
     }
 }
 
@@ -144,6 +147,7 @@ pub async fn preview_migration_data(
             let adapter = adapter.lock().await;
             preview_migration(&*adapter, &request).await
         }
+        _ => return Err("Transfer not supported for this database type".to_string()),
     }
 }
 
@@ -250,6 +254,7 @@ pub async fn execute_migration_data(
             let tgt = tgt.lock().await;
             run_migration!(src, tgt)
         }
+        _ => todo!(),
     }
 }
 
@@ -293,6 +298,7 @@ pub async fn auto_map_migration_columns(
         ActiveConnection::MySQL(adapter) => fetch_and_map!(adapter),
         ActiveConnection::SQLServer(adapter) => fetch_and_map!(adapter),
         ActiveConnection::SQLite(adapter) => fetch_and_map!(adapter),
+        _ => return Err("Transfer not supported for this database type".to_string()),
     }
 }
 
@@ -311,6 +317,7 @@ pub async fn generate_ddl_for_objects(
         ActiveConnection::MySQL(_) => DatabaseType::MySQL,
         ActiveConnection::SQLServer(_) => DatabaseType::SqlServer,
         ActiveConnection::SQLite(_) => DatabaseType::SQLite,
+        _ => return Err("Transfer not supported for this database type".to_string()),
     };
 
     async fn collect<A: DatabaseAdapter>(
@@ -380,6 +387,7 @@ pub async fn generate_ddl_for_objects(
             let adapter = adapter.lock().await;
             collect(&*adapter, &request, None, engine).await
         }
+        _ => return Err("Transfer not supported for this database type".to_string()),
     }
 }
 
@@ -542,6 +550,7 @@ pub async fn execute_sql_content(
             let adapter = adapter.lock().await;
             run(&*adapter, &statements, strategy, started).await
         }
+        _ => return Err("Transfer not supported for this database type".to_string()),
     };
 
     Ok(result)

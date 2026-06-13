@@ -4,8 +4,8 @@
 //! including databases, schemas, tables, columns, and table data.
 
 use crate::database::{
-    ColumnInfo, DatabaseAdapter, DatabaseSchema, MySQLAdapter, PostgresAdapter, QueryResult,
-    SqlServerAdapter, TableInfo,
+    ClickHouseAdapter, ColumnInfo, DatabaseAdapter, DatabaseSchema, DuckDbAdapter, HttpSqlAdapter,
+    MySQLAdapter, OdbcAdapter, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo,
 };
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
@@ -40,6 +40,10 @@ fn quote_identifier(identifier: &str, db_type: &str) -> String {
         "mysql" => format!("`{}`", identifier.replace("`", "``")),
         "sqlserver" => format!("[{}]", identifier.replace("]", "]]")),
         "sqlite" => format!("\"{}\"", identifier.replace("\"", "\"\"")),
+        "duckdb" => format!("\"{}\"", identifier.replace("\"", "\"\"")),
+        "clickhouse" => format!("`{}`", identifier.replace("`", "``")),
+        "odbc" => format!("\"{}\"", identifier.replace("\"", "\"\"")),
+        "trino" => identifier.to_string(),
         _ => identifier.to_string(),
     }
 }
@@ -135,6 +139,22 @@ pub async fn list_databases(
             let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
+        ActiveConnection::DuckDb(_) => {
+            // DuckDB is file-based and has no separate databases
+            return Ok(vec![]);
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_databases().await
+        }
+        ActiveConnection::Odbc(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_databases().await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_databases().await
+        }
     }
     .map_err(|e| format!("Failed to list databases: {}", e))?;
 
@@ -181,6 +201,25 @@ pub async fn list_schemas(
         ActiveConnection::SQLite(_) => {
             // SQLite doesn't have schemas
             return Ok(vec!["main".to_string()]);
+        }
+        ActiveConnection::DuckDb(_) => {
+            return Ok(vec![
+                "main".to_string(),
+                "information_schema".to_string(),
+                "pg_catalog".to_string(),
+            ]);
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_schemas(Some(&database)).await
+        }
+        ActiveConnection::Odbc(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_schemas(Some(&database)).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_schemas(Some(&database)).await
         }
     }
     .map_err(|e| format!("Failed to list schemas: {}", e))?;
@@ -236,6 +275,28 @@ pub async fn list_tables(
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_tables(None, None).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_tables(None, schema.as_deref()).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::Odbc(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(Some(&database), schema.as_deref())
+                .await
         }
     }
     .map_err(|e| format!("Failed to list tables: {}", e))?;
@@ -293,6 +354,30 @@ pub async fn get_table_info(
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
             adapter.get_table_info(None, None, &table_name).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_table_info(None, schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_table_info(Some(&database), None, &table_name)
+                .await
+        }
+        ActiveConnection::Odbc(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_table_info(Some(&database), schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_table_info(Some(&database), schema.as_deref(), &table_name)
+                .await
         }
     }
     .map_err(|e| format!("Failed to get table info: {}", e))?;
@@ -360,6 +445,30 @@ pub async fn list_columns(
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_columns(None, None, &table_name).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(Some(&database), None, &table_name)
+                .await
+        }
+        ActiveConnection::Odbc(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
         }
     }
     .map_err(|e| format!("Failed to list columns: {}", e))?;
@@ -458,6 +567,34 @@ pub async fn get_table_data(
                 build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
             adapter.execute_query(&sql).await
         }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "duckdb");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "duckdb");
+            adapter.execute_query(&sql).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified =
+                build_qualified_table(query.schema.as_deref(), &query.table, "clickhouse");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "clickhouse");
+            adapter.execute_query(&sql).await
+        }
+        ActiveConnection::Odbc(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "odbc");
+            let sql = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "odbc");
+            adapter.execute_query(&sql).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "trino");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "trino");
+            adapter.execute_query(&sql).await
+        }
     }
     .map_err(|e| format!("Failed to get table data: {}", e))?;
 
@@ -548,6 +685,30 @@ pub async fn get_table_count(
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
             let qualified = build_qualified_table(None, &table, "sqlite");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "duckdb");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "clickhouse");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        ActiveConnection::Odbc(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "odbc");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "trino");
             let query = build_count_query(&qualified, filter_ref);
             adapter.execute_query(&query).await
         }
@@ -733,6 +894,38 @@ pub async fn update_table_row(
                 .await
                 .map_err(|e| format!("Failed to update row: {}", e))?;
         }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("duckdb")?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("clickhouse")?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
+        }
+        ActiveConnection::Odbc(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("odbc")?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("trino")?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
+        }
     }
 
     Ok(())
@@ -847,6 +1040,38 @@ pub async fn delete_table_row(
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_delete_sql("sqlite");
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("duckdb");
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("clickhouse");
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+        ActiveConnection::Odbc(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("odbc");
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("trino");
             adapter
                 .execute_query(&sql)
                 .await

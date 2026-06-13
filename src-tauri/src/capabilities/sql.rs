@@ -30,10 +30,31 @@ async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String
 
 async fn execute_on_adapter(adapter: &ActiveConnection, sql: &str) -> Result<QueryResult, String> {
     match adapter {
-        ActiveConnection::Postgres(a) => a.lock().await.execute_query(sql).await.map_err(|e| e.to_string()),
-        ActiveConnection::MySQL(a) => a.lock().await.execute_query(sql).await.map_err(|e| e.to_string()),
-        ActiveConnection::SQLite(a) => a.lock().await.execute_query(sql).await.map_err(|e| e.to_string()),
-        ActiveConnection::SQLServer(a) => a.lock().await.execute_query(sql).await.map_err(|e| e.to_string()),
+        ActiveConnection::Postgres(a) => a
+            .lock()
+            .await
+            .execute_query(sql)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::MySQL(a) => a
+            .lock()
+            .await
+            .execute_query(sql)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLite(a) => a
+            .lock()
+            .await
+            .execute_query(sql)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLServer(a) => a
+            .lock()
+            .await
+            .execute_query(sql)
+            .await
+            .map_err(|e| e.to_string()),
+        _ => todo!(),
     }
 }
 
@@ -63,9 +84,16 @@ struct ExplainQueryHandler;
 
 #[async_trait]
 impl CapabilityHandler for ExecuteQueryHandler {
-    async fn handle(&self, args: &Value, connection_config: Option<&Value>) -> Result<String, String> {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
         let conn_id = get_connection_id(connection_config)?;
-        let sql = args.get("sql").and_then(|v| v.as_str()).ok_or_else(|| "Missing 'sql' argument".to_string())?;
+        let sql = args
+            .get("sql")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing 'sql' argument".to_string())?;
         let adapter = resolve_adapter(&conn_id).await?;
         let result = execute_on_adapter(&adapter, sql).await?;
         let json = serde_json::to_string(&result).map_err(|e| e.to_string())?;
@@ -75,14 +103,39 @@ impl CapabilityHandler for ExecuteQueryHandler {
 
 #[async_trait]
 impl CapabilityHandler for ListDatabasesHandler {
-    async fn handle(&self, _args: &Value, connection_config: Option<&Value>) -> Result<String, String> {
+    async fn handle(
+        &self,
+        _args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
         let conn_id = get_connection_id(connection_config)?;
         let adapter = resolve_adapter(&conn_id).await?;
         let dbs = match &adapter {
-            ActiveConnection::Postgres(a) => a.lock().await.list_databases().await.map_err(|e| e.to_string())?,
-            ActiveConnection::MySQL(a) => a.lock().await.list_databases().await.map_err(|e| e.to_string())?,
-            ActiveConnection::SQLite(a) => a.lock().await.list_databases().await.map_err(|e| e.to_string())?,
-            ActiveConnection::SQLServer(a) => a.lock().await.list_databases().await.map_err(|e| e.to_string())?,
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?,
+            _ => todo!(),
         };
         serde_json::to_string(&dbs).map_err(|e| e.to_string())
     }
@@ -90,15 +143,35 @@ impl CapabilityHandler for ListDatabasesHandler {
 
 #[async_trait]
 impl CapabilityHandler for ListSchemasHandler {
-    async fn handle(&self, args: &Value, connection_config: Option<&Value>) -> Result<String, String> {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
         let conn_id = get_connection_id(connection_config)?;
         let database = args.get("database").and_then(|v| v.as_str());
         let adapter = resolve_adapter(&conn_id).await?;
         let schemas = match &adapter {
-            ActiveConnection::Postgres(a) => a.lock().await.list_schemas(database).await.map_err(|e| e.to_string())?,
-            ActiveConnection::MySQL(a) => a.lock().await.list_schemas(database).await.map_err(|e| e.to_string())?,
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_schemas(database)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_schemas(database)
+                .await
+                .map_err(|e| e.to_string())?,
             ActiveConnection::SQLite(_) => vec![],
-            ActiveConnection::SQLServer(a) => a.lock().await.list_schemas(database).await.map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_schemas(database)
+                .await
+                .map_err(|e| e.to_string())?,
+            _ => todo!(),
         };
         serde_json::to_string(&schemas).map_err(|e| e.to_string())
     }
@@ -106,16 +179,41 @@ impl CapabilityHandler for ListSchemasHandler {
 
 #[async_trait]
 impl CapabilityHandler for ListTablesHandler {
-    async fn handle(&self, args: &Value, connection_config: Option<&Value>) -> Result<String, String> {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
         let conn_id = get_connection_id(connection_config)?;
         let database = args.get("database").and_then(|v| v.as_str());
         let schema = args.get("schema").and_then(|v| v.as_str());
         let adapter = resolve_adapter(&conn_id).await?;
         let tables = match &adapter {
-            ActiveConnection::Postgres(a) => a.lock().await.list_tables(database, schema).await.map_err(|e| e.to_string())?,
-            ActiveConnection::MySQL(a) => a.lock().await.list_tables(database, schema).await.map_err(|e| e.to_string())?,
-            ActiveConnection::SQLite(a) => a.lock().await.list_tables(None, None).await.map_err(|e| e.to_string())?,
-            ActiveConnection::SQLServer(a) => a.lock().await.list_tables(database, schema).await.map_err(|e| e.to_string())?,
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_tables(None, None)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            _ => todo!(),
         };
         serde_json::to_string(&tables).map_err(|e| e.to_string())
     }
@@ -123,36 +221,96 @@ impl CapabilityHandler for ListTablesHandler {
 
 #[async_trait]
 impl CapabilityHandler for GetSchemaHandler {
-    async fn handle(&self, args: &Value, connection_config: Option<&Value>) -> Result<String, String> {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
         let conn_id = get_connection_id(connection_config)?;
         let database = args.get("database").and_then(|v| v.as_str());
         let schema = args.get("schema").and_then(|v| v.as_str());
         let adapter = resolve_adapter(&conn_id).await?;
 
         let tables = match &adapter {
-            ActiveConnection::Postgres(a) => a.lock().await.list_tables(database, schema).await.map_err(|e| e.to_string())?,
-            ActiveConnection::MySQL(a) => a.lock().await.list_tables(database, schema).await.map_err(|e| e.to_string())?,
-            ActiveConnection::SQLite(a) => a.lock().await.list_tables(None, None).await.map_err(|e| e.to_string())?,
-            ActiveConnection::SQLServer(a) => a.lock().await.list_tables(database, schema).await.map_err(|e| e.to_string())?,
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_tables(None, None)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            _ => todo!(),
         };
 
         let mut schema_lines: Vec<String> = Vec::new();
         for table in &tables {
             let cols = match &adapter {
-                ActiveConnection::Postgres(a) => a.lock().await.list_columns(database, schema, &table.name).await.map_err(|e| e.to_string())?,
-                ActiveConnection::MySQL(a) => a.lock().await.list_columns(database, schema, &table.name).await.map_err(|e| e.to_string())?,
-                ActiveConnection::SQLite(a) => a.lock().await.list_columns(None, None, &table.name).await.map_err(|e| e.to_string())?,
-                ActiveConnection::SQLServer(a) => a.lock().await.list_columns(database, schema, &table.name).await.map_err(|e| e.to_string())?,
+                ActiveConnection::Postgres(a) => a
+                    .lock()
+                    .await
+                    .list_columns(database, schema, &table.name)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                ActiveConnection::MySQL(a) => a
+                    .lock()
+                    .await
+                    .list_columns(database, schema, &table.name)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                ActiveConnection::SQLite(a) => a
+                    .lock()
+                    .await
+                    .list_columns(None, None, &table.name)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                ActiveConnection::SQLServer(a) => a
+                    .lock()
+                    .await
+                    .list_columns(database, schema, &table.name)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                _ => todo!(),
             };
 
             let schema_name = table.schema.as_deref().unwrap_or("public");
             let table_type = &table.table_type;
-            schema_lines.push(format!("-- {}.{} ({})", schema_name, table.name, table_type));
+            schema_lines.push(format!(
+                "-- {}.{} ({})",
+                schema_name, table.name, table_type
+            ));
             for col in &cols {
                 let nullable = if col.nullable { "NULL" } else { "NOT NULL" };
-                let pk = if col.is_primary_key { " PRIMARY KEY" } else { "" };
-                let default = col.default_value.as_ref().map(|d| format!(" DEFAULT {}", d)).unwrap_or_default();
-                schema_lines.push(format!("  {} {} {}{}{}", col.name, col.data_type, nullable, default, pk));
+                let pk = if col.is_primary_key {
+                    " PRIMARY KEY"
+                } else {
+                    ""
+                };
+                let default = col
+                    .default_value
+                    .as_ref()
+                    .map(|d| format!(" DEFAULT {}", d))
+                    .unwrap_or_default();
+                schema_lines.push(format!(
+                    "  {} {} {}{}{}",
+                    col.name, col.data_type, nullable, default, pk
+                ));
             }
             schema_lines.push(String::new());
         }
@@ -162,17 +320,45 @@ impl CapabilityHandler for GetSchemaHandler {
 
 #[async_trait]
 impl CapabilityHandler for DescribeTableHandler {
-    async fn handle(&self, args: &Value, connection_config: Option<&Value>) -> Result<String, String> {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
         let conn_id = get_connection_id(connection_config)?;
-        let table = args.get("table").and_then(|v| v.as_str()).ok_or_else(|| "Missing 'table' argument".to_string())?;
+        let table = args
+            .get("table")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing 'table' argument".to_string())?;
         let database = args.get("database").and_then(|v| v.as_str());
         let schema = args.get("schema").and_then(|v| v.as_str());
         let adapter = resolve_adapter(&conn_id).await?;
         let cols = match &adapter {
-            ActiveConnection::Postgres(a) => a.lock().await.list_columns(database, schema, table).await.map_err(|e| e.to_string())?,
-            ActiveConnection::MySQL(a) => a.lock().await.list_columns(database, schema, table).await.map_err(|e| e.to_string())?,
-            ActiveConnection::SQLite(a) => a.lock().await.list_columns(None, None, table).await.map_err(|e| e.to_string())?,
-            ActiveConnection::SQLServer(a) => a.lock().await.list_columns(database, schema, table).await.map_err(|e| e.to_string())?,
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_columns(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_columns(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_columns(None, None, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_columns(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            _ => todo!(),
         };
         serde_json::to_string(&cols).map_err(|e| e.to_string())
     }
@@ -180,9 +366,16 @@ impl CapabilityHandler for DescribeTableHandler {
 
 #[async_trait]
 impl CapabilityHandler for ExplainQueryHandler {
-    async fn handle(&self, args: &Value, connection_config: Option<&Value>) -> Result<String, String> {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
         let conn_id = get_connection_id(connection_config)?;
-        let sql = args.get("sql").and_then(|v| v.as_str()).ok_or_else(|| "Missing 'sql' argument".to_string())?;
+        let sql = args
+            .get("sql")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing 'sql' argument".to_string())?;
         let explain_sql = format!("EXPLAIN ANALYZE {}", sql);
         let adapter = resolve_adapter(&conn_id).await?;
         let result = execute_on_adapter(&adapter, &explain_sql).await?;
@@ -206,10 +399,13 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
 
     reg.register(Capability {
         name: "sqlkit__list_databases",
-        description: "List all databases on the connected server.", handler: Arc::new(ListDatabasesHandler),
+        description: "List all databases on the connected server.",
+        handler: Arc::new(ListDatabasesHandler),
         input_schema: json!({"type": "object", "properties": {}, "required": []}),
-        risk_level: RiskLevel::Safe, required_permission: "read",
-        source_kind: SourceKind::SqlDatabase, tags: &["agent"],
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
     });
 
     reg.register(Capability {
@@ -255,4 +451,3 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
     });
 }
-

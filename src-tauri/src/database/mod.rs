@@ -60,14 +60,19 @@
 //! ```
 
 pub mod adapter;
+pub mod clickhouse;
 pub mod config;
+pub mod duckdb;
 pub mod error;
+pub mod http_sql;
 pub mod manager;
 pub mod mysql;
+pub mod odbc;
 pub mod pool;
 pub mod postgres;
 pub mod sqlite;
 pub mod sqlserver;
+pub mod strategy;
 pub mod types;
 
 #[cfg(test)]
@@ -75,10 +80,14 @@ mod tests;
 
 // Re-export main types for convenience
 pub use adapter::DatabaseAdapter;
+pub use clickhouse::{ClickHouseAdapter, ClickHousePool};
 pub use config::{ConnectionConfig, DatabaseType, PoolConfig, SslMode};
+pub use duckdb::{DuckDbAdapter, DuckDbPool};
 pub use error::{DbError, DbResult};
+pub use http_sql::{HttpSqlAdapter, HttpSqlPool};
 pub use manager::{ConnectionManager, ConnectionMetadata, ManagerStats};
 pub use mysql::{MySQLAdapter, MySQLPool};
+pub use odbc::{OdbcAdapter, OdbcConnection, OdbcPool};
 pub use pool::{ConnectionPool, PoolStats};
 pub use postgres::{PostgresAdapter, PostgresPool};
 pub use sqlite::{SQLiteAdapter, SQLitePool};
