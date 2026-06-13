@@ -11,8 +11,13 @@ pub struct StoredMessage {
 }
 
 /// Load messages for compaction (excludes tool call internal messages)
-pub fn load_messages_for_compact(db: &AgentDb, session_id: &str) -> Result<Vec<StoredMessage>, String> {
-    let conn = db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+pub fn load_messages_for_compact(
+    db: &AgentDb,
+    session_id: &str,
+) -> Result<Vec<StoredMessage>, String> {
+    let conn =
+        db.0.lock()
+            .map_err(|e| format!("Failed to lock db: {}", e))?;
     let mut stmt = conn
         .prepare("SELECT id, role, content, created_at FROM agent_messages WHERE session_id = ?1 ORDER BY created_at ASC")
         .map_err(|e| format!("Failed to prepare: {}", e))?;

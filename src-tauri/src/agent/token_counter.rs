@@ -12,11 +12,7 @@ pub fn count_tokens(text: &str, model: &str) -> usize {
     text.len() / 4
 }
 
-pub fn count_message_tokens(
-    role: &str,
-    content: &str,
-    model: &str,
-) -> usize {
+pub fn count_message_tokens(role: &str, content: &str, model: &str) -> usize {
     let tokens = count_tokens(content, model);
     // Add overhead for message formatting
     tokens + 4 // role prefix + formatting

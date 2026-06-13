@@ -13,7 +13,9 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, State};
 use tokio::sync::oneshot;
 
-use crate::agent::chat_formatter::{AnthropicChatFormatter, ChatFormatter, LlmMessage, LlmToolCall, OpenAIChatFormatter};
+use crate::agent::chat_formatter::{
+    AnthropicChatFormatter, ChatFormatter, LlmMessage, LlmToolCall, OpenAIChatFormatter,
+};
 use crate::agent::compact::{count_projected_tokens, evaluate, resolve_model_spec_for_session};
 use crate::agent::config::{build_headers, get_base_url};
 use crate::agent::tool_executor::ToolExecutor;
@@ -35,7 +37,7 @@ pub type CancelMap = Arc<Mutex<HashMap<String, oneshot::Sender<()>>>>;
 // ---------------------------------------------------------------------------
 
 const DEFAULT_MAX_ITERATIONS: u32 = 200;
-const DEFAULT_WALL_CLOCK_BUDGET_SECS: u64 = 30 * 60;   // 30 minutes
+const DEFAULT_WALL_CLOCK_BUDGET_SECS: u64 = 30 * 60; // 30 minutes
 const DEFAULT_TOKEN_BUDGET: usize = 20_000_000;
 const CONFIRM_TIMEOUT_SECS: u64 = 300;
 const RETRY_DELAYS_MS: &[u64] = &[1000, 3000, 8000];
@@ -65,7 +67,10 @@ fn emit_event(app: &AppHandle, event: &str, payload: Value) {
 // ---------------------------------------------------------------------------
 
 fn get_settings_str(settings: &Value, key: &str) -> Option<String> {
-    settings.get(key).and_then(|v| v.as_str()).map(|s| s.to_string())
+    settings
+        .get(key)
+        .and_then(|v| v.as_str())
+        .map(|s| s.to_string())
 }
 
 fn get_settings_u64(settings: &Value, key: &str, default: u64) -> u64 {
@@ -185,9 +190,7 @@ fn build_tools_list(settings: &Value) -> Vec<Value> {
         let bn = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
         an.cmp(bn)
     });
-    tools.dedup_by(|a, b| {
-        a.get("name") == b.get("name")
-    });
+    tools.dedup_by(|a, b| a.get("name") == b.get("name"));
 
     tools
 }
@@ -227,7 +230,10 @@ fn extract_llm_error(err: &str) -> String {
     if err.contains("status code 429") {
         return "Rate limited. Please wait and try again.".to_string();
     }
-    if err.contains("status code 500") || err.contains("status code 502") || err.contains("status code 503") {
+    if err.contains("status code 500")
+        || err.contains("status code 502")
+        || err.contains("status code 503")
+    {
         return "LLM provider returned a server error. Please try again.".to_string();
     }
     if err.contains("timed out") || err.contains("timeout") {
@@ -479,15 +485,22 @@ pub async fn run_agent_loop(
     // Phase 0: Setup & budget initialization
     // -----------------------------------------------------------------------
 
-    let max_iterations = get_settings_u64(&settings, "maxIterations", DEFAULT_MAX_ITERATIONS as u64) as u32;
-    let wall_clock_budget_secs = get_settings_u64(&settings, "wallClockBudgetSecs", DEFAULT_WALL_CLOCK_BUDGET_SECS);
-    let token_budget = get_settings_u64(&settings, "tokenBudget", DEFAULT_TOKEN_BUDGET as u64) as usize;
+    let max_iterations =
+        get_settings_u64(&settings, "maxIterations", DEFAULT_MAX_ITERATIONS as u64) as u32;
+    let wall_clock_budget_secs = get_settings_u64(
+        &settings,
+        "wallClockBudgetSecs",
+        DEFAULT_WALL_CLOCK_BUDGET_SECS,
+    );
+    let token_budget =
+        get_settings_u64(&settings, "tokenBudget", DEFAULT_TOKEN_BUDGET as u64) as usize;
     let require_confirmation = get_settings_bool(&settings, "requireConfirmation", true);
     let start_time = std::time::Instant::now();
     let model = get_settings_str(&settings, "model").unwrap_or_else(|| String::from("gpt-4o"));
     let base_url = get_base_url(&settings);
     let api_key = get_settings_str(&settings, "apiKey").unwrap_or_default();
-    let api_compat = get_settings_str(&settings, "apiCompatibility").unwrap_or_else(|| String::from("openai"));
+    let api_compat =
+        get_settings_str(&settings, "apiCompatibility").unwrap_or_else(|| String::from("openai"));
     let formatter: Box<dyn ChatFormatter> = if api_compat == "anthropic" {
         Box::new(AnthropicChatFormatter)
     } else {
@@ -502,22 +515,30 @@ pub async fn run_agent_loop(
 
     // Mark session as active
     if let Err(e) = update_session_status(&agent_db, &session_id, "running") {
-        emit_event(&app, "agent-loop-warning", json!({
-            "session_id": session_id,
-            "warning": format!("Failed to update session status: {}", e)
-        }));
+        emit_event(
+            &app,
+            "agent-loop-warning",
+            json!({
+                "session_id": session_id,
+                "warning": format!("Failed to update session status: {}", e)
+            }),
+        );
     }
 
     // -----------------------------------------------------------------------
     // Phase 1: Insert user message
     // -----------------------------------------------------------------------
 
-    let _user_msg_id = store_message(&agent_db, &session_id, "user", &user_message)
-        .map_err(|e| {
-            emit_event(&app, "agent-loop-error", json!({
-                "session_id": session_id,
-                "error": format!("Failed to store user message: {}", e)
-            }));
+    let _user_msg_id =
+        store_message(&agent_db, &session_id, "user", &user_message).map_err(|e| {
+            emit_event(
+                &app,
+                "agent-loop-error",
+                json!({
+                    "session_id": session_id,
+                    "error": format!("Failed to store user message: {}", e)
+                }),
+            );
             format!("Failed to store user message: {}", e)
         })?;
 
@@ -527,12 +548,16 @@ pub async fn run_agent_loop(
         .iter()
         .map(|m| crate::agent::token_counter::count_message_tokens(&m.role, &m.content, &model))
         .sum();
-    emit_event(&app, "agent-context-usage", json!({
-        "session_id": session_id,
-        "used_tokens": initial_tokens,
-        "capacity": token_budget,
-        "message_count": initial_messages.len(),
-    }));
+    emit_event(
+        &app,
+        "agent-context-usage",
+        json!({
+            "session_id": session_id,
+            "used_tokens": initial_tokens,
+            "capacity": token_budget,
+            "message_count": initial_messages.len(),
+        }),
+    );
 
     // -----------------------------------------------------------------------
     // Phase 2: Main agent loop
@@ -547,11 +572,15 @@ pub async fn run_agent_loop(
         // --- Check cancellation ---
         if is_cancelled(&cancel_map, &session_id) {
             take_cancellation(&cancel_map, &session_id);
-            emit_event(&app, "agent-loop-stopped", json!({
-                "session_id": session_id,
-                "reason": "cancelled",
-                "message": "Agent loop was cancelled by the user"
-            }));
+            emit_event(
+                &app,
+                "agent-loop-stopped",
+                json!({
+                    "session_id": session_id,
+                    "reason": "cancelled",
+                    "message": "Agent loop was cancelled by the user"
+                }),
+            );
             let _ = update_session_status(&agent_db, &session_id, "idle");
             return Ok(());
         }
@@ -559,11 +588,15 @@ pub async fn run_agent_loop(
         // --- Budget: max iterations ---
         iteration += 1;
         if iteration > max_iterations {
-            emit_event(&app, "agent-loop-stopped", json!({
-                "session_id": session_id,
-                "reason": "max_iterations",
-                "message": format!("Reached maximum iterations ({})", max_iterations)
-            }));
+            emit_event(
+                &app,
+                "agent-loop-stopped",
+                json!({
+                    "session_id": session_id,
+                    "reason": "max_iterations",
+                    "message": format!("Reached maximum iterations ({})", max_iterations)
+                }),
+            );
             let _ = update_session_status(&agent_db, &session_id, "idle");
             return Ok(());
         }
@@ -571,61 +604,88 @@ pub async fn run_agent_loop(
         // --- Budget: wall clock ---
         let elapsed = start_time.elapsed();
         if elapsed.as_secs() > wall_clock_budget_secs {
-            emit_event(&app, "agent-loop-stopped", json!({
-                "session_id": session_id,
-                "reason": "wall_clock",
-                "message": format!("Exceeded wall clock budget of {}s", wall_clock_budget_secs)
-            }));
+            emit_event(
+                &app,
+                "agent-loop-stopped",
+                json!({
+                    "session_id": session_id,
+                    "reason": "wall_clock",
+                    "message": format!("Exceeded wall clock budget of {}s", wall_clock_budget_secs)
+                }),
+            );
             let _ = update_session_status(&agent_db, &session_id, "idle");
             return Ok(());
         }
 
         // --- Budget: token budget ---
         if total_tokens_used > token_budget {
-            emit_event(&app, "agent-loop-stopped", json!({
-                "session_id": session_id,
-                "reason": "token_budget",
-                "message": format!("Exceeded token budget of {}", token_budget)
-            }));
+            emit_event(
+                &app,
+                "agent-loop-stopped",
+                json!({
+                    "session_id": session_id,
+                    "reason": "token_budget",
+                    "message": format!("Exceeded token budget of {}", token_budget)
+                }),
+            );
             let _ = update_session_status(&agent_db, &session_id, "idle");
             return Ok(());
         }
 
         // --- Emit iteration event ---
-        emit_event(&app, "agent-loop-iteration", json!({
-            "session_id": session_id,
-            "iter_count": iteration,
-            "max_iterations": max_iterations,
-        }));
+        emit_event(
+            &app,
+            "agent-loop-iteration",
+            json!({
+                "session_id": session_id,
+                "iter_count": iteration,
+                "max_iterations": max_iterations,
+            }),
+        );
 
         // --- Emit waiting event ---
-        emit_event(&app, "agent-loop-waiting-llm", json!({
-            "session_id": session_id,
-            "iter_count": iteration,
-        }));
+        emit_event(
+            &app,
+            "agent-loop-waiting-llm",
+            json!({
+                "session_id": session_id,
+                "iter_count": iteration,
+            }),
+        );
 
         // --- Load messages for this iteration ---
         let messages = match load_messages(&agent_db, &session_id) {
             Ok(msgs) => msgs,
             Err(e) => {
-                emit_event(&app, "agent-loop-error", json!({
-                    "session_id": session_id,
-                    "error": format!("Failed to load messages: {}", e)
-                }));
+                emit_event(
+                    &app,
+                    "agent-loop-error",
+                    json!({
+                        "session_id": session_id,
+                        "error": format!("Failed to load messages: {}", e)
+                    }),
+                );
                 let _ = update_session_status(&agent_db, &session_id, "error");
                 return Err(format!("Failed to load messages: {}", e));
             }
         };
 
         let (_model_name, context_window) = resolve_model_spec_for_session(&settings);
-        let compact_threshold = settings.get("compactThreshold").and_then(|v| v.as_f64()).unwrap_or(0.75);
+        let compact_threshold = settings
+            .get("compactThreshold")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.75);
         let should_compact = evaluate(total_tokens_used, context_window, compact_threshold);
 
         if should_compact {
-            emit_event(&app, "agent-loop-compacting", json!({
-                "session_id": session_id,
-                "phase": "start",
-            }));
+            emit_event(
+                &app,
+                "agent-loop-compacting",
+                json!({
+                    "session_id": session_id,
+                    "phase": "start",
+                }),
+            );
 
             match crate::agent::compact::compact_session(
                 &agent_db,
@@ -638,10 +698,17 @@ pub async fn run_agent_loop(
             ) {
                 Ok(summary_info) => {
                     let pre_tokens = total_tokens_used;
-                    let compacted_messages = load_messages(&agent_db, &session_id).unwrap_or_default();
+                    let compacted_messages =
+                        load_messages(&agent_db, &session_id).unwrap_or_default();
                     let post_tokens: usize = compacted_messages
                         .iter()
-                        .map(|m| crate::agent::token_counter::count_message_tokens(&m.role, &m.content, &_model_name))
+                        .map(|m| {
+                            crate::agent::token_counter::count_message_tokens(
+                                &m.role,
+                                &m.content,
+                                &_model_name,
+                            )
+                        })
                         .sum();
                     total_tokens_used = post_tokens;
                     let removed_count = summary_info
@@ -649,43 +716,63 @@ pub async fn run_agent_loop(
                         .and_then(|v| v.as_u64())
                         .unwrap_or(0);
 
-                    emit_event(&app, "agent-loop-summary-injected", json!({
-                        "session_id": session_id,
-                        "trigger": "auto",
-                        "pre_tokens": pre_tokens,
-                        "post_tokens": post_tokens,
-                        "removed_count": removed_count,
-                    }));
+                    emit_event(
+                        &app,
+                        "agent-loop-summary-injected",
+                        json!({
+                            "session_id": session_id,
+                            "trigger": "auto",
+                            "pre_tokens": pre_tokens,
+                            "post_tokens": post_tokens,
+                            "removed_count": removed_count,
+                        }),
+                    );
 
-                    emit_event(&app, "agent-context-usage", json!({
-                        "session_id": session_id,
-                        "used_tokens": post_tokens,
-                        "capacity": token_budget,
-                        "message_count": compacted_messages.len(),
-                    }));
+                    emit_event(
+                        &app,
+                        "agent-context-usage",
+                        json!({
+                            "session_id": session_id,
+                            "used_tokens": post_tokens,
+                            "capacity": token_budget,
+                            "message_count": compacted_messages.len(),
+                        }),
+                    );
                 }
                 Err(e) => {
-                    emit_event(&app, "agent-loop-warning", json!({
-                        "session_id": session_id,
-                        "warning": format!("Compaction failed: {}", e)
-                    }));
+                    emit_event(
+                        &app,
+                        "agent-loop-warning",
+                        json!({
+                            "session_id": session_id,
+                            "warning": format!("Compaction failed: {}", e)
+                        }),
+                    );
                 }
             }
 
-            emit_event(&app, "agent-loop-compacting", json!({
-                "session_id": session_id,
-                "phase": "end",
-            }));
+            emit_event(
+                &app,
+                "agent-loop-compacting",
+                json!({
+                    "session_id": session_id,
+                    "phase": "end",
+                }),
+            );
         }
 
         // --- Reload messages (they may have changed after compaction) ---
         let messages = match load_messages(&agent_db, &session_id) {
             Ok(msgs) => msgs,
             Err(e) => {
-                emit_event(&app, "agent-loop-error", json!({
-                    "session_id": session_id,
-                    "error": format!("Failed to reload messages after compaction: {}", e)
-                }));
+                emit_event(
+                    &app,
+                    "agent-loop-error",
+                    json!({
+                        "session_id": session_id,
+                        "error": format!("Failed to reload messages after compaction: {}", e)
+                    }),
+                );
                 let _ = update_session_status(&agent_db, &session_id, "error");
                 return Err(format!("Failed to reload messages: {}", e));
             }
@@ -695,10 +782,14 @@ pub async fn run_agent_loop(
         let formatted_messages = match formatter.format_messages(&messages, &system_prompt) {
             Ok(fm) => fm,
             Err(e) => {
-                emit_event(&app, "agent-loop-error", json!({
-                    "session_id": session_id,
-                    "error": format!("Failed to format messages: {}", e)
-                }));
+                emit_event(
+                    &app,
+                    "agent-loop-error",
+                    json!({
+                        "session_id": session_id,
+                        "error": format!("Failed to format messages: {}", e)
+                    }),
+                );
                 let _ = update_session_status(&agent_db, &session_id, "error");
                 return Err(format!("Failed to format messages: {}", e));
             }
@@ -719,9 +810,7 @@ pub async fn run_agent_loop(
         }
 
         if has_tools {
-            let formatted_tools = formatter
-                .format_tools(&tools)
-                .unwrap_or(json!(tools));
+            let formatted_tools = formatter.format_tools(&tools).unwrap_or(json!(tools));
             if let Some(obj) = request_body.as_object_mut() {
                 obj.insert("tools".to_string(), formatted_tools);
                 obj.insert("tool_choice".to_string(), json!("auto"));
@@ -749,9 +838,18 @@ pub async fn run_agent_loop(
 
         let headers: reqwest::header::HeaderMap = if api_compat == "anthropic" {
             let mut h = reqwest::header::HeaderMap::new();
-            h.insert(reqwest::header::HeaderName::from_static("x-api-key"), reqwest::header::HeaderValue::from_str(&api_key).unwrap());
-            h.insert(reqwest::header::HeaderName::from_static("anthropic-version"), reqwest::header::HeaderValue::from_static("2023-06-01"));
-            h.insert(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_static("application/json"));
+            h.insert(
+                reqwest::header::HeaderName::from_static("x-api-key"),
+                reqwest::header::HeaderValue::from_str(&api_key).unwrap(),
+            );
+            h.insert(
+                reqwest::header::HeaderName::from_static("anthropic-version"),
+                reqwest::header::HeaderValue::from_static("2023-06-01"),
+            );
+            h.insert(
+                reqwest::header::CONTENT_TYPE,
+                reqwest::header::HeaderValue::from_static("application/json"),
+            );
             h
         } else {
             build_headers(&api_key)
@@ -803,10 +901,14 @@ pub async fn run_agent_loop(
             Ok(resp) => resp,
             Err(e) => {
                 let friendly = extract_llm_error(&e);
-                emit_event(&app, "agent-loop-error", json!({
-                    "session_id": session_id,
-                    "error": friendly,
-                }));
+                emit_event(
+                    &app,
+                    "agent-loop-error",
+                    json!({
+                        "session_id": session_id,
+                        "error": friendly,
+                    }),
+                );
                 let _ = update_session_status(&agent_db, &session_id, "error");
                 return Err(friendly);
             }
@@ -820,22 +922,30 @@ pub async fn run_agent_loop(
             // Check cancellation mid-stream
             if is_cancelled(&cancel_map, &session_id) {
                 take_cancellation(&cancel_map, &session_id);
-                emit_event(&app, "agent-loop-stopped", json!({
-                    "session_id": session_id,
-                    "reason": "cancelled",
-                    "message": "Agent loop was cancelled during streaming"
-                }));
+                emit_event(
+                    &app,
+                    "agent-loop-stopped",
+                    json!({
+                        "session_id": session_id,
+                        "reason": "cancelled",
+                        "message": "Agent loop was cancelled during streaming"
+                    }),
+                );
                 let _ = update_session_status(&agent_db, &session_id, "idle");
                 return Ok(());
             }
 
             // Check wall clock mid-stream
             if start_time.elapsed().as_secs() > wall_clock_budget_secs {
-                emit_event(&app, "agent-loop-stopped", json!({
-                    "session_id": session_id,
-                    "reason": "wall_clock",
-                    "message": "Exceeded wall clock budget during streaming"
-                }));
+                emit_event(
+                    &app,
+                    "agent-loop-stopped",
+                    json!({
+                        "session_id": session_id,
+                        "reason": "wall_clock",
+                        "message": "Exceeded wall clock budget during streaming"
+                    }),
+                );
                 let _ = update_session_status(&agent_db, &session_id, "idle");
                 return Ok(());
             }
@@ -868,20 +978,28 @@ pub async fn run_agent_loop(
                                             if let Some(delta) = &chunk_result.content_delta {
                                                 assistant_content.push_str(delta);
                                                 accumulated_content.push_str(delta);
-                                                emit_event(&app, "agent-loop-delta", json!({
-                                                    "session_id": session_id,
-                                                    "content": delta,
-                                                }));
+                                                emit_event(
+                                                    &app,
+                                                    "agent-loop-delta",
+                                                    json!({
+                                                        "session_id": session_id,
+                                                        "content": delta,
+                                                    }),
+                                                );
                                             }
 
                                             // Thinking delta
                                             if let Some(thinking) = &chunk_result.thinking_delta {
                                                 assistant_thinking.push_str(thinking);
                                                 accumulated_thinking.push_str(thinking);
-                                                emit_event(&app, "agent-loop-thinking-delta", json!({
-                                                    "session_id": session_id,
-                                                    "content": thinking,
-                                                }));
+                                                emit_event(
+                                                    &app,
+                                                    "agent-loop-thinking-delta",
+                                                    json!({
+                                                        "session_id": session_id,
+                                                        "content": thinking,
+                                                    }),
+                                                );
                                             }
 
                                             // Accumulate tool calls (handles partial chunks)
@@ -889,7 +1007,9 @@ pub async fn run_agent_loop(
                                                 // Accumulate or merge tool calls by index/id
                                                 let existing = tool_calls_this_turn
                                                     .iter_mut()
-                                                    .find(|existing: &&mut LlmToolCall| existing.id == tc.id);
+                                                    .find(|existing: &&mut LlmToolCall| {
+                                                        existing.id == tc.id
+                                                    });
                                                 if let Some(existing) = existing {
                                                     // Merge: if name is empty, keep existing; if arguments accumulate
                                                     if !tc.name.is_empty() {
@@ -931,18 +1051,26 @@ pub async fn run_agent_loop(
                                         if let Some(delta) = cr.content_delta {
                                             assistant_content.push_str(&delta);
                                             accumulated_content.push_str(&delta);
-                                            emit_event(&app, "agent-loop-delta", json!({
-                                                "session_id": session_id,
-                                                "content": delta,
-                                            }));
+                                            emit_event(
+                                                &app,
+                                                "agent-loop-delta",
+                                                json!({
+                                                    "session_id": session_id,
+                                                    "content": delta,
+                                                }),
+                                            );
                                         }
                                         if let Some(thinking) = cr.thinking_delta {
                                             assistant_thinking.push_str(&thinking);
                                             accumulated_thinking.push_str(&thinking);
-                                            emit_event(&app, "agent-loop-thinking-delta", json!({
-                                                "session_id": session_id,
-                                                "content": thinking,
-                                            }));
+                                            emit_event(
+                                                &app,
+                                                "agent-loop-thinking-delta",
+                                                json!({
+                                                    "session_id": session_id,
+                                                    "content": thinking,
+                                                }),
+                                            );
                                         }
                                         if let Some(reason) = cr.finish_reason {
                                             finish_reason = Some(reason);
@@ -957,10 +1085,14 @@ pub async fn run_agent_loop(
                     }
                 }
                 Err(e) => {
-                    emit_event(&app, "agent-loop-error", json!({
-                        "session_id": session_id,
-                        "error": format!("Stream error: {}", e),
-                    }));
+                    emit_event(
+                        &app,
+                        "agent-loop-error",
+                        json!({
+                            "session_id": session_id,
+                            "error": format!("Stream error: {}", e),
+                        }),
+                    );
                     let _ = update_session_status(&agent_db, &session_id, "error");
                     return Err(format!("Stream error: {}", e));
                 }
@@ -977,13 +1109,18 @@ pub async fn run_agent_loop(
         });
 
         // --- Store assistant message ---
-        let assistant_msg_id = store_message(&agent_db, &session_id, "assistant", &assistant_content)?;
+        let assistant_msg_id =
+            store_message(&agent_db, &session_id, "assistant", &assistant_content)?;
 
         // Emit step-done for the assistant message
-        emit_event(&app, "agent-loop-step-done", json!({
-            "session_id": session_id,
-            "message_id": assistant_msg_id,
-        }));
+        emit_event(
+            &app,
+            "agent-loop-step-done",
+            json!({
+                "session_id": session_id,
+                "message_id": assistant_msg_id,
+            }),
+        );
 
         // Update token tracking
         let assistant_tokens = crate::agent::token_counter::count_message_tokens(
@@ -995,19 +1132,21 @@ pub async fn run_agent_loop(
 
         // If thinking was present, also count it
         if !assistant_thinking.is_empty() {
-            let thinking_tokens = crate::agent::token_counter::count_tokens(
-                &assistant_thinking,
-                &model,
-            );
+            let thinking_tokens =
+                crate::agent::token_counter::count_tokens(&assistant_thinking, &model);
             total_tokens_used += thinking_tokens;
         }
 
-        emit_event(&app, "agent-context-usage", json!({
-            "session_id": session_id,
-            "used_tokens": total_tokens_used,
-            "capacity": token_budget,
-            "message_count": load_messages(&agent_db, &session_id).unwrap_or_default().len(),
-        }));
+        emit_event(
+            &app,
+            "agent-context-usage",
+            json!({
+                "session_id": session_id,
+                "used_tokens": total_tokens_used,
+                "capacity": token_budget,
+                "message_count": load_messages(&agent_db, &session_id).unwrap_or_default().len(),
+            }),
+        );
 
         // -------------------------------------------------------------------
         // Phase 3: Handle tool calls
@@ -1018,22 +1157,30 @@ pub async fn run_agent_loop(
                 // Check cancellation before each tool call
                 if is_cancelled(&cancel_map, &session_id) {
                     take_cancellation(&cancel_map, &session_id);
-                    emit_event(&app, "agent-loop-stopped", json!({
-                        "session_id": session_id,
-                        "reason": "cancelled",
-                        "message": "Agent loop was cancelled during tool execution"
-                    }));
+                    emit_event(
+                        &app,
+                        "agent-loop-stopped",
+                        json!({
+                            "session_id": session_id,
+                            "reason": "cancelled",
+                            "message": "Agent loop was cancelled during tool execution"
+                        }),
+                    );
                     let _ = update_session_status(&agent_db, &session_id, "idle");
                     return Ok(());
                 }
 
                 // Check wall clock before each tool call
                 if start_time.elapsed().as_secs() > wall_clock_budget_secs {
-                    emit_event(&app, "agent-loop-stopped", json!({
-                        "session_id": session_id,
-                        "reason": "wall_clock",
-                        "message": "Exceeded wall clock budget during tool execution"
-                    }));
+                    emit_event(
+                        &app,
+                        "agent-loop-stopped",
+                        json!({
+                            "session_id": session_id,
+                            "reason": "wall_clock",
+                            "message": "Exceeded wall clock budget during tool execution"
+                        }),
+                    );
                     let _ = update_session_status(&agent_db, &session_id, "idle");
                     return Ok(());
                 }
@@ -1051,30 +1198,45 @@ pub async fn run_agent_loop(
                 )?;
 
                 // Emit tool-call event to frontend
-                emit_event(&app, "agent-loop-tool-call", json!({
-                    "session_id": session_id,
-                    "tool_call_id": tool_call.id,
-                    "tool_name": tool_call.name,
-                    "arguments": tool_call.arguments,
-                }));
+                emit_event(
+                    &app,
+                    "agent-loop-tool-call",
+                    json!({
+                        "session_id": session_id,
+                        "tool_call_id": tool_call.id,
+                        "tool_name": tool_call.name,
+                        "arguments": tool_call.arguments,
+                    }),
+                );
 
                 // --- Confirmation check ---
                 let should_execute = if require_confirmation {
                     // Check if there's a confirmation rule that auto-confirms this tool
-                    let auto_confirmed = is_tool_auto_confirmed(&agent_db, &session_id, &tool_call.name)?;
+                    let auto_confirmed =
+                        is_tool_auto_confirmed(&agent_db, &session_id, &tool_call.name)?;
 
                     if auto_confirmed {
                         true
                     } else {
                         // Ask user for confirmation
-                        emit_event(&app, "agent-loop-waiting-llm", json!({
-                            "session_id": session_id,
-                            "iter_count": iteration,
-                            "status": "awaiting_confirmation",
-                            "tool_name": tool_call.name,
-                        }));
+                        emit_event(
+                            &app,
+                            "agent-loop-waiting-llm",
+                            json!({
+                                "session_id": session_id,
+                                "iter_count": iteration,
+                                "status": "awaiting_confirmation",
+                                "tool_name": tool_call.name,
+                            }),
+                        );
 
-                        match request_confirmation(&confirm_map, &session_id, &tool_call.name, &tool_call.arguments).await
+                        match request_confirmation(
+                            &confirm_map,
+                            &session_id,
+                            &tool_call.name,
+                            &tool_call.arguments,
+                        )
+                        .await
                         {
                             Ok(true) => true,
                             Ok(false) => {
@@ -1088,12 +1250,16 @@ pub async fn run_agent_loop(
                                 );
                                 store_message(&agent_db, &session_id, "tool", &denial_msg)?;
 
-                                emit_event(&app, "agent-loop-tool-result", json!({
-                                    "session_id": session_id,
-                                    "tool_call_id": tool_call.id,
-                                    "envelope": null,
-                                    "error": "Tool call denied by user",
-                                }));
+                                emit_event(
+                                    &app,
+                                    "agent-loop-tool-result",
+                                    json!({
+                                        "session_id": session_id,
+                                        "tool_call_id": tool_call.id,
+                                        "envelope": null,
+                                        "error": "Tool call denied by user",
+                                    }),
+                                );
                                 false
                             }
                             Err(e) => {
@@ -1106,12 +1272,16 @@ pub async fn run_agent_loop(
                                 );
                                 store_message(&agent_db, &session_id, "tool", &error_msg)?;
 
-                                emit_event(&app, "agent-loop-tool-result", json!({
-                                    "session_id": session_id,
-                                    "tool_call_id": tool_call.id,
-                                    "envelope": null,
-                                    "error": error_msg,
-                                }));
+                                emit_event(
+                                    &app,
+                                    "agent-loop-tool-result",
+                                    json!({
+                                        "session_id": session_id,
+                                        "tool_call_id": tool_call.id,
+                                        "envelope": null,
+                                        "error": error_msg,
+                                    }),
+                                );
                                 false
                             }
                         }
@@ -1140,11 +1310,8 @@ pub async fn run_agent_loop(
                         store_tool_result(&agent_db, &tool_call_db_id, &envelope.full_result)?;
 
                         // Store the summary as a tool message in the conversation
-                        let tool_message = format!(
-                            "[Tool: {}]\n{}",
-                            tool_call.name,
-                            envelope.summary
-                        );
+                        let tool_message =
+                            format!("[Tool: {}]\n{}", tool_call.name, envelope.summary);
                         store_message(&agent_db, &session_id, "tool", &tool_message)?;
 
                         // Count tool result tokens
@@ -1156,28 +1323,29 @@ pub async fn run_agent_loop(
                         total_tokens_used += result_tokens;
 
                         // Emit tool-result event
-                        emit_event(&app, "agent-loop-tool-result", json!({
-                            "session_id": session_id,
-                            "tool_call_id": tool_call.id,
-                            "envelope": {
-                                "summary": envelope.summary,
-                                "full_result": null, // Not sent in event to keep payload small
-                                "metadata": {
-                                    "tool_name": envelope.metadata.tool_name,
-                                    "duration_ms": envelope.metadata.duration_ms,
-                                    "truncated": envelope.metadata.truncated,
+                        emit_event(
+                            &app,
+                            "agent-loop-tool-result",
+                            json!({
+                                "session_id": session_id,
+                                "tool_call_id": tool_call.id,
+                                "envelope": {
+                                    "summary": envelope.summary,
+                                    "full_result": null, // Not sent in event to keep payload small
+                                    "metadata": {
+                                        "tool_name": envelope.metadata.tool_name,
+                                        "duration_ms": envelope.metadata.duration_ms,
+                                        "truncated": envelope.metadata.truncated,
+                                    },
                                 },
-                            },
-                            "error": null,
-                        }));
+                                "error": null,
+                            }),
+                        );
                     }
                     Err(err) => {
                         update_tool_call_status(&agent_db, &tool_call_db_id, "error")?;
 
-                        let error_message = format!(
-                            "[Tool: {}] Error: {}",
-                            tool_call.name, err
-                        );
+                        let error_message = format!("[Tool: {}] Error: {}", tool_call.name, err);
                         store_message(&agent_db, &session_id, "tool", &error_message)?;
 
                         let error_tokens = crate::agent::token_counter::count_message_tokens(
@@ -1187,12 +1355,16 @@ pub async fn run_agent_loop(
                         );
                         total_tokens_used += error_tokens;
 
-                        emit_event(&app, "agent-loop-tool-result", json!({
-                            "session_id": session_id,
-                            "tool_call_id": tool_call.id,
-                            "envelope": null,
-                            "error": err,
-                        }));
+                        emit_event(
+                            &app,
+                            "agent-loop-tool-result",
+                            json!({
+                                "session_id": session_id,
+                                "tool_call_id": tool_call.id,
+                                "envelope": null,
+                                "error": err,
+                            }),
+                        );
                     }
                 }
             }
@@ -1207,23 +1379,35 @@ pub async fn run_agent_loop(
         // -------------------------------------------------------------------
 
         if reason == "stop" || reason == "length" || reason == "end_turn" {
-            emit_event(&app, "agent-loop-done", json!({
-                "session_id": session_id,
-            }));
+            emit_event(
+                &app,
+                "agent-loop-done",
+                json!({
+                    "session_id": session_id,
+                }),
+            );
             let _ = update_session_status(&agent_db, &session_id, "idle");
-            emit_event(&app, "agent-context-usage", json!({
-                "session_id": session_id,
-                "used_tokens": total_tokens_used,
-                "capacity": token_budget,
-                "message_count": load_messages(&agent_db, &session_id).unwrap_or_default().len(),
-            }));
+            emit_event(
+                &app,
+                "agent-context-usage",
+                json!({
+                    "session_id": session_id,
+                    "used_tokens": total_tokens_used,
+                    "capacity": token_budget,
+                    "message_count": load_messages(&agent_db, &session_id).unwrap_or_default().len(),
+                }),
+            );
             return Ok(());
         }
 
         // If we reach here with an unknown finish reason, stop gracefully
-        emit_event(&app, "agent-loop-done", json!({
-            "session_id": session_id,
-        }));
+        emit_event(
+            &app,
+            "agent-loop-done",
+            json!({
+                "session_id": session_id,
+            }),
+        );
         let _ = update_session_status(&agent_db, &session_id, "idle");
         return Ok(());
     }
@@ -1337,12 +1521,17 @@ pub async fn compact_agent_session(
     agent_db: State<'_, AgentDb>,
 ) -> Result<(), String> {
     let model = get_settings_str(&settings, "model").unwrap_or_else(|| String::from("gpt-4o"));
-    let (_model_name, context_window) = crate::agent::compact::resolve_model_spec_for_session(&settings);
+    let (_model_name, context_window) =
+        crate::agent::compact::resolve_model_spec_for_session(&settings);
 
-    emit_event(&app, "agent-loop-compacting", json!({
-        "session_id": session_id,
-        "phase": "start",
-    }));
+    emit_event(
+        &app,
+        "agent-loop-compacting",
+        json!({
+            "session_id": session_id,
+            "phase": "start",
+        }),
+    );
 
     let summary_info = crate::agent::compact::compact_session(
         &agent_db,
@@ -1364,25 +1553,37 @@ pub async fn compact_agent_session(
         .and_then(|v| v.as_u64())
         .unwrap_or(0);
 
-    emit_event(&app, "agent-loop-summary-injected", json!({
-        "session_id": session_id,
-        "trigger": "manual",
-        "pre_tokens": 0,
-        "post_tokens": post_tokens,
-        "removed_count": removed_count,
-    }));
+    emit_event(
+        &app,
+        "agent-loop-summary-injected",
+        json!({
+            "session_id": session_id,
+            "trigger": "manual",
+            "pre_tokens": 0,
+            "post_tokens": post_tokens,
+            "removed_count": removed_count,
+        }),
+    );
 
-    emit_event(&app, "agent-context-usage", json!({
-        "session_id": session_id,
-        "used_tokens": post_tokens,
-        "capacity": DEFAULT_TOKEN_BUDGET,
-        "message_count": compacted_messages.len(),
-    }));
+    emit_event(
+        &app,
+        "agent-context-usage",
+        json!({
+            "session_id": session_id,
+            "used_tokens": post_tokens,
+            "capacity": DEFAULT_TOKEN_BUDGET,
+            "message_count": compacted_messages.len(),
+        }),
+    );
 
-    emit_event(&app, "agent-loop-compacting", json!({
-        "session_id": session_id,
-        "phase": "end",
-    }));
+    emit_event(
+        &app,
+        "agent-loop-compacting",
+        json!({
+            "session_id": session_id,
+            "phase": "end",
+        }),
+    );
 
     Ok(())
 }
@@ -1477,10 +1678,14 @@ pub fn spawn_agent_loop(
         )
         .await
         {
-            emit_event(&app, "agent-loop-error", json!({
-                "session_id": session_id,
-                "error": e,
-            }));
+            emit_event(
+                &app,
+                "agent-loop-error",
+                json!({
+                    "session_id": session_id,
+                    "error": e,
+                }),
+            );
         }
     });
 }
@@ -1500,15 +1705,22 @@ async fn run_agent_loop_inner(
     // For background use, we delegate to the same logic via a direct implementation.
     // (In practice, code would be shared; here we reference the core logic.)
 
-    let max_iterations = get_settings_u64(settings, "maxIterations", DEFAULT_MAX_ITERATIONS as u64) as u32;
-    let wall_clock_budget_secs = get_settings_u64(settings, "wallClockBudgetSecs", DEFAULT_WALL_CLOCK_BUDGET_SECS);
-    let token_budget = get_settings_u64(settings, "tokenBudget", DEFAULT_TOKEN_BUDGET as u64) as usize;
+    let max_iterations =
+        get_settings_u64(settings, "maxIterations", DEFAULT_MAX_ITERATIONS as u64) as u32;
+    let wall_clock_budget_secs = get_settings_u64(
+        settings,
+        "wallClockBudgetSecs",
+        DEFAULT_WALL_CLOCK_BUDGET_SECS,
+    );
+    let token_budget =
+        get_settings_u64(settings, "tokenBudget", DEFAULT_TOKEN_BUDGET as u64) as usize;
     let require_confirmation = get_settings_bool(settings, "requireConfirmation", true);
     let start_time = std::time::Instant::now();
     let model = get_settings_str(settings, "model").unwrap_or_else(|| String::from("gpt-4o"));
     let base_url = get_base_url(settings);
     let api_key = get_settings_str(settings, "apiKey").unwrap_or_default();
-    let api_compat = get_settings_str(settings, "apiCompatibility").unwrap_or_else(|| String::from("openai"));
+    let api_compat =
+        get_settings_str(settings, "apiCompatibility").unwrap_or_else(|| String::from("openai"));
     let formatter: Box<dyn ChatFormatter> = if api_compat == "anthropic" {
         Box::new(AnthropicChatFormatter)
     } else {
@@ -1531,11 +1743,15 @@ async fn run_agent_loop_inner(
         // --- Check cancellation ---
         if is_cancelled(cancel_map, session_id) {
             take_cancellation(cancel_map, session_id);
-            emit_event(app, "agent-loop-stopped", json!({
-                "session_id": session_id,
-                "reason": "cancelled",
-                "message": "Agent loop was cancelled by the user"
-            }));
+            emit_event(
+                app,
+                "agent-loop-stopped",
+                json!({
+                    "session_id": session_id,
+                    "reason": "cancelled",
+                    "message": "Agent loop was cancelled by the user"
+                }),
+            );
             let _ = update_session_status(agent_db, session_id, "idle");
             return Ok(());
         }
@@ -1543,57 +1759,84 @@ async fn run_agent_loop_inner(
         // --- Budget checks ---
         iteration += 1;
         if iteration > max_iterations {
-            emit_event(app, "agent-loop-stopped", json!({
-                "session_id": session_id,
-                "reason": "max_iterations",
-                "message": format!("Reached maximum iterations ({})", max_iterations)
-            }));
+            emit_event(
+                app,
+                "agent-loop-stopped",
+                json!({
+                    "session_id": session_id,
+                    "reason": "max_iterations",
+                    "message": format!("Reached maximum iterations ({})", max_iterations)
+                }),
+            );
             let _ = update_session_status(agent_db, session_id, "idle");
             return Ok(());
         }
 
         if start_time.elapsed().as_secs() > wall_clock_budget_secs {
-            emit_event(app, "agent-loop-stopped", json!({
-                "session_id": session_id,
-                "reason": "wall_clock",
-                "message": format!("Exceeded wall clock budget of {}s", wall_clock_budget_secs)
-            }));
+            emit_event(
+                app,
+                "agent-loop-stopped",
+                json!({
+                    "session_id": session_id,
+                    "reason": "wall_clock",
+                    "message": format!("Exceeded wall clock budget of {}s", wall_clock_budget_secs)
+                }),
+            );
             let _ = update_session_status(agent_db, session_id, "idle");
             return Ok(());
         }
 
         if total_tokens_used > token_budget {
-            emit_event(app, "agent-loop-stopped", json!({
-                "session_id": session_id,
-                "reason": "token_budget",
-                "message": format!("Exceeded token budget of {}", token_budget)
-            }));
+            emit_event(
+                app,
+                "agent-loop-stopped",
+                json!({
+                    "session_id": session_id,
+                    "reason": "token_budget",
+                    "message": format!("Exceeded token budget of {}", token_budget)
+                }),
+            );
             let _ = update_session_status(agent_db, session_id, "idle");
             return Ok(());
         }
 
-        emit_event(app, "agent-loop-iteration", json!({
-            "session_id": session_id,
-            "iter_count": iteration,
-            "max_iterations": max_iterations,
-        }));
+        emit_event(
+            app,
+            "agent-loop-iteration",
+            json!({
+                "session_id": session_id,
+                "iter_count": iteration,
+                "max_iterations": max_iterations,
+            }),
+        );
 
-        emit_event(app, "agent-loop-waiting-llm", json!({
-            "session_id": session_id,
-            "iter_count": iteration,
-        }));
+        emit_event(
+            app,
+            "agent-loop-waiting-llm",
+            json!({
+                "session_id": session_id,
+                "iter_count": iteration,
+            }),
+        );
 
         // --- Load, potentially compact, call LLM ---
         let messages = load_messages(agent_db, session_id)?;
         let (_model_name, context_window) = resolve_model_spec_for_session(settings);
-        let compact_threshold = settings.get("compactThreshold").and_then(|v| v.as_f64()).unwrap_or(0.75);
+        let compact_threshold = settings
+            .get("compactThreshold")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.75);
         let should_compact = evaluate(total_tokens_used, context_window, compact_threshold);
 
         if should_compact {
-            emit_event(app, "agent-loop-compacting", json!({
-                "session_id": session_id,
-                "phase": "start",
-            }));
+            emit_event(
+                app,
+                "agent-loop-compacting",
+                json!({
+                    "session_id": session_id,
+                    "phase": "start",
+                }),
+            );
 
             if let Ok(summary_info) = crate::agent::compact::compact_session(
                 agent_db,
@@ -1603,29 +1846,43 @@ async fn run_agent_loop_inner(
                 0,
                 &_model_name,
                 context_window,
-            )
-            {
+            ) {
                 let compacted = load_messages(agent_db, session_id).unwrap_or_default();
                 let post_tokens: usize = compacted
                     .iter()
-                    .map(|m| crate::agent::token_counter::count_message_tokens(&m.role, &m.content, &model))
+                    .map(|m| {
+                        crate::agent::token_counter::count_message_tokens(
+                            &m.role, &m.content, &model,
+                        )
+                    })
                     .sum();
                 total_tokens_used = post_tokens;
-                let removed = summary_info.get("removed_count").and_then(|v| v.as_u64()).unwrap_or(0);
+                let removed = summary_info
+                    .get("removed_count")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(0);
 
-                emit_event(app, "agent-loop-summary-injected", json!({
-                    "session_id": session_id,
-                    "trigger": "auto",
-                    "pre_tokens": 0,
-                    "post_tokens": post_tokens,
-                    "removed_count": removed,
-                }));
+                emit_event(
+                    app,
+                    "agent-loop-summary-injected",
+                    json!({
+                        "session_id": session_id,
+                        "trigger": "auto",
+                        "pre_tokens": 0,
+                        "post_tokens": post_tokens,
+                        "removed_count": removed,
+                    }),
+                );
             }
 
-            emit_event(app, "agent-loop-compacting", json!({
-                "session_id": session_id,
-                "phase": "end",
-            }));
+            emit_event(
+                app,
+                "agent-loop-compacting",
+                json!({
+                    "session_id": session_id,
+                    "phase": "end",
+                }),
+            );
         }
 
         // Reload messages after potential compaction
@@ -1665,9 +1922,18 @@ async fn run_agent_loop_inner(
 
         let headers: reqwest::header::HeaderMap = if api_compat == "anthropic" {
             let mut h = reqwest::header::HeaderMap::new();
-            h.insert(reqwest::header::HeaderName::from_static("x-api-key"), reqwest::header::HeaderValue::from_str(&api_key).unwrap());
-            h.insert(reqwest::header::HeaderName::from_static("anthropic-version"), reqwest::header::HeaderValue::from_static("2023-06-01"));
-            h.insert(reqwest::header::CONTENT_TYPE, reqwest::header::HeaderValue::from_static("application/json"));
+            h.insert(
+                reqwest::header::HeaderName::from_static("x-api-key"),
+                reqwest::header::HeaderValue::from_str(&api_key).unwrap(),
+            );
+            h.insert(
+                reqwest::header::HeaderName::from_static("anthropic-version"),
+                reqwest::header::HeaderValue::from_static("2023-06-01"),
+            );
+            h.insert(
+                reqwest::header::CONTENT_TYPE,
+                reqwest::header::HeaderValue::from_static("application/json"),
+            );
             h
         } else {
             build_headers(&api_key)
@@ -1707,10 +1973,14 @@ async fn run_agent_loop_inner(
         let response = match stream_result {
             Ok(r) => r,
             Err(e) => {
-                emit_event(app, "agent-loop-error", json!({
-                    "session_id": session_id,
-                    "error": extract_llm_error(&e),
-                }));
+                emit_event(
+                    app,
+                    "agent-loop-error",
+                    json!({
+                        "session_id": session_id,
+                        "error": extract_llm_error(&e),
+                    }),
+                );
                 let _ = update_session_status(agent_db, session_id, "error");
                 return Err(extract_llm_error(&e));
             }
@@ -1722,11 +1992,15 @@ async fn run_agent_loop_inner(
         while let Some(chunk_result) = stream.next().await {
             if is_cancelled(cancel_map, session_id) {
                 take_cancellation(cancel_map, session_id);
-                emit_event(app, "agent-loop-stopped", json!({
-                    "session_id": session_id,
-                    "reason": "cancelled",
-                    "message": "Cancelled during streaming"
-                }));
+                emit_event(
+                    app,
+                    "agent-loop-stopped",
+                    json!({
+                        "session_id": session_id,
+                        "reason": "cancelled",
+                        "message": "Cancelled during streaming"
+                    }),
+                );
                 let _ = update_session_status(agent_db, session_id, "idle");
                 return Ok(());
             }
@@ -1754,16 +2028,24 @@ async fn run_agent_loop_inner(
                                 if let Ok(cr) = formatter.parse_chunk(&chunk) {
                                     if let Some(delta) = cr.content_delta {
                                         assistant_content.push_str(&delta);
-                                        emit_event(app, "agent-loop-delta", json!({
-                                            "session_id": session_id,
-                                            "content": delta,
-                                        }));
+                                        emit_event(
+                                            app,
+                                            "agent-loop-delta",
+                                            json!({
+                                                "session_id": session_id,
+                                                "content": delta,
+                                            }),
+                                        );
                                     }
                                     if let Some(thinking) = cr.thinking_delta {
-                                        emit_event(app, "agent-loop-thinking-delta", json!({
-                                            "session_id": session_id,
-                                            "content": thinking,
-                                        }));
+                                        emit_event(
+                                            app,
+                                            "agent-loop-thinking-delta",
+                                            json!({
+                                                "session_id": session_id,
+                                                "content": thinking,
+                                            }),
+                                        );
                                     }
                                     for tc in cr.tool_calls {
                                         if let Some(existing) = tool_calls_this_turn
@@ -1790,16 +2072,24 @@ async fn run_agent_loop_inner(
                                 if let Ok(cr) = formatter.parse_chunk(&chunk) {
                                     if let Some(delta) = cr.content_delta {
                                         assistant_content.push_str(&delta);
-                                        emit_event(app, "agent-loop-delta", json!({
-                                            "session_id": session_id,
-                                            "content": delta,
-                                        }));
+                                        emit_event(
+                                            app,
+                                            "agent-loop-delta",
+                                            json!({
+                                                "session_id": session_id,
+                                                "content": delta,
+                                            }),
+                                        );
                                     }
                                     if let Some(delta) = cr.thinking_delta {
-                                        emit_event(app, "agent-loop-thinking-delta", json!({
-                                            "session_id": session_id,
-                                            "content": delta,
-                                        }));
+                                        emit_event(
+                                            app,
+                                            "agent-loop-thinking-delta",
+                                            json!({
+                                                "session_id": session_id,
+                                                "content": delta,
+                                            }),
+                                        );
                                     }
                                     if let Some(reason) = cr.finish_reason {
                                         finish_reason = Some(reason);
@@ -1810,10 +2100,14 @@ async fn run_agent_loop_inner(
                     }
                 }
                 Err(e) => {
-                    emit_event(app, "agent-loop-error", json!({
-                        "session_id": session_id,
-                        "error": format!("Stream error: {}", e),
-                    }));
+                    emit_event(
+                        app,
+                        "agent-loop-error",
+                        json!({
+                            "session_id": session_id,
+                            "error": format!("Stream error: {}", e),
+                        }),
+                    );
                     let _ = update_session_status(agent_db, session_id, "error");
                     return Err(format!("Stream error: {}", e));
                 }
@@ -1828,12 +2122,17 @@ async fn run_agent_loop_inner(
             }
         });
 
-        let assistant_msg_id = store_message(agent_db, session_id, "assistant", &assistant_content)?;
+        let assistant_msg_id =
+            store_message(agent_db, session_id, "assistant", &assistant_content)?;
 
-        emit_event(app, "agent-loop-step-done", json!({
-            "session_id": session_id,
-            "message_id": assistant_msg_id,
-        }));
+        emit_event(
+            app,
+            "agent-loop-step-done",
+            json!({
+                "session_id": session_id,
+                "message_id": assistant_msg_id,
+            }),
+        );
 
         total_tokens_used += crate::agent::token_counter::count_message_tokens(
             "assistant",
@@ -1846,55 +2145,85 @@ async fn run_agent_loop_inner(
             for tool_call in &tool_calls_this_turn {
                 if is_cancelled(cancel_map, session_id) {
                     take_cancellation(cancel_map, session_id);
-                    emit_event(app, "agent-loop-stopped", json!({
-                        "session_id": session_id,
-                        "reason": "cancelled",
-                        "message": "Cancelled during tool execution"
-                    }));
+                    emit_event(
+                        app,
+                        "agent-loop-stopped",
+                        json!({
+                            "session_id": session_id,
+                            "reason": "cancelled",
+                            "message": "Cancelled during tool execution"
+                        }),
+                    );
                     let _ = update_session_status(agent_db, session_id, "idle");
                     return Ok(());
                 }
 
                 let args_str = serde_json::to_string(&tool_call.arguments)
                     .unwrap_or_else(|_| "{}".to_string());
-                let tc_db_id = store_tool_call(agent_db, session_id, &assistant_msg_id, &tool_call.name, &args_str, &tool_call.id)?;
+                let tc_db_id = store_tool_call(
+                    agent_db,
+                    session_id,
+                    &assistant_msg_id,
+                    &tool_call.name,
+                    &args_str,
+                    &tool_call.id,
+                )?;
 
-                emit_event(app, "agent-loop-tool-call", json!({
-                    "session_id": session_id,
-                    "tool_call_id": tool_call.id,
-                    "tool_name": tool_call.name,
-                    "arguments": tool_call.arguments,
-                }));
+                emit_event(
+                    app,
+                    "agent-loop-tool-call",
+                    json!({
+                        "session_id": session_id,
+                        "tool_call_id": tool_call.id,
+                        "tool_name": tool_call.name,
+                        "arguments": tool_call.arguments,
+                    }),
+                );
 
                 let should_exec = if require_confirmation {
                     let auto = is_tool_auto_confirmed(agent_db, session_id, &tool_call.name)?;
                     if auto {
                         true
                     } else {
-                        match request_confirmation(confirm_map, session_id, &tool_call.name, &tool_call.arguments).await {
+                        match request_confirmation(
+                            confirm_map,
+                            session_id,
+                            &tool_call.name,
+                            &tool_call.arguments,
+                        )
+                        .await
+                        {
                             Ok(true) => true,
                             Ok(false) => {
                                 let _ = update_tool_call_status(agent_db, &tc_db_id, "denied");
                                 let msg = format!("Tool call '{}' was denied.", tool_call.name);
                                 let _ = store_message(agent_db, session_id, "tool", &msg);
-                                emit_event(app, "agent-loop-tool-result", json!({
-                                    "session_id": session_id,
-                                    "tool_call_id": tool_call.id,
-                                    "envelope": null,
-                                    "error": "Denied by user",
-                                }));
+                                emit_event(
+                                    app,
+                                    "agent-loop-tool-result",
+                                    json!({
+                                        "session_id": session_id,
+                                        "tool_call_id": tool_call.id,
+                                        "envelope": null,
+                                        "error": "Denied by user",
+                                    }),
+                                );
                                 false
                             }
                             Err(e) => {
                                 let _ = update_tool_call_status(agent_db, &tc_db_id, "error");
                                 let msg = format!("Confirmation failed: {}", e);
                                 let _ = store_message(agent_db, session_id, "tool", &msg);
-                                emit_event(app, "agent-loop-tool-result", json!({
-                                    "session_id": session_id,
-                                    "tool_call_id": tool_call.id,
-                                    "envelope": null,
-                                    "error": msg,
-                                }));
+                                emit_event(
+                                    app,
+                                    "agent-loop-tool-result",
+                                    json!({
+                                        "session_id": session_id,
+                                        "tool_call_id": tool_call.id,
+                                        "envelope": null,
+                                        "error": msg,
+                                    }),
+                                );
                                 false
                             }
                         }
@@ -1909,7 +2238,10 @@ async fn run_agent_loop_inner(
 
                 let _ = update_tool_call_status(agent_db, &tc_db_id, "executing");
 
-                match executor.execute(&tool_call.name, &tool_call.arguments, &connection_config).await {
+                match executor
+                    .execute(&tool_call.name, &tool_call.arguments, &connection_config)
+                    .await
+                {
                     Ok(envelope) => {
                         let _ = update_tool_call_status(agent_db, &tc_db_id, "completed");
                         let _ = store_tool_result(agent_db, &tc_db_id, &envelope.full_result);
@@ -1917,25 +2249,27 @@ async fn run_agent_loop_inner(
                         let _ = store_message(agent_db, session_id, "tool", &tool_msg);
 
                         total_tokens_used += crate::agent::token_counter::count_message_tokens(
-                            "tool",
-                            &tool_msg,
-                            &model,
+                            "tool", &tool_msg, &model,
                         );
 
-                        emit_event(app, "agent-loop-tool-result", json!({
-                            "session_id": session_id,
-                            "tool_call_id": tool_call.id,
-                            "envelope": {
-                                "summary": envelope.summary,
-                                "full_result": null,
-                                "metadata": {
-                                    "tool_name": envelope.metadata.tool_name,
-                                    "duration_ms": envelope.metadata.duration_ms,
-                                    "truncated": envelope.metadata.truncated,
+                        emit_event(
+                            app,
+                            "agent-loop-tool-result",
+                            json!({
+                                "session_id": session_id,
+                                "tool_call_id": tool_call.id,
+                                "envelope": {
+                                    "summary": envelope.summary,
+                                    "full_result": null,
+                                    "metadata": {
+                                        "tool_name": envelope.metadata.tool_name,
+                                        "duration_ms": envelope.metadata.duration_ms,
+                                        "truncated": envelope.metadata.truncated,
+                                    },
                                 },
-                            },
-                            "error": null,
-                        }));
+                                "error": null,
+                            }),
+                        );
                     }
                     Err(err) => {
                         let _ = update_tool_call_status(agent_db, &tc_db_id, "error");
@@ -1943,17 +2277,19 @@ async fn run_agent_loop_inner(
                         let _ = store_message(agent_db, session_id, "tool", &err_msg);
 
                         total_tokens_used += crate::agent::token_counter::count_message_tokens(
-                            "tool",
-                            &err_msg,
-                            &model,
+                            "tool", &err_msg, &model,
                         );
 
-                        emit_event(app, "agent-loop-tool-result", json!({
-                            "session_id": session_id,
-                            "tool_call_id": tool_call.id,
-                            "envelope": null,
-                            "error": err,
-                        }));
+                        emit_event(
+                            app,
+                            "agent-loop-tool-result",
+                            json!({
+                                "session_id": session_id,
+                                "tool_call_id": tool_call.id,
+                                "envelope": null,
+                                "error": err,
+                            }),
+                        );
                     }
                 }
             }
@@ -1962,9 +2298,13 @@ async fn run_agent_loop_inner(
         }
 
         // Done with the loop
-        emit_event(app, "agent-loop-done", json!({
-            "session_id": session_id,
-        }));
+        emit_event(
+            app,
+            "agent-loop-done",
+            json!({
+                "session_id": session_id,
+            }),
+        );
         let _ = update_session_status(agent_db, session_id, "idle");
         return Ok(());
     }
@@ -2007,7 +2347,10 @@ mod tests {
         let settings = json!({
             "requireConfirmation": false,
         });
-        assert_eq!(get_settings_bool(&settings, "requireConfirmation", true), false);
+        assert_eq!(
+            get_settings_bool(&settings, "requireConfirmation", true),
+            false
+        );
         assert_eq!(get_settings_bool(&settings, "nonexistent", true), true);
     }
 
@@ -2040,32 +2383,25 @@ mod tests {
 
     #[test]
     fn test_extract_llm_error_auth() {
-        assert!(extract_llm_error("status code 401")
-            .contains("Authentication failed"));
+        assert!(extract_llm_error("status code 401").contains("Authentication failed"));
     }
 
     #[test]
     fn test_extract_llm_error_rate_limit() {
-        assert!(extract_llm_error("status code 429")
-            .contains("Rate limited"));
+        assert!(extract_llm_error("status code 429").contains("Rate limited"));
     }
 
     #[test]
     fn test_extract_llm_error_server() {
-        assert!(extract_llm_error("status code 500")
-            .contains("server error"));
-        assert!(extract_llm_error("status code 502")
-            .contains("server error"));
-        assert!(extract_llm_error("status code 503")
-            .contains("server error"));
+        assert!(extract_llm_error("status code 500").contains("server error"));
+        assert!(extract_llm_error("status code 502").contains("server error"));
+        assert!(extract_llm_error("status code 503").contains("server error"));
     }
 
     #[test]
     fn test_extract_llm_error_timeout() {
-        assert!(extract_llm_error("request timed out")
-            .contains("timed out"));
-        assert!(extract_llm_error("timeout error")
-            .contains("timed out"));
+        assert!(extract_llm_error("request timed out").contains("timed out"));
+        assert!(extract_llm_error("timeout error").contains("timed out"));
     }
 
     #[test]

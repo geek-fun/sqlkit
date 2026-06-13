@@ -56,10 +56,7 @@ fn to_metadata(cap: &super::Capability) -> Value {
     })
 }
 
-async fn resolve_connection_config(
-    app: &AppHandle,
-    connection_id: &str,
-) -> Result<Value, String> {
+async fn resolve_connection_config(app: &AppHandle, connection_id: &str) -> Result<Value, String> {
     let state: tauri::State<'_, crate::state::AppState> = app.state();
     let conns = state.connections.lock().await;
     let _active = conns

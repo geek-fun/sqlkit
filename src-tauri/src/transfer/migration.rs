@@ -32,7 +32,10 @@ pub async fn execute_migration<A1: DatabaseAdapter, A2: DatabaseAdapter>(
                 .await
                 .map_err(|e| format!("Failed to list source databases: {}", e))?;
             for source_db in source_databases {
-                if request.create_target_database_if_not_exists.unwrap_or(false) {
+                if request
+                    .create_target_database_if_not_exists
+                    .unwrap_or(false)
+                {
                     let target_databases = target_adapter
                         .list_databases()
                         .await
@@ -87,7 +90,10 @@ pub async fn execute_migration<A1: DatabaseAdapter, A2: DatabaseAdapter>(
             }
         }
         TransferScope::Database => {
-            if request.create_target_database_if_not_exists.unwrap_or(false) {
+            if request
+                .create_target_database_if_not_exists
+                .unwrap_or(false)
+            {
                 if let Some(ref target_db) = request.target_database {
                     let target_databases = target_adapter
                         .list_databases()
@@ -112,7 +118,11 @@ pub async fn execute_migration<A1: DatabaseAdapter, A2: DatabaseAdapter>(
                 let mut auto_plans: Vec<MigrationTablePlan> = Vec::new();
                 for table_info in tables {
                     let columns = source_adapter
-                        .list_columns(Some(source_db), request.source_schema.as_deref(), &table_info.name)
+                        .list_columns(
+                            Some(source_db),
+                            request.source_schema.as_deref(),
+                            &table_info.name,
+                        )
                         .await
                         .map_err(|e| e.to_string())?;
                     let mappings: Vec<MigrationMapping> = columns

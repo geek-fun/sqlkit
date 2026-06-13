@@ -17,9 +17,7 @@ pub struct QueryHistoryEntry {
 }
 
 #[tauri::command]
-pub fn load_query_history(
-    agent_db: State<'_, AgentDb>,
-) -> Result<Vec<QueryHistoryEntry>, String> {
+pub fn load_query_history(agent_db: State<'_, AgentDb>) -> Result<Vec<QueryHistoryEntry>, String> {
     let conn = agent_db
         .0
         .lock()

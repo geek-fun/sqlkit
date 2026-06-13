@@ -17,7 +17,9 @@ pub fn append(
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0);
 
-    let conn = db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn =
+        db.0.lock()
+            .map_err(|e| format!("Failed to lock db: {}", e))?;
     conn.execute(
         "INSERT INTO agent_messages (id, session_id, role, content, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
         rusqlite::params![id, session_id, role, content, now],
@@ -38,7 +40,9 @@ pub fn get_session_messages(
     db: &AgentDb,
     session_id: &str,
 ) -> Result<Vec<(String, String, String, i64)>, String> {
-    let conn = db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn =
+        db.0.lock()
+            .map_err(|e| format!("Failed to lock db: {}", e))?;
     let mut stmt = conn
         .prepare("SELECT id, role, content, created_at FROM agent_messages WHERE session_id = ?1 ORDER BY created_at ASC")
         .map_err(|e| format!("Failed to prepare: {}", e))?;
@@ -72,7 +76,9 @@ pub fn store_tool_call(
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0);
 
-    let conn = db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn =
+        db.0.lock()
+            .map_err(|e| format!("Failed to lock db: {}", e))?;
     conn.execute(
         "INSERT INTO agent_tool_calls (id, message_id, session_id, tool_name, arguments, status, created_at) VALUES (?1, ?2, ?3, ?4, ?5, 'pending', ?6)",
         rusqlite::params![id, message_id, session_id, tool_name, arguments, now],
@@ -93,7 +99,9 @@ pub fn store_tool_result(
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0);
 
-    let conn = db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn =
+        db.0.lock()
+            .map_err(|e| format!("Failed to lock db: {}", e))?;
     conn.execute(
         "INSERT INTO tool_result_store (id, tool_call_id, full_result, created_at) VALUES (?1, ?2, ?3, ?4)",
         rusqlite::params![id, tool_call_id, full_result, now],
@@ -104,7 +112,9 @@ pub fn store_tool_result(
 }
 
 pub fn get_tool_result(db: &AgentDb, tool_call_id: &str) -> Result<Option<String>, String> {
-    let conn = db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn =
+        db.0.lock()
+            .map_err(|e| format!("Failed to lock db: {}", e))?;
     let result = conn
         .query_row(
             "SELECT full_result FROM tool_result_store WHERE tool_call_id = ?1 ORDER BY created_at DESC LIMIT 1",

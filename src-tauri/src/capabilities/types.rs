@@ -34,7 +34,11 @@ impl SourceKind {
 
 #[async_trait]
 pub trait CapabilityHandler: Send + Sync {
-    async fn handle(&self, args: &Value, connection_config: Option<&Value>) -> Result<String, String>;
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String>;
 }
 
 pub struct Capability {

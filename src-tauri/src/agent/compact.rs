@@ -49,7 +49,9 @@ pub fn compact_session(
     _model: &str,
     _context_window: usize,
 ) -> Result<serde_json::Value, String> {
-    let conn = db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn =
+        db.0.lock()
+            .map_err(|e| format!("Failed to lock db: {}", e))?;
 
     // Count messages
     let total: i64 = conn
