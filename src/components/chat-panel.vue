@@ -207,15 +207,15 @@ function adjustTextareaHeight(e: Event) {
     </div>
 
     <!-- Stop banner -->
-    <div v-if="stopReason && stopMessage" class="mx-4 mb-2 p-3 border rounded-xl flex items-center justify-between gap-2" style="border-color: hsl(38 92% 50% / 0.35); background: hsl(38 92% 50% / 0.08);">
-      <div class="flex items-start gap-2">
+    <div v-if="stopReason && stopMessage" class="mx-4 mb-2 p-3 border rounded-xl flex gap-2 items-center justify-between" style="border-color: hsl(38 92% 50% / 0.35); background: hsl(38 92% 50% / 0.08);">
+      <div class="flex gap-2 items-start">
         <span class="i-carbon-pause-filled shrink-0 h-4 w-4" style="color: hsl(38 92% 50%);" />
         <div class="flex flex-col gap-0.5">
           <span class="text-xs font-medium">{{ stopMessage }}</span>
           <span class="text-[11px] text-muted-foreground">{{ t('dataStudio.agent.continueHint') }}</span>
         </div>
       </div>
-      <div class="flex gap-1.5 shrink-0">
+      <div class="flex shrink-0 gap-1.5">
         <button
           class="text-xs font-semibold px-2.5 py-1 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           style="border: 1px solid transparent; background: transparent; color: hsl(var(--muted-foreground));"
