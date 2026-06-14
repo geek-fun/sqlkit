@@ -31,6 +31,16 @@ Object.defineProperty(globalThis, 'document', {
   writable: true,
 })
 
+// Mock storeApi for backend persistence
+const mockGetSecret = jest.fn<Promise<unknown>, [string, unknown]>().mockResolvedValue(undefined)
+const mockSetSecret = jest.fn().mockResolvedValue(undefined)
+jest.mock('@/datasources/storeApi', () => ({
+  storeApi: {
+    getSecret: (...args: unknown[]) => mockGetSecret(...args as [string, unknown]),
+    setSecret: (...args: unknown[]) => mockSetSecret(...args as [string, unknown]),
+  },
+}))
+
 describe('appStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -259,12 +269,6 @@ describe('appStore', () => {
       expect(store.llmSettings.providers[0].name).toBe('OpenAI')
       expect(store.llmSettings.providers[0].enabled).toBe(true)
     })
-
-    it('should have empty feature model routes', () => {
-      const store = useAppStore()
-
-      expect(store.featureModelRoutes).toEqual({})
-    })
   })
 
   describe('addProvider', () => {
@@ -443,55 +447,15 @@ describe('appStore', () => {
       expect(config.model.label).toBeTruthy()
     })
 
-    it('should use feature model route if set', async () => {
+    it('should resolve with default provider when no stored settings', async () => {
       const store = useAppStore()
-      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o-mini', useRecommendedModel: false })
 
       const config = await store.getFeatureModelConfig('dataStudio')
 
-      expect(config.model.label).toBe('gpt-4o-mini')
-    })
-
-    it('should fall back to first provider when no routes exist', async () => {
-      const store = useAppStore()
-
-      const config = await store.getFeatureModelConfig('nonExistent')
-
       expect(config.provider).toBeTruthy()
+      expect(config.provider.enabled).toBe(true)
       expect(config.model.label).toBeTruthy()
-    })
-  })
-
-  describe('setFeatureModelRoute', () => {
-    it('should store a feature model route', async () => {
-      const store = useAppStore()
-
-      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o', useRecommendedModel: false })
-
-      expect(store.featureModelRoutes.dataStudio).toEqual({
-        selectedModelId: 'gpt-4o',
-        useRecommendedModel: false,
-      })
-    })
-
-    it('should override existing route for the same feature', async () => {
-      const store = useAppStore()
-      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o', useRecommendedModel: false })
-
-      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o-mini', useRecommendedModel: true })
-
-      expect(store.featureModelRoutes.dataStudio.selectedModelId).toBe('gpt-4o-mini')
-      expect(store.featureModelRoutes.dataStudio.useRecommendedModel).toBe(true)
-    })
-
-    it('should store multiple features independently', async () => {
-      const store = useAppStore()
-
-      await store.setFeatureModelRoute('dataStudio', { selectedModelId: 'gpt-4o', useRecommendedModel: false })
-      await store.setFeatureModelRoute('sidebarAssistant', { selectedModelId: 'gpt-4o-mini', useRecommendedModel: true })
-
-      expect(store.featureModelRoutes.dataStudio.selectedModelId).toBe('gpt-4o')
-      expect(store.featureModelRoutes.sidebarAssistant.selectedModelId).toBe('gpt-4o-mini')
+      expect(config.model.providerConfigId).toBe(config.provider.id)
     })
   })
 
