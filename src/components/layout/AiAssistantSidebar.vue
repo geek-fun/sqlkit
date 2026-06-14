@@ -3,7 +3,6 @@ import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChatPanel from '@/components/chat-panel.vue'
 import { useSidebarChatAgent } from '@/composables/useSidebarChatAgent'
-import { useAppStore } from '@/store/appStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
 import SessionHistoryPanel from '@/views/data-studio/components/session-history-panel.vue'
 
@@ -12,7 +11,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const appStore = useAppStore()
 const dataStudioStore = useDataStudioStore()
 
 const MIN_WIDTH = 320
@@ -82,11 +80,7 @@ function handleClose() {
   emit('close')
 }
 
-async function onModelChange(modelId: string) {
-  await appStore.setFeatureModelRoute('sidebarAssistant', {
-    selectedModelId: modelId,
-    useRecommendedModel: false,
-  })
+function onModelChange(modelId: string) {
   const sess = dataStudioStore.activeSidebarSession
   if (sess?.id) {
     dataStudioStore.setSessionModelId(sess.id, modelId)
