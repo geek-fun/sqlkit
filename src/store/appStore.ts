@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { storeApi } from '@/datasources/storeApi'
 
 export enum ThemeType {
   AUTO = 'auto',
@@ -53,11 +54,115 @@ export type ChatRuntimeConfig = {
   tokenBudget: number
 }
 
+export type ModelRef = {
+  id: string
+  label: string
+  providerKind: string
+  providerConfigId: string
+}
+
+export type FeatureModelRoute = {
+  selectedModelId?: string | null
+  preferredCategory?: 'general' | 'reasoning' | 'coding' | null
+  useRecommendedModel?: boolean
+}
+
 const CHAT_RUNTIME_DEFAULTS: ChatRuntimeConfig = {
   autoCompact: true,
   maxIterations: 200,
   wallClockBudgetMin: 30,
   tokenBudget: 20_000_000,
+}
+
+function createModelRef(providerId: string, providerKind: string, modelLabel: string): ModelRef {
+  return {
+    id: `${providerId}::${modelLabel}`,
+    label: modelLabel,
+    providerKind,
+    providerConfigId: providerId,
+  }
+}
+
+function normalizeFeatureRoute(route: FeatureModelRoute | undefined, providers: LlmProvider[], fallbackCategory: 'general' | 'reasoning' | 'coding'): FeatureModelRoute {
+  const selectedModelId = route?.selectedModelId ?? null
+  const selectedExists = selectedModelId === null
+    ? false
+    : providers.some(p =>
+        (p.models ?? []).some(modelId => `${p.id}::${modelId}` === selectedModelId),
+      )
+  return {
+    selectedModelId: selectedExists ? selectedModelId : null,
+    preferredCategory: route?.preferredCategory ?? fallbackCategory,
+    useRecommendedModel: route?.useRecommendedModel ?? !selectedExists,
+  }
+}
+
+function resolveRecommendedModelId(providers: LlmProvider[], _route: FeatureModelRoute): string | null {
+  const enabled = providers.filter(p => p.enabled)
+  for (const p of enabled) {
+    const firstModel = (p.models ?? [])[0]
+    if (firstModel)
+      return `${p.id}::${firstModel}`
+  }
+  return null
+}
+
+function reconcileModelRoutes(settings: {
+  providers: LlmProvider[]
+  models: { sidebarAssistant: FeatureModelRoute, dataStudio: FeatureModelRoute }
+}): { sidebarAssistant: FeatureModelRoute, dataStudio: FeatureModelRoute } {
+  return {
+    sidebarAssistant: normalizeFeatureRoute(settings.models.sidebarAssistant, settings.providers, 'general'),
+    dataStudio: normalizeFeatureRoute(settings.models.dataStudio, settings.providers, 'reasoning'),
+  }
+}
+
+function mergeLlmSettings(stored: {
+  providers?: LlmProvider[]
+  models?: { sidebarAssistant?: FeatureModelRoute, dataStudio?: FeatureModelRoute }
+  chat?: ChatRuntimeConfig
+}): {
+  providers: LlmProvider[]
+  models: { sidebarAssistant: FeatureModelRoute, dataStudio: FeatureModelRoute }
+  chat: ChatRuntimeConfig
+} {
+  const providers = stored.providers ?? []
+  return {
+    providers,
+    models: {
+      sidebarAssistant: normalizeFeatureRoute(
+        stored.models?.sidebarAssistant,
+        providers,
+        'general',
+      ),
+      dataStudio: normalizeFeatureRoute(
+        stored.models?.dataStudio,
+        providers,
+        'reasoning',
+      ),
+    },
+    chat: {
+      autoCompact: stored.chat?.autoCompact ?? CHAT_RUNTIME_DEFAULTS.autoCompact,
+      maxIterations: stored.chat?.maxIterations ?? CHAT_RUNTIME_DEFAULTS.maxIterations,
+      wallClockBudgetMin: stored.chat?.wallClockBudgetMin ?? CHAT_RUNTIME_DEFAULTS.wallClockBudgetMin,
+      tokenBudget: stored.chat?.tokenBudget ?? CHAT_RUNTIME_DEFAULTS.tokenBudget,
+    },
+  }
+}
+
+function defaultModelRoutes(): { sidebarAssistant: FeatureModelRoute, dataStudio: FeatureModelRoute } {
+  return {
+    sidebarAssistant: {
+      selectedModelId: null,
+      preferredCategory: 'general',
+      useRecommendedModel: true,
+    },
+    dataStudio: {
+      selectedModelId: null,
+      preferredCategory: 'reasoning',
+      useRecommendedModel: true,
+    },
+  }
 }
 
 type AppStoreState = {
@@ -69,6 +174,10 @@ type AppStoreState = {
   sidebarCollapsed: boolean
   llmSettings: {
     providers: LlmProvider[]
+    models: {
+      sidebarAssistant: FeatureModelRoute
+      dataStudio: FeatureModelRoute
+    }
     chat: ChatRuntimeConfig
   }
 }
@@ -196,6 +305,7 @@ export const useAppStore = defineStore('app', {
           models: [],
         },
       ],
+      models: defaultModelRoutes(),
       chat: { ...CHAT_RUNTIME_DEFAULTS },
     },
   }),
@@ -204,6 +314,11 @@ export const useAppStore = defineStore('app', {
     queryTimeout: (state): number => state.queryConfig.queryTimeout,
     defaultLimit: (state): number => state.queryConfig.defaultLimit,
     autoSave: (state): boolean => state.queryConfig.autoSave,
+    availableModels(state): ModelRef[] {
+      return state.llmSettings.providers.flatMap(p =>
+        (p.models ?? []).map(modelId => createModelRef(p.id, p.kind, modelId)),
+      )
+    },
   },
   actions: {
     applyUiTheme(uiThemeType: Exclude<ThemeType, ThemeType.AUTO>) {
@@ -328,11 +443,69 @@ export const useAppStore = defineStore('app', {
 
     // ── LLM/Agent configuration ──────────────────────────────────────────
 
-    async getFeatureModelConfig(_feature: string): Promise<{ provider: LlmProvider, model: { label: string } }> {
-      const enabled = this.llmSettings.providers.filter(p => p.enabled)
-      const provider = enabled[0] || this.llmSettings.providers[0]
-      const modelId = (provider.models ?? ['gpt-4o'])[0]
-      return { provider, model: { label: modelId } }
+    async fetchLlmSettings() {
+      const storedSettings = await storeApi.getSecret<{
+        providers?: LlmProvider[]
+        models?: { sidebarAssistant?: FeatureModelRoute, dataStudio?: FeatureModelRoute }
+        chat?: ChatRuntimeConfig
+      } | undefined>('llmSettings', undefined)
+      if (storedSettings) {
+        this.llmSettings = mergeLlmSettings(storedSettings)
+        return
+      }
+      await storeApi.setSecret('llmSettings', this.llmSettings)
+    },
+
+    async persistLlmSettings() {
+      this.llmSettings.models = reconcileModelRoutes(this.llmSettings)
+      await storeApi.setSecret('llmSettings', this.llmSettings)
+    },
+
+    async setFeatureModelRoute(
+      feature: 'sidebarAssistant' | 'dataStudio',
+      route: Partial<FeatureModelRoute>,
+    ) {
+      this.llmSettings.models[feature] = {
+        ...this.llmSettings.models[feature],
+        ...route,
+      }
+      await this.persistLlmSettings()
+    },
+
+    getResolvedFeatureModel(feature: string): { provider: LlmProvider, model: ModelRef } | undefined {
+      const route = this.llmSettings.models[feature as keyof typeof this.llmSettings.models]
+      if (!route)
+        return undefined
+      const selectedModel = route.selectedModelId
+        ? this.availableModels.find(m => m.id === route.selectedModelId)
+        : undefined
+
+      const modelId = route.useRecommendedModel || !selectedModel
+        ? resolveRecommendedModelId(this.llmSettings.providers, route)
+        : selectedModel.id
+
+      if (!modelId)
+        return undefined
+
+      const resolvedModel = this.availableModels.find(m => m.id === modelId)
+      if (!resolvedModel)
+        return undefined
+
+      const provider = this.llmSettings.providers.find(
+        p => p.id === resolvedModel.providerConfigId && p.enabled,
+      )
+      if (!provider)
+        return undefined
+
+      return { provider, model: resolvedModel }
+    },
+
+    async getFeatureModelConfig(feature: 'sidebarAssistant' | 'dataStudio'): Promise<{ provider: LlmProvider, model: ModelRef }> {
+      await this.fetchLlmSettings()
+      const resolved = this.getResolvedFeatureModel(feature)
+      if (!resolved)
+        throw new Error('No LLM provider configured. Please configure an AI provider in Settings.')
+      return resolved
     },
 
     async syncProviderModels(providerId: string) {

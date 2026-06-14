@@ -7,15 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-14
+
 ### Added
 
-- Transfer page redesigned with 4-tab layout: Import, Export, Structure, Migration
+- AI assistant sidebar, task manager, agent configuration, and provider alignment with Dockit (#63)
+- 30+ SQL database support via protocol aliasing, JDBC bridge, and native drivers (#61)
+- AI provider configuration UI in settings (#60)
+- AI agent with SQL capabilities in Data Studio (#58)
+- Data Studio agent improvements and transfer enhancements (#62)
+- Scope-based architecture for Transfer module with 4-tab layout: Import, Export, Structure, Migration (#56)
 - Migration wizard for cross-engine data transfer with column auto-mapping
 - Structure tab: DDL generation for selected tables + SQL file execution against a target database
 - New Tauri commands: `preview_migration`, `execute_migration`, `auto_map_migration_columns`, `generate_ddl_for_objects`, `execute_sql_content`
-- `execute_sql_content` honors `onError` strategy: `stop` (default) and `skipAndContinue`. `rollback` currently behaves like `stop` (aborts on first error); see Known Limitations.
+- `execute_sql_content` honors `onError` strategy: `stop` (default) and `skipAndContinue`
 - DDL generation reconnects to the requested database for PostgreSQL and SQL Server when it differs from the active connection
 - Full zh-CN i18n coverage for Transfer surfaces
+- Consolidated refresh button in database browser (refreshes databases, tables, views, and saved queries)
+- New Query (+) icon in saved queries section header
+
+### Fixed
+
+- tabStore API aligned with connectionId-first signatures (#53)
+- PostgreSQL type conversion for NUMERIC/DECIMAL (exact precision via rust_decimal), UUID, ENUM, and INT2
+- MySQL NULL value handling in column metadata (panic when INFORMATION_SCHEMA returns NULL values)
+- SQL Server identity column update error by excluding auto-increment columns
+- DECIMAL/NUMERIC precision preserved as string instead of lossy f64 conversion
+
+### Changed
+
+- Codebase simplification and cleanup
+- Transfer module redesigned with scope-based architecture (#56)
 
 ### Known Limitations
 
