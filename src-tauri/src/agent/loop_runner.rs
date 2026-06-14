@@ -80,13 +80,6 @@ fn get_settings_u64(settings: &Value, key: &str, default: u64) -> u64 {
         .unwrap_or(default)
 }
 
-fn get_settings_f64(settings: &Value, key: &str, default: f64) -> f64 {
-    settings
-        .get(key)
-        .and_then(|v| v.as_f64())
-        .unwrap_or(default)
-}
-
 fn get_settings_bool(settings: &Value, key: &str, default: bool) -> bool {
     settings
         .get(key)
@@ -156,7 +149,7 @@ fn build_system_prompt(settings: &Value) -> String {
 
 fn build_tools_list(settings: &Value) -> Vec<Value> {
     let sources = get_settings_string_array(settings, "attachedSources");
-    let db_types: Vec<String> = sources
+    let _db_types: Vec<String> = sources
         .iter()
         .filter_map(|s| {
             // Source identifiers may be like "postgres:conn-id" or connection ids
@@ -259,8 +252,8 @@ fn take_cancellation(cancel_map: &CancelMap, session_id: &str) -> bool {
 async fn request_confirmation(
     confirm_map: &ConfirmMap,
     session_id: &str,
-    tool_name: &str,
-    arguments: &Value,
+    _tool_name: &str,
+    _arguments: &Value,
 ) -> Result<bool, String> {
     let (tx, rx) = oneshot::channel::<bool>();
 
@@ -654,7 +647,7 @@ pub async fn run_agent_loop(
         );
 
         // --- Load messages for this iteration ---
-        let messages = match load_messages(&agent_db, &session_id) {
+        let _messages = match load_messages(&agent_db, &session_id) {
             Ok(msgs) => msgs,
             Err(e) => {
                 emit_event(
@@ -1820,7 +1813,7 @@ async fn run_agent_loop_inner(
         );
 
         // --- Load, potentially compact, call LLM ---
-        let messages = load_messages(agent_db, session_id)?;
+        let _messages = load_messages(agent_db, session_id)?;
         let (_model_name, context_window) = resolve_model_spec_for_session(settings);
         let compact_threshold = settings
             .get("compactThreshold")

@@ -4,7 +4,7 @@ use crate::database::{
     error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{
-        ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
+        ConnectionStatus, QueryResult, QueryRow, QueryValue,
     },
 };
 use async_trait::async_trait;
@@ -19,9 +19,13 @@ pub enum HttpSqlDialect {
 
 pub struct HttpSqlPool {
     client: reqwest::Client,
+    #[allow(dead_code)]
     base_url: String,
+    #[allow(dead_code)]
     dialect: HttpSqlDialect,
+    #[allow(dead_code)]
     username: String,
+    #[allow(dead_code)]
     password: String,
 }
 
