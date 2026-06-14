@@ -2,7 +2,7 @@
 import { storeToRefs } from 'pinia'
 import { useTransferStore } from '@/store/transferStore'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import ThemeToggle from './ThemeToggle.vue'
 
 defineProps<{
@@ -24,31 +24,35 @@ const { taskCount } = storeToRefs(transferStore)
     <div class="flex-1" />
 
     <!-- Right-side toggles -->
-    <template v-if="!hideAiButton">
+    <TooltipProvider>
+      <template v-if="!hideAiButton">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('toggleAi')">
+              <span class="i-carbon-chat-bot h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ $t('pages.settings.ai.featureRouting.sidebarAssistant.name') }}</TooltipContent>
+        </Tooltip>
+      </template>
+
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('toggleAi')">
-            <span class="i-carbon-chat-bot h-4 w-4" />
+          <Button variant="ghost" size="icon" class="relative h-8 w-8" @click="emit('toggleTaskManager')">
+            <span class="i-carbon-list-boxes h-4 w-4" />
+            <span
+              v-if="taskCount > 0"
+              class="text-[9px] text-white font-bold px-1 rounded-full bg-red-500 flex h-4 min-w-4 items-center justify-center absolute -right-0.5 -top-0.5"
+            >
+              {{ taskCount > 9 ? '9+' : taskCount }}
+            </span>
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('pages.settings.ai.featureRouting.sidebarAssistant.name') }}</TooltipContent>
+        <TooltipContent>{{ $t('transfer.tasks.title') }}</TooltipContent>
       </Tooltip>
-    </template>
 
-    <Tooltip>
-      <TooltipTrigger as-child>
-        <Button variant="ghost" size="icon" class="relative h-8 w-8" @click="emit('toggleTaskManager')">
-          <span class="i-carbon-list-boxes h-4 w-4" />
-          <span
-            v-if="taskCount > 0"
-            class="text-[9px] text-white font-bold px-1 rounded-full bg-red-500 flex h-4 min-w-4 items-center justify-center absolute -right-0.5 -top-0.5"
-          >
-            {{ taskCount > 9 ? '9+' : taskCount }}
-          </span>
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent>{{ $t('transfer.tasks.title') }}</TooltipContent>
-    </Tooltip>
+      <ThemeToggle />
+    </TooltipProvider>
 
     <ThemeToggle />
   </div>
