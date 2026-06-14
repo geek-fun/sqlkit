@@ -51,7 +51,12 @@ const { taskCount } = storeToRefs(transferStore)
         <TooltipContent>{{ $t('transfer.tasks.title') }}</TooltipContent>
       </Tooltip>
 
-      <ThemeToggle />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <ThemeToggle />
+        </TooltipTrigger>
+        <TooltipContent>{{ $t('common.buttons.dismiss') }}</TooltipContent>
+      </Tooltip>
     </TooltipProvider>
 
     <ThemeToggle />
