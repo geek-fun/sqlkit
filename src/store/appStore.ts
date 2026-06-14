@@ -349,6 +349,8 @@ export const useAppStore = defineStore('app', {
           provider: provider.apiCompatibility,
           apiKey: provider.apiKey,
           baseUrl: provider.baseUrl || null,
+          httpProxy: provider.proxy || null,
+          proxyMode: provider.proxyMode || 'none',
         })
         if (models.length > 0) {
           const updated = [...this.llmSettings.providers]
