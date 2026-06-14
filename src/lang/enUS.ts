@@ -727,6 +727,8 @@ export const enUS = {
         viewStructure: 'View Structure',
         createScript: 'CREATE Script',
         exportData: 'Export Data',
+        dropTable: 'Drop Table',
+        truncateTable: 'Truncate',
       },
       savedQueryActions: {
         open: 'Open',
@@ -802,6 +804,32 @@ export const enUS = {
     },
     header: {
       appName: 'SQLKit',
+    },
+    destructiveDialog: {
+      deleteRow: {
+        title: 'Confirm Deletion',
+        message: 'Delete {count} row(s) from table "{table}"?',
+        detail: 'This action cannot be undone.',
+        confirm: 'Delete',
+      },
+      dropTable: {
+        title: 'Drop Table',
+        message: 'Drop table "{table}"?',
+        detail: 'This will permanently delete the table and all its data. This action cannot be undone.',
+        confirm: 'Drop',
+      },
+      truncateTable: {
+        title: 'Truncate Table',
+        message: 'Truncate table "{table}"?',
+        detail: 'This will remove all {count} rows. This action cannot be undone.',
+        confirm: 'Truncate',
+      },
+      deleteConnection: {
+        title: 'Delete Connection',
+        message: 'Delete connection "{name}"?',
+        detail: 'This will remove the saved connection configuration. Active connections will be disconnected.',
+        confirm: 'Delete',
+      },
     },
   },
   updater: {
