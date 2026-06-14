@@ -15,6 +15,7 @@ export const enUS = {
       createConnection: 'Create Connection',
       testConnection: 'Test Connection',
       dismiss: 'Dismiss',
+      close: 'Close',
       browse: 'Browse',
       retry: 'Retry',
     },

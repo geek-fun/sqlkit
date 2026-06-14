@@ -15,6 +15,7 @@ export const zhCN = {
       createConnection: '创建连接',
       testConnection: '测试连接',
       dismiss: '关闭',
+      close: '关闭',
       browse: '浏览',
       retry: '重试',
     },
