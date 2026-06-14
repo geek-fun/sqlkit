@@ -16,7 +16,10 @@ use tokio::sync::oneshot;
 use crate::agent::chat_formatter::{
     AnthropicChatFormatter, ChatFormatter, LlmMessage, LlmToolCall, OpenAIChatFormatter,
 };
-use crate::agent::compact::{count_projected_tokens, evaluate, resolve_model_spec_for_session};
+use crate::agent::compact::{
+    count_projected_tokens_old as count_projected_tokens, evaluate_old as evaluate,
+    resolve_model_spec_for_session_old as resolve_model_spec_for_session,
+};
 use crate::agent::config::{build_headers, get_base_url};
 use crate::agent::tool_executor::ToolExecutor;
 use crate::common::http_client::create_http_client;
@@ -1526,7 +1529,7 @@ pub async fn compact_agent_session(
 ) -> Result<(), String> {
     let model = get_settings_str(&settings, "model").unwrap_or_else(|| String::from("gpt-4o"));
     let (_model_name, context_window) =
-        crate::agent::compact::resolve_model_spec_for_session(&settings);
+        crate::agent::compact::resolve_model_spec_for_session_old(&settings);
 
     emit_event(
         &app,
