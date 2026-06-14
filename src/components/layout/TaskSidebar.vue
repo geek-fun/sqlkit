@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue'
+import { onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { useTransferStore } from '@/store/transferStore'
 import TaskCard from '@/components/transfer/tasks/TaskCard.vue'
+import { useTransferStore } from '@/store/transferStore'
 
 const emit = defineEmits<{
   close: []
@@ -18,27 +18,27 @@ const DEFAULT_WIDTH = 420
 const currentWidth = ref(DEFAULT_WIDTH)
 const isResizing = ref(false)
 
-const startResize = (e: MouseEvent) => {
+function startResize(e: MouseEvent) {
   isResizing.value = true
   document.addEventListener('mousemove', onResize)
   document.addEventListener('mouseup', stopResize)
   e.preventDefault()
 }
 
-const onResize = (e: MouseEvent) => {
+function onResize(e: MouseEvent) {
   if (!isResizing.value)
     return
   const newWidth = window.innerWidth - e.clientX - 48
   currentWidth.value = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth))
 }
 
-const stopResize = () => {
+function stopResize() {
   isResizing.value = false
   document.removeEventListener('mousemove', onResize)
   document.removeEventListener('mouseup', stopResize)
 }
 
-const handleGoToTask = (task: any) => {
+function handleGoToTask(task: any) {
   transferStore.openTask(task.id)
   emit('close')
   router.push({
@@ -47,12 +47,13 @@ const handleGoToTask = (task: any) => {
   })
 }
 
-const handleDismiss = (taskId: string) => {
+function handleDismiss(taskId: string) {
   transferStore.removeTask(taskId)
 }
 
-const hasDismissable = () =>
-  transferStore.runningTasks.some(t => t.status !== 'running')
+function hasDismissable() {
+  return transferStore.runningTasks.some(t => t.status !== 'running')
+}
 
 onUnmounted(() => {
   document.removeEventListener('mousemove', onResize)
@@ -89,7 +90,7 @@ onUnmounted(() => {
       </div>
 
       <!-- Task list -->
-      <div class="flex-1 overflow-y-auto p-4 space-y-2">
+      <div class="p-4 flex-1 overflow-y-auto space-y-2">
         <div
           v-if="transferStore.runningTasks.length === 0"
           class="text-muted-foreground py-10 flex flex-col gap-3 items-center justify-center"

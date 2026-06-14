@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { useTransferStore } from '@/store/transferStore'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useTransferStore } from '@/store/transferStore'
 
 defineProps<{
   hideAiButton?: boolean
@@ -18,8 +18,8 @@ const { taskCount } = storeToRefs(transferStore)
 </script>
 
 <template>
-  <div class="h-10 flex items-center gap-1 pr-2 border-b bg-muted/30 shrink-0 overflow-hidden pl-[90px]" data-tauri-drag-region>
-    <span class="text-xs font-semibold text-muted-foreground select-none">SqlKit</span>
+  <div class="pl-[90px] pr-2 border-b bg-muted/30 flex shrink-0 gap-1 h-10 items-center overflow-hidden" data-tauri-drag-region>
+    <span class="text-xs text-muted-foreground font-semibold select-none">SqlKit</span>
     <div class="flex-1" />
 
     <TooltipProvider>
@@ -34,7 +34,7 @@ const { taskCount } = storeToRefs(transferStore)
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button variant="ghost" size="icon" class="relative h-8 w-8" @click="emit('toggleTaskManager')">
+          <Button variant="ghost" size="icon" class="h-8 w-8 relative" @click="emit('toggleTaskManager')">
             <span class="i-carbon-list-boxes h-4 w-4" />
             <span
               v-if="taskCount > 0"

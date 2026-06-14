@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import AiAssistantSidebar from './AiAssistantSidebar.vue'
-import TaskSidebar from './TaskSidebar.vue'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
+import TaskSidebar from './TaskSidebar.vue'
 
 const props = defineProps<{
   hideAiButton?: boolean
@@ -20,17 +20,17 @@ watch(sidePanel, (val) => {
   localStorage.setItem(STORAGE_KEY, String(val === 'ai'))
 })
 
-const toggleAi = () => {
+function toggleAi() {
   sidePanel.value = sidePanel.value === 'ai' ? 'none' : 'ai'
 }
 
-const toggleTaskManager = () => {
+function toggleTaskManager() {
   sidePanel.value = sidePanel.value === 'tasks' ? 'none' : 'tasks'
 }
 </script>
 
 <template>
-  <div class="h-screen flex flex-col overflow-hidden">
+  <div class="flex flex-col h-screen overflow-hidden">
     <AppHeader
       :hide-ai-button="props.hideAiButton ?? false"
       @toggle-ai="toggleAi"
