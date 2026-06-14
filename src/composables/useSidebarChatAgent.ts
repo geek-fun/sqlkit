@@ -10,10 +10,12 @@ import type {
 } from '@/types/chat'
 import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
+import { useAppStore } from '@/store/appStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
 import { useChatAgent } from './useChatAgent'
 
 function adaptSidebarSession(session: AgentSession): ChatSession {
+  const appStore = useAppStore()
   return {
     id: session.id,
     messages: session.messages.map(msg => ({
@@ -33,7 +35,7 @@ function adaptSidebarSession(session: AgentSession): ChatSession {
     status: session.status as ChatSessionStatus,
     sources: session.sources,
     permissionsMode: session.permissionsMode as 'Ask' | 'Auto',
-    maxIterations: 200,
+    maxIterations: appStore.llmSettings.chat.maxIterations,
     stopReason: session.stopReason,
     stopMessage: session.stopMessage,
   }
@@ -85,8 +87,8 @@ export function useSidebarChatAgent() {
         dataStudioStore.setMessageToolCalls(messageId, toolCalls, sessionId),
       removeOrphanedStreamingMessages: (sessionId: string, _finalizedMessageId: string) =>
         dataStudioStore.removeOrphanedStreamingMessages(sessionId),
-      updateToolCallStatus: (sessionId: string, messageId: string, toolCallId: string, status: AgentToolCallStatus) =>
-        dataStudioStore.updateToolCallStatus(messageId, toolCallId, status, undefined, undefined, sessionId),
+      updateToolCallStatus: (messageId: string, toolCallId: string, status: AgentToolCallStatus, result?: string, durationMs?: number, sessionId?: string) =>
+        dataStudioStore.updateToolCallStatus(messageId, toolCallId, status, result, durationMs, sessionId),
       setSessionStatus: (sessionId: string, status: ChatSessionStatus) =>
         dataStudioStore.setSessionStatus(sessionId, status as 'idle' | 'running' | 'waiting_confirmation' | 'error' | 'stopped'),
       setSessionStopped: (sessionId, reason, message) =>

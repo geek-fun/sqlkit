@@ -71,7 +71,6 @@ type AppStoreState = {
     providers: LlmProvider[]
     chat: ChatRuntimeConfig
   }
-  featureModelRoutes: Record<string, { selectedModelId: string, useRecommendedModel: boolean }>
 }
 
 export const useAppStore = defineStore('app', {
@@ -199,7 +198,6 @@ export const useAppStore = defineStore('app', {
       ],
       chat: { ...CHAT_RUNTIME_DEFAULTS },
     },
-    featureModelRoutes: {},
   }),
   persist: true,
   getters: {
@@ -330,33 +328,11 @@ export const useAppStore = defineStore('app', {
 
     // ── LLM/Agent configuration ──────────────────────────────────────────
 
-    async getFeatureModelConfig(feature: string): Promise<{ provider: LlmProvider, model: { label: string } }> {
-      const route = this.featureModelRoutes[feature]
+    async getFeatureModelConfig(_feature: string): Promise<{ provider: LlmProvider, model: { label: string } }> {
       const enabled = this.llmSettings.providers.filter(p => p.enabled)
-
-      // When a specific model is selected (not "recommended"), find the provider that owns it
-      if (route?.selectedModelId && !route?.useRecommendedModel) {
-        const owner = enabled.find(p => (p.models ?? []).includes(route.selectedModelId))
-        if (owner) {
-          return { provider: owner, model: { label: route.selectedModelId } }
-        }
-      }
-
-      // Fallback: use first enabled provider's first model
       const provider = enabled[0] || this.llmSettings.providers[0]
       const modelId = (provider.models ?? ['gpt-4o'])[0]
-
-      return {
-        provider,
-        model: { label: modelId },
-      }
-    },
-
-    async setFeatureModelRoute(feature: string, route: { selectedModelId: string, useRecommendedModel: boolean }) {
-      this.featureModelRoutes = {
-        ...this.featureModelRoutes,
-        [feature]: route,
-      }
+      return { provider, model: { label: modelId } }
     },
 
     async syncProviderModels(providerId: string) {

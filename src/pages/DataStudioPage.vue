@@ -8,14 +8,12 @@ import ChatPanel from '@/components/chat-panel.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { disposeAgentRuntime, initAgentRuntime } from '@/composables/agentRuntime'
 import { useDataStudioChatAgent } from '@/composables/useDataStudioChatAgent'
-import { useAppStore } from '@/store/appStore'
 import { DatabaseType, useConnectionStore } from '@/store/connectionStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
 import ModifySourceModal from '@/views/data-studio/components/modify-source-modal.vue'
 import SessionHistoryPanel from '@/views/data-studio/components/session-history-panel.vue'
 
 const { t } = useI18n()
-const appStore = useAppStore()
 const connectionStore = useConnectionStore()
 const { connections } = storeToRefs(connectionStore)
 const dataStudioStore = useDataStudioStore()
@@ -162,10 +160,6 @@ function openModifyModal(index: number) {
 }
 
 async function onModelChange(modelId: string) {
-  await appStore.setFeatureModelRoute('dataStudio', {
-    selectedModelId: modelId,
-    useRecommendedModel: false,
-  })
   const sess = dataStudioStore.activeSession
   if (sess?.id) {
     dataStudioStore.setSessionModelId(sess.id, modelId)

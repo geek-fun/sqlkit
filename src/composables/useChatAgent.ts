@@ -26,7 +26,7 @@ export type UseChatAgentConfig = {
     setMessageStatus: (sessionId: string, messageId: string, status: ChatMessageStatus) => void
     setMessageToolCalls: (sessionId: string, messageId: string, toolCalls: Array<AgentToolCall>) => void
     removeOrphanedStreamingMessages: (sessionId: string, finalizedMessageId: string) => void
-    updateToolCallStatus: (sessionId: string, messageId: string, toolCallId: string, status: AgentToolCallStatus, result?: string, durationMs?: number) => void
+    updateToolCallStatus: (messageId: string, toolCallId: string, status: AgentToolCallStatus, result?: string, durationMs?: number, sessionId?: string) => void
     setSessionStatus: (sessionId: string, status: ChatSessionStatus) => void
     setSessionStopped?: (sessionId: string, reason: string, message?: string) => void
     clearSessionStop?: (sessionId: string) => void
@@ -503,7 +503,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
     switch (action) {
       case 'allow_once': {
         config.sessionStore.setSessionStatus(sessionId, 'running')
-        config.sessionStore.updateToolCallStatus(sessionId, assistantMsgId, toolCallId, 'confirmed')
+        config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'confirmed', undefined, undefined, sessionId)
         await agentApi.confirmToolCall(toolCallId, true)
         break
       }
@@ -518,14 +518,14 @@ export function useChatAgent(config: UseChatAgentConfig) {
         }
         config.addConfirmationRule?.(rule)
         config.sessionStore.setSessionStatus(sessionId, 'running')
-        config.sessionStore.updateToolCallStatus(sessionId, assistantMsgId, toolCallId, 'confirmed')
+        config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'confirmed', undefined, undefined, sessionId)
         await agentApi.confirmToolCall(toolCallId, true)
         break
       }
 
       case 'deny': {
         config.sessionStore.setSessionStatus(sessionId, 'running')
-        config.sessionStore.updateToolCallStatus(sessionId, assistantMsgId, toolCallId, 'denied')
+        config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'denied', undefined, undefined, sessionId)
         await agentApi.confirmToolCall(toolCallId, false)
         break
       }
@@ -540,7 +540,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
         }
         config.addConfirmationRule?.(denyRule)
         config.sessionStore.setSessionStatus(sessionId, 'running')
-        config.sessionStore.updateToolCallStatus(sessionId, assistantMsgId, toolCallId, 'denied')
+        config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'denied', undefined, undefined, sessionId)
         await agentApi.confirmToolCall(toolCallId, false)
         break
       }

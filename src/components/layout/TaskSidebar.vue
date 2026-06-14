@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { BackgroundTask } from '@/types/transfer'
 import { onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import TaskCard from '@/components/transfer/tasks/TaskCard.vue'
@@ -38,7 +39,7 @@ function stopResize() {
   document.removeEventListener('mouseup', stopResize)
 }
 
-function handleGoToTask(task: any) {
+function handleGoToTask(task: BackgroundTask) {
   transferStore.openTask(task.id)
   emit('close')
   router.push({
@@ -52,7 +53,7 @@ function handleDismiss(taskId: string) {
 }
 
 function hasDismissable() {
-  return transferStore.runningTasks.some(t => t.status !== 'running')
+  return transferStore.runningTasks.some(t => t.status === 'completed' || t.status === 'failed')
 }
 
 onUnmounted(() => {
