@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Button } from '@/components/ui/button'
 import { useTransferStore } from '@/store/transferStore'
 import TaskCard from '@/components/transfer/tasks/TaskCard.vue'
 
@@ -71,23 +70,21 @@ onUnmounted(() => {
 
     <div class="flex flex-col h-full">
       <!-- Header -->
-      <div class="px-4 py-3 border-b border-border flex items-center justify-between">
+      <div class="header-row">
         <div class="flex gap-2 items-center">
           <span class="i-carbon-task text-muted-foreground h-4 w-4" />
-          <span class="text-sm tracking-wide font-semibold">Tasks</span>
+          <span class="header-title">Tasks</span>
         </div>
-        <div class="flex gap-1 items-center">
-          <Button
+        <div class="header-actions">
+          <button
             v-if="hasDismissable()"
-            variant="ghost"
-            size="sm"
-            class="text-[11px] tracking-wide h-7"
+            class="header-icon-btn"
             @click="transferStore.clearCompletedTasks()"
           >
-            Clear
-          </Button>
+            <span class="i-carbon-checkmark h-4 w-4" />
+          </button>
           <button
-            class="text-muted-foreground rounded inline-flex h-7 w-7 transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
+            class="header-icon-btn"
             @click="emit('close')"
           >
             <span class="i-carbon-close h-4 w-4" />
@@ -146,5 +143,43 @@ onUnmounted(() => {
 
 .resize-handle:hover {
   background: hsl(var(--primary) / 0.3);
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 12px 16px;
+  border-bottom: 1px solid hsl(var(--border));
+}
+
+.header-title {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.header-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.header-icon-btn:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
 }
 </style>

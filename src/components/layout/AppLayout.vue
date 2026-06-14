@@ -20,10 +20,12 @@ watch(showAiPanel, (val) => {
 
 function toggleAi() {
   showAiPanel.value = !showAiPanel.value
+  if (showAiPanel.value) showTaskManager.value = false
 }
 
 function toggleTaskManager() {
   showTaskManager.value = !showTaskManager.value
+  if (showTaskManager.value) showAiPanel.value = false
 }
 </script>
 
