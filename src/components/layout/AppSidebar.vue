@@ -16,8 +16,15 @@ const isActive = (path: string) => route.path === path
 
 <template>
   <aside class="border-r bg-background flex flex-shrink-0 flex-col h-full w-16 z-50">
+    <!-- Logo -->
+    <div class="border-b flex h-14 items-center justify-center">
+      <div class="text-lg text-white font-bold rounded-md bg-primary flex h-8 w-8 items-center justify-center">
+        S
+      </div>
+    </div>
+
     <!-- Navigation -->
-    <nav class="px-2 py-3 flex-1 overflow-y-auto space-y-2">
+    <nav class="px-2 py-4 flex-1 overflow-y-auto space-y-2">
       <TooltipProvider>
         <RouterLink
           v-for="item in menuItems"
