@@ -59,6 +59,5 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CXXFLAGS: ${{ matrix.os == 'windows-latest' && '/EHsc' || '' }}
         with:
           includeRelease: false
