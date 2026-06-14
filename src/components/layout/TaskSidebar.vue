@@ -4,10 +4,6 @@ import { useRouter } from 'vue-router'
 import { useTransferStore } from '@/store/transferStore'
 import TaskCard from '@/components/transfer/tasks/TaskCard.vue'
 
-defineProps<{
-  open: boolean
-}>()
-
 const emit = defineEmits<{
   close: []
 }>()

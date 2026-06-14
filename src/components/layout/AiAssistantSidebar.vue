@@ -7,10 +7,6 @@ import { useAppStore } from '@/store/appStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
 import SessionHistoryPanel from '@/views/data-studio/components/session-history-panel.vue'
 
-defineProps<{
-  open: boolean
-}>()
-
 const emit = defineEmits<{
   close: []
 }>()
