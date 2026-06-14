@@ -536,6 +536,8 @@ export const zhCN = {
         emptyState: '提出一个问题或描述您想要运行的查询。',
         noSource: '请先连接数据源。',
         stop: '停止',
+        continue: '继续',
+        continueHint: '代理已暂停。点击继续以恢复，或点击停止以结束会话。',
         clearChat: '清空对话',
         riskSafe: '安全操作',
         riskElevated: '中等风险',

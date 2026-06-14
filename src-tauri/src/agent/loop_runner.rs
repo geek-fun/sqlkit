@@ -845,7 +845,18 @@ pub async fn run_agent_loop(
             );
             h
         } else {
-            build_headers(&api_key)
+            let h = build_headers(
+                &serde_json::json!({ "apiKey": api_key, "apiCompatibility": api_compat }),
+            )
+            .unwrap_or_else(|_| {
+                let mut h = reqwest::header::HeaderMap::new();
+                h.insert(
+                    reqwest::header::CONTENT_TYPE,
+                    reqwest::header::HeaderValue::from_static("application/json"),
+                );
+                h
+            });
+            h
         };
         let client = create_http_client("system", None, Some(true), Some(Duration::from_secs(300)));
 
@@ -1929,7 +1940,18 @@ async fn run_agent_loop_inner(
             );
             h
         } else {
-            build_headers(&api_key)
+            let h = build_headers(
+                &serde_json::json!({ "apiKey": api_key, "apiCompatibility": api_compat }),
+            )
+            .unwrap_or_else(|_| {
+                let mut h = reqwest::header::HeaderMap::new();
+                h.insert(
+                    reqwest::header::CONTENT_TYPE,
+                    reqwest::header::HeaderValue::from_static("application/json"),
+                );
+                h
+            });
+            h
         };
         let client = create_http_client("system", None, Some(true), Some(Duration::from_secs(300)));
 

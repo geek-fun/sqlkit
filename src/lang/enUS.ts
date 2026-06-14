@@ -553,6 +553,8 @@ export const enUS = {
         emptyState: 'Ask a question or describe the query you want to run.',
         noSource: 'Attach a data source to get started.',
         stop: 'Stop',
+        continue: 'Continue',
+        continueHint: 'The agent has paused. Click Continue to resume or Stop to end the session.',
         clearChat: 'Clear Chat',
         riskSafe: 'Safe Operation',
         riskElevated: 'Elevated Risk',
