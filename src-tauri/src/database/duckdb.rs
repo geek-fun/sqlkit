@@ -431,9 +431,7 @@ impl DuckDbAdapter {
                 .map_err(|e| DbError::QueryExecution(format!("Failed to execute query: {}", e)))?;
 
             let mut rows: Vec<QueryRow> = Vec::new();
-            while let Some(row_result) = rows_iter.next() {
-                let row = row_result
-                    .map_err(|e| DbError::QueryExecution(format!("Failed to fetch row: {}", e)))?;
+            while let Ok(Some(row)) = rows_iter.next() {
                 let mut query_row = HashMap::new();
                 for (idx, col_name) in columns.iter().enumerate() {
                     match row.get_ref(idx) {

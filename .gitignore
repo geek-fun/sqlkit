@@ -30,3 +30,4 @@ coverage/
 # TypeScript build cache
 *.tsbuildinfo
 .omo/
+.sisyphus/
