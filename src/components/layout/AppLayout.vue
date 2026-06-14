@@ -9,23 +9,23 @@ const props = defineProps<{
   hideAiButton?: boolean
 }>()
 
+type SidePanel = 'none' | 'ai' | 'tasks'
 const STORAGE_KEY = 'sqlkit-ai-panel-open'
 
-const showAiPanel = ref(localStorage.getItem(STORAGE_KEY) === 'true')
-const showTaskManager = ref(false)
+const sidePanel = ref<SidePanel>(
+  localStorage.getItem(STORAGE_KEY) === 'true' ? 'ai' : 'none',
+)
 
-watch(showAiPanel, (val) => {
-  localStorage.setItem(STORAGE_KEY, String(val))
+watch(sidePanel, (val) => {
+  localStorage.setItem(STORAGE_KEY, String(val === 'ai'))
 })
 
-function toggleAi() {
-  showAiPanel.value = !showAiPanel.value
-  if (showAiPanel.value) showTaskManager.value = false
+const toggleAi = () => {
+  sidePanel.value = sidePanel.value === 'ai' ? 'none' : 'ai'
 }
 
-function toggleTaskManager() {
-  showTaskManager.value = !showTaskManager.value
-  if (showTaskManager.value) showAiPanel.value = false
+const toggleTaskManager = () => {
+  sidePanel.value = sidePanel.value === 'tasks' ? 'none' : 'tasks'
 }
 </script>
 
@@ -43,14 +43,12 @@ function toggleTaskManager() {
           <slot />
         </div>
         <AiAssistantSidebar
-          v-if="showAiPanel"
-          :open="showAiPanel"
-          @close="showAiPanel = false"
+          v-if="sidePanel === 'ai'"
+          @close="sidePanel = 'none'"
         />
         <TaskSidebar
-          v-if="showTaskManager"
-          :open="showTaskManager"
-          @close="showTaskManager = false"
+          v-if="sidePanel === 'tasks'"
+          @close="sidePanel = 'none'"
         />
       </main>
     </div>
