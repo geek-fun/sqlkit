@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import TaskManagerPanel from '@/components/transfer/tasks/TaskManagerPanel.vue'
 import AiAssistantSidebar from './AiAssistantSidebar.vue'
+import TaskSidebar from './TaskSidebar.vue'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
 
@@ -45,8 +45,12 @@ function toggleTaskManager() {
           :open="showAiPanel"
           @close="showAiPanel = false"
         />
+        <TaskSidebar
+          v-if="showTaskManager"
+          :open="showTaskManager"
+          @close="showTaskManager = false"
+        />
       </main>
     </div>
-    <TaskManagerPanel v-model:open="showTaskManager" />
   </div>
 </template>
