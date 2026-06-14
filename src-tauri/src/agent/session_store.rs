@@ -424,7 +424,7 @@ pub fn migrate_session_metadata(
     agent_db: State<'_, AgentDb>,
     session_meta: String,
     confirmation_rules: String,
-    _attached_sources: String,
+    attached_sources: String,
 ) -> Result<(), String> {
     let conn = agent_db
         .0

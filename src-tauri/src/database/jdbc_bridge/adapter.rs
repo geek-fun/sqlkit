@@ -4,19 +4,22 @@ use crate::database::{
     adapter::DatabaseAdapter,
     config::ConnectionConfig,
     error::{DbError, DbResult},
+    pool::ConnectionPool,
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
     },
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use super::download::{self, bridge_jar_path, driver_class, build_jdbc_url, ensure_bridge_setup};
 use super::launcher::JdbcBridgeLauncher;
 use super::pool::JdbcBridgePool;
 use super::protocol::{
-    ConnectParams, ConnectionStatusData, JdbcMethod, JdbcRequest,
+    ConnectParams, ConnectionStatusData, ExecuteQueryParams, JdbcMethod, JdbcRequest, ListParams,
     QueryResultData,
 };
 

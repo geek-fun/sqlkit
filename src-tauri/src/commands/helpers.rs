@@ -5,7 +5,7 @@ use crate::database::{
 };
 use crate::database::{
     mysql::MySQLAdapter, postgres::PostgresAdapter, sqlite::SQLiteAdapter,
-    sqlserver::SqlServerAdapter,
+    sqlserver::SqlServerAdapter, strategy,
 };
 use crate::state::ActiveConnection;
 use std::sync::Arc;

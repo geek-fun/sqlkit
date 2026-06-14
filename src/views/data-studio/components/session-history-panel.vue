@@ -40,7 +40,7 @@ function formatDate(timestamp: number): string {
         />
         <button
           class="i-carbon-close text-muted-foreground rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
-          :title="t('common.buttons.close')"
+          :title="t('common.close')"
           @click="emit('close')"
         />
       </div>
@@ -53,7 +53,7 @@ function formatDate(timestamp: number): string {
         v-for="session in dataStudioStore.sessions"
         :key="session.id"
         class="px-4 py-3 text-left border-b border-border/50 w-full transition-colors hover:bg-muted/50"
-        :class="{ 'bg-muted/30': session.id === dataStudioStore.activeSessionId || session.id === dataStudioStore.sidebarSessionId }"
+        :class="{ 'bg-muted/30': session.id === dataStudioStore.activeSessionId }"
         @click="emit('select', session.id)"
       >
         <div class="text-sm text-foreground font-medium truncate">

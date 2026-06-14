@@ -189,7 +189,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <AppLayout :hide-ai-button="true">
+  <AppLayout>
     <div class="bg-background flex h-full">
       <!-- History Panel (left sidebar) -->
       <div v-if="historyPanelOpen" class="border-r border-border shrink-0 w-72 overflow-y-auto">

@@ -31,13 +31,11 @@ use std::time::Instant;
 struct ClickHouseMetaColumn {
     name: String,
     #[serde(rename = "type")]
-    #[allow(dead_code)]
     col_type: String,
 }
 
 /// Statistics included in a ClickHouse response.
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct ClickHouseStatistics {
     elapsed: Option<f64>,
     rows_read: Option<u64>,
@@ -50,7 +48,6 @@ struct ClickHouseResponse {
     meta: Vec<ClickHouseMetaColumn>,
     data: Vec<HashMap<String, serde_json::Value>>,
     rows: u64,
-    #[allow(dead_code)]
     statistics: Option<ClickHouseStatistics>,
 }
 
@@ -66,7 +63,6 @@ struct ClickHouseResponse {
 /// base URL for the target server.
 pub struct ClickHousePool {
     client: reqwest::Client,
-    #[allow(dead_code)]
     base_url: String,
 }
 

@@ -29,27 +29,20 @@ const appStore = useAppStore()
 
 // ── Presets ───────────────────────────────────────────────────────────────────
 
+type PresetId = 'openai' | 'anthropic' | 'azure' | 'custom'
+
 type Preset = {
-  id: string
+  id: PresetId
   name: string
   apiCompatibility: string
   baseUrl: string
-  kind: string
 }
 
 const presets = computed<Preset[]>(() => [
-  { id: 'openai', name: 'OpenAI', apiCompatibility: 'openai', baseUrl: 'https://api.openai.com/v1', kind: 'openai' },
-  { id: 'deepseek', name: 'DeepSeek', apiCompatibility: 'openai', baseUrl: 'https://api.deepseek.com/v1', kind: 'deepseek' },
-  { id: 'openrouter', name: 'OpenRouter', apiCompatibility: 'openai', baseUrl: 'https://openrouter.ai/api/v1', kind: 'openrouter' },
-  { id: 'anthropic', name: 'Anthropic', apiCompatibility: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', kind: 'anthropic' },
-  { id: 'gemini', name: 'Google Gemini', apiCompatibility: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', kind: 'gemini' },
-  { id: 'grok', name: 'Grok', apiCompatibility: 'openai', baseUrl: 'https://api.x.ai/v1', kind: 'grok' },
-  { id: 'mistral', name: 'Mistral', apiCompatibility: 'openai', baseUrl: 'https://api.mistral.ai/v1', kind: 'mistral' },
-  { id: 'azure-openai', name: 'Azure OpenAI', apiCompatibility: 'openai', baseUrl: '', kind: 'azure-openai' },
-  { id: 'ollama', name: 'Ollama', apiCompatibility: 'openai', baseUrl: 'http://127.0.0.1:11434', kind: 'ollama' },
-  { id: 'lm-studio', name: 'LM Studio', apiCompatibility: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', kind: 'lm-studio' },
-  { id: 'custom-openai', name: 'Custom OpenAI', apiCompatibility: 'openai', baseUrl: '', kind: 'custom-openai' },
-  { id: 'custom-anthropic', name: 'Custom Anthropic', apiCompatibility: 'anthropic', baseUrl: '', kind: 'custom-anthropic' },
+  { id: 'openai', name: t('pages.settings.ai.form.presetOpenai'), apiCompatibility: 'openai', baseUrl: 'https://api.openai.com/v1' },
+  { id: 'anthropic', name: t('pages.settings.ai.form.presetAnthropic'), apiCompatibility: 'anthropic', baseUrl: 'https://api.anthropic.com/v1' },
+  { id: 'azure', name: t('pages.settings.ai.form.presetAzure'), apiCompatibility: 'azure', baseUrl: '' },
+  { id: 'custom', name: t('pages.settings.ai.form.presetCustom'), apiCompatibility: '', baseUrl: '' },
 ])
 
 // ── Proxy mode options ────────────────────────────────────────────────────────
@@ -72,7 +65,7 @@ const API_KEY_SENTINEL = '__SENTINEL__'
 const draft = ref<LlmProvider>(createEmptyDraft())
 const showKey = ref(false)
 const formErrors = ref<Record<string, string>>({})
-const selectedPresetId = ref<string | null>(null)
+const selectedPresetId = ref<PresetId | null>(null)
 
 // ── Computed ──────────────────────────────────────────────────────────────────
 
@@ -83,7 +76,7 @@ const isApiCompatibilityReadonly = computed(() => {
     return true
   if (!selectedPresetId.value)
     return false
-  return !selectedPresetId.value.startsWith('custom-')
+  return selectedPresetId.value !== 'custom'
 })
 
 const contextWindowInput = computed({
@@ -126,7 +119,6 @@ const apiKeyDisplayValue = computed({
 function createEmptyDraft(): LlmProvider {
   return {
     id: ulid(),
-    kind: '',
     name: '',
     apiCompatibility: '',
     apiKey: '',
@@ -152,9 +144,9 @@ function resetForm(provider?: LlmProvider | null) {
       proxyMode: provider.proxyMode ?? 'none',
       contextWindowOverride: provider.contextWindowOverride ?? undefined,
     }
-    // Derive the matching preset id from the provider's kind
-    const match = presets.value.find(p => p.id === provider.kind || (p.apiCompatibility === provider.apiCompatibility && !p.id.startsWith('custom-')))
-    selectedPresetId.value = match ? match.id : 'custom-openai'
+    // Derive the matching preset id from the provider's apiCompatibility
+    const match = presets.value.find(p => p.apiCompatibility === provider.apiCompatibility && p.id !== 'custom')
+    selectedPresetId.value = match ? match.id : 'custom'
   }
   else {
     draft.value = createEmptyDraft()
@@ -172,7 +164,6 @@ function beginReplaceApiKey() {
 
 function selectPreset(preset: Preset) {
   selectedPresetId.value = preset.id
-  draft.value.kind = preset.kind
   draft.value.apiCompatibility = preset.apiCompatibility
   draft.value.baseUrl = preset.baseUrl
   formErrors.value = {}
@@ -249,7 +240,7 @@ watch(() => props.open, (open) => {
       <!-- Provider type selector — only in create mode -->
       <div v-if="!isEdit" class="space-y-2">
         <Label>{{ t('pages.settings.ai.form.providerType') }}</Label>
-        <div class="gap-2 gap-y-2 grid grid-cols-3 max-h-[280px] overflow-y-auto">
+        <div class="gap-2 grid grid-cols-2">
           <button
             v-for="preset in presets"
             :key="preset.id"

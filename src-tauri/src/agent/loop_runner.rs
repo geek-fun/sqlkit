@@ -16,10 +16,7 @@ use tokio::sync::oneshot;
 use crate::agent::chat_formatter::{
     AnthropicChatFormatter, ChatFormatter, LlmMessage, LlmToolCall, OpenAIChatFormatter,
 };
-use crate::agent::compact::{
-    count_projected_tokens_old as count_projected_tokens, evaluate_old as evaluate,
-    resolve_model_spec_for_session_old as resolve_model_spec_for_session,
-};
+use crate::agent::compact::{count_projected_tokens, evaluate, resolve_model_spec_for_session};
 use crate::agent::config::{build_headers, get_base_url};
 use crate::agent::tool_executor::ToolExecutor;
 use crate::common::http_client::create_http_client;
@@ -80,6 +77,13 @@ fn get_settings_u64(settings: &Value, key: &str, default: u64) -> u64 {
     settings
         .get(key)
         .and_then(|v| v.as_u64())
+        .unwrap_or(default)
+}
+
+fn get_settings_f64(settings: &Value, key: &str, default: f64) -> f64 {
+    settings
+        .get(key)
+        .and_then(|v| v.as_f64())
         .unwrap_or(default)
 }
 
@@ -152,7 +156,7 @@ fn build_system_prompt(settings: &Value) -> String {
 
 fn build_tools_list(settings: &Value) -> Vec<Value> {
     let sources = get_settings_string_array(settings, "attachedSources");
-    let _db_types: Vec<String> = sources
+    let db_types: Vec<String> = sources
         .iter()
         .filter_map(|s| {
             // Source identifiers may be like "postgres:conn-id" or connection ids
@@ -255,8 +259,8 @@ fn take_cancellation(cancel_map: &CancelMap, session_id: &str) -> bool {
 async fn request_confirmation(
     confirm_map: &ConfirmMap,
     session_id: &str,
-    _tool_name: &str,
-    _arguments: &Value,
+    tool_name: &str,
+    arguments: &Value,
 ) -> Result<bool, String> {
     let (tx, rx) = oneshot::channel::<bool>();
 
@@ -650,7 +654,7 @@ pub async fn run_agent_loop(
         );
 
         // --- Load messages for this iteration ---
-        let _messages = match load_messages(&agent_db, &session_id) {
+        let messages = match load_messages(&agent_db, &session_id) {
             Ok(msgs) => msgs,
             Err(e) => {
                 emit_event(
@@ -848,18 +852,7 @@ pub async fn run_agent_loop(
             );
             h
         } else {
-            let h = build_headers(
-                &serde_json::json!({ "apiKey": api_key, "apiCompatibility": api_compat }),
-            )
-            .unwrap_or_else(|_| {
-                let mut h = reqwest::header::HeaderMap::new();
-                h.insert(
-                    reqwest::header::CONTENT_TYPE,
-                    reqwest::header::HeaderValue::from_static("application/json"),
-                );
-                h
-            });
-            h
+            build_headers(&api_key)
         };
         let client = create_http_client("system", None, Some(true), Some(Duration::from_secs(300)));
 
@@ -1529,7 +1522,7 @@ pub async fn compact_agent_session(
 ) -> Result<(), String> {
     let model = get_settings_str(&settings, "model").unwrap_or_else(|| String::from("gpt-4o"));
     let (_model_name, context_window) =
-        crate::agent::compact::resolve_model_spec_for_session_old(&settings);
+        crate::agent::compact::resolve_model_spec_for_session(&settings);
 
     emit_event(
         &app,
@@ -1827,7 +1820,7 @@ async fn run_agent_loop_inner(
         );
 
         // --- Load, potentially compact, call LLM ---
-        let _messages = load_messages(agent_db, session_id)?;
+        let messages = load_messages(agent_db, session_id)?;
         let (_model_name, context_window) = resolve_model_spec_for_session(settings);
         let compact_threshold = settings
             .get("compactThreshold")
@@ -1943,18 +1936,7 @@ async fn run_agent_loop_inner(
             );
             h
         } else {
-            let h = build_headers(
-                &serde_json::json!({ "apiKey": api_key, "apiCompatibility": api_compat }),
-            )
-            .unwrap_or_else(|_| {
-                let mut h = reqwest::header::HeaderMap::new();
-                h.insert(
-                    reqwest::header::CONTENT_TYPE,
-                    reqwest::header::HeaderValue::from_static("application/json"),
-                );
-                h
-            });
-            h
+            build_headers(&api_key)
         };
         let client = create_http_client("system", None, Some(true), Some(Duration::from_secs(300)));
 

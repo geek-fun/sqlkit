@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 
 use serde_json::{json, Value};
 

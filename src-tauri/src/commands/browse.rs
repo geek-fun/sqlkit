@@ -4,7 +4,8 @@
 //! including databases, schemas, tables, columns, and table data.
 
 use crate::database::{
-    ColumnInfo, DatabaseAdapter, DatabaseSchema, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo,
+    ClickHouseAdapter, ColumnInfo, DatabaseAdapter, DatabaseSchema, DuckDbAdapter, HttpSqlAdapter,
+    JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo,
 };
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};

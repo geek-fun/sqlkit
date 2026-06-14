@@ -98,7 +98,6 @@ fn to_openai_messages(
                         name: None,
                         tool_calls: None,
                         refusal: None,
-                        #[allow(deprecated)]
                         function_call: None,
                     },
                 ));
