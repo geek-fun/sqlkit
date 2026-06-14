@@ -29,7 +29,7 @@ const { taskCount } = storeToRefs(transferStore)
             <span class="i-carbon-chat-bot h-4 w-4" />
           </Button>
         </TooltipTrigger>
-        <TooltipContent>{{ $t('pages.settings.ai.featureRouting.sidebarAssistant.name') }}</TooltipContent>
+        <TooltipContent>{{ $t('aside.aiAssistant') }}</TooltipContent>
       </Tooltip>
 
       <Tooltip>

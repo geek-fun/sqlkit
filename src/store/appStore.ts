@@ -45,6 +45,20 @@ export type LlmProvider = {
   models?: string[]
 }
 
+export type ChatRuntimeConfig = {
+  autoCompact: boolean
+  maxIterations: number
+  wallClockBudgetMin: number
+  tokenBudget: number
+}
+
+const CHAT_RUNTIME_DEFAULTS: ChatRuntimeConfig = {
+  autoCompact: true,
+  maxIterations: 200,
+  wallClockBudgetMin: 30,
+  tokenBudget: 20_000_000,
+}
+
 type AppStoreState = {
   themeType: ThemeType
   languageType: LanguageType
@@ -54,6 +68,7 @@ type AppStoreState = {
   sidebarCollapsed: boolean
   llmSettings: {
     providers: LlmProvider[]
+    chat: ChatRuntimeConfig
   }
   featureModelRoutes: Record<string, { selectedModelId: string, useRecommendedModel: boolean }>
 }
@@ -99,6 +114,7 @@ export const useAppStore = defineStore('app', {
           models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022'],
         },
       ],
+      chat: { ...CHAT_RUNTIME_DEFAULTS },
     },
     featureModelRoutes: {},
   }),
@@ -316,6 +332,36 @@ export const useAppStore = defineStore('app', {
       return this.llmSettings.providers.some(
         p => p.enabled && (p.models ?? []).includes(modelId),
       )
+    },
+
+    // ── Agent Chat Config ───────────────────────────────────────────────
+
+    setAutoCompact(autoCompact: boolean) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: { ...this.llmSettings.chat, autoCompact },
+      }
+    },
+
+    setMaxIterations(maxIterations: number) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: { ...this.llmSettings.chat, maxIterations },
+      }
+    },
+
+    setWallClockBudgetMin(wallClockBudgetMin: number) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: { ...this.llmSettings.chat, wallClockBudgetMin },
+      }
+    },
+
+    setTokenBudget(tokenBudget: number) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: { ...this.llmSettings.chat, tokenBudget },
+      }
     },
   },
 })

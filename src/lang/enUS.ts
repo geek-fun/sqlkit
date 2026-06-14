@@ -348,8 +348,8 @@ export const enUS = {
         autoSaveHelp: 'Automatically save query changes',
       },
       ai: {
-        title: 'AI Providers',
-        description: 'Configure AI model providers and feature routing',
+        title: 'AI Settings',
+        description: 'Configure AI model providers and chat behavior',
         providerList: {
           title: 'Providers',
           description: 'Manage your AI model providers',
@@ -408,21 +408,17 @@ export const enUS = {
             baseUrlInvalid: 'Base URL must start with http:// or https://',
           },
         },
-        featureRouting: {
-          title: 'Feature Routing',
-          description: 'Assign models to specific AI features',
-          dataStudio: {
-            name: 'Data Studio',
-            description: 'AI assistant in the query editor and data browser',
-          },
-          sidebarAssistant: {
-            name: 'Sidebar Assistant',
-            description: 'AI assistant accessible from the sidebar',
-          },
-          useRecommended: 'Use recommended model',
-          selectModel: 'Select a model',
-          noModels: 'No models available. Add and enable a provider first.',
-          noModelsHint: 'Enable at least one provider and sync its models.',
+        chat: {
+          title: 'Agent',
+          description: 'Configure agent runtime behavior',
+          autoCompactLabel: 'Auto-compact messages',
+          autoCompactDescription: 'Automatically summarize old messages to save tokens when approaching context limits',
+          maxIterationsLabel: 'Max iterations',
+          maxIterationsDescription: 'Maximum number of tool-call iterations before the agent stops (1–1000)',
+          wallClockBudgetLabel: 'Wall clock budget (min)',
+          wallClockBudgetDescription: 'Maximum wall-clock time in minutes before the agent stops (1–240)',
+          tokenBudgetLabel: 'Token budget',
+          tokenBudgetDescription: 'Maximum tokens consumed before the agent stops',
         },
       },
       updates: {
