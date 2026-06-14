@@ -69,7 +69,7 @@ onUnmounted(() => {
       <div class="header-row">
         <div class="flex gap-2 items-center">
           <span class="i-carbon-task text-muted-foreground h-4 w-4" />
-          <span class="header-title">Tasks</span>
+          <span class="header-title">{{ $t('aside.tasks') }}</span>
         </div>
         <div class="header-actions">
           <button

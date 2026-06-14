@@ -1,4 +1,8 @@
 export const enUS = {
+  aside: {
+    aiAssistant: 'AI Assistant',
+    tasks: 'Tasks',
+  },
   common: {
     buttons: {
       create: 'Create',

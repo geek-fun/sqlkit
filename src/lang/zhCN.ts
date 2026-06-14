@@ -1,4 +1,8 @@
 export const zhCN = {
+  aside: {
+    aiAssistant: 'AI 助手',
+    tasks: '任务',
+  },
   common: {
     buttons: {
       create: '创建',

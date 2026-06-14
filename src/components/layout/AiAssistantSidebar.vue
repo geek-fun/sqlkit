@@ -138,7 +138,7 @@ onUnmounted(() => {
       <template #header>
         <div class="header-row">
           <span class="header-title">
-            AI Assistant
+            {{ $t('aside.aiAssistant') }}
           </span>
           <div class="header-actions">
             <button
