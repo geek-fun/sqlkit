@@ -140,39 +140,41 @@ onUnmounted(() => {
       @model-change="onModelChange"
     >
       <template #header>
-        <div class="header-title">
-          {{ t('pages.settings.ai.featureRouting.sidebarAssistant.name') }}
-        </div>
-        <div class="header-actions">
-          <button
-            class="header-icon-btn"
-            :title="t('dataStudio.history.newSession')"
-            @click="handleNewSession"
-          >
-            <span class="i-carbon-add h-4 w-4" />
-          </button>
-          <button
-            class="header-icon-btn"
-            :class="{ 'header-icon-btn--active': historyPanelOpen }"
-            :title="t('dataStudio.history.title')"
-            @click="historyPanelOpen = !historyPanelOpen"
-          >
-            <span class="i-carbon-time h-4 w-4" />
-          </button>
-          <button
-            class="header-icon-btn"
-            :title="t('dataStudio.agent.clearChat')"
-            @click="handleClearChat"
-          >
-            <span class="i-carbon-trash-can h-4 w-4" />
-          </button>
-          <button
-            class="header-icon-btn header-icon-btn--close"
-            :title="t('common.buttons.close')"
-            @click="handleClose"
-          >
-            <span class="i-carbon-close h-4 w-4" />
-          </button>
+        <div class="header-row">
+          <span class="header-title">
+            {{ t('pages.settings.ai.featureRouting.sidebarAssistant.name') }}
+          </span>
+          <div class="header-actions">
+            <button
+              class="header-icon-btn"
+              :title="t('dataStudio.history.newSession')"
+              @click="handleNewSession"
+            >
+              <span class="i-carbon-add h-4 w-4" />
+            </button>
+            <button
+              class="header-icon-btn"
+              :class="{ 'header-icon-btn--active': historyPanelOpen }"
+              :title="t('dataStudio.history.title')"
+              @click="historyPanelOpen = !historyPanelOpen"
+            >
+              <span class="i-carbon-time h-4 w-4" />
+            </button>
+            <button
+              class="header-icon-btn"
+              :title="t('dataStudio.agent.clearChat')"
+              @click="handleClearChat"
+            >
+              <span class="i-carbon-trash-can h-4 w-4" />
+            </button>
+            <button
+              class="header-icon-btn header-icon-btn--close"
+              :title="t('common.buttons.close')"
+              @click="handleClose"
+            >
+              <span class="i-carbon-close h-4 w-4" />
+            </button>
+          </div>
         </div>
       </template>
     </ChatPanel>
@@ -227,17 +229,22 @@ onUnmounted(() => {
   opacity: 0;
 }
 
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 12px 12px 16px;
+}
+
 .header-title {
-  font-size: 14px;
-  font-weight: 600;
-  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 700;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
   gap: 2px;
-  padding-right: 8px;
 }
 
 .header-icon-btn {
