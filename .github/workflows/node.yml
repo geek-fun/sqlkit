@@ -56,9 +56,24 @@ jobs:
       - run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+      - name: Download DuckDB binary (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: robinraju/release-downloader@v1.4
+        with:
+          repository: duckdb/duckdb
+          tag: v1.5.3
+          fileName: libduckdb-windows-amd64.zip
+          out-file-path: .
+      - name: Extract DuckDB binary (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          Expand-Archive -Path ${{ github.workspace }}/libduckdb-windows-amd64.zip -DestinationPath ${{ github.workspace }}/libduckdb
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CXXFLAGS: ${{ matrix.os == 'windows-latest' && '/EHsc' || '' }}
+          DUCKDB_LIB_DIR: ${{ github.workspace }}/libduckdb
+          DUCKDB_INCLUDE_DIR: ${{ github.workspace }}/libduckdb
         with:
           includeRelease: false
+          args: ${{ matrix.os == 'windows-latest' && '--no-default-features --features duckdb' || '' }}
