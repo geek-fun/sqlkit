@@ -138,7 +138,7 @@ onUnmounted(() => {
       <template #header>
         <div class="header-row">
           <span class="header-title">
-            {{ t('pages.settings.ai.featureRouting.sidebarAssistant.name') }}
+            AI Assistant
           </span>
           <div class="header-actions">
             <button
