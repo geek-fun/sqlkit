@@ -28,15 +28,15 @@ function toggleTaskManager() {
 </script>
 
 <template>
-  <div class="flex h-screen">
-    <AppSidebar />
-    <div class="flex flex-1 flex-col min-w-0">
-      <AppHeader
-        :hide-ai-button="props.hideAiButton ?? false"
-        @toggle-ai="toggleAi"
-        @toggle-task-manager="toggleTaskManager"
-      />
-      <main class="flex flex-1 min-h-0 overflow-hidden">
+  <div class="h-screen flex flex-col overflow-hidden">
+    <AppHeader
+      :hide-ai-button="props.hideAiButton ?? false"
+      @toggle-ai="toggleAi"
+      @toggle-task-manager="toggleTaskManager"
+    />
+    <div class="flex flex-1 min-h-0">
+      <AppSidebar />
+      <main class="flex flex-1 min-w-0 overflow-hidden">
         <div class="flex-1 overflow-auto">
           <slot />
         </div>
