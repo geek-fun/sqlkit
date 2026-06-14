@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref } from 'vue'
 import AiAssistantSidebar from './AiAssistantSidebar.vue'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
@@ -10,15 +10,8 @@ const props = defineProps<{
 }>()
 
 type SidePanel = 'none' | 'ai' | 'tasks'
-const STORAGE_KEY = 'sqlkit-ai-panel-open'
 
-const sidePanel = ref<SidePanel>(
-  localStorage.getItem(STORAGE_KEY) === 'true' ? 'ai' : 'none',
-)
-
-watch(sidePanel, (val) => {
-  localStorage.setItem(STORAGE_KEY, String(val === 'ai'))
-})
+const sidePanel = ref<SidePanel>('none')
 
 function toggleAi() {
   sidePanel.value = sidePanel.value === 'ai' ? 'none' : 'ai'
