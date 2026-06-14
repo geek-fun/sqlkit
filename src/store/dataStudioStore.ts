@@ -193,6 +193,7 @@ type DataStudioStoreState = {
   attachedSources: AttachedSource[]
   sessions: AgentSession[]
   activeSessionId: string | undefined
+  sidebarSessionId: string | undefined
   confirmationRules: ConfirmationRule[]
   toolResultFullBodies: Record<string, string>
   sessionErrors: Record<string, string>
@@ -206,6 +207,7 @@ export const useDataStudioStore = defineStore('dataStudio', {
     attachedSources: [],
     sessions: [],
     activeSessionId: undefined,
+    sidebarSessionId: undefined,
     confirmationRules: [],
     toolResultFullBodies: {},
     sessionErrors: {},
@@ -215,6 +217,9 @@ export const useDataStudioStore = defineStore('dataStudio', {
   getters: {
     activeSession: (state): AgentSession | undefined =>
       state.sessions.find(s => s.id === state.activeSessionId),
+
+    activeSidebarSession: (state): AgentSession | undefined =>
+      state.sessions.find(s => s.id === state.sidebarSessionId),
 
     getSessionProgress: state => (sessionId: string): SessionProgress | undefined =>
       state.sessionProgress[sessionId],
@@ -414,10 +419,38 @@ export const useDataStudioStore = defineStore('dataStudio', {
       return await this.createSession()
     },
 
+    async getOrCreateSidebarSession(): Promise<string> {
+      if (this.sidebarSessionId && this.sessions.some(s => s.id === this.sidebarSessionId))
+        return this.sidebarSessionId
+
+      const row = await agentApi.createAgentSession('AI Assistant', undefined, 'Ask', null)
+      const session: AgentSession = {
+        id: row.id,
+        title: row.title,
+        sources: [],
+        permissionsMode: 'Ask',
+        messages: [],
+        status: 'idle',
+        updated_at: Number(row.updated_at),
+        created_at: Number(row.created_at),
+        model_id: row.model_id ?? '',
+      }
+      this.sessions = [session, ...this.sessions]
+      this.sidebarSessionId = session.id
+      return session.id
+    },
+
     // ── Messages ───────────────────────────────────────────────────────────
 
-    addMessage(message: Omit<AgentMessage, 'id' | 'timestamp'> & { id?: string, timestamp?: number }): AgentMessage {
-      const session = this.activeSession
+    /** Find session by ID, or fall back to activeSession. */
+    _resolveSession(sessionId?: string): AgentSession | undefined {
+      if (sessionId)
+        return this.sessions.find(s => s.id === sessionId)
+      return this.activeSession
+    },
+
+    addMessage(message: Omit<AgentMessage, 'id' | 'timestamp'> & { id?: string, timestamp?: number }, sessionId?: string): AgentMessage {
+      const session = this._resolveSession(sessionId)
       if (!session)
         throw new Error('No active session')
 
@@ -435,8 +468,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
       return msg
     },
 
-    updateStreamingContent(messageId: string, content: string) {
-      const session = this.activeSession
+    updateStreamingContent(messageId: string, content: string, sessionId?: string) {
+      const session = this._resolveSession(sessionId)
       if (!session)
         return
 
@@ -452,8 +485,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
     },
 
-    updateStreamingThinking(messageId: string, thinking: string) {
-      const session = this.activeSession
+    updateStreamingThinking(messageId: string, thinking: string, sessionId?: string) {
+      const session = this._resolveSession(sessionId)
       if (!session)
         return
 
@@ -469,8 +502,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
     },
 
-    setMessageStatus(messageId: string, status: AgentMessageStatus) {
-      const session = this.activeSession
+    setMessageStatus(messageId: string, status: AgentMessageStatus, sessionId?: string) {
+      const session = this._resolveSession(sessionId)
       if (!session)
         return
 
@@ -486,8 +519,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
     },
 
-    setMessageToolCalls(messageId: string, toolCalls: AgentToolCall[]) {
-      const session = this.activeSession
+    setMessageToolCalls(messageId: string, toolCalls: AgentToolCall[], sessionId?: string) {
+      const session = this._resolveSession(sessionId)
       if (!session)
         return
 
@@ -503,8 +536,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
     },
 
-    updateToolCallStatus(messageId: string, toolCallId: string, status: AgentToolCallStatus) {
-      const session = this.activeSession
+    updateToolCallStatus(messageId: string, toolCallId: string, status: AgentToolCallStatus, _result?: string, _durationMs?: number, sessionId?: string) {
+      const session = this._resolveSession(sessionId)
       if (!session)
         return
 
@@ -527,8 +560,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
     },
 
-    removeOrphanedStreamingMessages() {
-      const session = this.activeSession
+    removeOrphanedStreamingMessages(sessionId?: string) {
+      const session = this._resolveSession(sessionId)
       if (!session)
         return
 
@@ -779,6 +812,9 @@ export const useDataStudioStore = defineStore('dataStudio', {
       this.sessions = this.sessions.filter(s => s.id !== sessionId)
       if (this.activeSessionId === sessionId) {
         this.activeSessionId = this.sessions[0]?.id ?? undefined
+      }
+      if (this.sidebarSessionId === sessionId) {
+        this.sidebarSessionId = undefined
       }
     },
   },

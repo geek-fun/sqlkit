@@ -34,6 +34,7 @@ export type QueryConfig = {
 
 export type LlmProvider = {
   id: string
+  kind: string
   name: string
   apiCompatibility: string
   apiKey: string
@@ -45,6 +46,20 @@ export type LlmProvider = {
   models?: string[]
 }
 
+export type ChatRuntimeConfig = {
+  autoCompact: boolean
+  maxIterations: number
+  wallClockBudgetMin: number
+  tokenBudget: number
+}
+
+const CHAT_RUNTIME_DEFAULTS: ChatRuntimeConfig = {
+  autoCompact: true,
+  maxIterations: 200,
+  wallClockBudgetMin: 30,
+  tokenBudget: 20_000_000,
+}
+
 type AppStoreState = {
   themeType: ThemeType
   languageType: LanguageType
@@ -54,6 +69,7 @@ type AppStoreState = {
   sidebarCollapsed: boolean
   llmSettings: {
     providers: LlmProvider[]
+    chat: ChatRuntimeConfig
   }
   featureModelRoutes: Record<string, { selectedModelId: string, useRecommendedModel: boolean }>
 }
@@ -82,23 +98,106 @@ export const useAppStore = defineStore('app', {
       providers: [
         {
           id: 'openai',
+          kind: 'openai',
           name: 'OpenAI',
           apiCompatibility: 'openai',
           apiKey: '',
-          baseUrl: '',
+          baseUrl: 'https://api.openai.com/v1',
           enabled: true,
           models: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo'],
         },
         {
+          id: 'deepseek',
+          kind: 'deepseek',
+          name: 'DeepSeek',
+          apiCompatibility: 'openai',
+          apiKey: '',
+          baseUrl: 'https://api.deepseek.com/v1',
+          enabled: true,
+          models: ['deepseek-chat', 'deepseek-reasoner'],
+        },
+        {
+          id: 'openrouter',
+          kind: 'openrouter',
+          name: 'OpenRouter',
+          apiCompatibility: 'openai',
+          apiKey: '',
+          baseUrl: 'https://openrouter.ai/api/v1',
+          enabled: true,
+          models: ['openai/gpt-4o-mini', 'anthropic/claude-sonnet-4', 'google/gemini-2.5-pro'],
+        },
+        {
           id: 'anthropic',
+          kind: 'anthropic',
           name: 'Anthropic',
           apiCompatibility: 'anthropic',
           apiKey: '',
-          baseUrl: '',
+          baseUrl: 'https://api.anthropic.com/v1',
           enabled: false,
           models: ['claude-sonnet-4-20250514', 'claude-3-5-sonnet-20241022'],
         },
+        {
+          id: 'gemini',
+          kind: 'gemini',
+          name: 'Google Gemini',
+          apiCompatibility: 'openai',
+          apiKey: '',
+          baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+          enabled: true,
+          models: ['gemini-2.5-pro', 'gemini-2.5-flash'],
+        },
+        {
+          id: 'grok',
+          kind: 'grok',
+          name: 'Grok',
+          apiCompatibility: 'openai',
+          apiKey: '',
+          baseUrl: 'https://api.x.ai/v1',
+          enabled: false,
+          models: ['grok-3'],
+        },
+        {
+          id: 'mistral',
+          kind: 'mistral',
+          name: 'Mistral',
+          apiCompatibility: 'openai',
+          apiKey: '',
+          baseUrl: 'https://api.mistral.ai/v1',
+          enabled: false,
+          models: ['mistral-large', 'mistral-small', 'codestral'],
+        },
+        {
+          id: 'azure-openai',
+          kind: 'azure-openai',
+          name: 'Azure OpenAI',
+          apiCompatibility: 'openai',
+          apiKey: '',
+          baseUrl: '',
+          enabled: false,
+          models: [],
+        },
+        {
+          id: 'ollama',
+          kind: 'ollama',
+          name: 'Ollama',
+          apiCompatibility: 'openai',
+          apiKey: '',
+          baseUrl: 'http://127.0.0.1:11434',
+          enabled: true,
+          models: ['llama3.1', 'qwen2.5-coder', 'mistral'],
+        },
+        {
+          id: 'lm-studio',
+          kind: 'lm-studio',
+          name: 'LM Studio',
+          apiCompatibility: 'openai',
+          apiKey: '',
+          baseUrl: 'http://127.0.0.1:1234/v1',
+          enabled: false,
+          models: [],
+        },
       ],
+      chat: { ...CHAT_RUNTIME_DEFAULTS },
     },
     featureModelRoutes: {},
   }),
@@ -316,6 +415,36 @@ export const useAppStore = defineStore('app', {
       return this.llmSettings.providers.some(
         p => p.enabled && (p.models ?? []).includes(modelId),
       )
+    },
+
+    // ── Agent Chat Config ───────────────────────────────────────────────
+
+    setAutoCompact(autoCompact: boolean) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: { ...this.llmSettings.chat, autoCompact },
+      }
+    },
+
+    setMaxIterations(maxIterations: number) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: { ...this.llmSettings.chat, maxIterations },
+      }
+    },
+
+    setWallClockBudgetMin(wallClockBudgetMin: number) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: { ...this.llmSettings.chat, wallClockBudgetMin },
+      }
+    },
+
+    setTokenBudget(tokenBudget: number) {
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: { ...this.llmSettings.chat, tokenBudget },
+      }
     },
   },
 })

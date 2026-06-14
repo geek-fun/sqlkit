@@ -14,7 +14,13 @@
       {
         "title": "SqlKit",
         "width": 1600,
-        "height": 1000
+        "height": 1000,
+        "titleBarStyle": "Overlay",
+        "trafficLightPosition": {
+          "x": 12,
+          "y": 18
+        },
+        "hiddenTitle": true
       }
     ],
     "security": {

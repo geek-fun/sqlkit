@@ -254,7 +254,7 @@ describe('appStore', () => {
     it('should have default providers', () => {
       const store = useAppStore()
 
-      expect(store.llmSettings.providers).toHaveLength(2)
+      expect(store.llmSettings.providers).toHaveLength(10)
       expect(store.llmSettings.providers[0].id).toBe('openai')
       expect(store.llmSettings.providers[0].name).toBe('OpenAI')
       expect(store.llmSettings.providers[0].enabled).toBe(true)
@@ -420,8 +420,8 @@ describe('appStore', () => {
 
       store.reorderProviders(reversed)
 
-      expect(store.llmSettings.providers[0].id).toBe('anthropic')
-      expect(store.llmSettings.providers[1].id).toBe('openai')
+      expect(store.llmSettings.providers[0].id).toBe('lm-studio')
+      expect(store.llmSettings.providers[1].id).toBe('ollama')
     })
 
     it('should accept empty array', () => {

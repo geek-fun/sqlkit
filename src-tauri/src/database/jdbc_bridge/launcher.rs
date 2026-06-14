@@ -5,13 +5,10 @@
 
 use crate::database::error::{DbError, DbResult};
 use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
 
 use super::protocol::{JdbcRequest, JdbcResponse};
-
-/// Default bridge JAR path relative to the app data directory.
-const BRIDGE_JAR_NAME: &str = "jdbc-bridge.jar";
 
 /// Manages the Java bridge subprocess.
 pub struct JdbcBridgeLauncher {

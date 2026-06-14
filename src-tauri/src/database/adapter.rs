@@ -115,15 +115,15 @@ pub trait DatabaseAdapter: Send + Sync {
     }
 
     /// List all schemas in a database.
-    async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
+    async fn list_schemas(&self, _database: Option<&str>) -> DbResult<Vec<String>> {
         Err(DbError::unsupported("list_schemas"))
     }
 
     /// List all tables in a schema.
     async fn list_tables(
         &self,
-        database: Option<&str>,
-        schema: Option<&str>,
+        _database: Option<&str>,
+        _schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
         Err(DbError::unsupported("list_tables"))
     }
@@ -131,9 +131,9 @@ pub trait DatabaseAdapter: Send + Sync {
     /// List all columns in a table.
     async fn list_columns(
         &self,
-        database: Option<&str>,
-        schema: Option<&str>,
-        table: &str,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        _table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
         Err(DbError::unsupported("list_columns"))
     }
@@ -141,9 +141,9 @@ pub trait DatabaseAdapter: Send + Sync {
     /// Get detailed information about a table.
     async fn get_table_info(
         &self,
-        database: Option<&str>,
-        schema: Option<&str>,
-        table: &str,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        _table: &str,
     ) -> DbResult<TableInfo> {
         Err(DbError::unsupported("get_table_info"))
     }

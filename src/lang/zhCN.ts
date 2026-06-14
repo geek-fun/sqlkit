@@ -1,4 +1,8 @@
 export const zhCN = {
+  aside: {
+    aiAssistant: 'AI 助手',
+    tasks: '任务',
+  },
   common: {
     buttons: {
       create: '创建',
@@ -15,6 +19,7 @@ export const zhCN = {
       createConnection: '创建连接',
       testConnection: '测试连接',
       dismiss: '关闭',
+      close: '关闭',
       browse: '浏览',
       retry: '重试',
     },
@@ -343,8 +348,8 @@ export const zhCN = {
         autoSaveHelp: '自动保存查询更改',
       },
       ai: {
-        title: 'AI 提供商',
-        description: '配置 AI 模型提供商和功能路由',
+        title: 'AI 设置',
+        description: '配置 AI 模型提供商和对话行为',
         providerList: {
           title: '提供商',
           description: '管理您的 AI 模型提供商',
@@ -403,21 +408,17 @@ export const zhCN = {
             baseUrlInvalid: '基础 URL 必须以 http:// 或 https:// 开头',
           },
         },
-        featureRouting: {
-          title: '功能路由',
-          description: '为特定 AI 功能分配模型',
-          dataStudio: {
-            name: '数据工作室',
-            description: '查询编辑器和数据浏览器中的 AI 助手',
-          },
-          sidebarAssistant: {
-            name: '侧边栏助手',
-            description: '可从侧边栏访问的 AI 助手',
-          },
-          useRecommended: '使用推荐模型',
-          selectModel: '选择模型',
-          noModels: '没有可用的模型。请先添加并启用一个提供商。',
-          noModelsHint: '至少启用一个提供商并同步其模型。',
+        chat: {
+          title: 'Agent',
+          description: '配置代理运行时行为',
+          autoCompactLabel: '自动压缩消息',
+          autoCompactDescription: '接近上下文限制时自动总结旧消息以节省 tokens',
+          maxIterationsLabel: '最大迭代次数',
+          maxIterationsDescription: '代理停止前的最大工具调用迭代次数（1–1000）',
+          wallClockBudgetLabel: '运行时间预算（分钟）',
+          wallClockBudgetDescription: '代理停止前的最大运行时间（1–240 分钟）',
+          tokenBudgetLabel: 'Token 预算',
+          tokenBudgetDescription: '代理停止前消耗的最大 token 数量',
         },
       },
     },
@@ -535,6 +536,8 @@ export const zhCN = {
         emptyState: '提出一个问题或描述您想要运行的查询。',
         noSource: '请先连接数据源。',
         stop: '停止',
+        continue: '继续',
+        continueHint: '代理已暂停。点击继续以恢复，或点击停止以结束会话。',
         clearChat: '清空对话',
         riskSafe: '安全操作',
         riskElevated: '中等风险',
