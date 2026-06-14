@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::common::http_client::create_http_client;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TokenizerFamily {
     OpenAiCl100k,
@@ -147,6 +149,8 @@ pub async fn get_provider_model_list(
     api_compat: &str,
     base_url: &str,
     api_key: &str,
+    proxy_url: Option<String>,
+    proxy_mode: &str,
 ) -> Result<Vec<serde_json::Value>, String> {
     if api_key.is_empty() {
         return Ok(default_models_for_api(api_compat)
@@ -165,10 +169,7 @@ pub async fn get_provider_model_list(
         _ => format!("{}/models", base_url.trim_end_matches('/')),
     };
 
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = create_http_client(proxy_mode, proxy_url, Some(true), None);
 
     let response = client
         .get(&url)

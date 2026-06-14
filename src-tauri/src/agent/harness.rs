@@ -179,6 +179,8 @@ pub async fn run_agent_step(
                 &tools,
                 &resolved_base,
                 &api_key,
+                http_proxy.as_deref(),
+                proxy_mode.as_deref(),
             )
             .await
         }
@@ -304,10 +306,12 @@ async fn run_anthropic(
     tools: &[Value],
     base_url: &str,
     api_key: &str,
+    http_proxy: Option<&str>,
+    proxy_mode: Option<&str>,
 ) -> Result<Value, String> {
     let client = create_http_client(
-        "none",
-        None,
+        proxy_mode.unwrap_or("none"),
+        http_proxy.map(|s| s.to_string()),
         None,
         Some(std::time::Duration::from_secs(300)),
     );
@@ -503,7 +507,7 @@ pub async fn validate_llm_config(
     let resolved_base = base_url
         .filter(|u| !u.is_empty())
         .unwrap_or_else(|| provider_adapter::default_base_url(api_compat));
-    let client = create_http_client(&proxy_mode.unwrap_or_default(), http_proxy, None, None);
+    let client = create_http_client(&proxy_mode.as_deref().unwrap_or("none"), http_proxy, None, None);
     match api_compat {
         "anthropic" => {
             let url = format!(
@@ -545,14 +549,22 @@ pub async fn list_llm_models(
     provider: String,
     api_key: String,
     base_url: Option<String>,
+    http_proxy: Option<String>,
+    proxy_mode: Option<String>,
 ) -> Result<Vec<String>, String> {
     let api_compat = provider_adapter::map_to_api_compatibility(&provider);
     let resolved_base = base_url
         .filter(|u| !u.is_empty())
         .unwrap_or_else(|| provider_adapter::default_base_url(api_compat));
-    let models = model_registry::get_provider_model_list(api_compat, &resolved_base, &api_key)
-        .await
-        .map_err(|e| sanitize_error(&e))?;
+    let models = model_registry::get_provider_model_list(
+        api_compat,
+        &resolved_base,
+        &api_key,
+        http_proxy,
+        &proxy_mode.unwrap_or_else(|| String::from("none")),
+    )
+    .await
+    .map_err(|e| sanitize_error(&e))?;
     Ok(models
         .into_iter()
         .filter_map(|m| {

@@ -203,7 +203,7 @@ pub async fn summarize_with_llm(
     let proxy_mode = settings
         .get("proxyMode")
         .and_then(|v| v.as_str())
-        .unwrap_or("system");
+        .unwrap_or("none");
     let http_client = create_http_client(proxy_mode, http_proxy, None, None);
 
     let resp = post_chat_completions_compact(&http_client, &base_url, headers, body).await?;
