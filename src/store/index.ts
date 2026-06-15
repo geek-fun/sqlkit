@@ -4,6 +4,7 @@ export type { ChatRuntimeConfig, EditorConfig, FeatureModelRoute, LlmProvider, M
 export {
   ConnectionStatus,
   DatabaseType,
+  buildTransportLayers,
   dbTypeToBackend,
   isJdbcDatabase,
   jdbcDatabaseTypes,

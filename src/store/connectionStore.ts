@@ -193,17 +193,51 @@ type ConnectionStoreState = {
   currentDatabases: Record<string, string>
 }
 
+function safeBool(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+function safeStr(value: unknown, fallback: string): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function safePort(value: unknown): number {
+  if (typeof value === 'number')
+    return value
+  if (typeof value === 'string') {
+    const parsed = parseInt(value, 10)
+    return Number.isNaN(parsed) ? 22 : parsed
+  }
+  return 22
+}
+
 function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfig | undefined {
   if (!Array.isArray(transportLayers) || transportLayers.length === 0) {
     return undefined
   }
 
-  const sshLayer = transportLayers.find((layer: Record<string, unknown>) => layer.type === 'ssh') as Record<string, unknown> | undefined
+  const sshLayer = transportLayers.find(
+    (layer: unknown) => typeof layer === 'object' && layer !== null && (layer as Record<string, unknown>).type === 'ssh',
+  ) as Record<string, unknown> | undefined
   if (!sshLayer) {
     return undefined
   }
 
-  const authMethod = sshLayer.auth_method as Record<string, unknown> | undefined
+  const authMethodRaw = sshLayer.auth_method
+  const authMethod = typeof authMethodRaw === 'object' && authMethodRaw !== null
+    ? (authMethodRaw as Record<string, unknown>)
+    : undefined
+
+  if (authMethod && authMethod.method === 'agent') {
+    return {
+      enabled: safeBool(sshLayer.enabled, true),
+      host: safeStr(sshLayer.host, ''),
+      port: safePort(sshLayer.port),
+      username: safeStr(sshLayer.username, ''),
+      authMethod: 'agent',
+    }
+  }
+
   let method: 'password' | 'privateKey' = 'password'
   let password: string | undefined
   let privateKey: string | undefined
@@ -212,29 +246,20 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
   if (authMethod) {
     if (authMethod.method === 'password') {
       method = 'password'
-      password = authMethod.password as string
+      password = safeStr(authMethod.password, '')
     }
     else if (authMethod.method === 'privateKey') {
       method = 'privateKey'
-      privateKey = authMethod.private_key_path as string
-      passphrase = authMethod.passphrase as string | undefined
-    }
-    else if (authMethod.method === 'agent') {
-      return {
-        enabled: sshLayer.enabled as boolean ?? true,
-        host: sshLayer.host as string || '',
-        port: (sshLayer.port as number) || 22,
-        username: sshLayer.username as string || '',
-        authMethod: 'agent',
-      }
+      privateKey = safeStr(authMethod.private_key_path, '')
+      passphrase = typeof authMethod.passphrase === 'string' ? authMethod.passphrase : undefined
     }
   }
 
   return {
-    enabled: sshLayer.enabled as boolean ?? true,
-    host: sshLayer.host as string || '',
-    port: (sshLayer.port as number) || 22,
-    username: sshLayer.username as string || '',
+    enabled: safeBool(sshLayer.enabled, true),
+    host: safeStr(sshLayer.host, ''),
+    port: safePort(sshLayer.port),
+    username: safeStr(sshLayer.username, ''),
     authMethod: method,
     password,
     privateKey,
@@ -242,7 +267,7 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
   }
 }
 
-function buildTransportLayers(sshTunnel?: SSHTunnelConfig): import('@/datasources/connectionApi').TransportLayerConfig[] | null {
+export function buildTransportLayers(sshTunnel?: SSHTunnelConfig): import('@/datasources/connectionApi').TransportLayerConfig[] | null {
   if (!sshTunnel?.enabled || !sshTunnel.host) {
     return null
   }
