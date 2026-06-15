@@ -45,6 +45,18 @@ export enum DatabaseType {
   TRINO = 'TRINO',
   PRESTO = 'PRESTO',
   DERBY = 'DERBY',
+  HIVE = 'HIVE',
+  DATABRICKS = 'DATABRICKS',
+  HANA = 'HANA',
+  TERADATA = 'TERADATA',
+  VERTICA = 'VERTICA',
+  EXASOL = 'EXASOL',
+  BIGQUERY = 'BIGQUERY',
+  INFORMIX = 'INFORMIX',
+  KYLIN = 'KYLIN',
+  CASSANDRA = 'CASSANDRA',
+  IRIS = 'IRIS',
+  ACCESS = 'ACCESS',
 }
 
 const PG_BACKEND = 'PostgreSQL'
@@ -92,6 +104,18 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.TRINO]: 'trino',
   [DatabaseType.PRESTO]: 'presto',
   [DatabaseType.DERBY]: 'derby',
+  [DatabaseType.HIVE]: 'hive',
+  [DatabaseType.DATABRICKS]: 'databricks',
+  [DatabaseType.HANA]: 'hana',
+  [DatabaseType.TERADATA]: 'teradata',
+  [DatabaseType.VERTICA]: 'vertica',
+  [DatabaseType.EXASOL]: 'exasol',
+  [DatabaseType.BIGQUERY]: 'bigquery',
+  [DatabaseType.INFORMIX]: 'informix',
+  [DatabaseType.KYLIN]: 'kylin',
+  [DatabaseType.CASSANDRA]: 'cassandra',
+  [DatabaseType.IRIS]: 'iris',
+  [DatabaseType.ACCESS]: 'access',
 }
 
 const dbTypeFromBackend: Record<string, DatabaseType> = {
@@ -111,6 +135,18 @@ const dbTypeFromBackend: Record<string, DatabaseType> = {
   trino: DatabaseType.TRINO,
   presto: DatabaseType.PRESTO,
   derby: DatabaseType.DERBY,
+  hive: DatabaseType.HIVE,
+  databricks: DatabaseType.DATABRICKS,
+  hana: DatabaseType.HANA,
+  teradata: DatabaseType.TERADATA,
+  vertica: DatabaseType.VERTICA,
+  exasol: DatabaseType.EXASOL,
+  bigquery: DatabaseType.BIGQUERY,
+  informix: DatabaseType.INFORMIX,
+  kylin: DatabaseType.KYLIN,
+  cassandra: DatabaseType.CASSANDRA,
+  iris: DatabaseType.IRIS,
+  access: DatabaseType.ACCESS,
 }
 
 const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
@@ -137,6 +173,18 @@ export function isJdbcDatabase(type: DatabaseType): boolean {
     DatabaseType.XUGUDB,
     DatabaseType.GBASE8A,
     DatabaseType.DERBY,
+    DatabaseType.HIVE,
+    DatabaseType.DATABRICKS,
+    DatabaseType.HANA,
+    DatabaseType.TERADATA,
+    DatabaseType.VERTICA,
+    DatabaseType.EXASOL,
+    DatabaseType.BIGQUERY,
+    DatabaseType.INFORMIX,
+    DatabaseType.KYLIN,
+    DatabaseType.CASSANDRA,
+    DatabaseType.IRIS,
+    DatabaseType.ACCESS,
   ].includes(type)
 }
 
@@ -149,6 +197,18 @@ export const jdbcDatabaseTypes: DatabaseType[] = [
   DatabaseType.XUGUDB,
   DatabaseType.GBASE8A,
   DatabaseType.DERBY,
+  DatabaseType.HIVE,
+  DatabaseType.DATABRICKS,
+  DatabaseType.HANA,
+  DatabaseType.TERADATA,
+  DatabaseType.VERTICA,
+  DatabaseType.EXASOL,
+  DatabaseType.BIGQUERY,
+  DatabaseType.INFORMIX,
+  DatabaseType.KYLIN,
+  DatabaseType.CASSANDRA,
+  DatabaseType.IRIS,
+  DatabaseType.ACCESS,
 ]
 
 export enum ConnectionStatus {
