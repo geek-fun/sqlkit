@@ -5,8 +5,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.*;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * BridgeMain — entry point for the SQLKit JDBC bridge.
@@ -17,8 +15,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class BridgeMain {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final Map<String, ConnectionManager> CONNECTIONS = new ConcurrentHashMap<>();
-    private static final ProtocolHandler HANDLER = new ProtocolHandler(CONNECTIONS);
+    private static final ProtocolHandler HANDLER = new ProtocolHandler(new ConnectionManager());
 
     public static void main(String[] args) throws Exception {
         // Disable Jackson's FAIL_ON_EMPTY_BEANS for safety

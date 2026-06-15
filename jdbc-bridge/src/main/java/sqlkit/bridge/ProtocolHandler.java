@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.sql.Connection;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -97,7 +98,14 @@ public class ProtocolHandler {
         int poolMin = params.has("pool_min") ? params.get("pool_min").asInt(1) : 1;
         int poolMax = params.has("pool_max") ? params.get("pool_max").asInt(5) : 5;
 
-        connectionManager.connect(connId, url, username, password, driverClass, poolMin, poolMax);
+        List<String> driverJars = new ArrayList<>();
+        if (params.has("driver_jars") && params.get("driver_jars").isArray()) {
+            for (JsonNode jar : params.get("driver_jars")) {
+                driverJars.add(jar.asText());
+            }
+        }
+
+        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax);
         response.put("result", connId);
     }
 

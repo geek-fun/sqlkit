@@ -66,6 +66,8 @@ pub struct ConnectParams {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub database: Option<String>,
     pub driver_class: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub driver_jars: Vec<String>,
     #[serde(default = "default_pool_min")]
     pub pool_min: u32,
     #[serde(default = "default_pool_max")]
