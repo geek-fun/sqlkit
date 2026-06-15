@@ -21,8 +21,7 @@ const JAVA_EXE: &str = if cfg!(target_os = "windows") {
 };
 
 /// Download URL base for releases.
-const BRIDGE_RELEASE_URL: &str =
-    "https://github.com/geek-fun/sqlkit/releases/latest/download";
+const BRIDGE_RELEASE_URL: &str = "https://github.com/geek-fun/sqlkit/releases/latest/download";
 
 // ── helpers ────────────────────────────────────────────────
 
@@ -179,8 +178,8 @@ pub async fn download_managed_jre() -> DbResult<()> {
     }
 
     let extract_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
-        let file = std::fs::File::open(&tmp_path)
-            .map_err(|e| format!("Failed to open archive: {}", e))?;
+        let file =
+            std::fs::File::open(&tmp_path).map_err(|e| format!("Failed to open archive: {}", e))?;
 
         if archive_name.ends_with(".tar.gz") {
             let decoder = flate2::read::GzDecoder::new(file);
@@ -195,11 +194,14 @@ pub async fn download_managed_jre() -> DbResult<()> {
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
         {
-            let bin_java = entry.path().join("bin").join(if cfg!(target_os = "windows") {
-                "java.exe"
-            } else {
-                "java"
-            });
+            let bin_java = entry
+                .path()
+                .join("bin")
+                .join(if cfg!(target_os = "windows") {
+                    "java.exe"
+                } else {
+                    "java"
+                });
             if bin_java.exists() {
                 let extracted_path = entry.path();
                 let target_path = parent.join("jre");
@@ -279,11 +281,15 @@ mod tests {
     #[test]
     fn test_is_valid_java() {
         // Non-existent path is invalid
-        assert!(!JreDetector::is_valid_java(&PathBuf::from("/nonexistent/java")));
+        assert!(!JreDetector::is_valid_java(&PathBuf::from(
+            "/nonexistent/java"
+        )));
 
         // The current executable should exist
         assert!(
-            JreDetector::is_valid_java(&std::env::current_exe().unwrap_or_else(|_| PathBuf::from("/"))),
+            JreDetector::is_valid_java(
+                &std::env::current_exe().unwrap_or_else(|_| PathBuf::from("/"))
+            ),
             "current_exe() should be valid"
         );
     }

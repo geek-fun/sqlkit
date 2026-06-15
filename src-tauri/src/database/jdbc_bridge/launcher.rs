@@ -36,7 +36,7 @@ impl JdbcBridgeLauncher {
     pub fn start(&mut self) -> DbResult<()> {
         let java = Self::detect_java().ok_or_else(|| {
             DbError::Connection(
-"Java not found. Install a JRE or call download_jre() to use the bundled JRE."
+                "Java not found. Install a JRE or call download_jre() to use the bundled JRE."
                     .to_string(),
             )
         })?;

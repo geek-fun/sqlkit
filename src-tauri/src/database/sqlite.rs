@@ -304,7 +304,11 @@ impl SQLiteAdapter {
         let upper = sql.trim().to_uppercase();
         let rest = upper.strip_prefix("CREATE TRIGGER ").unwrap_or("").trim();
 
-        let after_name = rest.splitn(2, char::is_whitespace).nth(1).unwrap_or("").trim();
+        let after_name = rest
+            .splitn(2, char::is_whitespace)
+            .nth(1)
+            .unwrap_or("")
+            .trim();
 
         let timing = if after_name.starts_with("INSTEAD OF") {
             "INSTEAD OF"
@@ -316,10 +320,7 @@ impl SQLiteAdapter {
             ""
         };
 
-        let after_timing = after_name
-            .strip_prefix(timing)
-            .unwrap_or(after_name)
-            .trim();
+        let after_timing = after_name.strip_prefix(timing).unwrap_or(after_name).trim();
 
         let event = after_timing
             .split_whitespace()
@@ -686,9 +687,14 @@ impl DatabaseAdapter for SQLiteAdapter {
                 DbError::QueryExecution(format!("Failed to prepare PRAGMA foreign_key_list: {}", e))
             })?;
 
-            let mut group_map: std::collections::HashMap<i64, (Vec<String>, Vec<String>, Option<String>, Option<String>)> = std::collections::HashMap::new();
-            let mut constraint_names: std::collections::HashMap<i64, String> = std::collections::HashMap::new();
-            let mut referenced_tables: std::collections::HashMap<i64, String> = std::collections::HashMap::new();
+            let mut group_map: std::collections::HashMap<
+                i64,
+                (Vec<String>, Vec<String>, Option<String>, Option<String>),
+            > = std::collections::HashMap::new();
+            let mut constraint_names: std::collections::HashMap<i64, String> =
+                std::collections::HashMap::new();
+            let mut referenced_tables: std::collections::HashMap<i64, String> =
+                std::collections::HashMap::new();
 
             let rows = pragma_stmt
                 .query_map([], |row| {
@@ -699,23 +705,42 @@ impl DatabaseAdapter for SQLiteAdapter {
                     let target_column: String = row.get(4)?;
                     let on_update: Option<String> = row.get(5).ok().flatten();
                     let on_delete: Option<String> = row.get(6).ok().flatten();
-                    Ok((id, seq, target_table, source_column, target_column, on_update, on_delete))
+                    Ok((
+                        id,
+                        seq,
+                        target_table,
+                        source_column,
+                        target_column,
+                        on_update,
+                        on_delete,
+                    ))
                 })
                 .map_err(|e| {
-                    DbError::QueryExecution(format!("Failed to query PRAGMA foreign_key_list: {}", e))
+                    DbError::QueryExecution(format!(
+                        "Failed to query PRAGMA foreign_key_list: {}",
+                        e
+                    ))
                 })?;
 
             for row in rows {
                 if let Ok((id, _seq, target_tbl, src_col, tgt_col, on_upd, on_del)) = row {
-                    referenced_tables.entry(id).or_insert_with(|| target_tbl.clone());
+                    referenced_tables
+                        .entry(id)
+                        .or_insert_with(|| target_tbl.clone());
                     if !constraint_names.contains_key(&id) {
                         constraint_names.insert(id, format!("fk_{}", id));
                     }
-                    let entry = group_map.entry(id).or_insert_with(|| (Vec::new(), Vec::new(), None, None));
+                    let entry = group_map
+                        .entry(id)
+                        .or_insert_with(|| (Vec::new(), Vec::new(), None, None));
                     entry.0.push(src_col);
                     entry.1.push(tgt_col);
-                    if entry.2.is_none() { entry.2 = on_upd; }
-                    if entry.3.is_none() { entry.3 = on_del; }
+                    if entry.2.is_none() {
+                        entry.2 = on_upd;
+                    }
+                    if entry.3.is_none() {
+                        entry.3 = on_del;
+                    }
                 }
             }
 
@@ -797,7 +822,8 @@ impl DatabaseAdapter for SQLiteAdapter {
     ) -> DbResult<Vec<TriggerInfo>> {
         Self::validate_table_name(table)?;
 
-        let query = "SELECT name, sql, tbl_name FROM sqlite_master WHERE type = 'trigger' ORDER BY name";
+        let query =
+            "SELECT name, sql, tbl_name FROM sqlite_master WHERE type = 'trigger' ORDER BY name";
         let result = self.execute_query_internal(query).await?;
 
         let mut triggers = Vec::new();
@@ -1020,10 +1046,7 @@ impl DatabaseAdapter for SQLiteAdapter {
         let object_type_upper = object_type.to_uppercase();
         match object_type_upper.as_str() {
             "TABLE" | "VIEW" => {
-                let query = format!(
-                    "ALTER TABLE \"{}\" RENAME TO \"{}\"",
-                    object_name, new_name
-                );
+                let query = format!("ALTER TABLE \"{}\" RENAME TO \"{}\"", object_name, new_name);
                 self.execute_query_internal(&query).await?;
                 Ok(())
             }
