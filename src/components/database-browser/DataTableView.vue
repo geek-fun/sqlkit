@@ -39,6 +39,10 @@ import {
   isTableNullValue,
   rowsToCsv,
 } from './dataTableHelpers'
+import SchemaTab from './SchemaTab.vue'
+import IndexesTab from './IndexesTab.vue'
+import ForeignKeysTab from './ForeignKeysTab.vue'
+import TriggersTab from './TriggersTab.vue'
 
 type TableDataResult = {
   columns: string[]
@@ -66,6 +70,17 @@ const { t } = useI18n()
 
 const ROWS_PER_PAGE_OPTIONS = [100, 500, 1000] as const
 type RowsPerPage = (typeof ROWS_PER_PAGE_OPTIONS)[number]
+
+// Sub-page navigation
+type SubPage = 'data' | 'schema' | 'indexes' | 'foreign_keys' | 'triggers'
+const activeSubPage = ref<SubPage>('data')
+const subPages: { id: SubPage, label: string }[] = [
+  { id: 'data', label: 'Data' },
+  { id: 'schema', label: 'Schema' },
+  { id: 'indexes', label: 'Indexes' },
+  { id: 'foreign_keys', label: 'Foreign Keys' },
+  { id: 'triggers', label: 'Triggers' },
+]
 
 const currentPage = ref(1)
 const rowsPerPage = ref<RowsPerPage>(100)
@@ -615,7 +630,23 @@ watch(
 
 <template>
   <div class="data-table-view flex flex-col h-full" @click="showColumnMenu = false">
-    <!-- Filter / Toolbar bar -->
+    <!-- Sub-page navigation bar -->
+    <div class="flex border-b bg-muted/30">
+      <button
+        v-for="page in subPages"
+        :key="page.id"
+        class="text-xs px-3 py-1.5 font-medium border-b-2 transition-colors"
+        :class="activeSubPage === page.id
+          ? 'border-primary text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground'"
+        @click="activeSubPage = page.id"
+      >
+        {{ page.label }}
+      </button>
+    </div>
+
+    <!-- Data sub-page: Filter / Toolbar bar -->
+    <template v-if="activeSubPage === 'data'">
     <div class="px-3 py-1.5 border-b bg-muted/20 flex gap-1.5 items-center">
       <!-- Filter icon -->
       <svg
@@ -1050,6 +1081,47 @@ watch(
         </div>
       </div>
     </div>
+    </template>
+
+    <!-- Schema sub-page -->
+    <SchemaTab
+      v-else-if="activeSubPage === 'schema'"
+      :connection-id="props.connectionId"
+      :database="props.database"
+      :schema="props.schema ?? null"
+      :table-name="props.tableName"
+      class="flex-1"
+    />
+
+    <!-- Indexes sub-page -->
+    <IndexesTab
+      v-else-if="activeSubPage === 'indexes'"
+      :connection-id="props.connectionId"
+      :database="props.database"
+      :schema="props.schema ?? null"
+      :table-name="props.tableName"
+      class="flex-1"
+    />
+
+    <!-- Foreign Keys sub-page -->
+    <ForeignKeysTab
+      v-else-if="activeSubPage === 'foreign_keys'"
+      :connection-id="props.connectionId"
+      :database="props.database"
+      :schema="props.schema ?? null"
+      :table-name="props.tableName"
+      class="flex-1"
+    />
+
+    <!-- Triggers sub-page -->
+    <TriggersTab
+      v-else-if="activeSubPage === 'triggers'"
+      :connection-id="props.connectionId"
+      :database="props.database"
+      :schema="props.schema ?? null"
+      :table-name="props.tableName"
+      class="flex-1"
+    />
 
     <!-- ── Delete confirmation dialog ── -->
     <AlertDialog v-model:open="deleteDialogOpen">

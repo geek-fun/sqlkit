@@ -5,6 +5,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { DatabaseBrowser, DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/components/database-browser'
+import ListingTab from '@/components/database-browser/ListingTab.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { Button } from '@/components/ui/button'
@@ -182,6 +183,30 @@ function getActiveConnectionId(): string | null {
   return isConnectionActive(connId) ? connId : null
 }
 
+const listingTabObjects = computed(() => {
+  const tab = activeTab.value
+  const connId = getConnectionId()
+  if (!tab?.listingTab || !connId) {
+    return null
+  }
+  const meta = databaseStore.metadata[connId]
+  if (!meta) {
+    return null
+  }
+  const objectKey = tab.listingTab.schema
+    ? `${tab.listingTab.database}.${tab.listingTab.schema}`
+    : tab.listingTab.database
+  const schemaObjects = meta.objects[objectKey]
+  if (!schemaObjects) {
+    return null
+  }
+  switch (tab.listingTab.type) {
+    case 'VIEW': return schemaObjects.views
+    case 'PROCEDURE': return schemaObjects.procedures
+    case 'FUNCTION': return schemaObjects.functions
+  }
+})
+
 async function executeQuery(details?: StatementToExecute) {
   if (!activeTab.value || activeTab.value.orphanFromConnectionId) {
     return
@@ -324,6 +349,50 @@ function handleSelectTable(table: TableInfo, database: string, schema?: string) 
   if (!connId)
     return
   tabStore.openTableViewTab(connId, database, table.name, schema)
+}
+
+function handleOpenListingTab(type: 'VIEW' | 'PROCEDURE' | 'FUNCTION', database: string, schema?: string) {
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+  tabStore.openListingTab(connId, database, type, schema)
+}
+
+function handleOpenDdlTab(name: string, type: string, database: string, schema?: string) {
+  if (type === 'VIEW') {
+    const connId = getActiveConnectionId()
+    if (!connId)
+      return
+    tabStore.openTableViewTab(connId, database, name, schema)
+    return
+  }
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+  const listingType = type === 'PROCEDURE' ? 'PROCEDURE' : 'FUNCTION'
+  tabStore.openListingTab(connId, database, listingType, schema)
+}
+
+function handleOpenFromListing(info: { name: string, type: string, schema?: string }, database: string) {
+  handleOpenDdlTab(info.name, info.type, database, info.schema)
+}
+
+async function handleRefreshListingTab() {
+  const tab = activeTab.value
+  const connId = getConnectionId()
+  if (!tab?.listingTab || !connId) {
+    return
+  }
+  try {
+    const schema = tab.listingTab.schema || ''
+    if (!schema) {
+      return
+    }
+    await databaseStore.fetchSchemaObjects(connId, tab.listingTab.database, schema)
+  }
+  catch {
+    // ignore
+  }
 }
 
 async function handleOpenSavedQuery(filePath: string) {
@@ -491,6 +560,8 @@ function closeResultPanel() {
             @export-data="handleExportData"
             @open-saved-query="handleOpenSavedQuery"
             @create-new-query="handleNewTab"
+            @open-listing-tab="handleOpenListingTab"
+            @open-ddl-tab="handleOpenDdlTab"
           />
         </div>
 
@@ -540,6 +611,22 @@ function closeResultPanel() {
               </p>
             </div>
           </div>
+
+          <!-- Listing Tab (Views / Procedures / Functions) -->
+          <ListingTab
+            v-else-if="activeTab?.listingTab && !activeTab.orphanFromConnectionId && listingTabObjects"
+            :key="`${getConnectionId()}-${activeTab.id}-${activeTab.listingTab.type}-${activeTab.listingTab.database}`"
+            :connection-id="getConnectionId() || ''"
+            :database="activeTab.listingTab.database"
+            :schema="activeTab.listingTab.schema ?? null"
+            :type="activeTab.listingTab.type"
+            :objects="listingTabObjects"
+            :loading="false"
+            :error="null"
+            class="flex-1"
+            @refresh="handleRefreshListingTab"
+            @open-object="(obj: any) => handleOpenFromListing({ name: obj.name, type: obj.object_type, schema: obj.schema }, activeTab?.listingTab?.database || '')"
+          />
 
           <!-- Query editor area (shown for normal query tabs) -->
           <template v-else>

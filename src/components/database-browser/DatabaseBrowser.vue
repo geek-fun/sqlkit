@@ -52,6 +52,8 @@ const emit = defineEmits<{
   (e: 'update:selectedSchema', schema: string): void
   (e: 'openSavedQuery', filePath: string): void
   (e: 'createNewQuery'): void
+  (e: 'openListingTab', type: string, database: string, schema?: string): void
+  (e: 'openDdlTab', name: string, type: string, database: string, schema?: string): void
 }>()
 
 const { t } = useI18n()
@@ -66,6 +68,8 @@ const contextMenuPosition = ref({ x: 0, y: 0 })
 const showContextMenu = ref(false)
 const showTables = ref(true)
 const showViews = ref(false)
+const showProcedures = ref(false)
+const showFunctions = ref(false)
 const showSavedQueries = ref(false)
 const savedQueryFiles = ref<SavedQueryInfo[]>([])
 const savedQueriesLoading = ref(false)
@@ -161,6 +165,17 @@ const systemDatabaseNodes = computed<TreeNode[]>(() => {
     .filter(db => db.is_system)
     .map(database => createDatabaseNode(database, metadata))
 })
+
+const schemaObjects = computed(() => {
+  if (!connectionId.value || !props.selectedDatabase || !props.selectedSchema) {
+    return null
+  }
+  return databaseStore.getSchemaObjects(connectionId.value, props.selectedDatabase, props.selectedSchema)
+})
+
+const viewsCount = computed(() => schemaObjects.value?.views.length ?? 0)
+const proceduresCount = computed(() => schemaObjects.value?.procedures.length ?? 0)
+const functionsCount = computed(() => schemaObjects.value?.functions.length ?? 0)
 
 const tablesAndViews = computed(() => {
   const currentDb = props.selectedDatabase
@@ -321,6 +336,51 @@ function handleTableClick(node: TreeNode) {
   selectNode(node)
   if ((node.type === 'table' || node.type === 'view') && node.metadata) {
     emit('selectTable', node.metadata, node.metadata.database, node.metadata.schema)
+  }
+}
+
+async function toggleViews() {
+  showViews.value = !showViews.value
+  if (showViews.value && connectionId.value && props.selectedDatabase && props.selectedSchema) {
+    await databaseStore.fetchSchemaObjects(connectionId.value, props.selectedDatabase, props.selectedSchema)
+  }
+}
+
+async function toggleProcedures() {
+  showProcedures.value = !showProcedures.value
+  if (showProcedures.value && connectionId.value && props.selectedDatabase && props.selectedSchema) {
+    await databaseStore.fetchSchemaObjects(connectionId.value, props.selectedDatabase, props.selectedSchema)
+  }
+}
+
+async function toggleFunctions() {
+  showFunctions.value = !showFunctions.value
+  if (showFunctions.value && connectionId.value && props.selectedDatabase && props.selectedSchema) {
+    await databaseStore.fetchSchemaObjects(connectionId.value, props.selectedDatabase, props.selectedSchema)
+  }
+}
+
+function handleViewClick(view: { name: string }) {
+  if (connectionId.value && props.selectedDatabase) {
+    emit('openDdlTab', view.name, 'VIEW', props.selectedDatabase, props.selectedSchema)
+  }
+}
+
+function handleProcedureClick(proc: { name: string }) {
+  if (connectionId.value && props.selectedDatabase) {
+    emit('openDdlTab', proc.name, 'PROCEDURE', props.selectedDatabase, props.selectedSchema)
+  }
+}
+
+function handleFunctionClick(func: { name: string }) {
+  if (connectionId.value && props.selectedDatabase) {
+    emit('openDdlTab', func.name, 'FUNCTION', props.selectedDatabase, props.selectedSchema)
+  }
+}
+
+function handleOpenListingTab(type: 'VIEW' | 'PROCEDURE' | 'FUNCTION') {
+  if (connectionId.value && props.selectedDatabase) {
+    emit('openListingTab', type, props.selectedDatabase, props.selectedSchema)
   }
 }
 
@@ -655,11 +715,11 @@ defineExpose({ fetchSavedQueryFiles })
         </div>
       </div>
 
-      <!-- VIEWS Section -->
+      <!-- VIEWS Section (opens listing tab) -->
       <div class="border-b">
         <button
           class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
-          @click="showViews = !showViews"
+          @click="toggleViews"
         >
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -676,23 +736,113 @@ defineExpose({ fetchSavedQueryFiles })
           >
             <path d="m9 18 6-6-6-6" />
           </svg>
-          {{ t('components.databaseBrowser.sections.views') }}
+          <span class="flex-1">{{ t('components.databaseBrowser.sections.views') }}</span>
+          <span class="text-xs text-muted-foreground bg-muted rounded px-1.5 py-0.5">{{ viewsCount }}</span>
         </button>
         <div v-if="showViews" class="py-1">
           <div
-            v-for="view in tablesAndViews.views"
-            :key="view.id"
+            v-for="view in schemaObjects?.views ?? []"
+            :key="view.name"
             class="tree-node text-sm px-2 py-1 flex gap-2 cursor-pointer items-center hover:bg-accent"
-            :class="{ 'bg-accent': selectedNodeId === view.id }"
-            @click="handleTableClick(view)"
-            @dblclick="handleDoubleClick(view)"
-            @contextmenu="handleContextMenu($event, view)"
+            @click="handleViewClick(view)"
+            @dblclick="handleOpenListingTab('VIEW')"
           >
             <span class="opacity-70 flex-shrink-0" v-html="getIcon('view')" />
             <span class="truncate">{{ view.name }}</span>
           </div>
-          <div v-if="tablesAndViews.views.length === 0 && !databaseStore.loading" class="text-xs text-muted-foreground px-2 py-2">
+          <div
+            v-if="(!schemaObjects?.views || schemaObjects.views.length === 0) && !databaseStore.fetching[`${props.selectedDatabase}.${props.selectedSchema}`]"
+            class="text-xs text-muted-foreground px-2 py-2"
+          >
             {{ t('components.databaseBrowser.noViews') }}
+          </div>
+        </div>
+      </div>
+
+      <!-- PROCEDURES Section -->
+      <div class="border-b">
+        <button
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          @click="toggleProcedures"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="transition-transform"
+            :class="{ 'rotate-90': showProcedures }"
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+          <span class="flex-1">{{ t('components.databaseBrowser.sections.procedures') }}</span>
+          <span class="text-xs text-muted-foreground bg-muted rounded px-1.5 py-0.5">{{ proceduresCount }}</span>
+        </button>
+        <div v-if="showProcedures" class="py-1">
+          <div
+            v-for="proc in schemaObjects?.procedures ?? []"
+            :key="proc.name"
+            class="tree-node text-sm px-2 py-1 flex gap-2 cursor-pointer items-center hover:bg-accent"
+            @click="handleProcedureClick(proc)"
+            @dblclick="handleOpenListingTab('PROCEDURE')"
+          >
+            <span class="opacity-70 flex-shrink-0" v-html="getIcon('view')" />
+            <span class="truncate">{{ proc.name }}</span>
+          </div>
+          <div
+            v-if="(!schemaObjects?.procedures || schemaObjects.procedures.length === 0) && !databaseStore.fetching[`${props.selectedDatabase}.${props.selectedSchema}`]"
+            class="text-xs text-muted-foreground px-2 py-2"
+          >
+            {{ t('components.databaseBrowser.noProcedures') }}
+          </div>
+        </div>
+      </div>
+
+      <!-- FUNCTIONS Section -->
+      <div class="border-b">
+        <button
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          @click="toggleFunctions"
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            class="transition-transform"
+            :class="{ 'rotate-90': showFunctions }"
+          >
+            <path d="m9 18 6-6-6-6" />
+          </svg>
+          <span class="flex-1">{{ t('components.databaseBrowser.sections.functions') }}</span>
+          <span class="text-xs text-muted-foreground bg-muted rounded px-1.5 py-0.5">{{ functionsCount }}</span>
+        </button>
+        <div v-if="showFunctions" class="py-1">
+          <div
+            v-for="fn in schemaObjects?.functions ?? []"
+            :key="fn.name"
+            class="tree-node text-sm px-2 py-1 flex gap-2 cursor-pointer items-center hover:bg-accent"
+            @click="handleFunctionClick(fn)"
+            @dblclick="handleOpenListingTab('FUNCTION')"
+          >
+            <span class="opacity-70 flex-shrink-0" v-html="getIcon('view')" />
+            <span class="truncate">{{ fn.name }}</span>
+          </div>
+          <div
+            v-if="(!schemaObjects?.functions || schemaObjects.functions.length === 0) && !databaseStore.fetching[`${props.selectedDatabase}.${props.selectedSchema}`]"
+            class="text-xs text-muted-foreground px-2 py-2"
+          >
+            {{ t('components.databaseBrowser.noFunctions') }}
           </div>
         </div>
       </div>
