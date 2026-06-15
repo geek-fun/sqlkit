@@ -45,8 +45,8 @@ impl JdbcBridgeAdapter {
     async fn init_bridge(&mut self) -> DbResult<Arc<Mutex<JdbcBridgeLauncher>>> {
         let db_type = self.config.db_type;
 
-        if !super::download::is_jre_installed() {
-            super::download::download_jre().await?;
+        if !super::jre::is_managed_jre_installed() {
+            super::jre::download_managed_jre().await?;
         }
 
         if !super::download::is_bridge_installed() {
@@ -80,6 +80,11 @@ impl JdbcBridgeAdapter {
                     password: self.config.password.clone(),
                     database: self.config.database.clone(),
                     driver_class: driver.to_string(),
+                    driver_jars: vec![
+                        super::download::driver_jar_path(db_type)
+                            .to_string_lossy()
+                            .to_string(),
+                    ],
                     pool_min: 1,
                     pool_max: 5,
                 })

@@ -27,21 +27,16 @@ impl JdbcBridgeLauncher {
         }
     }
 
-    /// Get the Java executable path, preferring the bundled JRE.
+    /// Get the Java executable path, preferring the managed JRE, then system.
     pub fn detect_java() -> Option<PathBuf> {
-        // Bundled JRE takes priority
-        let bundled = super::download::jre_java_path();
-        if bundled.exists() {
-            return Some(bundled);
-        }
-        None
+        super::jre::JreDetector::detect()
     }
 
     /// Start the Java bridge process.
     pub fn start(&mut self) -> DbResult<()> {
         let java = Self::detect_java().ok_or_else(|| {
             DbError::Connection(
-                "Bundled JRE not found. Call download_jre() first to install it."
+                "Java not found. Install a JRE or call download_managed_jre() to use the bundled JRE."
                     .to_string(),
             )
         })?;

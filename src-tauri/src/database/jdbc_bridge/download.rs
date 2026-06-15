@@ -1,7 +1,7 @@
 //! JDBC bridge and driver download management.
 //!
-//! Downloads the bridge fat JAR, a minimal JRE, and per-database JDBC
-//! driver JARs from GitHub Releases on demand. No system Java required.
+//! Downloads the bridge fat JAR and per-database JDBC driver JARs from
+//! GitHub Releases on demand.
 
 use crate::database::config::DatabaseType;
 use crate::database::error::{DbError, DbResult};
@@ -16,16 +16,6 @@ const BRIDGE_RELEASE_URL: &str =
 
 /// Subdirectory under user home for bridge data.
 const BRIDGE_DIR: &str = ".sqlkit/jdbc-bridge";
-
-/// JRE subdirectory name.
-const JRE_DIR: &str = "jre";
-
-/// Java executable path relative to JRE root.
-const JAVA_EXE: &str = if cfg!(target_os = "windows") {
-    "bin/java.exe"
-} else {
-    "bin/java"
-};
 
 /// Get the bridge data directory (~/.sqlkit/jdbc-bridge).
 fn bridge_dir() -> PathBuf {
@@ -45,41 +35,9 @@ pub fn bridge_jar_path() -> PathBuf {
     bridge_dir().join(BRIDGE_JAR)
 }
 
-/// Get the path to the bundled JRE java binary.
-pub fn jre_java_path() -> PathBuf {
-    bridge_dir().join(JRE_DIR).join(JAVA_EXE)
-}
-
-/// Get the platform-specific JRE archive filename used in downloads.
-fn jre_archive_name() -> &'static str {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    { "jre-macos-aarch64.tar.gz" }
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    { "jre-macos-x64.tar.gz" }
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    { "jre-linux-x64.tar.gz" }
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    { "jre-linux-aarch64.tar.gz" }
-    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-    { "jre-windows-x64.zip" }
-    #[cfg(not(any(
-        all(target_os = "macos", target_arch = "aarch64"),
-        all(target_os = "macos", target_arch = "x86_64"),
-        all(target_os = "linux", target_arch = "x86_64"),
-        all(target_os = "linux", target_arch = "aarch64"),
-        all(target_os = "windows", target_arch = "x86_64"),
-    )))]
-    { "" }
-}
-
 /// Check if the bridge JAR is already installed.
 pub fn is_bridge_installed() -> bool {
     bridge_jar_path().exists()
-}
-
-/// Check if the bundled JRE is installed.
-pub fn is_jre_installed() -> bool {
-    jre_java_path().exists()
 }
 
 /// Check if a JDBC driver is available for the given database type.
@@ -132,84 +90,6 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
     Ok(())
 }
 
-/// Download the bundled JRE for the current platform.
-///
-/// The JRE is a minimal image built with `jlink` (only java.base + java.sql),
-/// compressed as .tar.gz (macOS/Linux) or .zip (Windows).
-pub async fn download_jre() -> DbResult<()> {
-    let archive_name = jre_archive_name();
-    if archive_name.is_empty() {
-        return Err(DbError::Connection(
-            "No bundled JRE available for this platform".to_string(),
-        ));
-    }
-
-    let dir = bridge_dir();
-    tokio::fs::create_dir_all(&dir)
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to create bridge dir: {}", e)))?;
-
-    let url = format!("{}/jre/{}", BRIDGE_RELEASE_URL, archive_name);
-    let response = reqwest::get(&url)
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to download JRE: {}", e)))?;
-
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to read JRE download: {}", e)))?;
-
-    let tmp_path = dir.join(format!("{}.tmp", archive_name));
-    tokio::fs::write(&tmp_path, &bytes)
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to write JRE archive: {}", e)))?;
-
-    let jre_path = dir.join(JRE_DIR);
-    if jre_path.exists() {
-        tokio::fs::remove_dir_all(&jre_path)
-            .await
-            .map_err(|e| DbError::Connection(format!("Failed to remove old JRE: {}", e)))?;
-    }
-
-    let extract_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
-        let file = std::fs::File::open(&tmp_path)
-            .map_err(|e| format!("Failed to open archive: {}", e))?;
-
-        let jre_parent = dir.clone();
-        if archive_name.ends_with(".tar.gz") {
-            let decoder = flate2::read::GzDecoder::new(file);
-            let mut archive = tar::Archive::new(decoder);
-            archive
-                .unpack(&jre_parent)
-                .map_err(|e| format!("Failed to extract JRE: {}", e))?;
-        }
-
-        for entry in std::fs::read_dir(&jre_parent)
-            .map_err(|e| format!("Failed to list extracted files: {}", e))?
-            .filter_map(|e| e.ok())
-            .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-        {
-            let bin_java = entry.path().join("bin").join(if cfg!(target_os = "windows") { "java.exe" } else { "java" });
-            if bin_java.exists() {
-                let extracted_path = entry.path();
-                let target_path = jre_parent.join(JRE_DIR);
-                std::fs::rename(&extracted_path, &target_path)
-                    .map_err(|e| format!("Failed to rename JRE directory: {}", e))?;
-                break;
-            }
-        }
-
-        let _ = std::fs::remove_file(&tmp_path);
-        Ok(())
-    })
-    .await
-    .map_err(|e| DbError::Connection(format!("JRE extraction panicked: {}", e)))?;
-
-    extract_result.map_err(|e| DbError::Connection(format!("JRE extraction failed: {}", e)))?;
-
-    Ok(())
-}
-
 /// Download a JDBC driver JAR for the given database type.
 pub async fn download_driver(db_type: DatabaseType) -> DbResult<()> {
     let dir = drivers_dir();
@@ -249,6 +129,11 @@ fn driver_jar_name(db_type: DatabaseType) -> &'static str {
         GBase8a => "gbase8a-jdbc.jar",
         _ => "unknown.jar",
     }
+}
+
+/// Get the full path to a driver JAR for the given database type.
+pub fn driver_jar_path(db_type: DatabaseType) -> PathBuf {
+    drivers_dir().join(driver_jar_name(db_type))
 }
 
 /// Map a DatabaseType to a JDBC driver class name.
