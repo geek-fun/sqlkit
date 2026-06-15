@@ -219,6 +219,15 @@ pub fn db_error_to_api_error(error: &crate::database::DbError) -> ApiError {
         DbError::Other { message, .. } => {
             ApiError::new(error_codes::INTERNAL_ERROR, "Database error").with_details(message)
         }
+        DbError::DriverVersionIncompatible(msg) => {
+            ApiError::new(error_codes::CONNECTION_FAILED, "Incompatible JDBC driver version")
+                .with_details(msg)
+                .with_hint("Trying an older/newer driver version may resolve this")
+        }
+        DbError::UnsupportedOperation(msg) => {
+            ApiError::new(error_codes::INVALID_CONFIGURATION, "Unsupported operation")
+                .with_details(msg)
+        }
     }
 }
 

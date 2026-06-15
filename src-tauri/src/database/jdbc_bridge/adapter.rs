@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 
 use super::launcher::JdbcBridgeLauncher;
 use super::pool::JdbcBridgePool;
+use super::progress::ConnectionProgress;
 use super::protocol::{
     ConnectParams, ConnectionStatusData, JdbcMethod, JdbcRequest, QueryResultData,
 };
@@ -40,57 +41,23 @@ impl JdbcBridgeAdapter {
     }
 
     /// Ensure all prerequisites are met: JRE, bridge JAR, and JDBC driver.
-    /// Downloads anything missing automatically (called once from `connect`).
+    /// Uses the fallback chain to try multiple driver versions automatically.
     async fn init_bridge(&mut self) -> DbResult<Arc<Mutex<JdbcBridgeLauncher>>> {
         let db_type = self.config.db_type;
 
-        if !super::download::is_jre_installed() {
-            super::download::download_jre().await?;
-        }
-
-        if !super::download::is_bridge_installed() {
-            super::download::download_bridge_plugin().await?;
-        }
-
-        if !super::download::is_driver_available(db_type) {
-            super::download::download_driver(db_type).await?;
-        }
-
-        let bridge_jar = super::download::bridge_jar_path();
-        let mut launcher = JdbcBridgeLauncher::new(bridge_jar);
-        launcher.start()?;
-        let launcher = Arc::new(Mutex::new(launcher));
-
-        let url = super::download::build_jdbc_url(
+        // Use fallback chain for JDBC-dependent databases (Oracle, DB2, H2, etc.)
+        // For non-registry types, fall back to the old single-driver approach
+        let (_version, conn_id, launcher) = super::fallback::run_fallback_chain(
             db_type,
             &self.config.host,
             self.config.port,
             self.config.database.as_deref(),
-        );
-        let driver = super::download::driver_class(db_type);
-
-        let result = Self::send_request(
-            &launcher,
-            JdbcRequest::new(
-                JdbcMethod::Connect,
-                serde_json::to_value(ConnectParams {
-                    url,
-                    username: self.config.username.clone(),
-                    password: self.config.password.clone(),
-                    database: self.config.database.clone(),
-                    driver_class: driver.to_string(),
-                    pool_min: 1,
-                    pool_max: 5,
-                })
-                .unwrap_or_default(),
-            ),
+            &self.config.username,
+            &self.config.password,
         )
         .await?;
 
-        self.conn_id = result
-            .as_str()
-            .map(|s| s.to_string())
-            .or_else(|| Some(format!("conn_{}", uuid::Uuid::new_v4())));
+        self.conn_id = Some(conn_id);
         self.launcher = Some(launcher.clone());
 
         Ok(launcher)

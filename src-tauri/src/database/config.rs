@@ -73,6 +73,8 @@ pub enum DatabaseType {
     H2,
     /// Snowflake — JDBC bridge.
     Snowflake,
+    /// Apache Derby — JDBC bridge.
+    Derby,
     /// 达梦 DM8 (Oracle mode, primary) — JDBC bridge.
     DM8Oracle,
     /// 虚谷 XuguDB — JDBC bridge.

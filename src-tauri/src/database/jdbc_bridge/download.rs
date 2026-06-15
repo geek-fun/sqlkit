@@ -1,11 +1,12 @@
 //! JDBC bridge and driver download management.
 //!
-//! Downloads the bridge fat JAR, a minimal JRE, and per-database JDBC
-//! driver JARs from GitHub Releases on demand. No system Java required.
+//! Downloads the bridge fat JAR and per-database JDBC driver JARs from
+//! GitHub Releases and Maven Central on demand.
 
 use crate::database::config::DatabaseType;
 use crate::database::error::{DbError, DbResult};
-use std::path::PathBuf;
+use sha2::{Digest, Sha256};
+use std::path::{Path, PathBuf};
 
 /// Bridge JAR filename.
 const BRIDGE_JAR: &str = "jdbc-bridge.jar";
@@ -15,16 +16,6 @@ const BRIDGE_RELEASE_URL: &str = "https://github.com/geek-fun/sqlkit/releases/la
 
 /// Subdirectory under user home for bridge data.
 const BRIDGE_DIR: &str = ".sqlkit/jdbc-bridge";
-
-/// JRE subdirectory name.
-const JRE_DIR: &str = "jre";
-
-/// Java executable path relative to JRE root.
-const JAVA_EXE: &str = if cfg!(target_os = "windows") {
-    "bin/java.exe"
-} else {
-    "bin/java"
-};
 
 /// Get the bridge data directory (~/.sqlkit/jdbc-bridge).
 fn bridge_dir() -> PathBuf {
@@ -82,21 +73,62 @@ fn jre_archive_name() -> &'static str {
         ""
     }
 }
-
 /// Check if the bridge JAR is already installed.
 pub fn is_bridge_installed() -> bool {
     bridge_jar_path().exists()
-}
-
-/// Check if the bundled JRE is installed.
-pub fn is_jre_installed() -> bool {
-    jre_java_path().exists()
 }
 
 /// Check if a JDBC driver is available for the given database type.
 pub fn is_driver_available(db_type: DatabaseType) -> bool {
     let name = driver_jar_name(db_type);
     drivers_dir().join(name).exists()
+}
+
+/// Check if a specific driver version JAR is installed.
+pub fn is_driver_version_installed(db_type: DatabaseType, version: &str) -> bool {
+    let jar_name = driver_jar_name_for_version(db_type, version);
+    drivers_dir().join(&jar_name).exists()
+}
+
+/// Verify SHA-256 checksum of a file against expected hex string.
+pub fn verify_sha256(path: &Path, expected_hex: &str) -> DbResult<()> {
+    let bytes = std::fs::read(path)
+        .map_err(|e| DbError::Connection(format!("Failed to read file for checksum: {}", e)))?;
+    let mut hasher = Sha256::new();
+    hasher.update(&bytes);
+    let actual = hex::encode(hasher.finalize());
+    if !actual.eq_ignore_ascii_case(expected_hex) {
+        return Err(DbError::Connection(format!(
+            "SHA-256 mismatch for {}: expected {}, got {}",
+            path.display(), expected_hex, actual
+        )));
+    }
+    Ok(())
+}
+
+/// Download a file from URL to a temporary path, then atomically rename to final.
+pub async fn download_to_path(url: &str, dest: &Path) -> DbResult<()> {
+    let tmp_path = dest.with_extension("tmp");
+    let response = reqwest::get(url)
+        .await
+        .map_err(|e| DbError::Connection(format!("Failed to download from {}: {}", url, e)))?;
+    let bytes = response
+        .bytes()
+        .await
+        .map_err(|e| DbError::Connection(format!("Failed to read download: {}", e)))?;
+    // Ensure parent dir exists
+    if let Some(parent) = dest.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to create dir: {}", e)))?;
+    }
+    tokio::fs::write(&tmp_path, &bytes)
+        .await
+        .map_err(|e| DbError::Connection(format!("Failed to write temp file: {}", e)))?;
+    tokio::fs::rename(&tmp_path, dest)
+        .await
+        .map_err(|e| DbError::Connection(format!("Failed to finalize download: {}", e)))?;
+    Ok(())
 }
 
 /// Ensure the bridge JAR and required driver are installed.
@@ -228,7 +260,8 @@ pub async fn download_jre() -> DbResult<()> {
     Ok(())
 }
 
-/// Download a JDBC driver JAR for the given database type.
+/// Download a JDBC driver JAR for the given database type (from GitHub Releases).
+pub async fn download_driver(db_type: DatabaseType) -> DbResult<()> {
 pub async fn download_driver(db_type: DatabaseType) -> DbResult<()> {
     let dir = drivers_dir();
     tokio::fs::create_dir_all(&dir)
@@ -255,6 +288,38 @@ pub async fn download_driver(db_type: DatabaseType) -> DbResult<()> {
     Ok(())
 }
 
+/// Download a specific driver version from Maven Central.
+///
+/// Constructs the Maven Central URL from group/artifact/version coordinates
+/// and optionally verifies the SHA-256 checksum.
+pub async fn download_driver_from_maven(
+    maven_group: &str,
+    maven_artifact: &str,
+    version: &str,
+    dest_path: &Path,
+    expected_sha256: &str,
+) -> DbResult<()> {
+    if dest_path.exists() && !expected_sha256.is_empty() {
+        if verify_sha256(dest_path, expected_sha256).is_ok() {
+            return Ok(()); // Already downloaded and valid
+        }
+    }
+
+    let group_path = maven_group.replace('.', "/");
+    let url = format!(
+        "https://repo1.maven.org/maven2/{}/{}/{}/{}-{}.jar",
+        group_path, maven_artifact, version, maven_artifact, version
+    );
+
+    download_to_path(&url, dest_path).await?;
+
+    if !expected_sha256.is_empty() {
+        verify_sha256(dest_path, expected_sha256)?;
+    }
+
+    Ok(())
+}
+
 /// Map a DatabaseType to a JDBC driver JAR filename.
 fn driver_jar_name(db_type: DatabaseType) -> &'static str {
     use DatabaseType::*;
@@ -262,11 +327,39 @@ fn driver_jar_name(db_type: DatabaseType) -> &'static str {
         DB2 => "db2-jdbc.jar",
         H2 => "h2-2.4.240.jar",
         Snowflake => "snowflake-jdbc.jar",
+        Oracle => "ojdbc11.jar",
+        Derby => "derbyclient.jar",
         DM8Oracle => "dm-jdbc.jar",
         XuguDB => "xugudb-jdbc.jar",
         GBase8a => "gbase8a-jdbc.jar",
         _ => "unknown.jar",
     }
+}
+
+/// Get driver JAR filename for a specific version (for fallback chain).
+pub fn driver_jar_name_for_version(db_type: DatabaseType, version: &str) -> String {
+    use DatabaseType::*;
+    match db_type {
+        DB2 => format!("db2jcc-{}.jar", version),
+        H2 => format!("h2-{}.jar", version),
+        Snowflake => format!("snowflake-jdbc-{}.jar", version),
+        Oracle => format!("ojdbc-{}.jar", version),
+        Derby => format!("derbyclient-{}.jar", version),
+        DM8Oracle => format!("dm-jdbc-{}.jar", version),
+        XuguDB => format!("xugudb-jdbc-{}.jar", version),
+        GBase8a => format!("gbase8a-jdbc-{}.jar", version),
+        _ => format!("unknown-{}.jar", version),
+    }
+}
+
+/// Get the full path to a driver JAR for the given database type.
+pub fn driver_jar_path(db_type: DatabaseType) -> PathBuf {
+    drivers_dir().join(driver_jar_name(db_type))
+}
+
+/// Get the full path to a version-specific driver JAR.
+pub fn driver_jar_path_for_version(db_type: DatabaseType, version: &str) -> PathBuf {
+    drivers_dir().join(driver_jar_name_for_version(db_type, version))
 }
 
 /// Map a DatabaseType to a JDBC driver class name.
