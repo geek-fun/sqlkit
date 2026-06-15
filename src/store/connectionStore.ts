@@ -109,18 +109,28 @@ function resolveDatabase(type: DatabaseType, database?: string): string | null {
 
 export { resolveDatabase }
 
-export const isJdbcDatabase = (type: DatabaseType): boolean => {
+export function isJdbcDatabase(type: DatabaseType): boolean {
   return [
-    DatabaseType.ORACLE, DatabaseType.DB2, DatabaseType.H2,
-    DatabaseType.SNOWFLAKE, DatabaseType.DM8ORACLE,
-    DatabaseType.XUGUDB, DatabaseType.GBASE8A, DatabaseType.DERBY,
+    DatabaseType.ORACLE,
+    DatabaseType.DB2,
+    DatabaseType.H2,
+    DatabaseType.SNOWFLAKE,
+    DatabaseType.DM8ORACLE,
+    DatabaseType.XUGUDB,
+    DatabaseType.GBASE8A,
+    DatabaseType.DERBY,
   ].includes(type)
 }
 
 export const jdbcDatabaseTypes: DatabaseType[] = [
-  DatabaseType.ORACLE, DatabaseType.DB2, DatabaseType.H2,
-  DatabaseType.SNOWFLAKE, DatabaseType.DM8ORACLE,
-  DatabaseType.XUGUDB, DatabaseType.GBASE8A, DatabaseType.DERBY,
+  DatabaseType.ORACLE,
+  DatabaseType.DB2,
+  DatabaseType.H2,
+  DatabaseType.SNOWFLAKE,
+  DatabaseType.DM8ORACLE,
+  DatabaseType.XUGUDB,
+  DatabaseType.GBASE8A,
+  DatabaseType.DERBY,
 ]
 
 export enum ConnectionStatus {

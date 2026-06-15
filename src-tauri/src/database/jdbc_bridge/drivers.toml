@@ -185,9 +185,7 @@ maven_artifact = "xugudb-jdbc"
 jdbc_url_template = "jdbc:xugudb://{host}:{port}/{database}"
 default_port = 5138
 min_jre_version = "11"
-version_error_signatures = [
-  "driver version not compatible",
-]
+version_error_signatures = [ "driver version not compatible", ]
 
 [[databases.xugudb.versions]]
 version = "1.0.0"
@@ -205,9 +203,7 @@ maven_artifact = "gbase-connector-java"
 jdbc_url_template = "jdbc:gbase://{host}:{port}/{database}"
 default_port = 5258
 min_jre_version = "11"
-version_error_signatures = [
-  "driver version not compatible",
-]
+version_error_signatures = [ "driver version not compatible", ]
 
 [[databases.gbase8a.versions]]
 version = "8.5.1"

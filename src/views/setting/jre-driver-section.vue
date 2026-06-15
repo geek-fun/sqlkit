@@ -1,15 +1,15 @@
 <script setup lang="ts">
+import type { DriverInfo, JreStatus } from '@/datasources'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { jdbcApi, type DriverInfo, type JreStatus } from '@/datasources'
+import { jdbcApi } from '@/datasources'
 
 const { t } = useI18n()
 
 const jreStatus = ref<JreStatus | null>(null)
 const jreLoading = ref(false)
-const jreProgress = ref(0)
 
 const drivers = ref<DriverInfo[]>([])
 const driversLoading = ref(false)
@@ -108,8 +108,8 @@ onMounted(() => {
             {{ t('pages.settings.jre.jreCard.status.checking') }}
           </div>
           <div v-else-if="jreStatus" class="flex gap-2 items-center">
-            <span v-if="jreStatus.installed" class="text-green-600 text-sm">✅ {{ t('pages.settings.jre.jreCard.status.installed') }}</span>
-            <span v-else class="text-muted-foreground text-sm">⬇️ {{ t('pages.settings.jre.jreCard.status.notInstalled') }}</span>
+            <span v-if="jreStatus.installed" class="text-sm text-green-600">✅ {{ t('pages.settings.jre.jreCard.status.installed') }}</span>
+            <span v-else class="text-sm text-muted-foreground">⬇️ {{ t('pages.settings.jre.jreCard.status.notInstalled') }}</span>
             <span class="text-xs text-muted-foreground">
               ({{ jreStatus.source === 'managed' ? t('pages.settings.jre.jreCard.status.managed') : jreStatus.source === 'system' ? t('pages.settings.jre.jreCard.status.system') : '' }})
             </span>
@@ -154,7 +154,7 @@ onMounted(() => {
           {{ t('pages.settings.jre.driversCard.status.loading') }}
         </div>
 
-        <div v-else-if="drivers.length === 0" class="border rounded-md py-6 text-center">
+        <div v-else-if="drivers.length === 0" class="py-6 text-center border rounded-md">
           <p class="text-sm text-muted-foreground">
             {{ t('pages.settings.jre.driversCard.empty.title') }}
           </p>
@@ -163,11 +163,11 @@ onMounted(() => {
           </p>
         </div>
 
-        <div v-else class="divide-y border rounded-md">
+        <div v-else class="border rounded-md divide-y">
           <div
             v-for="driver in drivers"
             :key="driver.db_type"
-            class="flex gap-3 items-center px-4 py-3"
+            class="px-4 py-3 flex gap-3 items-center"
           >
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium truncate">
@@ -180,14 +180,14 @@ onMounted(() => {
             <div class="flex-shrink-0">
               <span
                 v-if="driver.installed"
-                class="text-green-600 text-xs"
+                class="text-xs text-green-600"
               >✅ {{ t('pages.settings.jre.driversCard.status.installed') }}</span>
               <span
                 v-else
-                class="text-muted-foreground text-xs"
+                class="text-xs text-muted-foreground"
               >⬇️ {{ t('pages.settings.jre.driversCard.status.notInstalled') }}</span>
             </div>
-            <div class="flex-shrink-0 flex gap-2">
+            <div class="flex flex-shrink-0 gap-2">
               <Button
                 v-if="!driver.installed"
                 size="sm"
