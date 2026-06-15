@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import type { QueryResult } from '@/store/tabStore'
 import type { ApiError } from '@/types/api'
-import { computed, ref } from 'vue'
+import type { ColumnFilter, SortColumn } from '@/types/grid'
+import { invoke } from '@tauri-apps/api/core'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import DataGrid from '@/components/grid/DataGrid.vue'
 import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
 import { formatApiError } from '@/types/api'
 
 type Props = {
@@ -13,6 +17,10 @@ type Props = {
   executionTime?: number
   height?: string
   resizable?: boolean
+  sql?: string
+  connectionId?: string
+  database?: string
+  schema?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -22,22 +30,19 @@ const props = withDefaults(defineProps<Props>(), {
   executionTime: 0,
   height: '300px',
   resizable: true,
+  sql: undefined,
+  connectionId: undefined,
+  database: undefined,
+  schema: undefined,
 })
 
 const emit = defineEmits<{
   (e: 'close'): void
   (e: 'resize', height: number): void
+  (e: 'refresh'): void
 }>()
 
 const { t } = useI18n()
-
-const formattedError = computed(() => {
-  if (!props.error)
-    return ''
-  if (typeof props.error === 'string')
-    return props.error
-  return formatApiError(props.error, t)
-})
 
 const panelHeight = ref(300)
 const isResizing = ref(false)
@@ -52,18 +57,118 @@ const formattedTime = computed(() => {
     : `${(props.executionTime / 1000).toFixed(2)}s`
 })
 
-function formatValue(value: unknown): string {
-  return value === null || value === undefined
-    ? 'NULL'
-    : typeof value === 'object'
-      ? JSON.stringify(value)
-      : String(value)
+// ── Sort/Filter Re-execution ──
+const gridLoading = ref(false)
+const gridError = ref<string | null>(null)
+const gridResults = ref<QueryResult | null>(null)
+const gridExecutionTimeMs = ref<number | undefined>(undefined)
+const activeSort = ref<SortColumn[]>([])
+const activeFilters = ref<ColumnFilter[]>([])
+
+// Sync from props when results change
+watch(() => props.results, (r) => {
+  if (r) {
+    gridResults.value = r
+    gridError.value = null
+  }
+}, { immediate: true })
+
+function buildWrappedSql(sort: SortColumn[], filters: ColumnFilter[]): string {
+  if (!props.sql)
+    return props.sql ?? ''
+  let sql = `SELECT * FROM (${props.sql}) AS _sqlkit_grid`
+
+  // Build WHERE clause
+  if (filters.length > 0) {
+    const clauses = filters.map((f) => {
+      const esc = (v: string) => v.replace(/'/g, '\'\'')
+      const col = f.column
+      switch (f.operator) {
+        case 'eq':
+          return `${col} = '${esc(f.value)}'`
+        case 'neq':
+          return `${col} != '${esc(f.value)}'`
+        case 'like':
+          return `${col} LIKE '%${esc(f.value)}%'`
+        case 'gt':
+          return `${col} > '${esc(f.value)}'`
+        case 'lt':
+          return `${col} < '${esc(f.value)}'`
+        case 'gte':
+          return `${col} >= '${esc(f.value)}'`
+        case 'lte':
+          return `${col} <= '${esc(f.value)}'`
+        case 'between':
+          return `${col} >= '${esc(f.value)}' AND ${col} <= '${esc(f.value2 ?? '')}'`
+        default:
+          return ''
+      }
+    }).filter(Boolean)
+    if (clauses.length > 0) {
+      sql += ` WHERE ${clauses.join(' AND ')}`
+    }
+  }
+
+  // Build ORDER BY clause
+  if (sort.length > 0) {
+    sql += ` ORDER BY ${sort.map(s => `${s.column} ${s.direction}`).join(', ')}`
+  }
+
+  return sql
 }
 
-function isNullValue(value: unknown): boolean {
-  return value === null || value === undefined
+async function handleSortChange(sort: SortColumn[]) {
+  activeSort.value = sort
+  await reExecuteWithSortFilter()
 }
 
+async function handleFilterChange(filters: ColumnFilter[]) {
+  activeFilters.value = filters
+  await reExecuteWithSortFilter()
+}
+
+async function reExecuteWithSortFilter() {
+  if (!props.connectionId || !props.sql)
+    return
+
+  gridLoading.value = true
+  gridError.value = null
+
+  try {
+    const wrappedSql = buildWrappedSql(activeSort.value, activeFilters.value)
+    const start = performance.now()
+    const result = await invoke<{ status: string, data: QueryResult }>('execute_query', {
+      connectionId: props.connectionId,
+      sql: wrappedSql,
+      database: props.database ?? null,
+    })
+    const elapsed = Math.round(performance.now() - start)
+
+    if (result.status === 'success') {
+      gridResults.value = result.data
+      gridExecutionTimeMs.value = elapsed
+    }
+    else {
+      gridError.value = t('components.queryResult.error')
+    }
+  }
+  catch (err) {
+    gridError.value = String(err)
+  }
+  finally {
+    gridLoading.value = false
+  }
+}
+
+function handleRefresh() {
+  activeSort.value = []
+  activeFilters.value = []
+  gridResults.value = props.results ?? null
+  gridError.value = null
+  emit('refresh')
+}
+
+// ── Resize ──
 function startResize(e: MouseEvent) {
   if (!props.resizable)
     return
@@ -93,6 +198,12 @@ function stopResize() {
 function close() {
   emit('close')
 }
+
+// Determine what to show
+const displayResults = computed(() => gridResults.value ?? props.results)
+const displayError = computed(() => gridError.value ?? props.error)
+const displayExecuting = computed(() => props.isExecuting || gridLoading.value)
+const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.executionTime)
 </script>
 
 <template>
@@ -108,45 +219,53 @@ function close() {
     />
 
     <!-- Header -->
-    <div class="px-3 py-1.5 border-b bg-muted/30 flex items-center justify-between">
+    <div class="px-3 py-1.5 border-b bg-muted/30 flex flex-shrink-0 items-center justify-between">
       <div class="flex gap-4 items-center">
         <span class="text-sm font-medium">
           {{ t('components.queryResult.title') }}
         </span>
-        <div v-if="results" class="text-xs text-muted-foreground flex gap-2 items-center">
-          <span v-if="results.columns.length > 0">{{ t('components.queryResult.rows', { count: results.rowCount }) }}</span>
-          <span v-else-if="results.rowsAffected !== undefined">{{ t('components.queryResult.rowsAffected', { count: results.rowsAffected }) }}</span>
+        <div v-if="displayResults" class="text-xs text-muted-foreground flex gap-2 items-center">
+          <span v-if="displayResults.columns.length > 0">{{ t('components.queryResult.rows', { count: displayResults.rowCount }) }}</span>
+          <span v-else-if="displayResults.rowsAffected !== undefined">{{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}</span>
           <span v-if="formattedTime">• {{ t('components.queryResult.time', { time: formattedTime }) }}</span>
         </div>
       </div>
-      <Button
-        variant="ghost"
-        size="icon"
-        class="h-6 w-6"
-        :title="t('components.queryResult.close')"
-        @click="close"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 6 6 18" />
-          <path d="m6 6 12 12" />
-        </svg>
-      </Button>
+      <div class="flex gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-6 w-6"
+          :title="t('components.dataTableView.refresh')"
+          @click="handleRefresh"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+            <path d="M8 16H3v5" />
+          </svg>
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-6 w-6"
+          :title="t('components.queryResult.close')"
+          @click="close"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
+          </svg>
+        </Button>
+      </div>
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-auto">
+    <div class="flex-1 min-h-0">
       <!-- Loading state -->
-      <div v-if="isExecuting" class="flex h-full items-center justify-center">
+      <div v-if="displayExecuting && !displayResults" class="flex h-full items-center justify-center">
         <div class="text-center">
-          <svg
-            class="text-primary mx-auto mb-2 h-8 w-8 animate-spin"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
+          <Spinner class="mx-auto mb-2 h-8 w-8" />
           <p class="text-sm text-muted-foreground">
             {{ t('components.queryResult.executing') }}
           </p>
@@ -154,78 +273,49 @@ function close() {
       </div>
 
       <!-- Error state -->
-      <div v-else-if="error" class="p-4">
-        <div class="p-4 border border-red-200 rounded-md bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+      <div v-else-if="displayError && !displayResults" class="p-4">
+        <div class="p-4 border border-destructive/30 rounded-md bg-destructive/5">
           <div class="flex gap-3 items-start">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600 mt-0.5 flex-shrink-0 dark:text-red-400">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" x2="12" y1="8" y2="12" />
-              <line x1="12" x2="12.01" y1="16" y2="16" />
-            </svg>
-            <div class="flex-1 space-y-2">
-              <div class="space-y-1">
-                <p
-                  v-for="(line, index) in formattedError.split('\n\n')"
-                  :key="index"
-                  class="text-sm dark:text-red-200"
-                  :class="line.startsWith('💡') ? 'text-amber-700 dark:text-amber-300' : 'text-red-800 dark:text-red-200'"
-                >
-                  {{ line }}
-                </p>
-              </div>
+            <span class="i-carbon-warning-alt text-destructive mt-0.5 flex-shrink-0 h-5 w-5" />
+            <div>
+              <p
+                v-for="(line, index) in (typeof displayError === 'string' ? displayError : formatApiError(displayError, t)).split('\n\n')"
+                :key="index"
+                class="text-sm text-destructive"
+              >
+                {{ line }}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Results table -->
-      <div v-else-if="results && results.columns.length > 0" class="h-full overflow-auto">
-        <table class="results-table w-full">
-          <thead>
-            <tr class="border-b">
-              <th class="results-table-header text-center w-12">
-                #
-              </th>
-              <th
-                v-for="column in results.columns"
-                :key="column"
-                class="results-table-header text-left whitespace-nowrap"
-              >
-                {{ column }}
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="(row, index) in results.rows" :key="index" class="border-b hover:bg-muted/50">
-              <td class="text-xs text-muted-foreground px-4 py-2 text-center w-12">
-                {{ index + 1 }}
-              </td>
-              <td
-                v-for="column in results.columns"
-                :key="`${index}-${column}`"
-                class="text-sm px-4 py-2 max-w-xs truncate"
-                :class="{ 'italic text-muted-foreground': isNullValue(row[column]) }"
-                :title="formatValue(row[column])"
-              >
-                {{ formatValue(row[column]) }}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <!-- DataGrid (SELECT results with columns) -->
+      <DataGrid
+        v-else-if="displayResults && displayResults.columns.length > 0"
+        :columns="displayResults.columns"
+        :rows="displayResults.rows"
+        :row-count="displayResults.rowCount"
+        :execution-time-ms="displayExecutionTime"
+        :connection-id="connectionId"
+        :database="database"
+        :schema="schema"
+        :loading="displayExecuting"
+        :error="displayError ? String(displayError) : null"
+        @sort-change="handleSortChange"
+        @filter-change="handleFilterChange"
+        @refresh="handleRefresh"
+      />
 
-      <!-- Empty state (DDL/DML success) -->
-      <div v-else-if="results && results.columns.length === 0" class="flex h-full items-center justify-center">
+      <!-- DML/DLL success (no columns returned) -->
+      <div v-else-if="displayResults && displayResults.columns.length === 0" class="flex h-full items-center justify-center">
         <div class="text-muted-foreground text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2 opacity-50">
-            <circle cx="12" cy="12" r="10" />
-            <path d="m9 12 2 2 4-4" />
-          </svg>
+          <span class="i-carbon-checkmark mx-auto mb-2 opacity-50 h-8 w-8 block" />
           <p class="text-sm font-medium">
             {{ t('components.queryResult.success') }}
           </p>
-          <p v-if="results.rowsAffected !== undefined" class="text-xs mt-1">
-            {{ t('components.queryResult.rowsAffected', { count: results.rowsAffected }) }}
+          <p v-if="displayResults.rowsAffected !== undefined" class="text-xs mt-1">
+            {{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}
           </p>
           <p v-else class="text-xs mt-1">
             {{ t('components.queryResult.commandCompleted') }}
@@ -233,13 +323,10 @@ function close() {
         </div>
       </div>
 
-      <!-- No results -->
+      <!-- No results (no query executed yet) -->
       <div v-else class="flex h-full items-center justify-center">
         <div class="text-muted-foreground text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2 opacity-50">
-            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-            <polyline points="14 2 14 8 20 8" />
-          </svg>
+          <span class="i-carbon-document-blank mx-auto mb-2 opacity-40 h-8 w-8 block" />
           <p class="text-sm">
             {{ t('components.queryResult.noResults') }}
           </p>
@@ -250,20 +337,6 @@ function close() {
 </template>
 
 <style scoped>
-.results-table {
-  border-collapse: collapse;
-}
-
-.results-table-header {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background-color: hsl(var(--muted));
-  padding: 0.5rem 1rem;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
 .resize-handle {
   position: relative;
 }
