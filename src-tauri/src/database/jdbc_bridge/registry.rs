@@ -69,6 +69,10 @@ pub struct DriverVersion {
     /// Additional error signatures specific to this version.
     #[serde(default)]
     pub version_error_signatures: Vec<String>,
+    /// Maven classifier (e.g. `"standalone"` for hive-jdbc-{version}-standalone.jar).
+    /// When set, the download URL becomes: {artifact}-{version}-{classifier}.jar
+    #[serde(default)]
+    pub maven_classifier: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -124,17 +128,22 @@ pub fn resolve_maven_url(
     let artifact = entry.maven_artifact_override.as_deref().unwrap_or(base_artifact);
     let version = &entry.version;
     let group_path = group.replace('.', "/");
+    let classifier_suffix = entry
+        .maven_classifier
+        .as_ref()
+        .map(|c| format!("-{c}"))
+        .unwrap_or_default();
     format!(
-        "https://repo1.maven.org/maven2/{group_path}/{artifact}/{version}/{artifact}-{version}.jar"
+        "https://repo1.maven.org/maven2/{group_path}/{artifact}/{version}/{artifact}-{version}{classifier_suffix}.jar"
     )
 }
 
 /// Substitute `{host}`, `{port}`, and `{database}` placeholders in a JDBC URL
 /// template.
 ///
-/// When `database` is `None`, the `{database}` placeholder is removed from the
-/// template (useful for databases like DM8 that do not require a database name
-/// in the connection URL).
+/// When `database` is `None`, the `{database}` placeholder and any associated
+/// parameter prefix (e.g. `;httpPath=`, `/DATABASE=`) are removed from the
+/// template to avoid dangling empty parameters.
 pub fn build_jdbc_url(
     config: &DatabaseDriverConfig,
     host: &str,
@@ -147,7 +156,18 @@ pub fn build_jdbc_url(
         .replace("{port}", &port.to_string());
     match database {
         Some(db) => url.replace("{database}", db),
-        None => url.replace("{database}", ""),
+        None => {
+            let url = url.replace("{database}", "");
+            // Remove dangling parameter prefixes left after {database} removal
+            let url = url
+                .replace(";httpPath=", "")
+                .replace("/DATABASE=", "")
+                .replace(";schema=", "")
+                .replace(";ProjectId=", "")
+                .replace(":INFORMIXSERVER=", "");
+            // Trim trailing separators that may be left behind
+            url.trim_end_matches(&[';', '&', '/', '?'][..]).to_string()
+        }
     }
 }
 
@@ -166,6 +186,18 @@ fn db_type_to_registry_key(db: DatabaseType) -> Option<&'static str> {
         DatabaseType::DM8Oracle => Some("dm8_oracle"),
         DatabaseType::XuguDB => Some("xugudb"),
         DatabaseType::GBase8a => Some("gbase8a"),
+        DatabaseType::Hive => Some("hive"),
+        DatabaseType::Databricks => Some("databricks"),
+        DatabaseType::Hana => Some("hana"),
+        DatabaseType::Teradata => Some("teradata"),
+        DatabaseType::Vertica => Some("vertica"),
+        DatabaseType::Exasol => Some("exasol"),
+        DatabaseType::BigQuery => Some("bigquery"),
+        DatabaseType::Informix => Some("informix"),
+        DatabaseType::Kylin => Some("kylin"),
+        DatabaseType::Cassandra => Some("cassandra"),
+        DatabaseType::Iris => Some("iris"),
+        DatabaseType::Access => Some("access"),
         _ => None,
     }
 }
@@ -186,6 +218,18 @@ mod tests {
         assert!(registry.databases.contains_key("oracle"));
         assert!(registry.databases.contains_key("db2"));
         assert!(registry.databases.contains_key("h2"));
+        assert!(registry.databases.contains_key("hive"));
+        assert!(registry.databases.contains_key("databricks"));
+        assert!(registry.databases.contains_key("hana"));
+        assert!(registry.databases.contains_key("teradata"));
+        assert!(registry.databases.contains_key("vertica"));
+        assert!(registry.databases.contains_key("exasol"));
+        assert!(registry.databases.contains_key("bigquery"));
+        assert!(registry.databases.contains_key("informix"));
+        assert!(registry.databases.contains_key("kylin"));
+        assert!(registry.databases.contains_key("cassandra"));
+        assert!(registry.databases.contains_key("iris"));
+        assert!(registry.databases.contains_key("access"));
     }
 
     #[test]
@@ -351,5 +395,21 @@ mod tests {
         assert_eq!(DriverRegistry::registry_key(DatabaseType::MySQL), None);
         assert_eq!(DriverRegistry::registry_key(DatabaseType::SqlServer), None);
         assert_eq!(DriverRegistry::registry_key(DatabaseType::SQLite), None);
+    }
+
+    #[test]
+    fn test_registry_key_new_jdbc_types() {
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Hive), Some("hive"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Databricks), Some("databricks"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Hana), Some("hana"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Teradata), Some("teradata"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Vertica), Some("vertica"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Exasol), Some("exasol"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::BigQuery), Some("bigquery"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Informix), Some("informix"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Kylin), Some("kylin"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Cassandra), Some("cassandra"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Iris), Some("iris"));
+        assert_eq!(DriverRegistry::registry_key(DatabaseType::Access), Some("access"));
     }
 }
