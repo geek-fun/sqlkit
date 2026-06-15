@@ -11,8 +11,7 @@ use std::path::PathBuf;
 const BRIDGE_JAR: &str = "jdbc-bridge.jar";
 
 /// Download URL base for bridge releases.
-const BRIDGE_RELEASE_URL: &str =
-    "https://github.com/geek-fun/sqlkit/releases/latest/download";
+const BRIDGE_RELEASE_URL: &str = "https://github.com/geek-fun/sqlkit/releases/latest/download";
 
 /// Subdirectory under user home for bridge data.
 const BRIDGE_DIR: &str = ".sqlkit/jdbc-bridge";
@@ -53,15 +52,25 @@ pub fn jre_java_path() -> PathBuf {
 /// Get the platform-specific JRE archive filename used in downloads.
 fn jre_archive_name() -> &'static str {
     #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    { "jre-macos-aarch64.tar.gz" }
+    {
+        "jre-macos-aarch64.tar.gz"
+    }
     #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    { "jre-macos-x64.tar.gz" }
+    {
+        "jre-macos-x64.tar.gz"
+    }
     #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    { "jre-linux-x64.tar.gz" }
+    {
+        "jre-linux-x64.tar.gz"
+    }
     #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    { "jre-linux-aarch64.tar.gz" }
+    {
+        "jre-linux-aarch64.tar.gz"
+    }
     #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-    { "jre-windows-x64.zip" }
+    {
+        "jre-windows-x64.zip"
+    }
     #[cfg(not(any(
         all(target_os = "macos", target_arch = "aarch64"),
         all(target_os = "macos", target_arch = "x86_64"),
@@ -69,7 +78,9 @@ fn jre_archive_name() -> &'static str {
         all(target_os = "linux", target_arch = "aarch64"),
         all(target_os = "windows", target_arch = "x86_64"),
     )))]
-    { "" }
+    {
+        ""
+    }
 }
 
 /// Check if the bridge JAR is already installed.
@@ -172,8 +183,8 @@ pub async fn download_jre() -> DbResult<()> {
     }
 
     let extract_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
-        let file = std::fs::File::open(&tmp_path)
-            .map_err(|e| format!("Failed to open archive: {}", e))?;
+        let file =
+            std::fs::File::open(&tmp_path).map_err(|e| format!("Failed to open archive: {}", e))?;
 
         let jre_parent = dir.clone();
         if archive_name.ends_with(".tar.gz") {
@@ -189,7 +200,14 @@ pub async fn download_jre() -> DbResult<()> {
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
         {
-            let bin_java = entry.path().join("bin").join(if cfg!(target_os = "windows") { "java.exe" } else { "java" });
+            let bin_java = entry
+                .path()
+                .join("bin")
+                .join(if cfg!(target_os = "windows") {
+                    "java.exe"
+                } else {
+                    "java"
+                });
             if bin_java.exists() {
                 let extracted_path = entry.path();
                 let target_path = jre_parent.join(JRE_DIR);
@@ -266,7 +284,12 @@ pub fn driver_class(db_type: DatabaseType) -> &'static str {
 }
 
 /// Build a JDBC URL from connection config.
-pub fn build_jdbc_url(db_type: DatabaseType, host: &str, port: u16, database: Option<&str>) -> String {
+pub fn build_jdbc_url(
+    db_type: DatabaseType,
+    host: &str,
+    port: u16,
+    database: Option<&str>,
+) -> String {
     use DatabaseType::*;
     let db = database.unwrap_or("");
     match db_type {

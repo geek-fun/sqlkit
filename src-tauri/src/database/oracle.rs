@@ -118,10 +118,7 @@ impl ConnectionPool for OraclePool {
     }
 
     fn idle_connections(&self) -> usize {
-        self.connections
-            .lock()
-            .map(|c| c.len())
-            .unwrap_or(0)
+        self.connections.lock().map(|c| c.len()).unwrap_or(0)
     }
 
     fn max_connections(&self) -> usize {
@@ -151,7 +148,8 @@ impl ConnectionPool for OraclePool {
         while let Some(_row) = stmt
             .next()
             .map_err(|e| DbError::PoolError(format!("Health check row fetch failed: {}", e)))?
-        {}
+        {
+        }
 
         drop(guard);
         self.return_conn(conn)
@@ -395,7 +393,8 @@ impl DatabaseAdapter for OracleAdapter {
     /// Convert an `oracle::Row` column into a `QueryValue`.
     fn row_to_query_value(row: &oracle::Row, idx: usize) -> DbResult<QueryValue> {
         // Try integer first, then float, then string fallback.
-        if row.is_null(idx)
+        if row
+            .is_null(idx)
             .map_err(|e| DbError::TypeConversion(format!("Null check failed: {}", e)))?
         {
             return Ok(QueryValue::Null);
@@ -433,9 +432,8 @@ impl DatabaseAdapter for OracleAdapter {
     }
 
     async fn list_schemas(&self, _database: Option<&str>) -> DbResult<Vec<String>> {
-        let mut result_set = self.run_meta_query(
-            "SELECT DISTINCT OWNER FROM ALL_TABLES ORDER BY OWNER",
-        )?;
+        let mut result_set =
+            self.run_meta_query("SELECT DISTINCT OWNER FROM ALL_TABLES ORDER BY OWNER")?;
 
         let mut schemas = Vec::new();
         while let Some(row) = result_set
@@ -536,9 +534,7 @@ impl DatabaseAdapter for OracleAdapter {
             let default_value: Option<String> = if row.is_null(3).unwrap_or(true) {
                 None
             } else {
-                row.get::<Option<String>>(3)
-                    .ok()
-                    .flatten()
+                row.get::<Option<String>>(3).ok().flatten()
             };
 
             let max_length: Option<u32> = row

@@ -1,4 +1,3 @@
-
 use serde_json::{json, Value};
 
 use super::{ChatFormatter, ChunkResult, LlmMessage, LlmToolCall, ParseResult};

@@ -7,13 +7,15 @@ use tauri::{AppHandle, Emitter};
 use crate::agent::chat_formatter::{ChatFormatter, LlmMessage, OpenAIChatFormatter};
 use crate::agent::config::{build_headers, get_base_url};
 use crate::agent::loop_runner_support::{
-    load_all_messages, load_messages_for_compact, new_id, now_ms,
-    post_chat_completions_compact, StoredMessage,
+    load_all_messages, load_messages_for_compact, new_id, now_ms, post_chat_completions_compact,
+    StoredMessage,
 };
 use crate::agent::model_registry::{
     apply_overrides, resolve_spec, usable_window, ModelSpec, TokenizerFamily,
 };
-use crate::agent::token_counter::{count_chat_messages, count_tools_tokens, estimate_stored_message};
+use crate::agent::token_counter::{
+    count_chat_messages, count_tools_tokens, estimate_stored_message,
+};
 use crate::common::http_client::create_http_client;
 use crate::db::AgentDb;
 
@@ -156,7 +158,8 @@ pub fn target_split_keeping_pairs(messages: &[StoredMessage], keep_pairs: usize)
     0
 }
 
-pub const COMPACT_SYSTEM_PROMPT: &str = "Summarize this conversation so it can continue without the full history.
+pub const COMPACT_SYSTEM_PROMPT: &str =
+    "Summarize this conversation so it can continue without the full history.
 
 Output exactly this Markdown structure, keeping all sections even if empty:
 
@@ -412,7 +415,9 @@ pub fn compact_session(
     _model: &str,
     _context_window: usize,
 ) -> Result<serde_json::Value, String> {
-    let conn = db.0.lock().map_err(|e| format!("Failed to lock db: {}", e))?;
+    let conn =
+        db.0.lock()
+            .map_err(|e| format!("Failed to lock db: {}", e))?;
     let total: i64 = conn
         .query_row(
             "SELECT COUNT(*) FROM agent_messages WHERE session_id = ?1",
@@ -430,10 +435,14 @@ pub fn compact_session(
     let keep = 4_i64;
     let remove_count = total - keep;
     let mut stmt = conn
-        .prepare("SELECT id FROM agent_messages WHERE session_id = ?1 ORDER BY created_at ASC LIMIT ?2")
+        .prepare(
+            "SELECT id FROM agent_messages WHERE session_id = ?1 ORDER BY created_at ASC LIMIT ?2",
+        )
         .map_err(|e| format!("Failed to prepare: {}", e))?;
     let to_remove: Vec<String> = stmt
-        .query_map(rusqlite::params![session_id, remove_count], |row| row.get::<_, String>(0))
+        .query_map(rusqlite::params![session_id, remove_count], |row| {
+            row.get::<_, String>(0)
+        })
         .map_err(|e| format!("Failed to query: {}", e))?
         .filter_map(|r| r.ok())
         .collect();
@@ -441,8 +450,11 @@ pub fn compact_session(
     let pre_tokens: usize = total as usize * 50;
     let removed_count = to_remove.len();
     for id in &to_remove {
-        conn.execute("DELETE FROM agent_messages WHERE id = ?1", rusqlite::params![id])
-            .map_err(|e| format!("Failed to delete message: {}", e))?;
+        conn.execute(
+            "DELETE FROM agent_messages WHERE id = ?1",
+            rusqlite::params![id],
+        )
+        .map_err(|e| format!("Failed to delete message: {}", e))?;
     }
 
     let now = now_ms();
