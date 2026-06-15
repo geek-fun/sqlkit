@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::common::http_client::create_http_client;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TokenizerFamily {
     OpenAiCl100k,
@@ -28,16 +30,51 @@ const DEFAULT_GENERIC_WINDOW: usize = 32_768;
 const DEFAULT_GENERIC_RESERVE: usize = 4_096;
 
 const OPENAI_MODELS: &[(&str, usize, usize, TokenizerFamily)] = &[
-    ("gpt-4o", 128_000, DEFAULT_OPENAI_RESERVE, TokenizerFamily::OpenAiO200k),
-    ("gpt-4o-mini", 128_000, DEFAULT_OPENAI_RESERVE, TokenizerFamily::OpenAiO200k),
+    (
+        "gpt-4o",
+        128_000,
+        DEFAULT_OPENAI_RESERVE,
+        TokenizerFamily::OpenAiO200k,
+    ),
+    (
+        "gpt-4o-mini",
+        128_000,
+        DEFAULT_OPENAI_RESERVE,
+        TokenizerFamily::OpenAiO200k,
+    ),
     ("gpt-4.1", 1_047_576, 32_000, TokenizerFamily::OpenAiO200k),
-    ("gpt-4.1-mini", 1_047_576, 32_000, TokenizerFamily::OpenAiO200k),
-    ("gpt-4.1-nano", 1_047_576, 32_000, TokenizerFamily::OpenAiO200k),
-    ("gpt-4-turbo", 128_000, DEFAULT_OPENAI_RESERVE, TokenizerFamily::OpenAiCl100k),
+    (
+        "gpt-4.1-mini",
+        1_047_576,
+        32_000,
+        TokenizerFamily::OpenAiO200k,
+    ),
+    (
+        "gpt-4.1-nano",
+        1_047_576,
+        32_000,
+        TokenizerFamily::OpenAiO200k,
+    ),
+    (
+        "gpt-4-turbo",
+        128_000,
+        DEFAULT_OPENAI_RESERVE,
+        TokenizerFamily::OpenAiCl100k,
+    ),
     ("gpt-4", 8_192, 4_096, TokenizerFamily::OpenAiCl100k),
-    ("gpt-3.5-turbo", 16_385, 4_096, TokenizerFamily::OpenAiCl100k),
+    (
+        "gpt-3.5-turbo",
+        16_385,
+        4_096,
+        TokenizerFamily::OpenAiCl100k,
+    ),
     ("o1", 200_000, 32_000, TokenizerFamily::OpenAiO200k),
-    ("o1-mini", 128_000, DEFAULT_OPENAI_RESERVE, TokenizerFamily::OpenAiO200k),
+    (
+        "o1-mini",
+        128_000,
+        DEFAULT_OPENAI_RESERVE,
+        TokenizerFamily::OpenAiO200k,
+    ),
     ("o3", 200_000, 32_000, TokenizerFamily::OpenAiO200k),
     ("o3-mini", 200_000, 32_000, TokenizerFamily::OpenAiO200k),
 ];
@@ -147,6 +184,8 @@ pub async fn get_provider_model_list(
     api_compat: &str,
     base_url: &str,
     api_key: &str,
+    proxy_url: Option<String>,
+    proxy_mode: &str,
 ) -> Result<Vec<serde_json::Value>, String> {
     if api_key.is_empty() {
         return Ok(default_models_for_api(api_compat)
@@ -165,10 +204,7 @@ pub async fn get_provider_model_list(
         _ => format!("{}/models", base_url.trim_end_matches('/')),
     };
 
-    let client = reqwest::Client::builder()
-        .no_proxy()
-        .build()
-        .map_err(|e| e.to_string())?;
+    let client = create_http_client(proxy_mode, proxy_url, Some(true), None);
 
     let response = client
         .get(&url)

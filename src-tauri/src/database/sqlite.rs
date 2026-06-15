@@ -9,8 +9,8 @@ use crate::database::{
     error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{
-        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, QueryResult, QueryRow,
-        QueryValue, TableInfo,
+        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+        QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
     },
 };
 use async_trait::async_trait;
@@ -297,6 +297,37 @@ impl SQLiteAdapter {
             }
             ValueRef::Blob(b) => Ok(QueryValue::Bytes(b.to_vec())),
         }
+    }
+
+    /// Parse a trigger DDL to extract action timing and event.
+    fn parse_trigger_ddl(sql: &str) -> (String, String) {
+        let upper = sql.trim().to_uppercase();
+        let rest = upper.strip_prefix("CREATE TRIGGER ").unwrap_or("").trim();
+
+        let after_name = rest.splitn(2, char::is_whitespace).nth(1).unwrap_or("").trim();
+
+        let timing = if after_name.starts_with("INSTEAD OF") {
+            "INSTEAD OF"
+        } else if after_name.starts_with("BEFORE") {
+            "BEFORE"
+        } else if after_name.starts_with("AFTER") {
+            "AFTER"
+        } else {
+            ""
+        };
+
+        let after_timing = after_name
+            .strip_prefix(timing)
+            .unwrap_or(after_name)
+            .trim();
+
+        let event = after_timing
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_string();
+
+        (timing.to_string(), event)
     }
 
     /// Execute a query and return results.
@@ -655,43 +686,352 @@ impl DatabaseAdapter for SQLiteAdapter {
                 DbError::QueryExecution(format!("Failed to prepare PRAGMA foreign_key_list: {}", e))
             })?;
 
+            let mut group_map: std::collections::HashMap<i64, (Vec<String>, Vec<String>, Option<String>, Option<String>)> = std::collections::HashMap::new();
+            let mut constraint_names: std::collections::HashMap<i64, String> = std::collections::HashMap::new();
+            let mut referenced_tables: std::collections::HashMap<i64, String> = std::collections::HashMap::new();
+
             let rows = pragma_stmt
                 .query_map([], |row| {
-                    let target_table: Option<String> = row.get(2).ok();
-                    let source_column: Option<String> = row.get(3).ok();
-                    let target_column: Option<String> = row.get(4).ok();
-                    Ok((target_table, source_column, target_column))
+                    let id: i64 = row.get(0)?;
+                    let seq: i64 = row.get(1)?;
+                    let target_table: String = row.get(2)?;
+                    let source_column: String = row.get(3)?;
+                    let target_column: String = row.get(4)?;
+                    let on_update: Option<String> = row.get(5).ok().flatten();
+                    let on_delete: Option<String> = row.get(6).ok().flatten();
+                    Ok((id, seq, target_table, source_column, target_column, on_update, on_delete))
                 })
                 .map_err(|e| {
-                    DbError::QueryExecution(format!(
-                        "Failed to query PRAGMA foreign_key_list: {}",
-                        e
-                    ))
+                    DbError::QueryExecution(format!("Failed to query PRAGMA foreign_key_list: {}", e))
                 })?;
 
             for row in rows {
-                if let Ok((target_table, source_column, target_column)) = row {
-                    if let (Some(target_table), Some(source_column)) =
-                        (&target_table, &source_column)
-                    {
-                        fks.push(ForeignKeyInfo {
-                            constraint_name: None,
-                            source_schema: "main".to_string(),
-                            source_table: table_name.clone(),
-                            source_column: source_column.clone(),
-                            target_schema: "main".to_string(),
-                            target_table: target_table.clone(),
-                            target_column: target_column.clone().unwrap_or_default(),
-                        });
+                if let Ok((id, _seq, target_tbl, src_col, tgt_col, on_upd, on_del)) = row {
+                    referenced_tables.entry(id).or_insert_with(|| target_tbl.clone());
+                    if !constraint_names.contains_key(&id) {
+                        constraint_names.insert(id, format!("fk_{}", id));
                     }
+                    let entry = group_map.entry(id).or_insert_with(|| (Vec::new(), Vec::new(), None, None));
+                    entry.0.push(src_col);
+                    entry.1.push(tgt_col);
+                    if entry.2.is_none() { entry.2 = on_upd; }
+                    if entry.3.is_none() { entry.3 = on_del; }
                 }
+            }
+
+            for (id, (columns, ref_columns, on_update, on_delete)) in group_map {
+                let constraint_name = constraint_names.remove(&id).unwrap_or_default();
+                let referenced_table = referenced_tables.remove(&id).unwrap_or_default();
+                fks.push(ForeignKeyInfo {
+                    constraint_name,
+                    source_table: table_name.clone(),
+                    columns,
+                    referenced_schema: Some("main".to_string()),
+                    referenced_table,
+                    referenced_columns: ref_columns,
+                    on_update,
+                    on_delete,
+                });
             }
         }
 
         drop(conn_guard);
         pool.return_conn(conn)?;
 
+        fks.sort_by(|a, b| a.constraint_name.cmp(&b.constraint_name));
         Ok(fks)
+    }
+
+    async fn list_views(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        let query = "SELECT name, sql FROM sqlite_master WHERE type = 'view' AND name NOT LIKE 'sqlite_%' ORDER BY name";
+        let result = self.execute_query_internal(query).await?;
+
+        let mut views = Vec::new();
+        for row in result.rows {
+            let name = match row.get("name") {
+                Some(QueryValue::String(s)) => s.clone(),
+                _ => continue,
+            };
+
+            let detail = match row.get("sql") {
+                Some(QueryValue::String(s)) => Some(s.clone()),
+                _ => None,
+            };
+
+            views.push(ObjectInfo {
+                name,
+                object_type: "VIEW".to_string(),
+                schema: Some("main".to_string()),
+                detail,
+            });
+        }
+
+        Ok(views)
+    }
+
+    async fn list_procedures(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        Err(DbError::unsupported("list_procedures"))
+    }
+
+    async fn list_functions(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        Err(DbError::unsupported("list_functions"))
+    }
+
+    async fn list_triggers(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<TriggerInfo>> {
+        Self::validate_table_name(table)?;
+
+        let query = "SELECT name, sql, tbl_name FROM sqlite_master WHERE type = 'trigger' ORDER BY name";
+        let result = self.execute_query_internal(query).await?;
+
+        let mut triggers = Vec::new();
+        for row in result.rows {
+            let tbl_name = match row.get("tbl_name") {
+                Some(QueryValue::String(s)) => s.clone(),
+                _ => continue,
+            };
+
+            if tbl_name != table {
+                continue;
+            }
+
+            let name = match row.get("name") {
+                Some(QueryValue::String(s)) => s.clone(),
+                _ => continue,
+            };
+
+            let ddl = match row.get("sql") {
+                Some(QueryValue::String(s)) => s.clone(),
+                _ => continue,
+            };
+
+            let (action_timing, event) = Self::parse_trigger_ddl(&ddl);
+
+            triggers.push(TriggerInfo {
+                name,
+                action_timing,
+                event,
+                ddl: Some(ddl),
+            });
+        }
+
+        Ok(triggers)
+    }
+
+    async fn list_indexes(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<IndexInfo>> {
+        Self::validate_table_name(table)?;
+
+        let query = format!("PRAGMA index_list(\"{}\")", table);
+        let result = self.execute_query_internal(&query).await?;
+
+        let mut indexes = Vec::new();
+        for row in result.rows {
+            let name = match row.get("name") {
+                Some(QueryValue::String(s)) => s.clone(),
+                _ => continue,
+            };
+
+            let is_unique = match row.get("unique") {
+                Some(QueryValue::Int(i)) => *i != 0,
+                _ => false,
+            };
+
+            let is_primary = match row.get("origin") {
+                Some(QueryValue::String(s)) => s == "pk",
+                _ => false,
+            };
+
+            Self::validate_table_name(&name)?;
+            let col_query = format!("PRAGMA index_info(\"{}\")", name);
+            let col_result = self.execute_query_internal(&col_query).await?;
+
+            let columns: Vec<String> = col_result
+                .rows
+                .iter()
+                .filter_map(|row| match row.get("name") {
+                    Some(QueryValue::String(s)) => Some(s.clone()),
+                    _ => None,
+                })
+                .collect();
+
+            indexes.push(IndexInfo {
+                name,
+                columns,
+                index_type: "BTREE".to_string(),
+                is_unique,
+                is_primary,
+            });
+        }
+
+        Ok(indexes)
+    }
+
+    async fn list_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        Self::validate_table_name(table)?;
+
+        let query = format!("PRAGMA foreign_key_list(\"{}\")", table);
+        let result = self.execute_query_internal(&query).await?;
+
+        let mut fk_groups: HashMap<i64, ForeignKeyInfo> = HashMap::new();
+        for row in result.rows {
+            let id = match row.get("id") {
+                Some(QueryValue::Int(i)) => *i,
+                _ => continue,
+            };
+
+            let referenced_table = match row.get("table") {
+                Some(QueryValue::String(s)) => s.clone(),
+                _ => continue,
+            };
+
+            let from_col = match row.get("from") {
+                Some(QueryValue::String(s)) => s.clone(),
+                _ => String::new(),
+            };
+
+            let to_col = match row.get("to") {
+                Some(QueryValue::String(s)) => s.clone(),
+                _ => String::new(),
+            };
+
+            let on_update = match row.get("on_update") {
+                Some(QueryValue::String(s)) => Some(s.clone()),
+                _ => None,
+            };
+
+            let on_delete = match row.get("on_delete") {
+                Some(QueryValue::String(s)) => Some(s.clone()),
+                _ => None,
+            };
+
+            let entry = fk_groups.entry(id).or_insert_with(|| ForeignKeyInfo {
+                constraint_name: format!("fk_{}", id),
+                source_table: table.to_string(),
+                columns: Vec::new(),
+                referenced_schema: Some("main".to_string()),
+                referenced_table: referenced_table.clone(),
+                referenced_columns: Vec::new(),
+                on_update: on_update.clone(),
+                on_delete: on_delete.clone(),
+            });
+
+            if !from_col.is_empty() {
+                entry.columns.push(from_col);
+            }
+            if !to_col.is_empty() {
+                entry.referenced_columns.push(to_col);
+            }
+        }
+
+        let mut foreign_keys: Vec<ForeignKeyInfo> = fk_groups.into_values().collect();
+        foreign_keys.sort_by(|a, b| a.constraint_name.cmp(&b.constraint_name));
+
+        Ok(foreign_keys)
+    }
+
+    async fn get_object_ddl(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<String> {
+        Self::validate_table_name(object_name)?;
+
+        let query = format!(
+            "SELECT sql FROM sqlite_master WHERE name = '{}' AND type = '{}'",
+            object_name, object_type
+        );
+        let result = self.execute_query_internal(&query).await?;
+
+        match result.rows.first().and_then(|row| row.get("sql")) {
+            Some(QueryValue::String(s)) => Ok(s.clone()),
+            _ => Err(DbError::new(format!(
+                "{} {} not found",
+                object_type, object_name
+            ))),
+        }
+    }
+
+    async fn drop_object(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<()> {
+        Self::validate_table_name(object_name)?;
+
+        let object_type_upper = object_type.to_uppercase();
+        let sql_type = match object_type_upper.as_str() {
+            "VIEW" => "VIEW",
+            "TRIGGER" => "TRIGGER",
+            "INDEX" => "INDEX",
+            _ => {
+                return Err(DbError::InvalidQuery(format!(
+                    "Unsupported object type for SQLite: {}",
+                    object_type
+                )));
+            }
+        };
+
+        let query = format!("DROP {} \"{}\"", sql_type, object_name);
+        self.execute_query_internal(&query).await?;
+        Ok(())
+    }
+
+    async fn rename_object(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+        new_name: &str,
+    ) -> DbResult<()> {
+        Self::validate_table_name(object_name)?;
+        Self::validate_table_name(new_name)?;
+
+        let object_type_upper = object_type.to_uppercase();
+        match object_type_upper.as_str() {
+            "TABLE" | "VIEW" => {
+                let query = format!(
+                    "ALTER TABLE \"{}\" RENAME TO \"{}\"",
+                    object_name, new_name
+                );
+                self.execute_query_internal(&query).await?;
+                Ok(())
+            }
+            _ => Err(DbError::InvalidQuery(format!(
+                "Unsupported object type for rename in SQLite: {}",
+                object_type
+            ))),
+        }
     }
 
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {

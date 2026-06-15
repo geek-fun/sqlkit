@@ -48,7 +48,7 @@ jobs:
             target: aarch64-apple-darwin,x86_64-apple-darwin
           - name: Windows
             platform: windows-latest
-            args: --no-default-features --features duckdb
+            args: -- --no-default-features --features duckdb
             target: x86_64-pc-windows-msvc
           - name: Linux
             platform: ubuntu-latest

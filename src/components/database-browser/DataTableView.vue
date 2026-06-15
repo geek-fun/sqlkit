@@ -1,19 +1,10 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { save as showSaveDialog } from '@tauri-apps/plugin-dialog'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import {
   Dialog,
   DialogContent,
@@ -31,6 +22,7 @@ import {
 import { Spinner } from '@/components/ui/spinner'
 import { useMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { toast } from '@/composables/useNotifications'
+import { useTableSearch } from '@/composables/useTableSearch'
 import { ConnectionStatus, useConnectionStore } from '@/store'
 import {
   computeOffset,
@@ -39,6 +31,10 @@ import {
   isTableNullValue,
   rowsToCsv,
 } from './dataTableHelpers'
+import ForeignKeysTab from './ForeignKeysTab.vue'
+import IndexesTab from './IndexesTab.vue'
+import SchemaTab from './SchemaTab.vue'
+import TriggersTab from './TriggersTab.vue'
 
 type TableDataResult = {
   columns: string[]
@@ -67,12 +63,39 @@ const { t } = useI18n()
 const ROWS_PER_PAGE_OPTIONS = [100, 500, 1000] as const
 type RowsPerPage = (typeof ROWS_PER_PAGE_OPTIONS)[number]
 
+// Sub-page navigation
+type SubPage = 'data' | 'schema' | 'indexes' | 'foreign_keys' | 'triggers'
+const activeSubPage = ref<SubPage>('data')
+const subPages: { id: SubPage, label: string }[] = [
+  { id: 'data', label: 'Data' },
+  { id: 'schema', label: 'Schema' },
+  { id: 'indexes', label: 'Indexes' },
+  { id: 'foreign_keys', label: 'Foreign Keys' },
+  { id: 'triggers', label: 'Triggers' },
+]
+
 const currentPage = ref(1)
 const rowsPerPage = ref<RowsPerPage>(100)
 const filterInput = ref('')
 const appliedFilter = ref('')
 const hiddenColumns = ref<Set<string>>(new Set())
 const showColumnMenu = ref(false)
+
+// ── Search state ──
+const searchTerm = ref('')
+const searchInputRef = ref<HTMLInputElement | null>(null)
+let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+const searchFilter = ref<string | null>(null) // active WHERE clause from search
+const { isSearching, invokeSearch, cancelPending } = useTableSearch()
+
+// Tracks whether the search input was just blurred by an ESC press,
+// so the next ESC (anywhere) triggers a full clear.
+let escBlurredSearch = false
+
+// Watch searchTerm to trigger debounced search on every keystroke
+watch(searchTerm, () => {
+  onSearchInput()
+})
 
 const data = ref<TableDataResult | null>(null)
 const totalCount = ref(0)
@@ -87,10 +110,37 @@ const connectionStore = useConnectionStore()
 const isReconnecting = ref(false)
 const connectionError = ref<string | null>(null)
 
+// --- Selection state ---
+const selectedRows = ref<Set<number>>(new Set())
+
+const allRowsSelected = computed(() =>
+  (data.value?.rows.length ?? 0) > 0 && selectedRows.value.size === (data.value?.rows.length ?? 0),
+)
+
+function toggleRowSelection(idx: number) {
+  const next = new Set(selectedRows.value)
+  if (next.has(idx))
+    next.delete(idx)
+  else
+    next.add(idx)
+  selectedRows.value = next
+}
+
+function toggleSelectAll() {
+  if (allRowsSelected.value) {
+    selectedRows.value = new Set()
+  }
+  else {
+    selectedRows.value = new Set(data.value?.rows.map((_, i) => i) ?? [])
+  }
+}
+
 // --- Delete state ---
 const deleteDialogOpen = ref(false)
 const deletingRow = ref<Record<string, unknown> | null>(null)
 const isDeleting = ref(false)
+const batchDeleteDialogOpen = ref(false)
+const isBatchDeleting = ref(false)
 
 // --- Edit state ---
 const editDialogOpen = ref(false)
@@ -285,7 +335,7 @@ async function fetchColumnInfo() {
 }
 
 function applyFilter() {
-  appliedFilter.value = filterInput.value.trim()
+  resolveAppliedFilter()
   currentPage.value = 1
   refresh()
 }
@@ -296,6 +346,102 @@ function clearFilter() {
     appliedFilter.value = ''
     currentPage.value = 1
     refresh()
+  }
+}
+
+// ── Search handlers ──
+
+/** Called whenever `searchTerm` changes — debounces 300ms then invokes backend. */
+function onSearchInput() {
+  if (searchDebounceTimer)
+    clearTimeout(searchDebounceTimer)
+
+  const term = searchTerm.value.trim()
+  if (!term) {
+    cancelPending()
+    searchFilter.value = null
+    resolveAppliedFilter()
+    currentPage.value = 1
+    refresh()
+    return
+  }
+
+  searchDebounceTimer = setTimeout(async () => {
+    const filter = await invokeSearch(
+      props.connectionId,
+      props.database,
+      props.schema,
+      props.tableName,
+      searchTerm.value,
+    )
+
+    if (filter !== null) {
+      searchFilter.value = filter || null
+      resolveAppliedFilter()
+      currentPage.value = 1
+      refresh()
+    }
+  }, 300)
+}
+
+/**
+ * Resolve `appliedFilter` from search and/or manual filter.
+ *
+ * Priority: search filter overrides manual filter when search is active.
+ */
+function resolveAppliedFilter() {
+  if (searchTerm.value.trim() && searchFilter.value) {
+    // Combine: search AND manual filter (or just search if no manual filter)
+    const manual = filterInput.value.trim()
+    if (manual)
+      appliedFilter.value = `${searchFilter.value} AND (${manual})`
+    else
+      appliedFilter.value = searchFilter.value
+  }
+  else {
+    // No search active — use manual filter only
+    appliedFilter.value = filterInput.value.trim() || ''
+  }
+}
+
+function clearSearch() {
+  searchTerm.value = ''
+  cancelPending()
+  if (searchDebounceTimer) {
+    clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = null
+  }
+  searchFilter.value = null
+  resolveAppliedFilter()
+  currentPage.value = 1
+  refresh()
+}
+
+function onSearchKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape') {
+    if (searchTerm.value) {
+      // First ESC with search active: blur input, mark for second-ESC clear
+      escBlurredSearch = true
+      searchInputRef.value?.blur()
+    }
+    else {
+      // No search text: just blur
+      searchInputRef.value?.blur()
+    }
+    e.preventDefault()
+  }
+}
+
+function onSearchFocus() {
+  escBlurredSearch = false
+}
+
+/** Handle ESC key on window — catches the "second ESC" after search input is blurred. */
+function onGlobalKeydown(e: KeyboardEvent) {
+  if (e.key === 'Escape' && escBlurredSearch) {
+    escBlurredSearch = false
+    clearSearch()
+    e.preventDefault()
   }
 }
 
@@ -400,6 +546,48 @@ async function confirmDelete() {
   finally {
     isDeleting.value = false
   }
+}
+
+async function confirmBatchDelete() {
+  const indices = [...selectedRows.value]
+  if (indices.length === 0 || !data.value)
+    return
+
+  isBatchDeleting.value = true
+  let successCount = 0
+  let failCount = 0
+
+  for (const idx of indices) {
+    const row = data.value.rows[idx]
+    if (!row || pkColumns.value.length === 0)
+      continue
+
+    try {
+      await invoke('delete_table_row', {
+        connectionId: props.connectionId,
+        database: props.database ?? null,
+        table: props.tableName,
+        schema: props.schema ?? null,
+        pkValues: extractPkValues(row),
+      })
+      successCount++
+    }
+    catch {
+      failCount++
+    }
+  }
+
+  if (failCount === 0) {
+    toast.success(`${successCount} row(s) deleted`)
+  }
+  else {
+    toast.warning(`${successCount} row(s) deleted, ${failCount} failed`)
+  }
+
+  batchDeleteDialogOpen.value = false
+  selectedRows.value = new Set()
+  isBatchDeleting.value = false
+  await refresh()
 }
 
 function rawValueToString(v: unknown): string {
@@ -575,15 +763,25 @@ async function confirmEdit() {
   }
 }
 
+// Clear selection when data changes
+watch(data, () => {
+  selectedRows.value = new Set()
+})
+
 const formatValue = formatTableValue
 const isNullValue = isTableNullValue
 
 onMounted(async () => {
+  document.addEventListener('keydown', onGlobalKeydown)
   const connected = await ensureConnection()
   if (connected) {
     fetchColumnInfo()
     refresh()
   }
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onGlobalKeydown)
 })
 
 watch(
@@ -592,6 +790,13 @@ watch(
     currentPage.value = 1
     appliedFilter.value = ''
     filterInput.value = ''
+    searchTerm.value = ''
+    searchFilter.value = null
+    cancelPending()
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer)
+      searchDebounceTimer = null
+    }
     hiddenColumns.value = new Set()
     connectionError.value = null
 
@@ -615,471 +820,612 @@ watch(
 
 <template>
   <div class="data-table-view flex flex-col h-full" @click="showColumnMenu = false">
-    <!-- Filter / Toolbar bar -->
-    <div class="px-3 py-1.5 border-b bg-muted/20 flex gap-1.5 items-center">
-      <!-- Filter icon -->
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="14"
-        height="14"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        class="text-muted-foreground flex-shrink-0"
+    <!-- Sub-page navigation bar -->
+    <div class="border-b bg-muted/30 flex">
+      <button
+        v-for="page in subPages"
+        :key="page.id"
+        class="text-xs font-medium px-3 py-1.5 border-b-2 transition-colors"
+        :class="activeSubPage === page.id
+          ? 'border-primary text-foreground'
+          : 'border-transparent text-muted-foreground hover:text-foreground'"
+        @click="activeSubPage = page.id"
       >
-        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
-      </svg>
+        {{ page.label }}
+      </button>
+    </div>
 
-      <!-- Filter input -->
-      <Input
-        v-model="filterInput"
-        :placeholder="t('components.dataTableView.filterPlaceholder')"
-        class="text-xs font-mono flex-1 h-7"
-        @keydown.enter="applyFilter"
-      />
-
-      <!-- Clear filter button -->
-      <Button
-        v-if="filterInput || appliedFilter"
-        variant="ghost"
-        size="icon"
-        class="flex-shrink-0 h-7 w-7"
-        :title="t('components.dataTableView.clearFilter')"
-        @click.stop="clearFilter"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M18 6 6 18" />
-          <path d="m6 6 12 12" />
+    <!-- Data sub-page: Toolbar bar (search + filter + actions) -->
+    <template v-if="activeSubPage === 'data'">
+      <div class="px-3 py-1.5 border-b bg-muted/20 flex gap-1.5 items-center">
+        <!-- 🔍 Search icon -->
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="text-muted-foreground flex-shrink-0"
+        >
+          <circle cx="11" cy="11" r="8" />
+          <path d="m21 21-4.3-4.3" />
         </svg>
-      </Button>
 
-      <!-- Refresh button -->
-      <Button
-        variant="ghost"
-        size="icon"
-        class="flex-shrink-0 h-7 w-7"
-        :disabled="loading"
-        :title="t('components.dataTableView.refresh')"
-        @click.stop="refresh"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :class="{ 'animate-spin': loading }">
-          <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-          <path d="M21 3v5h-5" />
-          <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-          <path d="M8 16H3v5" />
-        </svg>
-      </Button>
+        <!-- Search input — searches across all columns -->
+        <div class="flex-1 min-w-0 relative">
+          <Input
+            ref="searchInputRef"
+            v-model="searchTerm"
+            :placeholder="t('components.dataTableView.searchPlaceholder')"
+            class="text-xs pr-7 flex-1 h-7"
+            @keydown="onSearchKeydown"
+            @focus="onSearchFocus"
+          />
+          <!-- Inline spinner when search is active and waiting for backend -->
+          <div
+            v-if="isSearching"
+            class="text-muted-foreground right-2 top-1/2 absolute -translate-y-1/2"
+          >
+            <svg class="h-3.5 w-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </div>
+        </div>
 
-      <!-- Column visibility dropdown -->
-      <div class="flex-shrink-0 relative">
+        <!-- Clear search button -->
         <Button
+          v-if="searchTerm"
           variant="ghost"
           size="icon"
-          class="h-7 w-7"
-          :title="t('components.dataTableView.columns')"
-          @click.stop="showColumnMenu = !showColumnMenu"
+          class="flex-shrink-0 h-7 w-7"
+          :title="t('components.dataTableView.clearSearch')"
+          @click.stop="clearSearch"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect width="18" height="18" x="3" y="3" rx="2" />
-            <path d="M9 3v18" />
-            <path d="M15 3v18" />
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
           </svg>
         </Button>
 
-        <div
-          v-if="showColumnMenu && data && data.columns.length > 0"
-          class="text-popover-foreground mt-1 border rounded-md bg-popover max-h-64 min-w-36 shadow-md right-0 top-full absolute z-50 overflow-auto"
-          @click.stop
+        <!-- Visual separator between search and filter sections -->
+        <div class="mx-0.5 bg-border flex-shrink-0 h-5 w-px" />
+
+        <!-- Filter icon -->
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          class="text-muted-foreground flex-shrink-0"
         >
-          <div class="text-xs text-muted-foreground font-semibold p-1 px-2 py-1.5 border-b">
-            {{ t('components.dataTableView.columns') }}
-          </div>
-          <div class="p-1">
-            <button
-              v-for="col in data.columns"
-              :key="col"
-              class="text-sm px-2 py-1 text-left rounded flex gap-2 w-full cursor-pointer items-center hover:bg-accent"
-              @click="toggleColumn(col)"
-            >
-              <svg
-                v-if="!hiddenColumns.has(col)"
-                xmlns="http://www.w3.org/2000/svg"
-                width="12"
-                height="12"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="text-primary flex-shrink-0"
-              >
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
-              <span v-else class="flex-shrink-0 w-3 inline-block" />
-              <span class="truncate">{{ col }}</span>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- Export CSV button (current page) -->
-      <Button
-        variant="ghost"
-        size="icon"
-        class="flex-shrink-0 h-7 w-7"
-        :disabled="!data || data.rows.length === 0 || isExporting"
-        :title="t('components.dataTableView.exportCsv')"
-        @click.stop="exportCSV"
-      >
-        <Spinner v-if="isExporting" size="sm" />
-        <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-          <polyline points="7 10 12 15 17 10" />
-          <line x1="12" x2="12" y1="15" y2="3" />
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
         </svg>
-      </Button>
 
-      <!-- Apply Filters button -->
-      <Button
-        size="sm"
-        class="text-xs flex-shrink-0 h-7"
-        @click.stop="applyFilter"
-      >
-        {{ t('components.dataTableView.applyFilters') }}
-      </Button>
-    </div>
+        <!-- Filter input -->
+        <Input
+          v-model="filterInput"
+          :placeholder="t('components.dataTableView.filterPlaceholder')"
+          class="text-xs font-mono flex-1 h-7"
+          @keydown.enter="applyFilter"
+        />
 
-    <!-- Table area -->
-    <div class="flex-1 relative overflow-auto">
-      <!-- Connection error state -->
-      <div v-if="connectionError" class="p-4 flex h-full items-center justify-center">
-        <div class="text-center max-w-md">
-          <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground mx-auto mb-4">
-            <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-            <polyline points="10 17 15 12 10 7" />
-            <line x1="15" x2="3" y1="12" y2="12" />
+        <!-- Clear filter button -->
+        <Button
+          v-if="filterInput || appliedFilter"
+          variant="ghost"
+          size="icon"
+          class="flex-shrink-0 h-7 w-7"
+          :title="t('components.dataTableView.clearFilter')"
+          @click.stop="clearFilter"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 6 6 18" />
+            <path d="m6 6 12 12" />
           </svg>
-          <p class="text-sm text-muted-foreground mb-2">
-            {{ t('components.dataTableView.connectionLost') }}
-          </p>
-          <p class="text-xs text-muted-foreground/70 mb-4">
-            {{ connectionError }}
-          </p>
-          <Button size="sm" @click="handleRetry">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
-              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-              <path d="M21 3v5h-5" />
-              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-              <path d="M8 16H3v5" />
+        </Button>
+
+        <!-- Refresh button -->
+        <Button
+          variant="ghost"
+          size="icon"
+          class="flex-shrink-0 h-7 w-7"
+          :disabled="loading"
+          :title="t('components.dataTableView.refresh')"
+          @click.stop="refresh"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :class="{ 'animate-spin': loading }">
+            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+            <path d="M21 3v5h-5" />
+            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+            <path d="M8 16H3v5" />
+            <!-- Column visibility dropdown -->
+            <div class="flex-shrink-0 relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7"
+                :title="t('components.dataTableView.columns')"
+                @click.stop="showColumnMenu = !showColumnMenu"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M9 3v18" />
+                  <path d="M15 3v18" />
+                </svg>
+              </Button>
+
+              <div
+                v-if="showColumnMenu && data && data.columns.length > 0"
+                class="text-popover-foreground mt-1 border rounded-md bg-popover max-h-64 min-w-36 shadow-md right-0 top-full absolute z-50 overflow-auto"
+                @click.stop
+              >
+                <div class="text-xs text-muted-foreground font-semibold p-1 px-2 py-1.5 border-b">
+                  {{ t('components.dataTableView.columns') }}
+                </div>
+                <div class="p-1">
+                  <button
+                    v-for="col in data.columns"
+                    :key="col"
+                    class="text-sm px-2 py-1 text-left rounded flex gap-2 w-full cursor-pointer items-center hover:bg-accent"
+                    @click="toggleColumn(col)"
+                  >
+                    <svg
+                      v-if="!hiddenColumns.has(col)"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="text-primary flex-shrink-0"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <span v-else class="flex-shrink-0 w-3 inline-block" />
+                    <span class="truncate">{{ col }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Delete Selected button -->
+            <Button
+              v-if="selectedRows.size > 0 && pkColumns.length > 0"
+              variant="destructive"
+              size="sm"
+              class="text-xs flex-shrink-0 h-7"
+              @click.stop="batchDeleteDialogOpen = true"
+            >
+              <span class="i-carbon-trash-can mr-1 h-3.5 w-3.5" />
+              Delete Selected ({{ selectedRows.size }})
+            </Button>
+
+            <!-- Export CSV button (current page) -->
+            <Button
+              variant="ghost"
+              size="icon"
+              class="flex-shrink-0 h-7 w-7"
+              :disabled="!data || data.rows.length === 0 || isExporting"
+              :title="t('components.dataTableView.exportCsv')"
+              @click.stop="exportCSV"
+            >
+              <Spinner v-if="isExporting" size="sm" />
+              <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" x2="12" y1="15" y2="3" />
+              </svg>
+            </Button>
+
+            <!-- Apply Filters button -->
+            <Button
+              size="sm"
+              class="text-xs flex-shrink-0 h-7"
+              @click.stop="applyFilter"
+            >
+              {{ t('components.dataTableView.applyFilters') }}
+            </Button>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Table area -->
+      <div class="flex-1 relative overflow-auto">
+        <!-- Connection error state -->
+        <div v-if="connectionError" class="p-4 flex h-full items-center justify-center">
+          <div class="text-center max-w-md">
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground mx-auto mb-4">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+              <polyline points="10 17 15 12 10 7" />
+              <line x1="15" x2="3" y1="12" y2="12" />
             </svg>
-            {{ t('components.dataTableView.reconnect') }}
-          </Button>
+            <p class="text-sm text-muted-foreground mb-2">
+              {{ t('components.dataTableView.connectionLost') }}
+            </p>
+            <p class="text-xs text-muted-foreground/70 mb-4">
+              {{ connectionError }}
+            </p>
+            <Button size="sm" @click="handleRetry">
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1.5">
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+                <path d="M21 3v5h-5" />
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+                <path d="M8 16H3v5" />
+              </svg>
+              {{ t('components.dataTableView.reconnect') }}
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <!-- Reconnecting state -->
-      <div v-else-if="isReconnecting" class="p-4 flex h-full items-center justify-center">
-        <div class="text-center">
-          <svg class="text-primary mx-auto mb-2 h-8 w-8 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <p class="text-sm text-muted-foreground">
-            {{ t('components.dataTableView.reconnecting') }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Loading overlay -->
-      <div
-        v-if="loading"
-        class="bg-background/60 flex items-center inset-0 justify-center absolute z-10"
-      >
-        <div class="text-center">
-          <svg
-            class="text-primary mx-auto mb-2 h-8 w-8 animate-spin"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-          <p class="text-sm text-muted-foreground">
-            {{ t('components.dataTableView.loading') }}
-          </p>
-        </div>
-      </div>
-
-      <!-- Error state -->
-      <div v-else-if="error" class="p-4">
-        <div class="p-4 border border-red-200 rounded-md bg-red-50 dark:border-red-800 dark:bg-red-900/20">
-          <div class="flex gap-3 items-start">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600 mt-0.5 flex-shrink-0 dark:text-red-400">
-              <circle cx="12" cy="12" r="10" />
-              <line x1="12" x2="12" y1="8" y2="12" />
-              <line x1="12" x2="12.01" y1="16" y2="16" />
+        <!-- Reconnecting state -->
+        <div v-else-if="isReconnecting" class="p-4 flex h-full items-center justify-center">
+          <div class="text-center">
+            <svg class="text-primary mx-auto mb-2 h-8 w-8 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
             </svg>
-            <div>
-              <p class="text-sm text-red-800 font-medium dark:text-red-200">
-                {{ t('components.dataTableView.error') }}
-              </p>
-              <p class="text-sm text-red-700 mt-1 dark:text-red-300">
-                {{ error }}
-              </p>
+            <p class="text-sm text-muted-foreground">
+              {{ t('components.dataTableView.reconnecting') }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Loading overlay -->
+        <div
+          v-if="loading"
+          class="bg-background/60 flex items-center inset-0 justify-center absolute z-10"
+        >
+          <div class="text-center">
+            <svg
+              class="text-primary mx-auto mb-2 h-8 w-8 animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+            <p class="text-sm text-muted-foreground">
+              {{ t('components.dataTableView.loading') }}
+            </p>
+          </div>
+        </div>
+
+        <!-- Error state -->
+        <div v-else-if="error" class="p-4">
+          <div class="p-4 border border-red-200 rounded-md bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+            <div class="flex gap-3 items-start">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600 mt-0.5 flex-shrink-0 dark:text-red-400">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" x2="12" y1="8" y2="12" />
+                <line x1="12" x2="12.01" y1="16" y2="16" />
+              </svg>
+              <div>
+                <p class="text-sm text-red-800 font-medium dark:text-red-200">
+                  {{ t('components.dataTableView.error') }}
+                </p>
+                <p class="text-sm text-red-700 mt-1 dark:text-red-300">
+                  {{ error }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- Data table -->
-      <table
-        v-else-if="data && data.columns.length > 0"
-        class="data-table w-full"
-      >
-        <thead>
-          <tr class="border-b">
-            <th class="data-table-header text-center w-10">
-              #
-            </th>
-            <th
-              v-for="col in visibleColumns"
-              :key="col"
-              class="data-table-header text-left"
-            >
-              <div class="col-header-cell" :title="columnTypeMap[col] ? `${col} · ${columnTypeMap[col]}` : col">
-                <svg
-                  v-if="columnIsPK[col]"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="10"
-                  height="10"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="text-amber-500 flex-shrink-0"
+        <!-- Data table -->
+        <table
+          v-else-if="data && data.columns.length > 0"
+          class="data-table w-full"
+        >
+          <thead>
+            <tr class="border-b">
+              <th v-if="pkColumns.length > 0" class="data-table-header text-center w-10">
+                <input
+                  type="checkbox"
+                  class="h-3 w-3 cursor-pointer"
+                  :checked="allRowsSelected"
+                  @change="toggleSelectAll"
                 >
-                  <circle cx="7.5" cy="15.5" r="5.5" />
-                  <path d="m21 2-9.6 9.6" />
-                  <path d="m15.5 7.5 3 3L22 7l-3-3" />
-                </svg>
-                <span class="col-name truncate">{{ col }}</span>
-                <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
-              </div>
-            </th>
-            <!-- Actions header — sticky right, excluded from CSV / column visibility -->
-            <th class="data-table-header data-table-actions-col text-center">
-              {{ t('components.dataTableView.actions') }}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr
-            v-for="(row, i) in data.rows"
-            :key="i"
-            class="border-b hover:bg-muted/50"
-          >
-            <td class="text-xs text-muted-foreground px-3 py-1.5 text-center w-10">
-              {{ offset + i + 1 }}
-            </td>
-            <td
-              v-for="col in visibleColumns"
-              :key="`${i}-${col}`"
-              class="text-sm px-3 py-1.5 max-w-xs truncate"
-              :class="{ 'italic text-muted-foreground': isNullValue(row[col]) }"
-              :title="formatValue(row[col])"
-            >
-              {{ formatValue(row[col]) }}
-            </td>
-            <!-- Actions cell — sticky right -->
-            <td class="data-table-actions-col px-2 py-1">
-              <div class="flex gap-0.5 items-center justify-center">
-                <!-- Edit button -->
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="text-foreground h-6 w-6"
-                  :title="t('components.dataTableView.editRow')"
-                  @click.stop="openEditDialog(row)"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-                    <path d="m15 5 4 4" />
-                  </svg>
-                </Button>
-                <!-- Delete button -->
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  class="text-foreground h-6 w-6 hover:text-destructive"
-                  :title="t('components.dataTableView.deleteRow')"
-                  @click.stop="openDeleteDialog(row)"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M3 6h18" />
-                    <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                    <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                  </svg>
-                </Button>
-              </div>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-
-      <!-- Empty state -->
-      <div
-        v-else-if="data && data.rows.length === 0"
-        class="flex h-full items-center justify-center"
-      >
-        <div class="text-muted-foreground text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2 opacity-50">
-            <path d="M12 3v18" />
-            <rect width="18" height="18" x="3" y="3" rx="2" />
-            <path d="M3 9h18" />
-            <path d="M3 15h18" />
-          </svg>
-          <p class="text-sm">
-            {{ t('components.dataTableView.noRows') }}
-          </p>
-        </div>
-      </div>
-
-      <!-- No data yet -->
-      <div v-else class="flex h-full items-center justify-center">
-        <div class="text-muted-foreground text-center">
-          <svg
-            class="text-primary mx-auto mb-2 h-8 w-8 animate-spin"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-          </svg>
-        </div>
-      </div>
-    </div>
-
-    <!-- Status bar + pagination -->
-    <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex flex-wrap gap-3 items-center">
-      <!-- Left: stats -->
-      <div class="flex flex-shrink-0 gap-3 items-center">
-        <span v-if="totalCount > 0" class="tabular-nums">
-          {{ totalCount.toLocaleString() }} rows
-        </span>
-        <span v-if="formattedTime" class="text-muted-foreground/70">{{ formattedTime }}</span>
-      </div>
-
-      <div class="flex-1" />
-
-      <!-- Right: pagination + rows per page grouped -->
-      <div class="flex flex-shrink-0 gap-2 items-center">
-        <!-- Page navigation -->
-        <div v-if="data" class="flex gap-0.5 items-center">
-          <!-- Prev -->
-          <button
-            class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="currentPage === 1 || loading"
-            @click="goToPage(currentPage - 1)"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m15 18-6-6 6-6" />
-            </svg>
-          </button>
-
-          <template v-for="(p, idx) in pageNumbers" :key="idx">
-            <span
-              v-if="p === '...'"
-              class="text-xs text-muted-foreground inline-flex h-6 w-6 items-center justify-center"
-            >…</span>
-            <button
-              v-else
-              class="text-xs font-medium px-1.5 rounded inline-flex h-6 min-w-6 transition-colors items-center justify-center"
-              :class="p === currentPage
-                ? 'bg-primary text-primary-foreground'
-                : 'hover:bg-accent'"
-              :disabled="loading"
-              @click="goToPage(p as number)"
-            >
-              {{ p }}
-            </button>
-          </template>
-
-          <!-- Next -->
-          <button
-            class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
-            :disabled="currentPage >= totalPages || loading"
-            @click="goToPage(currentPage + 1)"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="m9 18 6-6-6-6" />
-            </svg>
-          </button>
-        </div>
-
-        <!-- Divider -->
-        <div v-if="data" class="bg-border h-3.5 w-px" />
-
-        <!-- Rows per page -->
-        <div class="flex gap-1.5 items-center">
-          <span class="text-muted-foreground/70">Rows</span>
-          <Select
-            :model-value="String(rowsPerPage)"
-            @update:model-value="changeRowsPerPage"
-          >
-            <SelectTrigger class="text-xs h-6 w-16">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem
-                v-for="n in ROWS_PER_PAGE_OPTIONS"
-                :key="n"
-                :value="String(n)"
+              </th>
+              <th class="data-table-header text-center w-10">
+                #
+              </th>
+              <th
+                v-for="col in visibleColumns"
+                :key="col"
+                class="data-table-header text-left"
               >
-                {{ n }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+                <div class="col-header-cell" :title="columnTypeMap[col] ? `${col} · ${columnTypeMap[col]}` : col">
+                  <svg
+                    v-if="columnIsPK[col]"
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    class="text-amber-500 flex-shrink-0"
+                  >
+                    <circle cx="7.5" cy="15.5" r="5.5" />
+                    <path d="m21 2-9.6 9.6" />
+                    <path d="m15.5 7.5 3 3L22 7l-3-3" />
+                  </svg>
+                  <span class="col-name truncate">{{ col }}</span>
+                  <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
+                </div>
+              </th>
+              <!-- Actions header — sticky right, excluded from CSV / column visibility -->
+              <th class="data-table-header data-table-actions-col text-center">
+                {{ t('components.dataTableView.actions') }}
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="(row, i) in data.rows"
+              :key="i"
+              class="border-b hover:bg-muted/50"
+              :class="{ 'bg-muted/30': selectedRows.has(i) }"
+            >
+              <td v-if="pkColumns.length > 0" class="text-xs px-3 py-1.5 text-center w-10">
+                <input
+                  type="checkbox"
+                  class="h-3 w-3 cursor-pointer"
+                  :checked="selectedRows.has(i)"
+                  @change="toggleRowSelection(i)"
+                >
+              </td>
+              <td class="text-xs text-muted-foreground px-3 py-1.5 text-center w-10">
+                {{ offset + i + 1 }}
+              </td>
+              <td
+                v-for="col in visibleColumns"
+                :key="`${i}-${col}`"
+                class="text-sm px-3 py-1.5 max-w-xs truncate"
+                :class="{ 'italic text-muted-foreground': isNullValue(row[col]) }"
+                :title="formatValue(row[col])"
+              >
+                {{ formatValue(row[col]) }}
+              </td>
+              <!-- Actions cell — sticky right -->
+              <td class="data-table-actions-col px-2 py-1">
+                <div class="flex gap-0.5 items-center justify-center">
+                  <!-- Edit button -->
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="text-foreground h-6 w-6"
+                    :title="t('components.dataTableView.editRow')"
+                    @click.stop="openEditDialog(row)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
+                      <path d="m15 5 4 4" />
+                    </svg>
+                  </Button>
+                  <!-- Delete button -->
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    class="text-foreground h-6 w-6 hover:text-destructive"
+                    :title="t('components.dataTableView.deleteRow')"
+                    @click.stop="openDeleteDialog(row)"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M3 6h18" />
+                      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
+                      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                    </svg>
+                  </Button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Empty state -->
+        <div
+          v-else-if="data && data.rows.length === 0"
+          class="flex h-full items-center justify-center"
+        >
+          <div class="text-muted-foreground text-center">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mx-auto mb-2 opacity-50">
+              <path d="M12 3v18" />
+              <rect width="18" height="18" x="3" y="3" rx="2" />
+              <path d="M3 9h18" />
+              <path d="M3 15h18" />
+            </svg>
+            <p class="text-sm">
+              {{ t('components.dataTableView.noRows') }}
+            </p>
+          </div>
+        </div>
+
+        <!-- No data yet -->
+        <div v-else class="flex h-full items-center justify-center">
+          <div class="text-muted-foreground text-center">
+            <svg
+              class="text-primary mx-auto mb-2 h-8 w-8 animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+            </svg>
+          </div>
         </div>
       </div>
-    </div>
+
+      <!-- Status bar + pagination -->
+      <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex flex-wrap gap-3 items-center">
+        <!-- Left: stats -->
+        <div class="flex flex-shrink-0 gap-3 items-center">
+          <span v-if="totalCount > 0" class="tabular-nums">
+            {{ totalCount.toLocaleString() }} rows
+          </span>
+          <span v-if="formattedTime" class="text-muted-foreground/70">{{ formattedTime }}</span>
+        </div>
+
+        <div class="flex-1" />
+
+        <!-- Right: pagination + rows per page grouped -->
+        <div class="flex flex-shrink-0 gap-2 items-center">
+          <!-- Page navigation -->
+          <div v-if="data" class="flex gap-0.5 items-center">
+            <!-- Prev -->
+            <button
+              class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="currentPage === 1 || loading"
+              @click="goToPage(currentPage - 1)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m15 18-6-6 6-6" />
+              </svg>
+            </button>
+
+            <template v-for="(p, idx) in pageNumbers" :key="idx">
+              <span
+                v-if="p === '...'"
+                class="text-xs text-muted-foreground inline-flex h-6 w-6 items-center justify-center"
+              >…</span>
+              <button
+                v-else
+                class="text-xs font-medium px-1.5 rounded inline-flex h-6 min-w-6 transition-colors items-center justify-center"
+                :class="p === currentPage
+                  ? 'bg-primary text-primary-foreground'
+                  : 'hover:bg-accent'"
+                :disabled="loading"
+                @click="goToPage(p as number)"
+              >
+                {{ p }}
+              </button>
+            </template>
+
+            <!-- Next -->
+            <button
+              class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
+              :disabled="currentPage >= totalPages || loading"
+              @click="goToPage(currentPage + 1)"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="m9 18 6-6-6-6" />
+              </svg>
+            </button>
+          </div>
+
+          <!-- Divider -->
+          <div v-if="data" class="bg-border h-3.5 w-px" />
+
+          <!-- Rows per page -->
+          <div class="flex gap-1.5 items-center">
+            <span class="text-muted-foreground/70">Rows</span>
+            <Select
+              :model-value="String(rowsPerPage)"
+              @update:model-value="changeRowsPerPage"
+            >
+              <SelectTrigger class="text-xs h-6 w-16">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem
+                  v-for="n in ROWS_PER_PAGE_OPTIONS"
+                  :key="n"
+                  :value="String(n)"
+                >
+                  {{ n }}
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <!-- Schema sub-page -->
+    <SchemaTab
+      v-else-if="activeSubPage === 'schema'"
+      :connection-id="props.connectionId"
+      :database="props.database"
+      :schema="props.schema ?? null"
+      :table-name="props.tableName"
+      class="flex-1"
+    />
+
+    <!-- Indexes sub-page -->
+    <IndexesTab
+      v-else-if="activeSubPage === 'indexes'"
+      :connection-id="props.connectionId"
+      :database="props.database"
+      :schema="props.schema ?? null"
+      :table-name="props.tableName"
+      class="flex-1"
+    />
+
+    <!-- Foreign Keys sub-page -->
+    <ForeignKeysTab
+      v-else-if="activeSubPage === 'foreign_keys'"
+      :connection-id="props.connectionId"
+      :database="props.database"
+      :schema="props.schema ?? null"
+      :table-name="props.tableName"
+      class="flex-1"
+    />
+
+    <!-- Triggers sub-page -->
+    <TriggersTab
+      v-else-if="activeSubPage === 'triggers'"
+      :connection-id="props.connectionId"
+      :database="props.database"
+      :schema="props.schema ?? null"
+      :table-name="props.tableName"
+      class="flex-1"
+    />
 
     <!-- ── Delete confirmation dialog ── -->
-    <AlertDialog v-model:open="deleteDialogOpen">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('components.dataTableView.deleteDialog.title') }}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {{ t('components.dataTableView.deleteDialog.message') }}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <!-- PK summary so user knows exactly which row will be deleted -->
+    <DestructiveConfirmDialog
+      v-model:open="deleteDialogOpen"
+      :title="t('components.destructiveDialog.deleteRow.title')"
+      :message="t('components.destructiveDialog.deleteRow.message', { count: 1, table: props.tableName })"
+      :detail="t('components.destructiveDialog.deleteRow.detail')"
+      :confirm-label="t('components.destructiveDialog.deleteRow.confirm')"
+      :loading="isDeleting"
+      @confirm="confirmDelete"
+    >
+      <!-- PK summary so user knows exactly which row will be deleted -->
+      <template #default>
         <div v-if="deletingRow" class="text-xs text-muted-foreground font-mono px-3 py-2 rounded-md bg-muted break-all">
           {{ formatPkSummary(deletingRow) }}
         </div>
+      </template>
+    </DestructiveConfirmDialog>
 
-        <AlertDialogFooter>
-          <AlertDialogCancel :disabled="isDeleting">
-            {{ t('common.buttons.cancel') }}
-          </AlertDialogCancel>
-          <AlertDialogAction
-            :disabled="isDeleting"
-            @click.prevent="confirmDelete"
-          >
-            <Spinner v-if="isDeleting" size="sm" class="mr-1.5" />
-            {{ t('components.dataTableView.deleteDialog.confirm') }}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <!-- ── Batch delete confirmation dialog ── -->
+    <DestructiveConfirmDialog
+      v-model:open="batchDeleteDialogOpen"
+      :title="t('components.destructiveDialog.deleteRow.title')"
+      :message="t('components.destructiveDialog.deleteRow.message', { count: selectedRows.size, table: props.tableName })"
+      :detail="t('components.destructiveDialog.deleteRow.detail')"
+      :confirm-label="t('components.destructiveDialog.deleteRow.confirm')"
+      :loading="isBatchDeleting"
+      @confirm="confirmBatchDelete"
+    />
 
     <!-- ── Edit row dialog ── -->
     <Dialog v-model:open="editDialogOpen">

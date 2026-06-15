@@ -72,6 +72,7 @@ pub mod mysql;
 pub mod oracle;
 pub mod pool;
 pub mod postgres;
+pub mod search;
 pub mod sqlite;
 pub mod sqlserver;
 pub mod strategy;
@@ -97,6 +98,6 @@ pub use postgres::{PostgresAdapter, PostgresPool};
 pub use sqlite::{SQLiteAdapter, SQLitePool};
 pub use sqlserver::{SqlServerAdapter, SqlServerPool};
 pub use types::{
-    ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, QueryResult, QueryRow,
-    QueryValue, TableInfo,
+    ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+    QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
 };

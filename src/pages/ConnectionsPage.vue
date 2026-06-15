@@ -6,18 +6,9 @@ import { useRouter } from 'vue-router'
 import { ServerCard, ServerFormDialog } from '@/components/connections'
 import ConnectingModal from '@/components/connections/ConnectingModal.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
+import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/composables/useNotifications'
 import { ConnectionStatus, useConnectionStore } from '@/store'
@@ -566,24 +557,14 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
     />
 
     <!-- Delete Confirmation Dialog -->
-    <AlertDialog v-model:open="deleteDialogOpen">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('pages.connections.delete.title') }}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {{ t('pages.connections.delete.message', { name: connectionToDelete?.name }) }}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>{{ t('common.buttons.cancel') }}</AlertDialogCancel>
-          <AlertDialogAction
-            @click="confirmDelete"
-          >
-            {{ t('common.buttons.delete') }}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <DestructiveConfirmDialog
+      v-model:open="deleteDialogOpen"
+      :title="t('components.destructiveDialog.deleteConnection.title')"
+      :message="t('components.destructiveDialog.deleteConnection.message', { name: connectionToDelete?.name })"
+      :detail="t('components.destructiveDialog.deleteConnection.detail')"
+      :confirm-label="t('components.destructiveDialog.deleteConnection.confirm')"
+      @confirm="confirmDelete"
+    />
 
     <!-- Connecting Modal -->
     <ConnectingModal ref="connectingModal" />

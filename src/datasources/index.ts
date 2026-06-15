@@ -1,5 +1,7 @@
 export { agentApi, default as agentApiDefault } from './agentApi'
 export type { AgentMessage, AgentSession, AttachedSourceRow, ConfirmationRuleRow, ToolDefinition, ToolEnvelope, ToolMetadata, ToolsResponse } from './agentApi'
+export { browseApi } from './browseApi'
+export type { ForeignKeyInfo as BrowseForeignKeyInfo, IndexInfo, ObjectInfo, TriggerInfo } from './browseApi'
 export { connectionApi } from './connectionApi'
 export type { ConnectionStatus, ServerConfig } from './connectionApi'
 export { getForeignKeys } from './erDiagramApi'

@@ -118,7 +118,7 @@ const filteredForeignKeys = computed(() =>
   foreignKeys.value.filter(
     fk =>
       filteredTableNames.value.has(fk.source_table)
-      && filteredTableNames.value.has(fk.target_table),
+      && filteredTableNames.value.has(fk.referenced_table),
   ),
 )
 
@@ -128,8 +128,8 @@ const highlightedTables = computed(() => {
   const connected = new Set<string>([selectedTableId.value])
   for (const fk of foreignKeys.value) {
     if (fk.source_table === selectedTableId.value)
-      connected.add(fk.target_table)
-    if (fk.target_table === selectedTableId.value)
+      connected.add(fk.referenced_table)
+    if (fk.referenced_table === selectedTableId.value)
       connected.add(fk.source_table)
   }
   return connected
@@ -209,8 +209,8 @@ function computeLayout() {
   }
 
   for (const fk of filteredForeignKeys.value) {
-    g.setEdge(fk.source_table, fk.target_table, {
-      label: fk.constraint_name || '',
+    g.setEdge(fk.source_table, fk.referenced_table, {
+      label: fk.constraint_name,
     })
   }
 
@@ -288,7 +288,7 @@ async function fetchSchemaData() {
       schema: t.schema,
       columns: columnResults[i],
       foreignKeys: fkList.filter(
-        fk => fk.source_table === t.name || fk.target_table === t.name,
+        fk => fk.source_table === t.name || fk.referenced_table === t.name,
       ),
     }))
 
@@ -677,8 +677,8 @@ onMounted(() => {
                       v-if="
                         node.table.foreignKeys.some(
                           fk =>
-                            fk.source_column === col.name
-                            || fk.target_column === col.name,
+                            fk.columns.includes(col.name)
+                            || fk.referenced_columns.includes(col.name),
                         )
                       "
                       class="er-fk"

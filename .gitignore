@@ -31,3 +31,5 @@ coverage/
 *.tsbuildinfo
 .omo/
 .sisyphus/
+# Java build output
+jdbc-bridge/target/

@@ -9,7 +9,8 @@ use crate::database::{
     error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{
-        ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
+        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+        QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
     },
 };
 use async_trait::async_trait;
@@ -873,11 +874,6 @@ impl DatabaseAdapter for SqlServerAdapter {
         _database: Option<&str>,
         _schema: Option<&str>,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
-        use crate::database::types::ForeignKeyInfo;
-
-        let client = self.get_client().await?;
-        let mut client = client.lock().await;
-
         let schema_filter = match _schema {
             Some(s) => format!(
                 "AND OBJECT_SCHEMA_NAME(fk.parent_object_id) = '{}'",
@@ -908,6 +904,9 @@ impl DatabaseAdapter for SqlServerAdapter {
             "#,
         );
 
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
         let stream = client
             .simple_query(&sql)
             .await
@@ -918,51 +917,717 @@ impl DatabaseAdapter for SqlServerAdapter {
             .await
             .map_err(|e| DbError::QueryExecution(format!("Failed to get FK results: {}", e)))?;
 
-        let fks = rows
+        // Group rows by constraint_name to collect columns and referenced_columns
+        let mut fk_map: HashMap<String, ForeignKeyInfo> = HashMap::new();
+
+        for row in &rows {
+            let constraint_name = match Self::convert_value(row, 0) {
+                Ok(QueryValue::String(s)) => s,
+                _ => continue,
+            };
+            let source_table = match Self::convert_value(row, 2) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+            let source_column = match Self::convert_value(row, 3) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+            let target_schema = match Self::convert_value(row, 4) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+            let target_table = match Self::convert_value(row, 5) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+            let target_column = match Self::convert_value(row, 6) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+
+            fk_map
+                .entry(constraint_name.clone())
+                .and_modify(|entry| {
+                    entry.columns.push(source_column.clone());
+                    entry.referenced_columns.push(target_column.clone());
+                })
+                .or_insert_with(|| ForeignKeyInfo {
+                    constraint_name,
+                    source_table,
+                    columns: vec![source_column],
+                    referenced_schema: Some(target_schema),
+                    referenced_table: target_table,
+                    referenced_columns: vec![target_column],
+                    on_update: None,
+                    on_delete: None,
+                });
+        }
+
+        let fks: Vec<ForeignKeyInfo> = fk_map.into_values().collect();
+        Ok(fks)
+    }
+
+    async fn list_views(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = SqlServerAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_views(None, schema).await;
+            }
+        }
+
+        let schema_filter = schema.unwrap_or("dbo");
+
+        let query = format!(
+            r#"
+            SELECT
+                v.name,
+                'VIEW',
+                s.name,
+                OBJECT_DEFINITION(v.object_id)
+            FROM sys.views v
+            INNER JOIN sys.schemas s ON v.schema_id = s.schema_id
+            WHERE s.name = '{}'
+            ORDER BY v.name
+            "#,
+            schema_filter
+        );
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let stream = client
+            .simple_query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let views = rows
             .iter()
             .map(|row| {
-                let constraint_name = match Self::convert_value(row, 0) {
+                let name = match Self::convert_value(row, 0) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let object_type = match Self::convert_value(row, 1) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let schema_name = match Self::convert_value(row, 2) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let definition = match Self::convert_value(row, 3) {
                     Ok(QueryValue::String(s)) => Some(s),
                     _ => None,
                 };
-                let source_schema = match Self::convert_value(row, 1) {
-                    Ok(QueryValue::String(s)) => s,
-                    _ => String::new(),
-                };
-                let source_table = match Self::convert_value(row, 2) {
-                    Ok(QueryValue::String(s)) => s,
-                    _ => String::new(),
-                };
-                let source_column = match Self::convert_value(row, 3) {
-                    Ok(QueryValue::String(s)) => s,
-                    _ => String::new(),
-                };
-                let target_schema = match Self::convert_value(row, 4) {
-                    Ok(QueryValue::String(s)) => s,
-                    _ => String::new(),
-                };
-                let target_table = match Self::convert_value(row, 5) {
-                    Ok(QueryValue::String(s)) => s,
-                    _ => String::new(),
-                };
-                let target_column = match Self::convert_value(row, 6) {
-                    Ok(QueryValue::String(s)) => s,
-                    _ => String::new(),
-                };
-
-                ForeignKeyInfo {
-                    constraint_name,
-                    source_schema,
-                    source_table,
-                    source_column,
-                    target_schema,
-                    target_table,
-                    target_column,
+                let detail = definition.map(|def| {
+                    if def.len() > 100 {
+                        format!("{}...", &def[..100])
+                    } else {
+                        def
+                    }
+                });
+                ObjectInfo {
+                    name,
+                    object_type,
+                    schema: Some(schema_name),
+                    detail,
                 }
             })
             .collect();
 
-        Ok(fks)
+        Ok(views)
+    }
+
+    async fn list_procedures(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = SqlServerAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_procedures(None, schema).await;
+            }
+        }
+
+        let schema_filter = schema.unwrap_or("dbo");
+
+        let query = format!(
+            r#"
+            SELECT
+                p.name,
+                'PROCEDURE',
+                s.name,
+                ISNULL(STUFF((
+                    SELECT ', ' + par.name + ' ' + TYPE_NAME(par.system_type_id)
+                    FROM sys.parameters par
+                    WHERE par.object_id = p.object_id AND par.parameter_id > 0
+                    ORDER BY par.parameter_id
+                    FOR XML PATH('')
+                ), 1, 2, ''), '')
+            FROM sys.procedures p
+            INNER JOIN sys.schemas s ON p.schema_id = s.schema_id
+            WHERE s.name = '{}'
+            ORDER BY p.name
+            "#,
+            schema_filter
+        );
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let stream = client
+            .simple_query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let procedures = rows
+            .iter()
+            .map(|row| {
+                let name = match Self::convert_value(row, 0) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let object_type = match Self::convert_value(row, 1) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let schema_name = match Self::convert_value(row, 2) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let params = match Self::convert_value(row, 3) {
+                    Ok(QueryValue::String(s)) if !s.is_empty() => Some(format!("({})", s)),
+                    _ => None,
+                };
+                ObjectInfo {
+                    name,
+                    object_type,
+                    schema: Some(schema_name),
+                    detail: params,
+                }
+            })
+            .collect();
+
+        Ok(procedures)
+    }
+
+    async fn list_functions(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = SqlServerAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_functions(None, schema).await;
+            }
+        }
+
+        let schema_filter = schema.unwrap_or("dbo");
+
+        let query = format!(
+            r#"
+            SELECT
+                o.name,
+                'FUNCTION',
+                s.name,
+                ISNULL(STUFF((
+                    SELECT ', ' + par.name + ' ' + TYPE_NAME(par.system_type_id)
+                    FROM sys.parameters par
+                    WHERE par.object_id = o.object_id AND par.parameter_id > 0
+                    ORDER BY par.parameter_id
+                    FOR XML PATH('')
+                ), 1, 2, ''), '')
+            FROM sys.objects o
+            INNER JOIN sys.schemas s ON o.schema_id = s.schema_id
+            WHERE s.name = '{}' AND o.type IN ('FN', 'IF', 'TF', 'FS', 'FT')
+            ORDER BY o.name
+            "#,
+            schema_filter
+        );
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let stream = client
+            .simple_query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let functions = rows
+            .iter()
+            .map(|row| {
+                let name = match Self::convert_value(row, 0) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let object_type = match Self::convert_value(row, 1) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let schema_name = match Self::convert_value(row, 2) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let params = match Self::convert_value(row, 3) {
+                    Ok(QueryValue::String(s)) if !s.is_empty() => Some(format!("({})", s)),
+                    _ => None,
+                };
+                ObjectInfo {
+                    name,
+                    object_type,
+                    schema: Some(schema_name),
+                    detail: params,
+                }
+            })
+            .collect();
+
+        Ok(functions)
+    }
+
+    async fn list_triggers(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<TriggerInfo>> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot list triggers from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("dbo");
+
+        let query = format!(
+            r#"
+            SELECT
+                t.name,
+                CASE WHEN t.is_instead_of_trigger = 1 THEN 'INSTEAD OF' ELSE 'AFTER' END,
+                ISNULL(STUFF((
+                    SELECT ', ' + te.type_desc
+                    FROM sys.trigger_events te
+                    WHERE te.object_id = t.object_id
+                    ORDER BY te.type
+                    FOR XML PATH('')
+                ), 1, 2, ''), ''),
+                OBJECT_DEFINITION(t.object_id)
+            FROM sys.triggers t
+            INNER JOIN sys.tables tb ON t.parent_id = tb.object_id
+            INNER JOIN sys.schemas s ON tb.schema_id = s.schema_id
+            WHERE s.name = '{}' AND tb.name = '{}'
+            ORDER BY t.name
+            "#,
+            schema_filter, table
+        );
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let stream = client
+            .simple_query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let triggers = rows
+            .iter()
+            .map(|row| {
+                let name = match Self::convert_value(row, 0) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let action_timing = match Self::convert_value(row, 1) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let event = match Self::convert_value(row, 2) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let ddl = match Self::convert_value(row, 3) {
+                    Ok(QueryValue::String(s)) => Some(s),
+                    _ => None,
+                };
+                TriggerInfo {
+                    name,
+                    action_timing,
+                    event,
+                    ddl,
+                }
+            })
+            .collect();
+
+        Ok(triggers)
+    }
+
+    async fn list_indexes(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<IndexInfo>> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot list indexes from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("dbo");
+
+        let query = format!(
+            r#"
+            SELECT
+                i.name,
+                i.type_desc,
+                i.is_unique,
+                i.is_primary_key,
+                ISNULL(STUFF((
+                    SELECT ', ' + c.name
+                    FROM sys.index_columns ic
+                    INNER JOIN sys.columns c ON ic.column_id = c.column_id AND ic.object_id = c.object_id
+                    WHERE ic.object_id = i.object_id AND ic.index_id = i.index_id AND ic.is_included_column = 0
+                    ORDER BY ic.key_ordinal
+                    FOR XML PATH('')
+                ), 1, 2, ''), '')
+            FROM sys.indexes i
+            INNER JOIN sys.tables t ON i.object_id = t.object_id
+            INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+            WHERE s.name = '{}' AND t.name = '{}'
+            ORDER BY i.name
+            "#,
+            schema_filter, table
+        );
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let stream = client
+            .simple_query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let indexes = rows
+            .iter()
+            .map(|row| {
+                let name = match Self::convert_value(row, 0) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let index_type = match Self::convert_value(row, 1) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let is_unique = match Self::convert_value(row, 2) {
+                    Ok(QueryValue::Bool(b)) => b,
+                    Ok(QueryValue::Int(i)) => i != 0,
+                    _ => false,
+                };
+                let is_primary = match Self::convert_value(row, 3) {
+                    Ok(QueryValue::Bool(b)) => b,
+                    Ok(QueryValue::Int(i)) => i != 0,
+                    _ => false,
+                };
+                let columns_str = match Self::convert_value(row, 4) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let columns = if columns_str.is_empty() {
+                    Vec::new()
+                } else {
+                    columns_str.split(", ").map(|s| s.to_string()).collect()
+                };
+                IndexInfo {
+                    name,
+                    columns,
+                    index_type,
+                    is_unique,
+                    is_primary,
+                }
+            })
+            .collect();
+
+        Ok(indexes)
+    }
+
+    async fn list_foreign_keys(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot list foreign keys from a different database without reconnecting"
+                    .to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("dbo");
+
+        let query = format!(
+            r#"
+            SELECT
+                fk.name,
+                OBJECT_SCHEMA_NAME(fk.referenced_object_id),
+                OBJECT_NAME(fk.referenced_object_id),
+                ISNULL(fk.update_referential_action_desc, 'NO ACTION'),
+                ISNULL(fk.delete_referential_action_desc, 'NO ACTION'),
+                ISNULL(STUFF((
+                    SELECT ', ' + COL_NAME(fkc.parent_object_id, fkc.parent_column_id)
+                    FROM sys.foreign_key_columns fkc
+                    WHERE fkc.constraint_object_id = fk.object_id
+                    ORDER BY fkc.constraint_column_id
+                    FOR XML PATH('')
+                ), 1, 2, ''), ''),
+                ISNULL(STUFF((
+                    SELECT ', ' + COL_NAME(fkc.referenced_object_id, fkc.referenced_column_id)
+                    FROM sys.foreign_key_columns fkc
+                    WHERE fkc.constraint_object_id = fk.object_id
+                    ORDER BY fkc.constraint_column_id
+                    FOR XML PATH('')
+                ), 1, 2, ''), '')
+            FROM sys.foreign_keys fk
+            INNER JOIN sys.tables t ON fk.parent_object_id = t.object_id
+            INNER JOIN sys.schemas s ON t.schema_id = s.schema_id
+            WHERE s.name = '{}' AND t.name = '{}'
+            ORDER BY fk.name
+            "#,
+            schema_filter, table
+        );
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let stream = client
+            .simple_query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let foreign_keys = rows
+            .iter()
+            .map(|row| {
+                let constraint_name = match Self::convert_value(row, 0) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let referenced_schema = match Self::convert_value(row, 1) {
+                    Ok(QueryValue::String(s)) => Some(s),
+                    _ => None,
+                };
+                let referenced_table = match Self::convert_value(row, 2) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let on_update = match Self::convert_value(row, 3) {
+                    Ok(QueryValue::String(s)) => Some(s),
+                    _ => None,
+                };
+                let on_delete = match Self::convert_value(row, 4) {
+                    Ok(QueryValue::String(s)) => Some(s),
+                    _ => None,
+                };
+                let columns_str = match Self::convert_value(row, 5) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let ref_columns_str = match Self::convert_value(row, 6) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let columns = if columns_str.is_empty() {
+                    Vec::new()
+                } else {
+                    columns_str.split(", ").map(|s| s.to_string()).collect()
+                };
+                let referenced_columns = if ref_columns_str.is_empty() {
+                    Vec::new()
+                } else {
+                    ref_columns_str.split(", ").map(|s| s.to_string()).collect()
+                };
+                ForeignKeyInfo {
+                    constraint_name,
+                    source_table: table.to_string(),
+                    columns,
+                    referenced_schema,
+                    referenced_table,
+                    referenced_columns,
+                    on_update,
+                    on_delete,
+                }
+            })
+            .collect();
+
+        Ok(foreign_keys)
+    }
+
+    async fn get_object_ddl(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        _object_type: &str,
+    ) -> DbResult<String> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot get DDL from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("dbo");
+
+        let query = format!(
+            "SELECT OBJECT_DEFINITION(OBJECT_ID(N'{}.{}'))",
+            schema_filter, object_name
+        );
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let stream = client
+            .simple_query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        if let Some(row) = rows.first() {
+            match Self::convert_value(row, 0) {
+                Ok(QueryValue::String(s)) => Ok(s),
+                _ => Err(DbError::DatabaseNotFound(format!(
+                    "DDL not found for {}.{}",
+                    schema_filter, object_name
+                ))),
+            }
+        } else {
+            Err(DbError::DatabaseNotFound(format!(
+                "Object {}.{} not found",
+                schema_filter, object_name
+            )))
+        }
+    }
+
+    async fn drop_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<()> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot drop object from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("dbo");
+        let qualified = format!("{}.{}", schema_filter, object_name);
+
+        let sql = match object_type.to_uppercase().as_str() {
+            "VIEW" => format!("DROP VIEW IF EXISTS {}", qualified),
+            "PROCEDURE" => format!("DROP PROCEDURE IF EXISTS {}", qualified),
+            "FUNCTION" => format!("DROP FUNCTION IF EXISTS {}", qualified),
+            "TABLE" => format!("DROP TABLE IF EXISTS {}", qualified),
+            _ => {
+                return Err(DbError::UnsupportedOperation(format!(
+                    "drop_object not supported for type: {}",
+                    object_type
+                )))
+            }
+        };
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        client
+            .simple_query(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .into_results()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn rename_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        _object_type: &str,
+        new_name: &str,
+    ) -> DbResult<()> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot rename object from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("dbo");
+        let qualified = format!("{}.{}", schema_filter, object_name);
+
+        let sql = format!("EXEC sp_rename N'{}', N'{}'", qualified, new_name);
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        client
+            .simple_query(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .into_results()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
     }
 
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {

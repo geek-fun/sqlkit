@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import type { StatementToExecute } from '@/composables/useSqlStatements'
 import type { TableInfo } from '@/store/databaseStore'
+import { invoke } from '@tauri-apps/api/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { DatabaseBrowser, DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/components/database-browser'
 import ErDiagramView from '@/components/er-diagram/ErDiagramView.vue'
+import ListingTab from '@/components/database-browser/ListingTab.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { Button } from '@/components/ui/button'
+import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import {
   Select,
   SelectContent,
@@ -38,6 +41,11 @@ const selectedDatabase = ref<string>('')
 const selectedSchema = ref<string>('')
 const queryTabsRef = ref<InstanceType<typeof QueryTabs>>()
 const databaseBrowserRef = ref<InstanceType<typeof DatabaseBrowser>>()
+
+// ── Destructive action dialog state ──
+const destructiveDialogOpen = ref(false)
+const destructiveAction = ref<{ type: 'drop' | 'truncate', table: TableInfo, database: string, schema?: string } | null>(null)
+const isDestructiveActionExecuting = ref(false)
 const showOrphanTabDialog = ref(false)
 const orphanTabToHandle = ref<string | null>(null)
 
@@ -194,6 +202,31 @@ function getActiveConnectionId(): string | null {
   return isConnectionActive(connId) ? connId : null
 }
 
+const listingTabObjects = computed(() => {
+  const tab = activeTab.value
+  const connId = getConnectionId()
+  if (!tab?.listingTab || !connId) {
+    return null
+  }
+  const meta = databaseStore.metadata[connId]
+  if (!meta) {
+    return null
+  }
+  const objectKey = tab.listingTab.schema
+    ? `${tab.listingTab.database}.${tab.listingTab.schema}`
+    : tab.listingTab.database
+  const schemaObjects = meta.objects[objectKey]
+  if (!schemaObjects) {
+    return null
+  }
+  switch (tab.listingTab.type) {
+    case 'VIEW': return schemaObjects.views
+    case 'PROCEDURE': return schemaObjects.procedures
+    case 'FUNCTION': return schemaObjects.functions
+    default: return null
+  }
+})
+
 async function executeQuery(details?: StatementToExecute) {
   if (!activeTab.value || activeTab.value.orphanFromConnectionId) {
     return
@@ -333,8 +366,55 @@ function handleExportData(_table: TableInfo, _database: string, _schema?: string
 
 function handleShowErDiagram(database: string, schema?: string) {
   const connId = getActiveConnectionId()
-  if (connId) {
+  if (connId)
     tabStore.openErDiagramTab(connId, database, schema)
+}
+
+function handleDropTable(table: TableInfo, database: string, schema?: string) {
+  destructiveAction.value = { type: 'drop', table, database, schema }
+  destructiveDialogOpen.value = true
+}
+
+function handleTruncateTable(table: TableInfo, database: string, schema?: string) {
+  destructiveAction.value = { type: 'truncate', table, database, schema }
+  destructiveDialogOpen.value = true
+}
+
+async function handleDestructiveConfirm() {
+  const action = destructiveAction.value
+  if (!action)
+    return
+
+  isDestructiveActionExecuting.value = true
+  const connId = getActiveConnectionId()
+  if (!connId) {
+    toast.error('No active connection')
+    isDestructiveActionExecuting.value = false
+    return
+  }
+
+  const schemaPrefix = action.schema ? `"${action.schema}".` : ''
+  const qualifiedName = `${schemaPrefix}"${action.table.name}"`
+  const sql = action.type === 'drop'
+    ? `DROP TABLE IF EXISTS ${qualifiedName};`
+    : `TRUNCATE TABLE ${qualifiedName};`
+
+  try {
+    await invoke('execute_query', {
+      connectionId: connId,
+      sql,
+    })
+    const actionLabel = action.type === 'drop' ? 'dropped' : 'truncated'
+    toast.success(`Table ${actionLabel} successfully`)
+    destructiveDialogOpen.value = false
+    destructiveAction.value = null
+    databaseBrowserRef.value?.refreshTree()
+  }
+  catch (err) {
+    toast.error(`Failed to ${action.type} table: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  finally {
+    isDestructiveActionExecuting.value = false
   }
 }
 
@@ -343,6 +423,50 @@ function handleSelectTable(table: TableInfo, database: string, schema?: string) 
   if (!connId)
     return
   tabStore.openTableViewTab(connId, database, table.name, schema)
+}
+
+function handleOpenListingTab(type: 'VIEW' | 'PROCEDURE' | 'FUNCTION', database: string, schema?: string) {
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+  tabStore.openListingTab(connId, database, type, schema)
+}
+
+function handleOpenDdlTab(name: string, type: string, database: string, schema?: string) {
+  if (type === 'VIEW') {
+    const connId = getActiveConnectionId()
+    if (!connId)
+      return
+    tabStore.openTableViewTab(connId, database, name, schema)
+    return
+  }
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+  const listingType = type === 'PROCEDURE' ? 'PROCEDURE' : 'FUNCTION'
+  tabStore.openListingTab(connId, database, listingType, schema)
+}
+
+function handleOpenFromListing(info: { name: string, type: string, schema?: string }, database: string) {
+  handleOpenDdlTab(info.name, info.type, database, info.schema)
+}
+
+async function handleRefreshListingTab() {
+  const tab = activeTab.value
+  const connId = getConnectionId()
+  if (!tab?.listingTab || !connId) {
+    return
+  }
+  try {
+    const schema = tab.listingTab.schema || ''
+    if (!schema) {
+      return
+    }
+    await databaseStore.fetchSchemaObjects(connId, tab.listingTab.database, schema)
+  }
+  catch {
+    // ignore
+  }
 }
 
 async function handleOpenSavedQuery(filePath: string) {
@@ -509,8 +633,12 @@ function closeResultPanel() {
             @view-structure="handleViewStructure"
             @export-data="handleExportData"
             @show-er-diagram="handleShowErDiagram"
+            @drop-table="handleDropTable"
+            @truncate-table="handleTruncateTable"
             @open-saved-query="handleOpenSavedQuery"
             @create-new-query="handleNewTab"
+            @open-listing-tab="handleOpenListingTab"
+            @open-ddl-tab="handleOpenDdlTab"
           />
         </div>
 
@@ -568,6 +696,22 @@ function closeResultPanel() {
             :database="activeTab.erDiagram.database"
             :schema="activeTab.erDiagram.schema"
             class="flex-1"
+          />
+
+          <!-- Listing Tab (Views / Procedures / Functions) -->
+          <ListingTab
+            v-else-if="activeTab?.listingTab && !activeTab.orphanFromConnectionId && listingTabObjects"
+            :key="`${getConnectionId()}-${activeTab.id}-${activeTab.listingTab.type}-${activeTab.listingTab.database}`"
+            :connection-id="getConnectionId() || ''"
+            :database="activeTab.listingTab.database"
+            :schema="activeTab.listingTab.schema ?? null"
+            :type="activeTab.listingTab.type"
+            :objects="listingTabObjects"
+            :loading="false"
+            :error="null"
+            class="flex-1"
+            @refresh="handleRefreshListingTab"
+            @open-object="(obj: any) => handleOpenFromListing({ name: obj.name, type: obj.object_type, schema: obj.schema }, activeTab?.listingTab?.database || '')"
           />
 
           <!-- Query editor area (shown for normal query tabs) -->
@@ -752,6 +896,27 @@ function closeResultPanel() {
         </div>
       </div>
     </div>
+
+    <!-- Destructive Action Confirmation Dialog (Drop/Truncate Table) -->
+    <DestructiveConfirmDialog
+      v-if="destructiveAction"
+      v-model:open="destructiveDialogOpen"
+      :title="destructiveAction.type === 'drop'
+        ? t('components.destructiveDialog.dropTable.title')
+        : t('components.destructiveDialog.truncateTable.title')"
+      :message="destructiveAction.type === 'drop'
+        ? t('components.destructiveDialog.dropTable.message', { table: destructiveAction.table.name })
+        : t('components.destructiveDialog.truncateTable.message', { table: destructiveAction.table.name })"
+      :detail="destructiveAction.type === 'drop'
+        ? t('components.destructiveDialog.dropTable.detail')
+        : t('components.destructiveDialog.truncateTable.detail')"
+      :confirm-label="destructiveAction.type === 'drop'
+        ? t('components.destructiveDialog.dropTable.confirm')
+        : t('components.destructiveDialog.truncateTable.confirm')"
+      :loading="isDestructiveActionExecuting"
+      @confirm="handleDestructiveConfirm"
+      @update:open="(v) => { if (!v) destructiveAction = null }"
+    />
 
     <!-- Orphan Tab Warning Dialog -->
     <AlertDialog v-model:open="showOrphanTabDialog">
