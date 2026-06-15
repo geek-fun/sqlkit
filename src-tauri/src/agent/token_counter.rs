@@ -43,10 +43,7 @@ pub fn count_chat_messages(messages: &[Value], spec: &ModelSpec) -> usize {
 }
 
 fn count_single_message(message: &Value, family: TokenizerFamily) -> usize {
-    let role = message
-        .get("role")
-        .and_then(|v| v.as_str())
-        .unwrap_or("");
+    let role = message.get("role").and_then(|v| v.as_str()).unwrap_or("");
     let mut total = PER_MESSAGE_OVERHEAD + count_text(role, family);
 
     if let Some(content) = message.get("content") {
@@ -77,10 +74,7 @@ fn count_value_text(value: &Value, family: TokenizerFamily) -> usize {
     match value {
         Value::String(s) => count_text(s, family),
         Value::Null => 0,
-        Value::Array(items) => items
-            .iter()
-            .map(|v| count_value_text(v, family))
-            .sum(),
+        Value::Array(items) => items.iter().map(|v| count_value_text(v, family)).sum(),
         Value::Object(_) => count_text(&value.to_string(), family),
         other => count_text(&other.to_string(), family),
     }
@@ -114,7 +108,11 @@ pub fn count_tokens(text: &str, model: &str) -> usize {
 
 fn resolve_spec_for_model(model: &str) -> ModelSpec {
     let lower = model.to_lowercase();
-    if lower.contains("gpt-4") || lower.contains("gpt-3.5") || lower.contains("o1") || lower.contains("o3") {
+    if lower.contains("gpt-4")
+        || lower.contains("gpt-3.5")
+        || lower.contains("o1")
+        || lower.contains("o3")
+    {
         resolve_spec("OPEN_AI", model)
     } else if lower.contains("claude") {
         resolve_spec("anthropic", model)
