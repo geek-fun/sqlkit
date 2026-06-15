@@ -138,6 +138,66 @@ impl QueryResult {
     }
 }
 
+/// Information about a database object (view, procedure, function).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ObjectInfo {
+    /// Object name.
+    pub name: String,
+    /// Object type (VIEW, PROCEDURE, FUNCTION).
+    pub object_type: String,
+    /// Schema name.
+    pub schema: Option<String>,
+    /// Detail information (columns for views, params for procs, return type for funcs).
+    pub detail: Option<String>,
+}
+
+/// Information about a table index.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IndexInfo {
+    /// Index name.
+    pub name: String,
+    /// Column names included in the index.
+    pub columns: Vec<String>,
+    /// Index type (BTREE, HASH, GIN, GIST, etc.).
+    pub index_type: String,
+    /// Whether the index enforces uniqueness.
+    pub is_unique: bool,
+    /// Whether this is the primary key index.
+    pub is_primary: bool,
+}
+
+/// Information about a foreign key constraint.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForeignKeyInfo {
+    /// Constraint name.
+    pub constraint_name: String,
+    /// Local columns in the constraint.
+    pub columns: Vec<String>,
+    /// Referenced schema.
+    pub referenced_schema: Option<String>,
+    /// Referenced table.
+    pub referenced_table: String,
+    /// Referenced columns.
+    pub referenced_columns: Vec<String>,
+    /// ON UPDATE action (CASCADE, SET NULL, RESTRICT, NO ACTION).
+    pub on_update: Option<String>,
+    /// ON DELETE action (CASCADE, SET NULL, RESTRICT, NO ACTION).
+    pub on_delete: Option<String>,
+}
+
+/// Information about a table trigger.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TriggerInfo {
+    /// Trigger name.
+    pub name: String,
+    /// Action timing (BEFORE, AFTER, INSTEAD OF).
+    pub action_timing: String,
+    /// Trigger event (INSERT, UPDATE, DELETE).
+    pub event: String,
+    /// DDL source of the trigger.
+    pub ddl: Option<String>,
+}
+
 /// Connection status information.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionStatus {

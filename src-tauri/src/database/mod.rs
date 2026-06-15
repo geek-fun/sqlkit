@@ -95,7 +95,8 @@ pub use postgres::{PostgresAdapter, PostgresPool};
 pub use sqlite::{SQLiteAdapter, SQLitePool};
 pub use sqlserver::{SqlServerAdapter, SqlServerPool};
 pub use types::{
-    ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
+    ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+    QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
 };
 #[cfg(feature = "oracle")]
 pub use oracle::OracleAdapter;
