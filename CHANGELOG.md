@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-06-16
+
+### Added
+
+- SQL formatting with configurable dialect and style (#92)
+
+### Changed
+
+- Format shortcut from Cmd+Shift+F to Shift+Alt+F for cross-platform consistency
+
 ## [0.5.4] - 2026-06-15
 
 ### Added
