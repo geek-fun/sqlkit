@@ -33,6 +33,8 @@ pub struct SshTunnelConfig {
     pub connect_timeout_secs: u64,
     #[serde(default)]
     pub keepalive_interval_secs: u64,
+    #[serde(default)]
+    pub verify_host_key: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

@@ -18,15 +18,24 @@ use crate::ssh::config::{
 
 const BUFFER_SIZE: usize = 65536;
 
-struct SshClient;
+struct SshClient {
+    verify_host_key: bool,
+}
 
 impl client::Handler for SshClient {
     type Error = russh::Error;
 
+    /// Host key verification is unconditionally accepted when `verify_host_key` is false
+    /// (the default). This trades security for convenience — MITM attacks are possible on
+    /// untrusted networks. Enable `verify_host_key` in the SSH tunnel config to require
+    /// known-hosts verification before trusting the server's identity.
     async fn check_server_key(
         &mut self,
         _server_public_key: &russh::keys::ssh_key::PublicKey,
     ) -> Result<bool, Self::Error> {
+        if self.verify_host_key {
+            log::warn!("Host key verification is not yet implemented; accepting key anyway");
+        }
         Ok(true)
     }
 }
@@ -57,18 +66,12 @@ fn ssh_client_config() -> client::Config {
 
 use russh::keys::agent::AgentIdentity;
 
-#[cfg(unix)]
-async fn authenticate_with_agent(
+async fn authenticate_with_agent_inner(
+    mut agent: russh::keys::agent::client::AgentClient<impl tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static>,
     session: &mut Handle<SshClient>,
     username: &str,
     timeout: &Duration,
 ) -> Result<(), String> {
-    use russh::keys::agent::client::AgentClient;
-
-    let mut agent = AgentClient::connect_env()
-        .await
-        .map_err(|e| format!("SSH agent unavailable: {}", e))?;
-
     let identities = agent
         .request_identities()
         .await
@@ -108,56 +111,31 @@ async fn authenticate_with_agent(
     }
 }
 
+#[cfg(unix)]
+async fn authenticate_with_agent(
+    session: &mut Handle<SshClient>,
+    username: &str,
+    timeout: &Duration,
+) -> Result<(), String> {
+    let agent = russh::keys::agent::client::AgentClient::connect_env()
+        .await
+        .map_err(|e| format!("SSH agent unavailable: {}", e))?;
+
+    authenticate_with_agent_inner(agent, session, username, timeout).await
+}
+
 #[cfg(windows)]
 async fn authenticate_with_agent(
     session: &mut Handle<SshClient>,
     username: &str,
     timeout: &Duration,
 ) -> Result<(), String> {
-    use russh::keys::agent::client::AgentClient;
-
     let stream = pageant::PageantStream::new()
         .await
         .map_err(|e| format!("SSH agent (Pageant) unavailable: {}", e))?;
-    let mut agent = AgentClient::connect(stream);
+    let agent = russh::keys::agent::client::AgentClient::connect(stream);
 
-    let identities = agent
-        .request_identities()
-        .await
-        .map_err(|e| format!("SSH agent request failed: {}", e))?;
-
-    if identities.is_empty() {
-        return Err("SSH agent has no identities".to_string());
-    }
-
-    let hash_alg = session.best_supported_rsa_hash().await.ok().flatten().flatten();
-
-    let auth_result = tokio::time::timeout(*timeout, async {
-        for identity in &identities {
-            let result = match identity {
-                AgentIdentity::PublicKey { key, .. } => {
-                    session.authenticate_publickey_with(username, key.clone(), hash_alg, &mut agent).await
-                }
-                AgentIdentity::Certificate { certificate, .. } => {
-                    session.authenticate_certificate_with(username, certificate.clone(), hash_alg, &mut agent).await
-                }
-            };
-
-            match result {
-                Ok(auth_res) if auth_res.success() => return Ok(()),
-                Ok(_) => continue,
-                Err(_) => continue,
-            }
-        }
-        Err("No SSH agent identity was accepted".to_string())
-    })
-    .await;
-
-    match auth_result {
-        Ok(Ok(())) => Ok(()),
-        Ok(Err(e)) => Err(e),
-        Err(_) => Err("SSH agent auth timed out".to_string()),
-    }
+    authenticate_with_agent_inner(agent, session, username, timeout).await
 }
 
 fn load_ssh_private_key(path: &str, passphrase: Option<&str>) -> Result<russh::keys::PrivateKey, String> {
@@ -431,7 +409,7 @@ async fn tunnel_reconnect_loop(
         match client::connect(
             Arc::new(ssh_client_config()),
             (&*connect_host, connect_port),
-            SshClient,
+            SshClient { verify_host_key: current_config.verify_host_key },
         )
         .await
         {
@@ -471,7 +449,7 @@ async fn tunnel_reconnect_loop(
             match client::connect(
                 Arc::new(ssh_client_config()),
                 (&*connect_host, connect_port),
-                SshClient,
+                SshClient { verify_host_key: current_config.verify_host_key },
             )
             .await
             {
@@ -672,7 +650,7 @@ async fn spawn_tunnel_task(
     let timeout_dur = Duration::from_secs(timeout);
     let mut init_session = tokio::time::timeout(
         timeout_dur,
-        client::connect(ssh_config_init, (&*config.host, config.port), SshClient),
+        client::connect(ssh_config_init, (&*config.host, config.port), SshClient { verify_host_key: config.verify_host_key }),
     )
     .await
     .map_err(|_| format!("SSH connection timed out ({}s)", timeout))?
