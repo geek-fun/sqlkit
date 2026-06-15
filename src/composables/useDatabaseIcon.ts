@@ -39,6 +39,18 @@ import vastbaseLogo from '@/assets/images/database-icons/vastbase-logo.svg'
 import xugudbLogo from '@/assets/images/database-icons/xugudb-logo.svg'
 import yashandbLogo from '@/assets/images/database-icons/yashandb-logo.svg'
 import yugabytedbLogo from '@/assets/images/database-icons/yugabytedb-logo.svg'
+import hiveLogo from '@/assets/images/database-icons/hive-logo.svg'
+import databricksLogo from '@/assets/images/database-icons/databricks-logo.svg'
+import hanaLogo from '@/assets/images/database-icons/hana-logo.svg'
+import teradataLogo from '@/assets/images/database-icons/teradata-logo.svg'
+import verticaLogo from '@/assets/images/database-icons/vertica-logo.svg'
+import exasolLogo from '@/assets/images/database-icons/exasol-logo.svg'
+import bigqueryLogo from '@/assets/images/database-icons/bigquery-logo.svg'
+import informixLogo from '@/assets/images/database-icons/informix-logo.svg'
+import kylinLogo from '@/assets/images/database-icons/kylin-logo.svg'
+import cassandraLogo from '@/assets/images/database-icons/cassandra-logo.svg'
+import irisLogo from '@/assets/images/database-icons/iris-logo.svg'
+import accessLogo from '@/assets/images/database-icons/access-logo.svg'
 
 type DatabaseIconConfig = {
   icon: string
@@ -87,6 +99,18 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   TRINO: { icon: trinoLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   PRESTO: { icon: prestoLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   DERBY: { icon: sqliteLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  HIVE: { icon: hiveLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
+  DATABRICKS: { icon: databricksLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  HANA: { icon: hanaLogo, color: 'bg-teal-100 dark:bg-teal-900/30' },
+  TERADATA: { icon: teradataLogo, color: 'bg-red-100 dark:bg-red-900/30' },
+  VERTICA: { icon: verticaLogo, color: 'bg-green-100 dark:bg-green-900/30' },
+  EXASOL: { icon: exasolLogo, color: 'bg-amber-100 dark:bg-amber-900/30' },
+  BIGQUERY: { icon: bigqueryLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  INFORMIX: { icon: informixLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  KYLIN: { icon: kylinLogo, color: 'bg-slate-800 dark:bg-slate-200/30' },
+  CASSANDRA: { icon: cassandraLogo, color: 'bg-gray-100 dark:bg-gray-800/30' },
+  IRIS: { icon: irisLogo, color: 'bg-teal-100 dark:bg-teal-900/30' },
+  ACCESS: { icon: accessLogo, color: 'bg-red-100 dark:bg-red-900/30' },
 }
 
 export function useDatabaseIcon() {
