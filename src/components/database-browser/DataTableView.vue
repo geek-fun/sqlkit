@@ -3,17 +3,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { save as showSaveDialog } from '@tauri-apps/plugin-dialog'
 import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import {
   Dialog,
   DialogContent,
@@ -87,10 +78,37 @@ const connectionStore = useConnectionStore()
 const isReconnecting = ref(false)
 const connectionError = ref<string | null>(null)
 
+// --- Selection state ---
+const selectedRows = ref<Set<number>>(new Set())
+
+const allRowsSelected = computed(() =>
+  (data.value?.rows.length ?? 0) > 0 && selectedRows.value.size === (data.value?.rows.length ?? 0),
+)
+
+function toggleRowSelection(idx: number) {
+  const next = new Set(selectedRows.value)
+  if (next.has(idx))
+    next.delete(idx)
+  else
+    next.add(idx)
+  selectedRows.value = next
+}
+
+function toggleSelectAll() {
+  if (allRowsSelected.value) {
+    selectedRows.value = new Set()
+  }
+  else {
+    selectedRows.value = new Set(data.value?.rows.map((_, i) => i) ?? [])
+  }
+}
+
 // --- Delete state ---
 const deleteDialogOpen = ref(false)
 const deletingRow = ref<Record<string, unknown> | null>(null)
 const isDeleting = ref(false)
+const batchDeleteDialogOpen = ref(false)
+const isBatchDeleting = ref(false)
 
 // --- Edit state ---
 const editDialogOpen = ref(false)
@@ -402,6 +420,48 @@ async function confirmDelete() {
   }
 }
 
+async function confirmBatchDelete() {
+  const indices = [...selectedRows.value]
+  if (indices.length === 0 || !data.value)
+    return
+
+  isBatchDeleting.value = true
+  let successCount = 0
+  let failCount = 0
+
+  for (const idx of indices) {
+    const row = data.value.rows[idx]
+    if (!row || pkColumns.value.length === 0)
+      continue
+
+    try {
+      await invoke('delete_table_row', {
+        connectionId: props.connectionId,
+        database: props.database ?? null,
+        table: props.tableName,
+        schema: props.schema ?? null,
+        pkValues: extractPkValues(row),
+      })
+      successCount++
+    }
+    catch {
+      failCount++
+    }
+  }
+
+  if (failCount === 0) {
+    toast.success(`${successCount} row(s) deleted`)
+  }
+  else {
+    toast.warning(`${successCount} row(s) deleted, ${failCount} failed`)
+  }
+
+  batchDeleteDialogOpen.value = false
+  selectedRows.value = new Set()
+  isBatchDeleting.value = false
+  await refresh()
+}
+
 function rawValueToString(v: unknown): string {
   if (v === null || v === undefined)
     return ''
@@ -575,6 +635,11 @@ async function confirmEdit() {
   }
 }
 
+// Clear selection when data changes
+watch(data, () => {
+  selectedRows.value = new Set()
+})
+
 const formatValue = formatTableValue
 const isNullValue = isTableNullValue
 
@@ -743,6 +808,18 @@ watch(
         </svg>
       </Button>
 
+      <!-- Delete Selected button -->
+      <Button
+        v-if="selectedRows.size > 0 && pkColumns.length > 0"
+        variant="destructive"
+        size="sm"
+        class="text-xs flex-shrink-0 h-7"
+        @click.stop="batchDeleteDialogOpen = true"
+      >
+        <span class="i-carbon-trash-can mr-1 h-3.5 w-3.5" />
+        Delete Selected ({{ selectedRows.size }})
+      </Button>
+
       <!-- Apply Filters button -->
       <Button
         size="sm"
@@ -843,6 +920,14 @@ watch(
       >
         <thead>
           <tr class="border-b">
+            <th v-if="pkColumns.length > 0" class="data-table-header text-center w-10">
+              <input
+                type="checkbox"
+                class="h-3 w-3 cursor-pointer"
+                :checked="allRowsSelected"
+                @change="toggleSelectAll"
+              >
+            </th>
             <th class="data-table-header text-center w-10">
               #
             </th>
@@ -884,7 +969,16 @@ watch(
             v-for="(row, i) in data.rows"
             :key="i"
             class="border-b hover:bg-muted/50"
+            :class="{ 'bg-muted/30': selectedRows.has(i) }"
           >
+            <td v-if="pkColumns.length > 0" class="text-xs px-3 py-1.5 text-center w-10">
+              <input
+                type="checkbox"
+                class="h-3 w-3 cursor-pointer"
+                :checked="selectedRows.has(i)"
+                @change="toggleRowSelection(i)"
+              >
+            </td>
             <td class="text-xs text-muted-foreground px-3 py-1.5 text-center w-10">
               {{ offset + i + 1 }}
             </td>
@@ -1052,34 +1146,33 @@ watch(
     </div>
 
     <!-- ── Delete confirmation dialog ── -->
-    <AlertDialog v-model:open="deleteDialogOpen">
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{{ t('components.dataTableView.deleteDialog.title') }}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {{ t('components.dataTableView.deleteDialog.message') }}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-
-        <!-- PK summary so user knows exactly which row will be deleted -->
+    <DestructiveConfirmDialog
+      v-model:open="deleteDialogOpen"
+      :title="t('components.destructiveDialog.deleteRow.title')"
+      :message="t('components.destructiveDialog.deleteRow.message', { count: 1, table: props.tableName })"
+      :detail="t('components.destructiveDialog.deleteRow.detail')"
+      :confirm-label="t('components.destructiveDialog.deleteRow.confirm')"
+      :loading="isDeleting"
+      @confirm="confirmDelete"
+    >
+      <!-- PK summary so user knows exactly which row will be deleted -->
+      <template #default>
         <div v-if="deletingRow" class="text-xs text-muted-foreground font-mono px-3 py-2 rounded-md bg-muted break-all">
           {{ formatPkSummary(deletingRow) }}
         </div>
+      </template>
+    </DestructiveConfirmDialog>
 
-        <AlertDialogFooter>
-          <AlertDialogCancel :disabled="isDeleting">
-            {{ t('common.buttons.cancel') }}
-          </AlertDialogCancel>
-          <AlertDialogAction
-            :disabled="isDeleting"
-            @click.prevent="confirmDelete"
-          >
-            <Spinner v-if="isDeleting" size="sm" class="mr-1.5" />
-            {{ t('components.dataTableView.deleteDialog.confirm') }}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <!-- ── Batch delete confirmation dialog ── -->
+    <DestructiveConfirmDialog
+      v-model:open="batchDeleteDialogOpen"
+      :title="t('components.destructiveDialog.deleteRow.title')"
+      :message="t('components.destructiveDialog.deleteRow.message', { count: selectedRows.size, table: props.tableName })"
+      :detail="t('components.destructiveDialog.deleteRow.detail')"
+      :confirm-label="t('components.destructiveDialog.deleteRow.confirm')"
+      :loading="isBatchDeleting"
+      @confirm="confirmBatchDelete"
+    />
 
     <!-- ── Edit row dialog ── -->
     <Dialog v-model:open="editDialogOpen">
