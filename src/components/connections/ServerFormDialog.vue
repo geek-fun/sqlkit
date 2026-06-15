@@ -20,7 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { toast } from '@/composables/useNotifications'
-import { DatabaseType, buildTransportLayers, dbTypeToBackend, resolveDatabase } from '@/store'
+import { buildTransportLayers, DatabaseType, dbTypeToBackend, resolveDatabase } from '@/store'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import SslConfigSection from './ssl/SslConfigSection.vue'
 

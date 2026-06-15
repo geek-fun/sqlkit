@@ -265,7 +265,7 @@ function safePort(value: unknown): number {
   if (typeof value === 'number')
     return value
   if (typeof value === 'string') {
-    const parsed = parseInt(value, 10)
+    const parsed = Number.parseInt(value, 10)
     return Number.isNaN(parsed) ? 22 : parsed
   }
   return 22
