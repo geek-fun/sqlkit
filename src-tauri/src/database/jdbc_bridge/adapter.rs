@@ -17,8 +17,7 @@ use super::launcher::JdbcBridgeLauncher;
 use super::pool::JdbcBridgePool;
 use super::progress::ConnectionProgress;
 use super::protocol::{
-    ConnectParams, ConnectionStatusData, JdbcMethod, JdbcRequest,
-    QueryResultData,
+    ConnectParams, ConnectionStatusData, JdbcMethod, JdbcRequest, QueryResultData,
 };
 
 /// JDBC bridge adapter.
@@ -132,7 +131,6 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     async fn connect(&mut self) -> DbResult<()> {
         self.init_bridge().await?;
         Ok(())
-
     }
 
     async fn disconnect(&mut self) -> DbResult<()> {
@@ -149,9 +147,12 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         let launcher = self.launcher()?;
         let data = Self::send_request(
             &launcher,
-            JdbcRequest::new(JdbcMethod::TestConnection, serde_json::json!({
-                "conn_id": self.conn_id,
-            })),
+            JdbcRequest::new(
+                JdbcMethod::TestConnection,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                }),
+            ),
         )
         .await?;
         Self::parse_connection_status(data)
@@ -161,10 +162,13 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         let launcher = self.launcher()?;
         let data = Self::send_request(
             &launcher,
-            JdbcRequest::new(JdbcMethod::ExecuteQuery, serde_json::json!({
-                "conn_id": self.conn_id,
-                "sql": query,
-            })),
+            JdbcRequest::new(
+                JdbcMethod::ExecuteQuery,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "sql": query,
+                }),
+            ),
         )
         .await?;
         Self::parse_query_result(data)
@@ -174,9 +178,12 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         let launcher = self.launcher()?;
         let data = Self::send_request(
             &launcher,
-            JdbcRequest::new(JdbcMethod::ListDatabases, serde_json::json!({
-                "conn_id": self.conn_id,
-            })),
+            JdbcRequest::new(
+                JdbcMethod::ListDatabases,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                }),
+            ),
         )
         .await?;
         let names: Vec<String> = serde_json::from_value(data)
@@ -196,10 +203,13 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         let launcher = self.launcher()?;
         let data = Self::send_request(
             &launcher,
-            JdbcRequest::new(JdbcMethod::ListSchemas, serde_json::json!({
-                "conn_id": self.conn_id,
-                "database": database,
-            })),
+            JdbcRequest::new(
+                JdbcMethod::ListSchemas,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                }),
+            ),
         )
         .await?;
         serde_json::from_value(data)
@@ -214,11 +224,14 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         let launcher = self.launcher()?;
         let data = Self::send_request(
             &launcher,
-            JdbcRequest::new(JdbcMethod::ListTables, serde_json::json!({
-                "conn_id": self.conn_id,
-                "database": database,
-                "schema": schema,
-            })),
+            JdbcRequest::new(
+                JdbcMethod::ListTables,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                }),
+            ),
         )
         .await?;
         let tables: Vec<serde_json::Value> = serde_json::from_value(data)
@@ -252,12 +265,15 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         let launcher = self.launcher()?;
         let data = Self::send_request(
             &launcher,
-            JdbcRequest::new(JdbcMethod::ListColumns, serde_json::json!({
-                "conn_id": self.conn_id,
-                "database": database,
-                "schema": schema,
-                "table": table,
-            })),
+            JdbcRequest::new(
+                JdbcMethod::ListColumns,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                    "table": table,
+                }),
+            ),
         )
         .await?;
         let cols: Vec<serde_json::Value> = serde_json::from_value(data)
@@ -272,10 +288,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                         .and_then(|v| v.as_str())
                         .unwrap_or("unknown")
                         .to_string(),
-                    nullable: c
-                        .get("nullable")
-                        .and_then(|v| v.as_bool())
-                        .unwrap_or(true),
+                    nullable: c.get("nullable").and_then(|v| v.as_bool()).unwrap_or(true),
                     default_value: c
                         .get("default_value")
                         .and_then(|v| v.as_str())
@@ -288,8 +301,12 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                         .get("is_auto_increment")
                         .and_then(|v| v.as_bool())
                         .unwrap_or(false),
-                    max_length: c.get("max_length").and_then(|v| v.as_u64().map(|x| x as u32)),
-                    precision: c.get("precision").and_then(|v| v.as_u64().map(|x| x as u32)),
+                    max_length: c
+                        .get("max_length")
+                        .and_then(|v| v.as_u64().map(|x| x as u32)),
+                    precision: c
+                        .get("precision")
+                        .and_then(|v| v.as_u64().map(|x| x as u32)),
                     scale: c.get("scale").and_then(|v| v.as_u64().map(|x| x as u32)),
                     description: None,
                     metadata: HashMap::new(),

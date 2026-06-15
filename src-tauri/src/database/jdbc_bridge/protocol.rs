@@ -76,8 +76,12 @@ pub struct ConnectParams {
     pub pool_max: u32,
 }
 
-fn default_pool_min() -> u32 { 1 }
-fn default_pool_max() -> u32 { 5 }
+fn default_pool_min() -> u32 {
+    1
+}
+fn default_pool_max() -> u32 {
+    5
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecuteQueryParams {

@@ -37,7 +37,7 @@ impl JdbcBridgeLauncher {
     pub fn start(&mut self) -> DbResult<()> {
         let java = Self::detect_java().ok_or_else(|| {
             DbError::Connection(
-                "Java not found. Install a JRE or call download_managed_jre() to use the bundled JRE."
+"Java not found. Install a JRE or call download_jre() to use the bundled JRE."
                     .to_string(),
             )
         })?;
@@ -153,17 +153,20 @@ impl JdbcBridgeLauncher {
 
     /// Send a request and receive a response.
     pub fn send_request(&mut self, req: &JdbcRequest) -> DbResult<JdbcResponse> {
-        let process = self.process.as_mut().ok_or_else(|| {
-            DbError::Connection("JDBC bridge not started".to_string())
-        })?;
+        let process = self
+            .process
+            .as_mut()
+            .ok_or_else(|| DbError::Connection("JDBC bridge not started".to_string()))?;
 
-        let stdout = process.stdout.as_mut().ok_or_else(|| {
-            DbError::Connection("JDBC bridge stdout not available".to_string())
-        })?;
+        let stdout = process
+            .stdout
+            .as_mut()
+            .ok_or_else(|| DbError::Connection("JDBC bridge stdout not available".to_string()))?;
 
-        let stdin = self.stdin.as_mut().ok_or_else(|| {
-            DbError::Connection("JDBC bridge stdin not available".to_string())
-        })?;
+        let stdin = self
+            .stdin
+            .as_mut()
+            .ok_or_else(|| DbError::Connection("JDBC bridge stdin not available".to_string()))?;
 
         // Serialize and write request line
         let json = serde_json::to_string(req)

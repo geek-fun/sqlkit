@@ -109,8 +109,7 @@ pub fn normalize_base_url(url: &str) -> String {
     let without_slashes = trimmed.trim_end_matches('/');
     if without_slashes.ends_with("/v1") {
         without_slashes.to_string()
-    }
-    else {
+    } else {
         format!("{}/v1", without_slashes)
     }
 }
@@ -168,8 +167,7 @@ pub fn build_headers(settings: &Value) -> Result<HeaderMap, String> {
     if !api_key.is_empty() && !config.auth_header_name.is_empty() {
         let header_value = if config.auth_header_prefix.is_empty() {
             format!("{}", api_key)
-        }
-        else {
+        } else {
             format!("{}{}", config.auth_header_prefix, api_key)
         };
         let value = HeaderValue::from_str(&header_value)
@@ -272,8 +270,7 @@ mod tests {
 
     #[test]
     fn test_get_base_url_explicit() {
-        let s =
-            json!({"apiCompatibility": "openai-compatible", "baseUrl": "https://custom.example.com"});
+        let s = json!({"apiCompatibility": "openai-compatible", "baseUrl": "https://custom.example.com"});
         assert_eq!(get_base_url(&s), "https://custom.example.com/v1");
     }
 
@@ -317,18 +314,9 @@ mod tests {
     fn test_map_to_api_compatibility() {
         assert_eq!(map_to_api_compatibility("OLLAMA"), "local");
         assert_eq!(map_to_api_compatibility("OPENAI"), "openai-compatible");
-        assert_eq!(
-            map_to_api_compatibility("DEEP_SEEK"),
-            "openai-compatible"
-        );
-        assert_eq!(
-            map_to_api_compatibility("OPENROUTER"),
-            "openai-compatible"
-        );
-        assert_eq!(
-            map_to_api_compatibility("LM_STUDIO"),
-            "openai-compatible"
-        );
+        assert_eq!(map_to_api_compatibility("DEEP_SEEK"), "openai-compatible");
+        assert_eq!(map_to_api_compatibility("OPENROUTER"), "openai-compatible");
+        assert_eq!(map_to_api_compatibility("LM_STUDIO"), "openai-compatible");
     }
 
     #[test]

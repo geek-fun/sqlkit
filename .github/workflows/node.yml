@@ -76,4 +76,4 @@ jobs:
           DUCKDB_INCLUDE_DIR: ${{ github.workspace }}/libduckdb
         with:
           includeRelease: false
-          args: ${{ matrix.os == 'windows-latest' && '--no-default-features --features duckdb' || '' }}
+          args: ${{ matrix.os == 'windows-latest' && '-- --no-default-features --features duckdb' || '' }}

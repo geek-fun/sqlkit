@@ -497,6 +497,8 @@ pub async fn run_agent_loop(
     let api_key = get_settings_str(&settings, "apiKey").unwrap_or_default();
     let api_compat =
         get_settings_str(&settings, "apiCompatibility").unwrap_or_else(|| String::from("openai"));
+    let proxy_url = get_settings_str(&settings, "httpProxy");
+    let proxy_mode = get_settings_str(&settings, "proxyMode").unwrap_or_else(|| String::from("none"));
     let formatter: Box<dyn ChatFormatter> = if api_compat == "anthropic" {
         Box::new(AnthropicChatFormatter)
     } else {
@@ -861,7 +863,7 @@ pub async fn run_agent_loop(
             });
             h
         };
-        let client = create_http_client("system", None, Some(true), Some(Duration::from_secs(300)));
+        let client = create_http_client(&proxy_mode, proxy_url.clone(), Some(true), Some(Duration::from_secs(300)));
 
         // Reset accumulated content for this iteration
         accumulated_content.clear();
@@ -1728,6 +1730,8 @@ async fn run_agent_loop_inner(
     let api_key = get_settings_str(settings, "apiKey").unwrap_or_default();
     let api_compat =
         get_settings_str(settings, "apiCompatibility").unwrap_or_else(|| String::from("openai"));
+    let proxy_url = get_settings_str(settings, "httpProxy");
+    let proxy_mode = get_settings_str(settings, "proxyMode").unwrap_or_else(|| String::from("none"));
     let formatter: Box<dyn ChatFormatter> = if api_compat == "anthropic" {
         Box::new(AnthropicChatFormatter)
     } else {
@@ -1956,7 +1960,7 @@ async fn run_agent_loop_inner(
             });
             h
         };
-        let client = create_http_client("system", None, Some(true), Some(Duration::from_secs(300)));
+        let client = create_http_client(&proxy_mode, proxy_url.clone(), Some(true), Some(Duration::from_secs(300)));
 
         let mut assistant_content = String::new();
         let mut tool_calls_this_turn: Vec<LlmToolCall> = Vec::new();

@@ -10,14 +10,14 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+#[cfg(feature = "oracle")]
+use crate::database::OracleAdapter;
 /// Core adapter types used in dispatch logic.
 use crate::database::{
     clickhouse::ClickHouseAdapter, duckdb::DuckDbAdapter, http_sql::HttpSqlAdapter,
     jdbc_bridge::JdbcBridgeAdapter, mysql::MySQLAdapter, postgres::PostgresAdapter,
     sqlite::SQLiteAdapter, sqlserver::SqlServerAdapter,
 };
-#[cfg(feature = "oracle")]
-use crate::database::OracleAdapter;
 
 /// Server configuration with connection details.
 ///

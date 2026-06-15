@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-06-15
+
+### Changed
+
+- Agent module fixes and database adapter improvements (#86)
+
+## [0.4.0] - 2026-06-15
+
+### Added
+
+- Inline row data search across all columns in table view (#83)
+- Confirmation dialogs for UI destructive actions in data grid and sidebar (#78)
+- HTTP proxy configuration for LLM provider connections (#74)
+
+### Fixed
+
+- Windows MSVC build compatibility by setting CXXFLAGS for Visual C++ build tools
+
 ## [0.3.0] - 2026-06-14
 
 ### Added

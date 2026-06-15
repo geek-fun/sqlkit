@@ -320,6 +320,8 @@ export function useChatAgent(config: UseChatAgentConfig) {
         model: modelConfig.model.label,
         baseUrl: modelConfig.provider.baseUrl,
         apiKey: modelConfig.provider.apiKey,
+        httpProxy: modelConfig.provider.proxy,
+        proxyMode: modelConfig.provider.proxyMode ?? 'none',
         tools: runtime?.tools ?? [],
         toolMetadata: runtime?.toolMetadata ?? {},
         maxIterations: activeSession.value?.maxIterations ?? 25,
