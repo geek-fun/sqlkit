@@ -76,6 +76,18 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         XuguDB => ConnectionStrategy::JdbcBridge,
         GBase8a => ConnectionStrategy::JdbcBridge,
         Derby => ConnectionStrategy::JdbcBridge,
+        Hive => ConnectionStrategy::JdbcBridge,
+        Databricks => ConnectionStrategy::JdbcBridge,
+        Hana => ConnectionStrategy::JdbcBridge,
+        Teradata => ConnectionStrategy::JdbcBridge,
+        Vertica => ConnectionStrategy::JdbcBridge,
+        Exasol => ConnectionStrategy::JdbcBridge,
+        BigQuery => ConnectionStrategy::JdbcBridge,
+        Informix => ConnectionStrategy::JdbcBridge,
+        Kylin => ConnectionStrategy::JdbcBridge,
+        Cassandra => ConnectionStrategy::JdbcBridge,
+        Iris => ConnectionStrategy::JdbcBridge,
+        Access => ConnectionStrategy::JdbcBridge,
 
         // HTTP SQL bridge
         Trino | Presto => ConnectionStrategy::Http,
@@ -124,6 +136,18 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
         XuguDB => Some(5138),
         GBase8a => Some(5258),
         Derby => Some(1527),
+        Hive => Some(10000),
+        Databricks => Some(443),
+        Hana => Some(30015),
+        Teradata => Some(1025),
+        Vertica => Some(5433),
+        Exasol => Some(8563),
+        BigQuery => Some(443),
+        Informix => Some(9088),
+        Kylin => Some(7070),
+        Cassandra => Some(9042),
+        Iris => Some(1972),
+        Access => Some(0),
         Trino => Some(8080),
         Presto => Some(8080),
     }
@@ -196,6 +220,19 @@ mod tests {
             DatabaseType::DM8Oracle,
             DatabaseType::XuguDB,
             DatabaseType::GBase8a,
+            DatabaseType::Derby,
+            DatabaseType::Hive,
+            DatabaseType::Databricks,
+            DatabaseType::Hana,
+            DatabaseType::Teradata,
+            DatabaseType::Vertica,
+            DatabaseType::Exasol,
+            DatabaseType::BigQuery,
+            DatabaseType::Informix,
+            DatabaseType::Kylin,
+            DatabaseType::Cassandra,
+            DatabaseType::Iris,
+            DatabaseType::Access,
         ] {
             assert_eq!(
                 resolve_effective_type(db),
@@ -234,5 +271,17 @@ mod tests {
         assert_eq!(default_port(DatabaseType::QuestDB), Some(8812));
         assert_eq!(default_port(DatabaseType::Vastbase), Some(5432));
         assert_eq!(default_port(DatabaseType::YashanDB), Some(1688));
+        assert_eq!(default_port(DatabaseType::Hive), Some(10000));
+        assert_eq!(default_port(DatabaseType::Databricks), Some(443));
+        assert_eq!(default_port(DatabaseType::Hana), Some(30015));
+        assert_eq!(default_port(DatabaseType::Teradata), Some(1025));
+        assert_eq!(default_port(DatabaseType::Vertica), Some(5433));
+        assert_eq!(default_port(DatabaseType::Exasol), Some(8563));
+        assert_eq!(default_port(DatabaseType::BigQuery), Some(443));
+        assert_eq!(default_port(DatabaseType::Informix), Some(9088));
+        assert_eq!(default_port(DatabaseType::Kylin), Some(7070));
+        assert_eq!(default_port(DatabaseType::Cassandra), Some(9042));
+        assert_eq!(default_port(DatabaseType::Iris), Some(1972));
+        assert_eq!(default_port(DatabaseType::Access), Some(0));
     }
 }

@@ -86,6 +86,18 @@ const defaultPorts: Record<string, number> = {
   [DatabaseType.TRINO]: 8080,
   [DatabaseType.PRESTO]: 8080,
   [DatabaseType.DERBY]: 1527,
+  [DatabaseType.HIVE]: 10000,
+  [DatabaseType.DATABRICKS]: 443,
+  [DatabaseType.HANA]: 30015,
+  [DatabaseType.TERADATA]: 1025,
+  [DatabaseType.VERTICA]: 5433,
+  [DatabaseType.EXASOL]: 8563,
+  [DatabaseType.BIGQUERY]: 443,
+  [DatabaseType.INFORMIX]: 9088,
+  [DatabaseType.KYLIN]: 7070,
+  [DatabaseType.CASSANDRA]: 9042,
+  [DatabaseType.IRIS]: 1972,
+  [DatabaseType.ACCESS]: 0,
 }
 
 const defaultConnection: ServerConnection = {
@@ -623,6 +635,90 @@ function handleSave() {
                   <div class="flex gap-2 items-center">
                     <img :src="getDatabaseIcon(DatabaseType.DERBY)" alt="" class="h-5 w-5 object-contain">
                     {{ t('components.serverForm.databaseTypes.derby') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.HIVE">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.HIVE)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.hive') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.DATABRICKS">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.DATABRICKS)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.databricks') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.HANA">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.HANA)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.hana') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.TERADATA">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.TERADATA)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.teradata') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.VERTICA">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.VERTICA)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.vertica') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.EXASOL">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.EXASOL)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.exasol') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.BIGQUERY">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.BIGQUERY)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.bigquery') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.INFORMIX">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.INFORMIX)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.informix') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.KYLIN">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.KYLIN)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.kylin') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.CASSANDRA">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.CASSANDRA)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.cassandra') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.IRIS">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.IRIS)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.iris') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.ACCESS">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.ACCESS)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.access') }}
                     <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
                   </div>
                 </SelectItem>

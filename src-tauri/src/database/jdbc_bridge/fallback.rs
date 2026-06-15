@@ -47,6 +47,7 @@ pub async fn try_driver(
             &version.version,
             &jar_path,
             &version.jar_sha256,
+            version.maven_classifier.as_deref(),
         ).await {
             Ok(_) => {}
             Err(e) => return DriverAttempt::Fatal(e),
@@ -206,9 +207,21 @@ fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
         "H2 Database" => DatabaseType::H2,
         "Apache Derby" => DatabaseType::Derby,
         "Snowflake" => DatabaseType::Snowflake,
-        "DM8" => DatabaseType::DM8Oracle,
-        "XuguDB" => DatabaseType::XuguDB,
+        "达梦 DM8" => DatabaseType::DM8Oracle,
+        "虚谷 XuguDB" => DatabaseType::XuguDB,
         "GBase 8a" => DatabaseType::GBase8a,
+        "Apache Hive" => DatabaseType::Hive,
+        "Databricks SQL" => DatabaseType::Databricks,
+        "SAP HANA" => DatabaseType::Hana,
+        "Teradata" => DatabaseType::Teradata,
+        "Vertica" => DatabaseType::Vertica,
+        "Exasol" => DatabaseType::Exasol,
+        "Google BigQuery" => DatabaseType::BigQuery,
+        "IBM Informix" => DatabaseType::Informix,
+        "Apache Kylin" => DatabaseType::Kylin,
+        "Apache Cassandra" => DatabaseType::Cassandra,
+        "InterSystems IRIS" => DatabaseType::Iris,
+        "Microsoft Access" => DatabaseType::Access,
         _ => DatabaseType::PostgreSQL, // fallback, shouldn't happen
     }
 }

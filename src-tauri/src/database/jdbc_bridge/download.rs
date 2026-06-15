@@ -167,12 +167,15 @@ pub async fn download_driver(db_type: DatabaseType) -> DbResult<()> {
 ///
 /// Constructs the Maven Central URL from group/artifact/version coordinates
 /// and optionally verifies the SHA-256 checksum.
+/// When `maven_classifier` is `Some`, the JAR filename becomes
+/// `{artifact}-{version}-{classifier}.jar` (e.g. `hive-jdbc-3.1.3-standalone.jar`).
 pub async fn download_driver_from_maven(
     maven_group: &str,
     maven_artifact: &str,
     version: &str,
     dest_path: &Path,
     expected_sha256: &str,
+    maven_classifier: Option<&str>,
 ) -> DbResult<()> {
     if dest_path.exists() && !expected_sha256.is_empty() {
         if verify_sha256(dest_path, expected_sha256).is_ok() {
@@ -181,9 +184,12 @@ pub async fn download_driver_from_maven(
     }
 
     let group_path = maven_group.replace('.', "/");
+    let classifier_suffix = maven_classifier
+        .map(|c| format!("-{c}"))
+        .unwrap_or_default();
     let url = format!(
-        "https://repo1.maven.org/maven2/{}/{}/{}/{}-{}.jar",
-        group_path, maven_artifact, version, maven_artifact, version
+        "https://repo1.maven.org/maven2/{}/{}/{}/{}-{}{}.jar",
+        group_path, maven_artifact, version, maven_artifact, version, classifier_suffix
     );
 
     download_to_path(&url, dest_path).await?;
@@ -207,6 +213,18 @@ fn driver_jar_name(db_type: DatabaseType) -> &'static str {
         DM8Oracle => "dm-jdbc.jar",
         XuguDB => "xugudb-jdbc.jar",
         GBase8a => "gbase8a-jdbc.jar",
+        Hive => "hive-jdbc.jar",
+        Databricks => "databricks-jdbc.jar",
+        Hana => "ngdbc.jar",
+        Teradata => "terajdbc.jar",
+        Vertica => "vertica-jdbc.jar",
+        Exasol => "exasol-jdbc.jar",
+        BigQuery => "bigquery-jdbc.jar",
+        Informix => "informix-jdbc.jar",
+        Kylin => "kylin-jdbc.jar",
+        Cassandra => "cassandra-jdbc.jar",
+        Iris => "iris-jdbc.jar",
+        Access => "ucanaccess.jar",
         _ => "unknown.jar",
     }
 }
@@ -223,6 +241,18 @@ pub fn driver_jar_name_for_version(db_type: DatabaseType, version: &str) -> Stri
         DM8Oracle => format!("dm-jdbc-{}.jar", version),
         XuguDB => format!("xugudb-jdbc-{}.jar", version),
         GBase8a => format!("gbase8a-jdbc-{}.jar", version),
+        Hive => format!("hive-jdbc-{}.jar", version),
+        Databricks => format!("databricks-jdbc-{}.jar", version),
+        Hana => format!("ngdbc-{}.jar", version),
+        Teradata => format!("terajdbc-{}.jar", version),
+        Vertica => format!("vertica-jdbc-{}.jar", version),
+        Exasol => format!("exasol-jdbc-{}.jar", version),
+        BigQuery => format!("bigquery-jdbc-{}.jar", version),
+        Informix => format!("informix-jdbc-{}.jar", version),
+        Kylin => format!("kylin-jdbc-{}.jar", version),
+        Cassandra => format!("cassandra-jdbc-{}.jar", version),
+        Iris => format!("iris-jdbc-{}.jar", version),
+        Access => format!("ucanaccess-{}.jar", version),
         _ => format!("unknown-{}.jar", version),
     }
 }

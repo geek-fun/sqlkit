@@ -85,7 +85,7 @@ pub async fn download_driver(db_type: String) -> Result<(), String> {
         let maven_group = version.maven_group_override.as_deref().unwrap_or(&config.maven_group);
         let maven_artifact = version.maven_artifact_override.as_deref().unwrap_or(&config.maven_artifact);
         let dest = download::driver_jar_path_for_version(dt, &version.version);
-        download::download_driver_from_maven(maven_group, maven_artifact, &version.version, &dest, &version.jar_sha256)
+        download::download_driver_from_maven(maven_group, maven_artifact, &version.version, &dest, &version.jar_sha256, version.maven_classifier.as_deref())
             .await
             .map_err(|e| e.to_string())?;
     }
@@ -116,6 +116,18 @@ fn parse_db_type(s: &str) -> Result<DatabaseType, String> {
         "dm8_oracle" | "dm8oracle" => Ok(DatabaseType::DM8Oracle),
         "xugudb" | "xugu" => Ok(DatabaseType::XuguDB),
         "gbase8a" | "gbase_8a" => Ok(DatabaseType::GBase8a),
+        "hive" => Ok(DatabaseType::Hive),
+        "databricks" => Ok(DatabaseType::Databricks),
+        "hana" => Ok(DatabaseType::Hana),
+        "teradata" => Ok(DatabaseType::Teradata),
+        "vertica" => Ok(DatabaseType::Vertica),
+        "exasol" => Ok(DatabaseType::Exasol),
+        "bigquery" => Ok(DatabaseType::BigQuery),
+        "informix" => Ok(DatabaseType::Informix),
+        "kylin" => Ok(DatabaseType::Kylin),
+        "cassandra" => Ok(DatabaseType::Cassandra),
+        "iris" => Ok(DatabaseType::Iris),
+        "access" => Ok(DatabaseType::Access),
         _ => Err(format!("Unknown JDBC database type: {}", s)),
     }
 }
@@ -130,6 +142,18 @@ fn db_type_from_registry_key(key: &str) -> Option<DatabaseType> {
         "dm8_oracle" => Some(DatabaseType::DM8Oracle),
         "xugudb" => Some(DatabaseType::XuguDB),
         "gbase8a" => Some(DatabaseType::GBase8a),
+        "hive" => Some(DatabaseType::Hive),
+        "databricks" => Some(DatabaseType::Databricks),
+        "hana" => Some(DatabaseType::Hana),
+        "teradata" => Some(DatabaseType::Teradata),
+        "vertica" => Some(DatabaseType::Vertica),
+        "exasol" => Some(DatabaseType::Exasol),
+        "bigquery" => Some(DatabaseType::BigQuery),
+        "informix" => Some(DatabaseType::Informix),
+        "kylin" => Some(DatabaseType::Kylin),
+        "cassandra" => Some(DatabaseType::Cassandra),
+        "iris" => Some(DatabaseType::Iris),
+        "access" => Some(DatabaseType::Access),
         _ => None,
     }
 }
