@@ -1115,6 +1115,90 @@ impl DatabaseAdapter for PostgresAdapter {
         })
     }
 
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let schema_filter = _schema.unwrap_or("public");
+
+        let query = r#"
+            SELECT
+                tc.constraint_name,
+                tc.table_name AS source_table,
+                kcu.column_name,
+                ccu.table_schema AS referenced_schema,
+                ccu.table_name AS referenced_table,
+                ccu.column_name AS referenced_column,
+                rc.update_rule,
+                rc.delete_rule
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage ccu
+                ON tc.constraint_name = ccu.constraint_name
+                AND tc.table_schema = ccu.table_schema
+            JOIN information_schema.referential_constraints rc
+                ON tc.constraint_name = rc.constraint_name
+                AND tc.table_schema = rc.constraint_schema
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+            AND tc.table_schema = $1
+            ORDER BY tc.constraint_name, kcu.ordinal_position
+        "#;
+
+        let rows = client
+            .query(query, &[&schema_filter])
+            .await
+            .map_err(|e| DbError::QueryExecution(format!("Failed to query foreign keys: {}", e)))?;
+
+        // Group by constraint name
+        let mut fk_map: std::collections::HashMap<String, ForeignKeyInfo> =
+            std::collections::HashMap::new();
+        for row in &rows {
+            let constraint_name: String = row.get(0);
+            let source_table: String = row.get(1);
+            let column_name: String = row.get(2);
+            let referenced_schema: Option<String> = row.get(3);
+            let referenced_table: String = row.get(4);
+            let referenced_column: String = row.get(5);
+            let on_update: Option<String> = row.get(6);
+            let on_delete: Option<String> = row.get(7);
+
+            fk_map
+                .entry(constraint_name.clone())
+                .and_modify(|fk| {
+                    fk.columns.push(column_name.clone());
+                    fk.referenced_columns.push(referenced_column.clone());
+                })
+                .or_insert(ForeignKeyInfo {
+                    constraint_name,
+                    source_table,
+                    columns: vec![column_name],
+                    referenced_schema,
+                    referenced_table,
+                    referenced_columns: vec![referenced_column],
+                    on_update,
+                    on_delete,
+                });
+        }
+
+        let foreign_keys: Vec<ForeignKeyInfo> = fk_map.into_values().collect();
+        Ok(foreign_keys)
+    }
+
     async fn list_views(
         &self,
         database: Option<&str>,
@@ -1308,7 +1392,7 @@ impl DatabaseAdapter for PostgresAdapter {
                 let args: Option<String> = row.get(3);
                 let result_type: Option<String> = row.get(4);
                 let detail = match (args, result_type) {
-                    (Some(a), Some(r)) => Some(format!("({}) → {}", a, r)),
+                    (Some(a), Some(r)) => Some(format!("({}) \u{2192} {}", a, r)),
                     (Some(a), None) => Some(format!("({})", a)),
                     (None, Some(r)) => Some(r),
                     _ => None,
@@ -1554,6 +1638,7 @@ impl DatabaseAdapter for PostgresAdapter {
                 })
                 .or_insert(ForeignKeyInfo {
                     constraint_name,
+                    source_table: table.to_string(),
                     columns: vec![column_name],
                     referenced_schema,
                     referenced_table,
@@ -1667,7 +1752,6 @@ impl DatabaseAdapter for PostgresAdapter {
             "PROCEDURE" => format!("DROP PROCEDURE IF EXISTS {} CASCADE", qualified),
             "FUNCTION" => format!("DROP FUNCTION IF EXISTS {} CASCADE", qualified),
             "TRIGGER" => {
-                // For triggers, we need the table name too
                 return Err(DbError::UnsupportedOperation(
                     "Drop trigger requires table name; use DROP TRIGGER on table instead"
                         .to_string(),

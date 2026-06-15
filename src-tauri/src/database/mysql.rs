@@ -624,6 +624,100 @@ impl DatabaseAdapter for MySQLAdapter {
         })
     }
 
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        let mut conn = self.get_conn().await?;
+
+        let database_filter = match _database {
+            Some(db) => format!("AND kcu.CONSTRAINT_SCHEMA = '{}'", db.replace('\'', "''")),
+            None => String::new(),
+        };
+
+        let sql = format!(
+            r#"
+        SELECT
+            kcu.CONSTRAINT_NAME AS constraint_name,
+            kcu.CONSTRAINT_SCHEMA AS source_schema,
+            kcu.TABLE_NAME AS source_table,
+            kcu.COLUMN_NAME AS source_column,
+            kcu.REFERENCED_TABLE_SCHEMA AS target_schema,
+            kcu.REFERENCED_TABLE_NAME AS target_table,
+            kcu.REFERENCED_COLUMN_NAME AS target_column,
+            rc.UPDATE_RULE,
+            rc.DELETE_RULE
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+        LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc
+            ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME
+            AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA
+        WHERE kcu.REFERENCED_TABLE_NAME IS NOT NULL
+        {database_filter}
+        ORDER BY kcu.CONSTRAINT_SCHEMA, kcu.TABLE_NAME, kcu.ORDINAL_POSITION
+        "#,
+        );
+
+        let rows: Vec<Row> = conn
+            .query(sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(format!("Failed to query foreign keys: {}", e)))?;
+
+        let mut fk_map: std::collections::HashMap<String, ForeignKeyInfo> =
+            std::collections::HashMap::new();
+
+        for row in rows {
+            let constraint_name: String = row
+                .get::<String, _>("constraint_name")
+                .unwrap_or_default();
+            let source_table: String = row
+                .get::<String, _>("source_table")
+                .unwrap_or_default();
+            let source_column: String = row
+                .get::<String, _>("source_column")
+                .unwrap_or_default();
+            let target_schema: Option<String> = row
+                .get::<Option<String>, _>("target_schema")
+                .flatten();
+            let target_table: String = row
+                .get::<String, _>("target_table")
+                .unwrap_or_default();
+            let target_column: String = row
+                .get::<String, _>("target_column")
+                .unwrap_or_default();
+            let on_update: Option<String> = row
+                .get::<Option<String>, _>("UPDATE_RULE")
+                .flatten();
+            let on_delete: Option<String> = row
+                .get::<Option<String>, _>("DELETE_RULE")
+                .flatten();
+
+            // Use constraint_name + source_table as key to handle same-named
+            // constraints across different tables
+            let key = format!("{}|{}", constraint_name, source_table);
+
+            fk_map
+                .entry(key)
+                .and_modify(|fk| {
+                    fk.columns.push(source_column.clone());
+                    fk.referenced_columns.push(target_column.clone());
+                })
+                .or_insert(ForeignKeyInfo {
+                    constraint_name: constraint_name.clone(),
+                    source_table: source_table.clone(),
+                    columns: vec![source_column],
+                    referenced_schema: target_schema,
+                    referenced_table: target_table,
+                    referenced_columns: vec![target_column],
+                    on_update,
+                    on_delete,
+                });
+        }
+
+        let foreign_keys: Vec<ForeignKeyInfo> = fk_map.into_values().collect();
+        Ok(foreign_keys)
+    }
+
     async fn list_views(
         &self,
         database: Option<&str>,
@@ -858,6 +952,7 @@ impl DatabaseAdapter for MySQLAdapter {
                 })
                 .or_insert(ForeignKeyInfo {
                     constraint_name,
+                    source_table: table.to_string(),
                     columns: vec![column_name],
                     referenced_schema,
                     referenced_table,

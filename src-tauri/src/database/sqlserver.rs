@@ -869,6 +869,105 @@ impl DatabaseAdapter for SqlServerAdapter {
         })
     }
 
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        let schema_filter = match _schema {
+            Some(s) => format!(
+                "AND OBJECT_SCHEMA_NAME(fk.parent_object_id) = '{}'",
+                s.replace('\'', "''")
+            ),
+            None => String::new(),
+        };
+
+        let sql = format!(
+            r#"
+            SELECT
+                fk.name AS constraint_name,
+                OBJECT_SCHEMA_NAME(fk.parent_object_id) AS source_schema,
+                OBJECT_NAME(fk.parent_object_id) AS source_table,
+                COL_NAME(fkc.parent_object_id, fkc.parent_column_id) AS source_column,
+                OBJECT_SCHEMA_NAME(fk.referenced_object_id) AS target_schema,
+                OBJECT_NAME(fk.referenced_object_id) AS target_table,
+                COL_NAME(fkc.referenced_object_id, fkc.referenced_column_id) AS target_column
+            FROM sys.foreign_keys fk
+            JOIN sys.foreign_key_columns fkc
+                ON fk.object_id = fkc.constraint_object_id
+            WHERE 1=1
+            {schema_filter}
+            ORDER BY
+                OBJECT_SCHEMA_NAME(fk.parent_object_id),
+                OBJECT_NAME(fk.parent_object_id),
+                fkc.constraint_column_id
+            "#,
+        );
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let stream = client
+            .simple_query(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(format!("Failed to query foreign keys: {}", e)))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(format!("Failed to get FK results: {}", e)))?;
+
+        // Group rows by constraint_name to collect columns and referenced_columns
+        let mut fk_map: HashMap<String, ForeignKeyInfo> = HashMap::new();
+
+        for row in &rows {
+            let constraint_name = match Self::convert_value(row, 0) {
+                Ok(QueryValue::String(s)) => s,
+                _ => continue,
+            };
+            let source_table = match Self::convert_value(row, 2) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+            let source_column = match Self::convert_value(row, 3) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+            let target_schema = match Self::convert_value(row, 4) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+            let target_table = match Self::convert_value(row, 5) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+            let target_column = match Self::convert_value(row, 6) {
+                Ok(QueryValue::String(s)) => s,
+                _ => String::new(),
+            };
+
+            fk_map
+                .entry(constraint_name.clone())
+                .and_modify(|entry| {
+                    entry.columns.push(source_column.clone());
+                    entry.referenced_columns.push(target_column.clone());
+                })
+                .or_insert_with(|| ForeignKeyInfo {
+                    constraint_name,
+                    source_table,
+                    columns: vec![source_column],
+                    referenced_schema: Some(target_schema),
+                    referenced_table: target_table,
+                    referenced_columns: vec![target_column],
+                    on_update: None,
+                    on_delete: None,
+                });
+        }
+
+        let fks: Vec<ForeignKeyInfo> = fk_map.into_values().collect();
+        Ok(fks)
+    }
+
     async fn list_views(
         &self,
         database: Option<&str>,
@@ -1392,6 +1491,7 @@ impl DatabaseAdapter for SqlServerAdapter {
                 };
                 ForeignKeyInfo {
                     constraint_name,
+                    source_table: table.to_string(),
                     columns,
                     referenced_schema,
                     referenced_table,

@@ -171,6 +171,8 @@ pub struct IndexInfo {
 pub struct ForeignKeyInfo {
     /// Constraint name.
     pub constraint_name: String,
+    /// Source table name.
+    pub source_table: String,
     /// Local columns in the constraint.
     pub columns: Vec<String>,
     /// Referenced schema.

@@ -14,6 +14,11 @@ export type QueryResult = {
   executionTimeMs?: number
 }
 
+export type ErDiagramMeta = {
+  database: string
+  schema?: string
+}
+
 export type TableViewMeta = {
   tableName: string
   database: string
@@ -41,6 +46,7 @@ export type QueryTab = {
   error?: ApiError | string
   executionTime?: number
   tableView?: TableViewMeta
+  erDiagram?: ErDiagramMeta
   listingTab?: ListingTabMeta
   /** If set, this tab is orphaned from the specified connection and cannot execute queries */
   orphanFromConnectionId?: string
@@ -122,6 +128,23 @@ export const useTabStore = defineStore('tabs', {
         isExecuting: false,
         hasUnsavedChanges: false,
         tableView: { tableName, database, schema },
+      }
+      this.tabs = [...this.tabs, tab]
+      this.activeTabId = tab.id
+      return tab
+    },
+
+    openErDiagramTab(connectionId: string, database: string, schema?: string): QueryTab {
+      const tab: QueryTab = {
+        id: generateId(),
+        name: `ER Diagram - ${database}${schema ? `.${schema}` : ''}`,
+        content: '',
+        connectionId,
+        database,
+        schema,
+        isExecuting: false,
+        hasUnsavedChanges: false,
+        erDiagram: { database, schema },
       }
       this.tabs = [...this.tabs, tab]
       this.activeTabId = tab.id

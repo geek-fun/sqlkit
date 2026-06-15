@@ -68,6 +68,8 @@ pub mod http_sql;
 pub mod jdbc_bridge;
 pub mod manager;
 pub mod mysql;
+#[cfg(feature = "oracle")]
+pub mod oracle;
 pub mod pool;
 pub mod postgres;
 pub mod search;
@@ -75,8 +77,6 @@ pub mod sqlite;
 pub mod sqlserver;
 pub mod strategy;
 pub mod types;
-#[cfg(feature = "oracle")]
-pub mod oracle;
 
 #[cfg(test)]
 mod tests;
@@ -91,6 +91,8 @@ pub use http_sql::{HttpSqlAdapter, HttpSqlPool};
 pub use jdbc_bridge::{JdbcBridgeAdapter, JdbcBridgeLauncher, JdbcBridgePool};
 pub use manager::{ConnectionManager, ConnectionMetadata, ManagerStats};
 pub use mysql::{MySQLAdapter, MySQLPool};
+#[cfg(feature = "oracle")]
+pub use oracle::OracleAdapter;
 pub use pool::{ConnectionPool, PoolStats};
 pub use postgres::{PostgresAdapter, PostgresPool};
 pub use sqlite::{SQLiteAdapter, SQLitePool};
@@ -99,5 +101,3 @@ pub use types::{
     ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
     QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
 };
-#[cfg(feature = "oracle")]
-pub use oracle::OracleAdapter;

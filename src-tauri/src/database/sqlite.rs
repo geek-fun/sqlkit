@@ -645,6 +645,103 @@ impl DatabaseAdapter for SQLiteAdapter {
         })
     }
 
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let conn = pool.get_conn().await?;
+        let conn_guard = conn
+            .lock()
+            .map_err(|e| DbError::QueryExecution(format!("Failed to lock connection: {}", e)))?;
+
+        let mut stmt = conn_guard
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+            )
+            .map_err(|e| DbError::QueryExecution(format!("Failed to list tables: {}", e)))?;
+
+        let table_names: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| DbError::QueryExecution(format!("Failed to query tables: {}", e)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        drop(stmt);
+
+        let mut fks = Vec::new();
+
+        for table_name in table_names {
+            let pragma_sql = format!(
+                "PRAGMA foreign_key_list(\"{}\")",
+                table_name.replace('\"', "\"\"")
+            );
+
+            let mut pragma_stmt = conn_guard.prepare(&pragma_sql).map_err(|e| {
+                DbError::QueryExecution(format!("Failed to prepare PRAGMA foreign_key_list: {}", e))
+            })?;
+
+            let mut group_map: std::collections::HashMap<i64, (Vec<String>, Vec<String>, Option<String>, Option<String>)> = std::collections::HashMap::new();
+            let mut constraint_names: std::collections::HashMap<i64, String> = std::collections::HashMap::new();
+            let mut referenced_tables: std::collections::HashMap<i64, String> = std::collections::HashMap::new();
+
+            let rows = pragma_stmt
+                .query_map([], |row| {
+                    let id: i64 = row.get(0)?;
+                    let seq: i64 = row.get(1)?;
+                    let target_table: String = row.get(2)?;
+                    let source_column: String = row.get(3)?;
+                    let target_column: String = row.get(4)?;
+                    let on_update: Option<String> = row.get(5).ok().flatten();
+                    let on_delete: Option<String> = row.get(6).ok().flatten();
+                    Ok((id, seq, target_table, source_column, target_column, on_update, on_delete))
+                })
+                .map_err(|e| {
+                    DbError::QueryExecution(format!("Failed to query PRAGMA foreign_key_list: {}", e))
+                })?;
+
+            for row in rows {
+                if let Ok((id, _seq, target_tbl, src_col, tgt_col, on_upd, on_del)) = row {
+                    referenced_tables.entry(id).or_insert_with(|| target_tbl.clone());
+                    if !constraint_names.contains_key(&id) {
+                        constraint_names.insert(id, format!("fk_{}", id));
+                    }
+                    let entry = group_map.entry(id).or_insert_with(|| (Vec::new(), Vec::new(), None, None));
+                    entry.0.push(src_col);
+                    entry.1.push(tgt_col);
+                    if entry.2.is_none() { entry.2 = on_upd; }
+                    if entry.3.is_none() { entry.3 = on_del; }
+                }
+            }
+
+            for (id, (columns, ref_columns, on_update, on_delete)) in group_map {
+                let constraint_name = constraint_names.remove(&id).unwrap_or_default();
+                let referenced_table = referenced_tables.remove(&id).unwrap_or_default();
+                fks.push(ForeignKeyInfo {
+                    constraint_name,
+                    source_table: table_name.clone(),
+                    columns,
+                    referenced_schema: Some("main".to_string()),
+                    referenced_table,
+                    referenced_columns: ref_columns,
+                    on_update,
+                    on_delete,
+                });
+            }
+        }
+
+        drop(conn_guard);
+        pool.return_conn(conn)?;
+
+        fks.sort_by(|a, b| a.constraint_name.cmp(&b.constraint_name));
+        Ok(fks)
+    }
+
     async fn list_views(
         &self,
         _database: Option<&str>,
@@ -835,6 +932,7 @@ impl DatabaseAdapter for SQLiteAdapter {
 
             let entry = fk_groups.entry(id).or_insert_with(|| ForeignKeyInfo {
                 constraint_name: format!("fk_{}", id),
+                source_table: table.to_string(),
                 columns: Vec::new(),
                 referenced_schema: Some("main".to_string()),
                 referenced_table: referenced_table.clone(),

@@ -151,6 +151,15 @@ pub trait DatabaseAdapter: Send + Sync {
         Err(DbError::unsupported("get_table_info"))
     }
 
+    /// Get foreign key relationships for tables in a schema.
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        Err(DbError::unsupported("get_foreign_keys"))
+    }
+
     /// List all views in a schema.
     async fn list_views(
         &self,
