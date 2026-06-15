@@ -321,6 +321,46 @@ export const enUS = {
           auto: 'Auto (Follow System)',
         },
       },
+      jre: {
+        title: 'JRE & Drivers',
+        description: 'Manage Java Runtime and JDBC drivers for database connections',
+        jreCard: {
+          title: 'Java Runtime',
+          description: 'Required for JDBC bridge connections (Oracle, DB2, H2, Derby)',
+          status: {
+            installed: 'Installed',
+            notInstalled: 'Not Installed',
+            checking: 'Checking...',
+            managed: 'Managed',
+            system: 'System',
+          },
+          actions: {
+            download: 'Download JRE',
+            remove: 'Remove JRE',
+            redownload: 'Re-download',
+          },
+        },
+        driversCard: {
+          title: 'JDBC Drivers',
+          description: 'Database-specific JDBC driver files',
+          label: {
+            versions: 'versions',
+          },
+          status: {
+            installed: 'Installed',
+            notInstalled: 'Not Installed',
+            loading: 'Loading drivers...',
+          },
+          actions: {
+            download: 'Download',
+            remove: 'Remove',
+          },
+          empty: {
+            title: 'No drivers configured',
+            message: 'They will be auto-downloaded when you connect to a JDBC database.',
+          },
+        },
+      },
       editor: {
         title: 'Editor',
         description: 'Configure the SQL editor behavior and appearance',
@@ -664,6 +704,14 @@ export const enUS = {
         gbase8a: '南大通用 GBase 8a',
         trino: 'Trino',
         presto: 'Presto',
+        derby: 'Apache Derby',
+      },
+      databaseGroups: {
+        native: 'Native',
+        jdbc: '☕ JDBC',
+      },
+      databaseBadges: {
+        jdbc: '(JDBC)',
       },
       sqlite: {
         modes: {

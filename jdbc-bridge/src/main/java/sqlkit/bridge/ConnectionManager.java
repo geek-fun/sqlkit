@@ -13,6 +13,7 @@ import java.util.*;
 public class ConnectionManager {
 
     private final Map<String, HikariDataSource> pools = new HashMap<>();
+    private final Map<String, DriverClassLoader> loaders = new HashMap<>();
 
     /**
      * Create a new JDBC connection pool.
@@ -27,13 +28,19 @@ public class ConnectionManager {
      */
     public void connect(String connId, String url, String username,
                         String password, String driverClass,
-                        int minPool, int maxPool) throws Exception {
+                        List<String> driverJars,
+                        int minPool, int maxPool) throws ClassifiedException, Exception {
         if (pools.containsKey(connId)) {
             throw new Exception("Connection already exists: " + connId);
         }
 
-        // Load the JDBC driver class
-        Class.forName(driverClass);
+        DriverClassLoader loader = new DriverClassLoader(driverJars);
+        Class<?> driverCls = Class.forName(driverClass, true, loader);
+        if (java.sql.Driver.class.isAssignableFrom(driverCls)) {
+            java.sql.Driver driver = (java.sql.Driver) driverCls.getDeclaredConstructor().newInstance();
+            java.sql.DriverManager.registerDriver(driver);
+        }
+        loaders.put(connId, loader);
 
         HikariConfig config = new HikariConfig();
         config.setJdbcUrl(url);
@@ -57,7 +64,8 @@ public class ConnectionManager {
             // ok
         } catch (Exception e) {
             ds.close();
-            throw new Exception("Failed to verify connection: " + e.getMessage());
+            ErrorClassifier.ErrorType errorType = ErrorClassifier.classify(e.getMessage());
+            throw new ClassifiedException("Failed to verify connection: " + e.getMessage(), e, errorType);
         }
 
         pools.put(connId, ds);
@@ -70,6 +78,10 @@ public class ConnectionManager {
         HikariDataSource ds = pools.remove(connId);
         if (ds != null) {
             ds.close();
+        }
+        DriverClassLoader loader = loaders.remove(connId);
+        if (loader != null) {
+            try { loader.close(); } catch (Exception ignored) { }
         }
     }
 
@@ -113,5 +125,9 @@ public class ConnectionManager {
             ds.close();
         }
         pools.clear();
+        for (DriverClassLoader loader : loaders.values()) {
+            try { loader.close(); } catch (Exception ignored) { }
+        }
+        loaders.clear();
     }
 }

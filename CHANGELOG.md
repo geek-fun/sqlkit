@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-15
+
+### Added
+
+- JDBC driver management with registry, fallback chains, and JRE auto-detection (#87)
+- Schema browser with views, procedures, functions, and enhanced table view with sub-pages (#84)
+
+### Fixed
+
+- Various review issues and code quality improvements
+
 ## [0.4.1] - 2026-06-15
 
 ### Changed

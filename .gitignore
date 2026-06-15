@@ -29,6 +29,10 @@ coverage/
 
 # TypeScript build cache
 *.tsbuildinfo
+
+# Java build output
+jdbc-bridge/target/
+
 .omo/
 .sisyphus/
 # Java build output
