@@ -660,6 +660,14 @@ export const enUS = {
         gbase8a: '南大通用 GBase 8a',
         trino: 'Trino',
         presto: 'Presto',
+        derby: 'Apache Derby',
+      },
+      databaseGroups: {
+        native: 'Native',
+        jdbc: '☕ JDBC',
+      },
+      databaseBadges: {
+        jdbc: '(JDBC)',
       },
       sqlite: {
         modes: {

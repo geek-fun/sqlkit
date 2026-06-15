@@ -5,6 +5,8 @@ export {
   ConnectionStatus,
   DatabaseType,
   dbTypeToBackend,
+  isJdbcDatabase,
+  jdbcDatabaseTypes,
   resolveDatabase,
   useConnectionStore,
 } from './connectionStore'

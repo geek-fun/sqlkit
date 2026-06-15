@@ -643,6 +643,14 @@ export const zhCN = {
         gbase8a: 'GBase 8a (南大通用)',
         trino: 'Trino',
         presto: 'Presto',
+        derby: 'Apache Derby',
+      },
+      databaseGroups: {
+        native: '原生',
+        jdbc: '☕ JDBC',
+      },
+      databaseBadges: {
+        jdbc: '(JDBC)',
       },
       sqlite: {
         modes: {

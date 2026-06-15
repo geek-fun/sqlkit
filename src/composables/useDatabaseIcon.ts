@@ -68,6 +68,7 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   GBASE8A: { icon: gbaseLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   TRINO: { icon: trinoLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   PRESTO: { icon: prestoLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  DERBY: { icon: sqliteLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
 }
 
 export function useDatabaseIcon() {
