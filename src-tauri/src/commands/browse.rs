@@ -4,7 +4,8 @@
 //! including databases, schemas, tables, columns, and table data.
 
 use crate::database::{
-    ColumnInfo, DatabaseAdapter, DatabaseSchema, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo,
+    ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo, MySQLAdapter, PostgresAdapter,
+    QueryResult, SqlServerAdapter, TableInfo,
 };
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
@@ -473,6 +474,61 @@ pub async fn list_columns(
     .map_err(|e| format!("Failed to list columns: {}", e))?;
 
     Ok(columns)
+}
+
+/// Get foreign key relationships for tables in a schema/database.
+///
+/// Returns a list of foreign key constraints showing how tables reference each other.
+#[tauri::command]
+pub async fn get_foreign_keys(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let connections = state.connections.lock().await;
+
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    let result = match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_foreign_keys(None, None).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_foreign_keys(None, schema.as_deref()).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_foreign_keys(Some(&database), None).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+        }
+    }
+    .map_err(|e| format!("Failed to get foreign keys: {}", e))?;
+
+    Ok(result)
 }
 
 /// Get table data with pagination and optional WHERE-clause filter.

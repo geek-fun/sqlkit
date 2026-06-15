@@ -153,3 +153,14 @@ pub struct ConnectionStatus {
     #[serde(default)]
     pub metadata: HashMap<String, String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ForeignKeyInfo {
+    pub constraint_name: Option<String>,
+    pub source_schema: String,
+    pub source_table: String,
+    pub source_column: String,
+    pub target_schema: String,
+    pub target_table: String,
+    pub target_column: String,
+}

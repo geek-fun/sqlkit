@@ -9,7 +9,8 @@ use crate::database::{
     error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{
-        ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
+        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, QueryResult, QueryRow,
+        QueryValue, TableInfo,
     },
 };
 use async_trait::async_trait;
@@ -611,6 +612,86 @@ impl DatabaseAdapter for SQLiteAdapter {
             row_count,
             ..table_info
         })
+    }
+
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let conn = pool.get_conn().await?;
+        let conn_guard = conn
+            .lock()
+            .map_err(|e| DbError::QueryExecution(format!("Failed to lock connection: {}", e)))?;
+
+        let mut stmt = conn_guard
+            .prepare(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+            )
+            .map_err(|e| DbError::QueryExecution(format!("Failed to list tables: {}", e)))?;
+
+        let table_names: Vec<String> = stmt
+            .query_map([], |row| row.get(0))
+            .map_err(|e| DbError::QueryExecution(format!("Failed to query tables: {}", e)))?
+            .filter_map(|r| r.ok())
+            .collect();
+
+        drop(stmt);
+
+        let mut fks = Vec::new();
+
+        for table_name in table_names {
+            let pragma_sql = format!(
+                "PRAGMA foreign_key_list(\"{}\")",
+                table_name.replace('\"', "\"\"")
+            );
+
+            let mut pragma_stmt = conn_guard.prepare(&pragma_sql).map_err(|e| {
+                DbError::QueryExecution(format!("Failed to prepare PRAGMA foreign_key_list: {}", e))
+            })?;
+
+            let rows = pragma_stmt
+                .query_map([], |row| {
+                    let target_table: Option<String> = row.get(2).ok();
+                    let source_column: Option<String> = row.get(3).ok();
+                    let target_column: Option<String> = row.get(4).ok();
+                    Ok((target_table, source_column, target_column))
+                })
+                .map_err(|e| {
+                    DbError::QueryExecution(format!(
+                        "Failed to query PRAGMA foreign_key_list: {}",
+                        e
+                    ))
+                })?;
+
+            for row in rows {
+                if let Ok((target_table, source_column, target_column)) = row {
+                    if let (Some(target_table), Some(source_column)) =
+                        (&target_table, &source_column)
+                    {
+                        fks.push(ForeignKeyInfo {
+                            constraint_name: None,
+                            source_schema: "main".to_string(),
+                            source_table: table_name.clone(),
+                            source_column: source_column.clone(),
+                            target_schema: "main".to_string(),
+                            target_table: target_table.clone(),
+                            target_column: target_column.clone().unwrap_or_default(),
+                        });
+                    }
+                }
+            }
+        }
+
+        drop(conn_guard);
+        pool.return_conn(conn)?;
+
+        Ok(fks)
     }
 
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {

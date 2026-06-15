@@ -1114,6 +1114,78 @@ impl DatabaseAdapter for PostgresAdapter {
         })
     }
 
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        use crate::database::types::ForeignKeyInfo;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let schema_filter = match _schema {
+            Some(s) => format!("AND tc.table_schema = '{}'", s.replace('\'', "''")),
+            None => "AND tc.table_schema NOT IN ('pg_catalog', 'information_schema')".to_string(),
+        };
+
+        let sql = format!(
+            r#"
+            SELECT
+                tc.constraint_name,
+                tc.table_schema AS source_schema,
+                tc.table_name AS source_table,
+                kcu.column_name AS source_column,
+                ccu.table_schema AS target_schema,
+                ccu.table_name AS target_table,
+                ccu.column_name AS target_column
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+                ON tc.constraint_catalog = kcu.constraint_catalog
+                AND tc.constraint_schema = kcu.constraint_schema
+                AND tc.constraint_name = kcu.constraint_name
+            JOIN information_schema.constraint_column_usage ccu
+                ON tc.constraint_catalog = ccu.constraint_catalog
+                AND tc.constraint_schema = ccu.constraint_schema
+                AND tc.constraint_name = ccu.constraint_name
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+            {schema_filter}
+            ORDER BY tc.table_schema, tc.table_name, kcu.ordinal_position
+            "#,
+        );
+
+        let rows = client
+            .query(&sql, &[])
+            .await
+            .map_err(|e| DbError::QueryExecution(format!("Failed to query foreign keys: {}", e)))?;
+
+        let fks = rows
+            .iter()
+            .map(|row| ForeignKeyInfo {
+                constraint_name: row
+                    .try_get::<_, Option<String>>("constraint_name")
+                    .ok()
+                    .flatten(),
+                source_schema: row.get("source_schema"),
+                source_table: row.get("source_table"),
+                source_column: row.get("source_column"),
+                target_schema: row.get("target_schema"),
+                target_table: row.get("target_table"),
+                target_column: row.get("target_column"),
+            })
+            .collect();
+
+        Ok(fks)
+    }
+
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {
         self.pool.clone()
     }

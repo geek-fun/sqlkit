@@ -5,6 +5,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { DatabaseBrowser, DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/components/database-browser'
+import ErDiagramView from '@/components/er-diagram/ErDiagramView.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { Button } from '@/components/ui/button'
@@ -173,6 +174,17 @@ const isTableViewConnectionValid = computed(() => {
   return true
 })
 
+const isErDiagramConnectionValid = computed(() => {
+  if (!activeTab.value?.erDiagram)
+    return true
+  if (activeTab.value.orphanFromConnectionId)
+    return false
+  const connId = getConnectionId()
+  if (!connId)
+    return false
+  return connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
+})
+
 function isConnectionActive(connId: string | null | undefined): boolean {
   return connId !== null && connId !== undefined && connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
 }
@@ -317,6 +329,13 @@ WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` :
 
 function handleExportData(_table: TableInfo, _database: string, _schema?: string) {
   // TODO: Implement export data functionality
+}
+
+function handleShowErDiagram(database: string, schema?: string) {
+  const connId = getActiveConnectionId()
+  if (connId) {
+    tabStore.openErDiagramTab(connId, database, schema)
+  }
 }
 
 function handleSelectTable(table: TableInfo, database: string, schema?: string) {
@@ -489,6 +508,7 @@ function closeResultPanel() {
             @select-top-n="handleSelectTopN"
             @view-structure="handleViewStructure"
             @export-data="handleExportData"
+            @show-er-diagram="handleShowErDiagram"
             @open-saved-query="handleOpenSavedQuery"
             @create-new-query="handleNewTab"
           />
@@ -540,6 +560,15 @@ function closeResultPanel() {
               </p>
             </div>
           </div>
+
+          <!-- ER Diagram view -->
+          <ErDiagramView
+            v-else-if="activeTab?.erDiagram && !activeTab.orphanFromConnectionId && isErDiagramConnectionValid"
+            :connection-id="getConnectionId() || ''"
+            :database="activeTab.erDiagram.database"
+            :schema="activeTab.erDiagram.schema"
+            class="flex-1"
+          />
 
           <!-- Query editor area (shown for normal query tabs) -->
           <template v-else>

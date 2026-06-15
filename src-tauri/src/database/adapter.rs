@@ -7,7 +7,7 @@ use crate::database::{
     config::ConnectionConfig,
     error::{DbError, DbResult},
     pool::ConnectionPool,
-    types::{ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, TableInfo},
+    types::{ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, QueryResult, TableInfo},
 };
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -146,6 +146,15 @@ pub trait DatabaseAdapter: Send + Sync {
         _table: &str,
     ) -> DbResult<TableInfo> {
         Err(DbError::unsupported("get_table_info"))
+    }
+
+    /// Get foreign key relationships for tables in a schema.
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        Err(DbError::unsupported("get_foreign_keys"))
     }
 
     /// Get the connection pool.

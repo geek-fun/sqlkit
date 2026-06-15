@@ -48,6 +48,7 @@ const emit = defineEmits<{
   (e: 'selectTopN', table: TableInfo, database: string, schema?: string, n?: number): void
   (e: 'viewStructure', table: TableInfo, database: string, schema?: string): void
   (e: 'exportData', table: TableInfo, database: string, schema?: string): void
+  (e: 'showErDiagram', database: string, schema?: string): void
   (e: 'update:selectedDatabase', database: string): void
   (e: 'update:selectedSchema', schema: string): void
   (e: 'openSavedQuery', filePath: string): void
@@ -337,19 +338,15 @@ function handleDoubleClick(node: TreeNode) {
 }
 
 function handleContextMenu(event: MouseEvent, node: TreeNode) {
-  if (node.type !== 'table' && node.type !== 'view') {
-    return
-  }
-
   event.preventDefault()
   contextMenuNode.value = node
   contextMenuPosition.value = { x: event.clientX, y: event.clientY }
   showContextMenu.value = true
 }
 
-type ContextAction = 'createScript' | 'selectTopN' | 'viewStructure' | 'exportData'
+type ContextAction = 'createScript' | 'selectTopN' | 'viewStructure' | 'exportData' | 'showErDiagram'
 
-const contextActionEmitters: Record<ContextAction, (metadata: TreeNodeMetadata) => void> = {
+const contextActionEmitters: Partial<Record<ContextAction, (metadata: TreeNodeMetadata) => void>> = {
   createScript: metadata => emit('createScript', metadata, metadata.database, metadata.schema),
   selectTopN: metadata => emit('selectTopN', metadata, metadata.database, metadata.schema, 100),
   viewStructure: metadata => emit('viewStructure', metadata, metadata.database, metadata.schema),
@@ -357,11 +354,40 @@ const contextActionEmitters: Record<ContextAction, (metadata: TreeNodeMetadata) 
 }
 
 function handleContextAction(action: ContextAction) {
-  if (!contextMenuNode.value || !contextMenuNode.value.metadata) {
+  if (!contextMenuNode.value) {
     return
   }
 
-  contextActionEmitters[action](contextMenuNode.value.metadata)
+  if (action === 'showErDiagram') {
+    const node = contextMenuNode.value
+    if (node.type === 'database') {
+      emit('showErDiagram', node.name)
+    }
+    else if (node.type === 'schema') {
+      const database = node.parentId
+        ? node.parentId.replace(/^db-/, '')
+        : (props.selectedDatabase || '')
+      emit('showErDiagram', database, node.name)
+    }
+    else if (node.type === 'table' || node.type === 'view') {
+      // For table/view nodes, use the metadata or parent context
+      const database = props.selectedDatabase || ''
+      const schema = node.metadata?.schema
+      emit('showErDiagram', database, schema)
+    }
+    showContextMenu.value = false
+    contextMenuNode.value = null
+    return
+  }
+
+  if (!contextMenuNode.value.metadata) {
+    return
+  }
+
+  const emitter = contextActionEmitters[action]
+  if (emitter) {
+    emitter(contextMenuNode.value.metadata)
+  }
   showContextMenu.value = false
   contextMenuNode.value = null
 }
@@ -786,6 +812,7 @@ defineExpose({ fetchSavedQueryFiles })
     >
       <div class="p-1">
         <div
+          v-if="contextMenuNode && (contextMenuNode.type === 'table' || contextMenuNode.type === 'view')"
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleContextAction('selectTopN')"
         >
@@ -799,6 +826,7 @@ defineExpose({ fetchSavedQueryFiles })
           {{ t('components.databaseBrowser.contextMenu.selectTopN') }}
         </div>
         <div
+          v-if="contextMenuNode && (contextMenuNode.type === 'table' || contextMenuNode.type === 'view')"
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleContextAction('viewStructure')"
         >
@@ -810,6 +838,7 @@ defineExpose({ fetchSavedQueryFiles })
           {{ t('components.databaseBrowser.contextMenu.viewStructure') }}
         </div>
         <div
+          v-if="contextMenuNode && (contextMenuNode.type === 'table' || contextMenuNode.type === 'view')"
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleContextAction('createScript')"
         >
@@ -821,8 +850,27 @@ defineExpose({ fetchSavedQueryFiles })
           </svg>
           {{ t('components.databaseBrowser.contextMenu.createScript') }}
         </div>
-        <div class="my-1 bg-border h-px" />
         <div
+          v-if="contextMenuNode && (contextMenuNode.type === 'table' || contextMenuNode.type === 'view')"
+          class="my-1 bg-border h-px"
+        />
+        <div
+          v-if="contextMenuNode && (contextMenuNode.type === 'schema' || contextMenuNode.type === 'database' || contextMenuNode.type === 'table' || contextMenuNode.type === 'view')"
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleContextAction('showErDiagram')"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
+            <circle cx="12" cy="12" r="3" />
+            <circle cx="19" cy="5" r="2" />
+            <circle cx="5" cy="19" r="2" />
+            <line x1="12" y1="12" x2="13.65" y2="5.87" />
+            <line x1="12" y1="12" x2="6.35" y2="17.13" />
+            <line x1="12" y1="12" x2="17" y2="14" />
+          </svg>
+          {{ t('components.databaseBrowser.contextMenu.showErDiagram') }}
+        </div>
+        <div
+          v-if="contextMenuNode && (contextMenuNode.type === 'table' || contextMenuNode.type === 'view')"
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleContextAction('exportData')"
         >

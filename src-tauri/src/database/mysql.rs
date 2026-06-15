@@ -623,6 +623,60 @@ impl DatabaseAdapter for MySQLAdapter {
         })
     }
 
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        use crate::database::types::ForeignKeyInfo;
+
+        let mut conn = self.get_conn().await?;
+
+        let database_filter = match _database {
+            Some(db) => format!("AND kcu.CONSTRAINT_SCHEMA = '{}'", db.replace('\'', "''")),
+            None => String::new(),
+        };
+
+        let sql = format!(
+            r#"
+        SELECT
+            kcu.CONSTRAINT_NAME AS constraint_name,
+            kcu.CONSTRAINT_SCHEMA AS source_schema,
+            kcu.TABLE_NAME AS source_table,
+            kcu.COLUMN_NAME AS source_column,
+            kcu.REFERENCED_TABLE_SCHEMA AS target_schema,
+            kcu.REFERENCED_TABLE_NAME AS target_table,
+            kcu.REFERENCED_COLUMN_NAME AS target_column
+        FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu
+        WHERE kcu.REFERENCED_TABLE_NAME IS NOT NULL
+        {database_filter}
+        ORDER BY kcu.CONSTRAINT_SCHEMA, kcu.TABLE_NAME, kcu.ORDINAL_POSITION
+        "#,
+        );
+
+        let rows: Vec<Row> = conn
+            .query(sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(format!("Failed to query foreign keys: {}", e)))?;
+
+        let fks = rows
+            .iter()
+            .map(|row| ForeignKeyInfo {
+                constraint_name: row
+                    .get::<Option<String>, _>("constraint_name")
+                    .unwrap_or_default(),
+                source_schema: row.get("source_schema").unwrap_or_default(),
+                source_table: row.get("source_table").unwrap_or_default(),
+                source_column: row.get("source_column").unwrap_or_default(),
+                target_schema: row.get("target_schema").unwrap_or_default(),
+                target_table: row.get("target_table").unwrap_or_default(),
+                target_column: row.get("target_column").unwrap_or_default(),
+            })
+            .collect();
+
+        Ok(fks)
+    }
+
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {
         self.pool.clone()
     }

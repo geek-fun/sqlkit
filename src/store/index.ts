@@ -32,4 +32,4 @@ export type {
 export { useHistoryStore } from './historyStore'
 export type { HistoryEntry, HistoryEntryStatus } from './historyStore'
 export { useTabStore } from './tabStore'
-export type { QueryResult, QueryTab } from './tabStore'
+export type { ErDiagramMeta, QueryResult, QueryTab } from './tabStore'

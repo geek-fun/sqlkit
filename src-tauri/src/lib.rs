@@ -206,6 +206,7 @@ pub fn run() {
             commands::get_table_info,
             commands::get_table_data,
             commands::get_table_count,
+            commands::get_foreign_keys,
             commands::update_table_row,
             commands::delete_table_row,
             // File operations commands

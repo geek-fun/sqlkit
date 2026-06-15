@@ -155,6 +155,60 @@ describe('tabStore', () => {
     })
   })
 
+  describe('openErDiagramTab', () => {
+    it('creates a tab with erDiagram metadata', () => {
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      const store = useTabStore()
+
+      const tab = store.openErDiagramTab('conn-1', 'testdb', 'public')
+
+      expect(tab.connectionId).toBe('conn-1')
+      expect(tab.database).toBe('testdb')
+      expect(tab.schema).toBe('public')
+      expect(tab.erDiagram).toBeDefined()
+      expect(tab.erDiagram!.database).toBe('testdb')
+      expect(tab.erDiagram!.schema).toBe('public')
+      expect(tab.name).toContain('ER Diagram')
+      expect(tab.isExecuting).toBe(false)
+      expect(store.activeTabId).toBe(tab.id)
+      expect(tab.hasUnsavedChanges).toBe(false)
+      expect(tab.content).toBe('')
+    })
+
+    it('creates a tab without schema', () => {
+      ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
+      const store = useTabStore()
+
+      const tab = store.openErDiagramTab('conn-1', 'testdb')
+
+      expect(tab.schema).toBeUndefined()
+      expect(tab.erDiagram!.schema).toBeUndefined()
+      expect(tab.name).toBe('ER Diagram - testdb')
+    })
+
+    it('creates separate tabs for different databases', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
+      store.openErDiagramTab('conn-1', 'testdb', 'public')
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
+
+      store.openErDiagramTab('conn-1', 'otherdb', 'public')
+
+      expect(store.tabs).toHaveLength(2)
+    })
+
+    it('creates separate tabs for different connections', () => {
+      const store = useTabStore()
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-1')
+      store.openErDiagramTab('conn-1', 'testdb', 'public')
+      ;(crypto.randomUUID as jest.Mock).mockReturnValueOnce('tab-2')
+
+      store.openErDiagramTab('conn-2', 'testdb', 'public')
+
+      expect(store.tabs).toHaveLength(2)
+    })
+  })
+
   describe('closeTab', () => {
     it('should remove tab from tabs', () => {
       const store = useTabStore()

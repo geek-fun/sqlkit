@@ -868,6 +868,103 @@ impl DatabaseAdapter for SqlServerAdapter {
         })
     }
 
+    async fn get_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        use crate::database::types::ForeignKeyInfo;
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let schema_filter = match _schema {
+            Some(s) => format!(
+                "AND OBJECT_SCHEMA_NAME(fk.parent_object_id) = '{}'",
+                s.replace('\'', "''")
+            ),
+            None => String::new(),
+        };
+
+        let sql = format!(
+            r#"
+            SELECT
+                fk.name AS constraint_name,
+                OBJECT_SCHEMA_NAME(fk.parent_object_id) AS source_schema,
+                OBJECT_NAME(fk.parent_object_id) AS source_table,
+                COL_NAME(fkc.parent_object_id, fkc.parent_column_id) AS source_column,
+                OBJECT_SCHEMA_NAME(fk.referenced_object_id) AS target_schema,
+                OBJECT_NAME(fk.referenced_object_id) AS target_table,
+                COL_NAME(fkc.referenced_object_id, fkc.referenced_column_id) AS target_column
+            FROM sys.foreign_keys fk
+            JOIN sys.foreign_key_columns fkc
+                ON fk.object_id = fkc.constraint_object_id
+            WHERE 1=1
+            {schema_filter}
+            ORDER BY
+                OBJECT_SCHEMA_NAME(fk.parent_object_id),
+                OBJECT_NAME(fk.parent_object_id),
+                fkc.constraint_column_id
+            "#,
+        );
+
+        let stream = client
+            .simple_query(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(format!("Failed to query foreign keys: {}", e)))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(format!("Failed to get FK results: {}", e)))?;
+
+        let fks = rows
+            .iter()
+            .map(|row| {
+                let constraint_name = match Self::convert_value(row, 0) {
+                    Ok(QueryValue::String(s)) => Some(s),
+                    _ => None,
+                };
+                let source_schema = match Self::convert_value(row, 1) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let source_table = match Self::convert_value(row, 2) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let source_column = match Self::convert_value(row, 3) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let target_schema = match Self::convert_value(row, 4) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let target_table = match Self::convert_value(row, 5) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+                let target_column = match Self::convert_value(row, 6) {
+                    Ok(QueryValue::String(s)) => s,
+                    _ => String::new(),
+                };
+
+                ForeignKeyInfo {
+                    constraint_name,
+                    source_schema,
+                    source_table,
+                    source_column,
+                    target_schema,
+                    target_table,
+                    target_column,
+                }
+            })
+            .collect();
+
+        Ok(fks)
+    }
+
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {
         self.pool.clone()
     }
