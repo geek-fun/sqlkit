@@ -745,7 +745,6 @@ watch(() => [props.rows, props.columns], () => {
         :selected-rows="selection.getSelectedRows(rows)"
         :columns="columns"
         :table-name="tableName"
-        @delete-selected="/* handled by parent */"
         @export-selected="(fmt) => copyUtil.copyRowsAs(selection.getSelectedRows(rows), columns, fmt, tableName)"
       />
 
