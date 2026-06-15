@@ -32,6 +32,7 @@
     "pinia": "^3.0.4",
     "pinia-plugin-persistedstate": "^4.7.1",
     "radix-vue": "^1.9.17",
+    "sql-formatter": "^15.8.1",
     "ulidx": "^2.4.1",
     "vue": "^3.5.13",
     "vue-i18n": "^11.2.8",
