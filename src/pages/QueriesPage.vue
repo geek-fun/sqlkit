@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { StatementToExecute } from '@/composables/useSqlStatements'
+import type { DatabaseType } from '@/store/connectionStore'
 import type { TableInfo } from '@/store/databaseStore'
 import { invoke } from '@tauri-apps/api/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -22,6 +23,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
+import { useSqlFormatter } from '@/composables/useSqlFormatter'
 import { loadQueryFile, saveQueryFile, saveQueryFileAs } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
@@ -41,6 +43,8 @@ const selectedDatabase = ref<string>('')
 const selectedSchema = ref<string>('')
 const queryTabsRef = ref<InstanceType<typeof QueryTabs>>()
 const databaseBrowserRef = ref<InstanceType<typeof DatabaseBrowser>>()
+
+const { formatSql, resolveDialect } = useSqlFormatter()
 
 // ── Destructive action dialog state ──
 const destructiveDialogOpen = ref(false)
@@ -254,6 +258,50 @@ async function executeQuery(details?: StatementToExecute) {
 
 async function handleExplainQuery() {
   // TODO: Implement explain query
+}
+
+function getActiveDialect(): string | null {
+  const connId = selectedConnectionId.value || connectionStore.activeConnectionId
+  if (!connId)
+    return null
+  const conn = connectionStore.getConnectionById(connId)
+  if (!conn)
+    return null
+  const dbType = conn.type as DatabaseType
+  return resolveDialect(dbType)
+}
+
+function handleFormatSql(): string {
+  const content = activeTab.value?.content || ''
+  if (!content.trim())
+    return content
+
+  const dialect = getActiveDialect() || 'sql'
+  const { indentWidth, lineWidth } = appStore.editorConfig
+
+  const result = formatSql(content, dialect, {
+    tabWidth: indentWidth,
+    expressionWidth: lineWidth,
+  })
+
+  if (result.error) {
+    toast.error(t('pages.queries.notifications.formatFailed'), {
+      description: result.error,
+    })
+  }
+
+  return result.sql
+}
+
+function handleToolbarFormat() {
+  if (activeTab.value?.orphanFromConnectionId || !activeTab.value)
+    return
+  if (activeTab.value.content.trim()) {
+    const formatted = handleFormatSql()
+    if (formatted !== activeTab.value.content) {
+      tabStore.updateTabContent(activeTab.value.id, formatted)
+    }
+  }
 }
 
 function handleNewTab() {
@@ -763,6 +811,29 @@ function closeResultPanel() {
                 </Tooltip>
               </TooltipProvider>
 
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="gap-1 h-7"
+                      :disabled="!activeTab || activeTab.orphanFromConnectionId"
+                      @click="handleToolbarFormat"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                        <polyline points="14 2 14 8 20 8" />
+                      </svg>
+                      {{ t('pages.queries.editor.format') }}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{{ t('pages.queries.shortcuts.format', { key: modifierKey }) }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               <div class="flex-1" />
 
               <!-- Download / Save As -->
@@ -809,6 +880,7 @@ function closeResultPanel() {
                 :word-wrap="appStore.editorConfig.wordWrap"
                 :minimap="appStore.editorConfig.showMinimap"
                 :show-line-numbers="appStore.editorConfig.showLineNumbers"
+                :format-sql="handleFormatSql"
                 @execute="(details) => executeQuery(details)"
                 @statement-not-found="toast.error(t('pages.queries.notifications.noStatementFound'))"
                 @save="handleSaveQuery"
