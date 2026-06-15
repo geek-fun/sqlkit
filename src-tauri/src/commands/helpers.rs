@@ -175,6 +175,7 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
         "gbase8c" | "gbase_8c" => Ok(DatabaseType::GBase8c),
         "xugudb" | "xugu" => Ok(DatabaseType::XuguDB),
         "gbase8a" | "gbase_8a" => Ok(DatabaseType::GBase8a),
+        "derby" => Ok(DatabaseType::Derby),
         _ => Err(format!("Unsupported database type: {}", db_type)),
     }
 }

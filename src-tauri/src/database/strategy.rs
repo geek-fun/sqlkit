@@ -74,6 +74,7 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         DM8Oracle => ConnectionStrategy::JdbcBridge,
         XuguDB => ConnectionStrategy::JdbcBridge,
         GBase8a => ConnectionStrategy::JdbcBridge,
+        Derby => ConnectionStrategy::JdbcBridge,
 
         // HTTP SQL bridge
         Trino | Presto => ConnectionStrategy::Http,
@@ -116,6 +117,7 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
         DM8Oracle => Some(5236),
         XuguDB => Some(5138),
         GBase8a => Some(5258),
+        Derby => Some(1527),
         Trino => Some(8080),
         Presto => Some(8080),
     }

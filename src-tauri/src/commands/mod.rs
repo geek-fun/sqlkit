@@ -12,6 +12,7 @@ pub mod transfer;
 pub use browse::*;
 pub use connection::*;
 pub use file_operations::*;
+pub use jdbc::*;
 pub use query::*;
 pub use server::*;
 pub use store::*;

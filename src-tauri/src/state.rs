@@ -113,6 +113,7 @@ impl ServerConfig {
             "gbase8c" => Ok(DatabaseType::GBase8c),
             "xugudb" | "xugu" => Ok(DatabaseType::XuguDB),
             "gbase8a" => Ok(DatabaseType::GBase8a),
+            "derby" => Ok(DatabaseType::Derby),
             _ => Err(format!("Unsupported database type: {}", self.db_type)),
         }
     }

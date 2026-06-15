@@ -112,7 +112,7 @@ impl JreDetector {
     }
 
     /// Probe `JAVA_HOME` then `PATH` for a `java` executable.
-    fn detect_system_java() -> Option<PathBuf> {
+    pub fn detect_system_java() -> Option<PathBuf> {
         // Check JAVA_HOME
         if let Ok(java_home) = std::env::var("JAVA_HOME") {
             let java = PathBuf::from(java_home).join(JAVA_EXE);

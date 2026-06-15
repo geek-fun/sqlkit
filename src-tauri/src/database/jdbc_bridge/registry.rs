@@ -161,8 +161,7 @@ fn db_type_to_registry_key(db: DatabaseType) -> Option<&'static str> {
         DatabaseType::Oracle => Some("oracle"),
         DatabaseType::DB2 => Some("db2"),
         DatabaseType::H2 => Some("h2"),
-        // Derby — reserved for future use (not yet a DatabaseType variant)
-        // DatabaseType::Derby => Some("derby"),
+        DatabaseType::Derby => Some("derby"),
         DatabaseType::Snowflake => Some("snowflake"),
         DatabaseType::DM8Oracle => Some("dm8_oracle"),
         DatabaseType::XuguDB => Some("xugudb"),
