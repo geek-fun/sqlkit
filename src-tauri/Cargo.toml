@@ -93,7 +93,7 @@ portpicker = "0.1.1"
 pageant = "0.2"
 # Pure Rust Oracle TNS implementation, optional feature
 oracle-rs = { version = "0.1", optional = true }
-rsfbclient = { version = "0.26", features = ["pure_rust"], optional = true }
+rsfbclient = { version = "0.26", features = [ "pure_rust" ], optional = true }
 
 [features]
 default = [ "duckdb-bundled" ]
