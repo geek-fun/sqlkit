@@ -67,7 +67,7 @@ pub async fn try_driver(
     all_patterns.extend(version.version_error_signatures.clone());
 
     // Send connect request
-    let params = serde_json::to_value(ConnectParams {
+    let params = match serde_json::to_value(ConnectParams {
         url,
         username: username.to_string(),
         password: password.clone(),
@@ -76,8 +76,13 @@ pub async fn try_driver(
         driver_jars: vec![],
         pool_min: 1,
         pool_max: 5,
-    })
-    .unwrap_or_default();
+    }) {
+        Ok(v) => v,
+        Err(e) => return DriverAttempt::Fatal(DbError::Connection(format!(
+            "Failed to serialize connect params: {}",
+            e,
+        ))),
+    };
 
     let req = JdbcRequest::new(JdbcMethod::Connect, params);
 
@@ -195,16 +200,15 @@ pub async fn run_fallback_chain(
 }
 
 fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
-    // Derive DatabaseType from config name
-    match config.name {
-        _ if config.name.contains("Oracle") => DatabaseType::Oracle,
-        _ if config.name.contains("DB2") => DatabaseType::DB2,
-        _ if config.name.contains("H2") => DatabaseType::H2,
-        _ if config.name.contains("Derby") => DatabaseType::Derby,
-        _ if config.name.contains("Snowflake") => DatabaseType::Snowflake,
-        _ if config.name.contains("DM8") => DatabaseType::DM8Oracle,
-        _ if config.name.contains("XuguDB") => DatabaseType::XuguDB,
-        _ if config.name.contains("GBase") => DatabaseType::GBase8a,
+    match config.name.as_str() {
+        "Oracle Database" => DatabaseType::Oracle,
+        "IBM DB2" => DatabaseType::DB2,
+        "H2 Database" => DatabaseType::H2,
+        "Apache Derby" => DatabaseType::Derby,
+        "Snowflake" => DatabaseType::Snowflake,
+        "DM8" => DatabaseType::DM8Oracle,
+        "XuguDB" => DatabaseType::XuguDB,
+        "GBase 8a" => DatabaseType::GBase8a,
         _ => DatabaseType::PostgreSQL, // fallback, shouldn't happen
     }
 }

@@ -11,8 +11,7 @@ use std::path::PathBuf;
 const JRE_BASE_DIR: &str = ".sqlkit/jre";
 
 /// Version of the bundled JRE.
-#[allow(dead_code)]
-const MANAGED_JRE_VERSION: &str = "21";
+pub const MANAGED_JRE_VERSION: &str = "21";
 
 /// Java executable path relative to JRE root (platform-aware).
 const JAVA_EXE: &str = if cfg!(target_os = "windows") {

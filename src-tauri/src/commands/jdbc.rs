@@ -24,7 +24,7 @@ pub async fn check_jre_status() -> Result<JreStatus, String> {
     if managed_path.exists() {
         Ok(JreStatus {
             installed: true,
-            version: Some("21.0.2".to_string()),
+            version: Some(jre::MANAGED_JRE_VERSION.to_string()),
             path: Some(managed_path.to_string_lossy().to_string()),
             source: "managed".to_string(),
         })

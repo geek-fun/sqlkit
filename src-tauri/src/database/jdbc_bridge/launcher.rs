@@ -7,7 +7,6 @@ use crate::database::error::{DbError, DbResult};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::fs;
 
 use super::protocol::{JdbcRequest, JdbcResponse};
 
