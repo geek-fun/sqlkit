@@ -64,6 +64,8 @@ pub mod clickhouse;
 pub mod config;
 pub mod duckdb;
 pub mod error;
+#[cfg(feature = "firebird")]
+pub mod firebird;
 pub mod http_sql;
 pub mod jdbc_bridge;
 pub mod manager;
@@ -72,10 +74,12 @@ pub mod mysql;
 pub mod oracle;
 pub mod pool;
 pub mod postgres;
+pub mod rqlite;
 pub mod search;
 pub mod sqlite;
 pub mod sqlserver;
 pub mod strategy;
+pub mod turso;
 pub mod types;
 
 #[cfg(test)]
@@ -87,6 +91,8 @@ pub use clickhouse::{ClickHouseAdapter, ClickHousePool};
 pub use config::{ConnectionConfig, DatabaseType, PoolConfig, SslMode};
 pub use duckdb::{DuckDbAdapter, DuckDbPool};
 pub use error::{DbError, DbResult};
+#[cfg(feature = "firebird")]
+pub use firebird::{FirebirdAdapter, FirebirdPool};
 pub use http_sql::{HttpSqlAdapter, HttpSqlPool};
 pub use jdbc_bridge::{JdbcBridgeAdapter, JdbcBridgeLauncher, JdbcBridgePool};
 pub use manager::{ConnectionManager, ConnectionMetadata, ManagerStats};
@@ -95,8 +101,10 @@ pub use mysql::{MySQLAdapter, MySQLPool};
 pub use oracle::OracleAdapter;
 pub use pool::{ConnectionPool, PoolStats};
 pub use postgres::{PostgresAdapter, PostgresPool};
+pub use rqlite::{RqliteAdapter, RqlitePool};
 pub use sqlite::{SQLiteAdapter, SQLitePool};
 pub use sqlserver::{SqlServerAdapter, SqlServerPool};
+pub use turso::{TursoAdapter, TursoPool};
 pub use types::{
     ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
     QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,

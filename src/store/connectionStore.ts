@@ -57,6 +57,10 @@ export enum DatabaseType {
   CASSANDRA = 'CASSANDRA',
   IRIS = 'IRIS',
   ACCESS = 'ACCESS',
+  FIREBIRD = 'FIREBIRD',
+  RQLITE = 'RQLITE',
+  TURSO = 'TURSO',
+  TDENGINE = 'TDENGINE',
 }
 
 const PG_BACKEND = 'PostgreSQL'
@@ -116,6 +120,10 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.CASSANDRA]: 'cassandra',
   [DatabaseType.IRIS]: 'iris',
   [DatabaseType.ACCESS]: 'access',
+  [DatabaseType.FIREBIRD]: 'firebird',
+  [DatabaseType.RQLITE]: 'rqlite',
+  [DatabaseType.TURSO]: 'turso',
+  [DatabaseType.TDENGINE]: 'tdengine',
 }
 
 const dbTypeFromBackend: Record<string, DatabaseType> = {
@@ -147,6 +155,10 @@ const dbTypeFromBackend: Record<string, DatabaseType> = {
   cassandra: DatabaseType.CASSANDRA,
   iris: DatabaseType.IRIS,
   access: DatabaseType.ACCESS,
+  firebird: DatabaseType.FIREBIRD,
+  rqlite: DatabaseType.RQLITE,
+  turso: DatabaseType.TURSO,
+  tdengine: DatabaseType.TDENGINE,
 }
 
 const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
@@ -185,6 +197,7 @@ export function isJdbcDatabase(type: DatabaseType): boolean {
     DatabaseType.CASSANDRA,
     DatabaseType.IRIS,
     DatabaseType.ACCESS,
+    DatabaseType.TDENGINE,
   ].includes(type)
 }
 
@@ -209,6 +222,7 @@ export const jdbcDatabaseTypes: DatabaseType[] = [
   DatabaseType.CASSANDRA,
   DatabaseType.IRIS,
   DatabaseType.ACCESS,
+  DatabaseType.TDENGINE,
 ]
 
 export enum ConnectionStatus {

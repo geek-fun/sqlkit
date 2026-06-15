@@ -90,6 +90,7 @@ sha2 = "0.10"
 duckdb = { version = "1.10503", optional = true }
 # Pure Rust Oracle TNS implementation, optional feature
 oracle-rs = { version = "0.1", optional = true }
+rsfbclient = { version = "0.26", features = ["pure_rust"], optional = true }
 
 [features]
 default = [ "duckdb-bundled" ]
@@ -99,3 +100,4 @@ duckdb-bundled = [
   "duckdb/bundled",
 ]
 oracle = [ "dep:oracle-rs" ]
+firebird = [ "dep:rsfbclient" ]

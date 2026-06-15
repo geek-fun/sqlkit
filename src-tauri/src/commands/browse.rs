@@ -4,8 +4,8 @@
 //! including databases, schemas, tables, columns, and table data.
 
 use crate::database::{
-    search, ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo, IndexInfo, MySQLAdapter, ObjectInfo,
-    PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo, TriggerInfo,
+    search, ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo, IndexInfo, MySQLAdapter,
+    ObjectInfo, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo, TriggerInfo,
 };
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
@@ -155,6 +155,19 @@ pub async fn list_databases(
             let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_databases().await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_databases().await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_databases().await
+        }
     }
     .map_err(|e| format!("Failed to list databases: {}", e))?;
 
@@ -218,6 +231,19 @@ pub async fn list_schemas(
             adapter.list_schemas(Some(&database)).await
         }
         ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_schemas(Some(&database)).await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_schemas(Some(&database)).await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_schemas(Some(&database)).await
+        }
+        ActiveConnection::Turso(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_schemas(Some(&database)).await
         }
@@ -293,6 +319,25 @@ pub async fn list_tables(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(Some(&database), schema.as_deref())
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_tables(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_tables(Some(&database), schema.as_deref())
@@ -374,6 +419,25 @@ pub async fn get_table_info(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_table_info(Some(&database), schema.as_deref(), &table_name)
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_table_info(Some(&database), schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_table_info(Some(&database), schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .get_table_info(Some(&database), schema.as_deref(), &table_name)
@@ -470,6 +534,25 @@ pub async fn list_columns(
                 .list_columns(None, schema.as_deref(), &table_name)
                 .await
         }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
     }
     .map_err(|e| format!("Failed to list columns: {}", e))?;
 
@@ -495,15 +578,21 @@ pub async fn get_foreign_keys(
     let result = match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+            adapter
+                .get_foreign_keys(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+            adapter
+                .get_foreign_keys(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+            adapter
+                .get_foreign_keys(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
@@ -519,11 +608,34 @@ pub async fn get_foreign_keys(
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+            adapter
+                .get_foreign_keys(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_foreign_keys(Some(&database), schema.as_deref()).await
+            adapter
+                .get_foreign_keys(Some(&database), schema.as_deref())
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_foreign_keys(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_foreign_keys(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_foreign_keys(Some(&database), schema.as_deref())
+                .await
         }
     }
     .map_err(|e| format!("Failed to get foreign keys: {}", e))?;
@@ -650,6 +762,28 @@ pub async fn get_table_data(
                 build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "trino");
             adapter.execute_query(&sql).await
         }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "sqlite");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
+            adapter.execute_query(&sql).await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "sqlite");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
+            adapter.execute_query(&sql).await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "sqlite");
+            let sql =
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
+            adapter.execute_query(&sql).await
+        }
     }
     .map_err(|e| format!("Failed to get table data: {}", e))?;
 
@@ -764,6 +898,25 @@ pub async fn get_table_count(
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
             let qualified = build_qualified_table(schema.as_deref(), &table, "trino");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlite");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlite");
+            let query = build_count_query(&qualified, filter_ref);
+            adapter.execute_query(&query).await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlite");
             let query = build_count_query(&qualified, filter_ref);
             adapter.execute_query(&query).await
         }
@@ -981,6 +1134,31 @@ pub async fn update_table_row(
                 .await
                 .map_err(|e| format!("Failed to update row: {}", e))?;
         }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("sqlite")?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("sqlite")?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_update_sql("sqlite")?;
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to update row: {}", e))?;
+        }
     }
 
     Ok(())
@@ -1132,6 +1310,31 @@ pub async fn delete_table_row(
                 .await
                 .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("sqlite");
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("sqlite");
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            let sql = build_delete_sql("sqlite");
+            adapter
+                .execute_query(&sql)
+                .await
+                .map_err(|e| format!("Failed to delete row: {}", e))?;
+        }
     }
 
     Ok(())
@@ -1183,6 +1386,19 @@ pub async fn list_views(
             let adapter = adapter.lock().await;
             adapter.list_views(Some(&database), schema.as_deref()).await
         }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(Some(&database), schema.as_deref()).await
+        }
     }
     .map_err(|e| format!("Failed to list views: {}", e))
 }
@@ -1203,15 +1419,21 @@ pub async fn list_procedures(
     match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_procedures(Some(&database), schema.as_deref()).await
+            adapter
+                .list_procedures(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_procedures(Some(&database), schema.as_deref()).await
+            adapter
+                .list_procedures(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_procedures(Some(&database), schema.as_deref()).await
+            adapter
+                .list_procedures(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
@@ -1223,15 +1445,40 @@ pub async fn list_procedures(
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_procedures(Some(&database), schema.as_deref()).await
+            adapter
+                .list_procedures(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_procedures(Some(&database), schema.as_deref()).await
+            adapter
+                .list_procedures(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_procedures(Some(&database), schema.as_deref()).await
+            adapter
+                .list_procedures(Some(&database), schema.as_deref())
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_procedures(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_procedures(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_procedures(Some(&database), schema.as_deref())
+                .await
         }
     }
     .map_err(|e| format!("Failed to list procedures: {}", e))
@@ -1253,15 +1500,21 @@ pub async fn list_functions(
     match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_functions(Some(&database), schema.as_deref()).await
+            adapter
+                .list_functions(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_functions(Some(&database), schema.as_deref()).await
+            adapter
+                .list_functions(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_functions(Some(&database), schema.as_deref()).await
+            adapter
+                .list_functions(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
@@ -1273,15 +1526,40 @@ pub async fn list_functions(
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_functions(Some(&database), schema.as_deref()).await
+            adapter
+                .list_functions(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_functions(Some(&database), schema.as_deref()).await
+            adapter
+                .list_functions(Some(&database), schema.as_deref())
+                .await
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_functions(Some(&database), schema.as_deref()).await
+            adapter
+                .list_functions(Some(&database), schema.as_deref())
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_functions(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_functions(Some(&database), schema.as_deref())
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_functions(Some(&database), schema.as_deref())
+                .await
         }
     }
     .map_err(|e| format!("Failed to list functions: {}", e))
@@ -1304,15 +1582,21 @@ pub async fn list_triggers(
     match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_triggers(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_triggers(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_triggers(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
@@ -1324,15 +1608,40 @@ pub async fn list_triggers(
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_triggers(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_triggers(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_triggers(Some(&database), schema.as_deref(), &table)
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_triggers(Some(&database), schema.as_deref(), &table)
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_triggers(Some(&database), schema.as_deref(), &table)
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_triggers(Some(&database), schema.as_deref(), &table)
+                .await
         }
     }
     .map_err(|e| format!("Failed to list triggers: {}", e))
@@ -1355,15 +1664,21 @@ pub async fn list_indexes(
     match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_indexes(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_indexes(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_indexes(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
@@ -1375,15 +1690,40 @@ pub async fn list_indexes(
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_indexes(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_indexes(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_indexes(Some(&database), schema.as_deref(), &table)
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_indexes(Some(&database), schema.as_deref(), &table)
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_indexes(Some(&database), schema.as_deref(), &table)
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_indexes(Some(&database), schema.as_deref(), &table)
+                .await
         }
     }
     .map_err(|e| format!("Failed to list indexes: {}", e))
@@ -1406,15 +1746,21 @@ pub async fn list_foreign_keys(
     match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
@@ -1422,19 +1768,46 @@ pub async fn list_foreign_keys(
         }
         ActiveConnection::DuckDb(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_foreign_keys(None, schema.as_deref(), &table).await
+            adapter
+                .list_foreign_keys(None, schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
+                .await
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+            adapter
+                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
+                .await
         }
     }
     .map_err(|e| format!("Failed to list foreign keys: {}", e))
@@ -1458,35 +1831,115 @@ pub async fn get_object_ddl(
     match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .get_object_ddl(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .get_object_ddl(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .get_object_ddl(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_object_ddl(None, None, &object_name, &object_type).await
+            adapter
+                .get_object_ddl(None, None, &object_name, &object_type)
+                .await
         }
         ActiveConnection::DuckDb(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_object_ddl(None, schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .get_object_ddl(None, schema.as_deref(), &object_name, &object_type)
+                .await
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .get_object_ddl(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .get_object_ddl(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .get_object_ddl(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_object_ddl(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_object_ddl(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .get_object_ddl(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
     }
     .map_err(|e| format!("Failed to get object DDL: {}", e))
@@ -1510,35 +1963,115 @@ pub async fn drop_object(
     match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .drop_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .drop_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .drop_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.drop_object(None, None, &object_name, &object_type).await
+            adapter
+                .drop_object(None, None, &object_name, &object_type)
+                .await
         }
         ActiveConnection::DuckDb(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.drop_object(None, schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .drop_object(None, schema.as_deref(), &object_name, &object_type)
+                .await
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .drop_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .drop_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+            adapter
+                .drop_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .drop_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .drop_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .drop_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                )
+                .await
         }
     }
     .map_err(|e| format!("Failed to drop object: {}", e))
@@ -1563,35 +2096,130 @@ pub async fn rename_object(
     match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+            adapter
+                .rename_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+            adapter
+                .rename_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+            adapter
+                .rename_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.rename_object(None, None, &object_name, &object_type, &new_name).await
+            adapter
+                .rename_object(None, None, &object_name, &object_type, &new_name)
+                .await
         }
         ActiveConnection::DuckDb(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.rename_object(None, schema.as_deref(), &object_name, &object_type, &new_name).await
+            adapter
+                .rename_object(
+                    None,
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+            adapter
+                .rename_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+            adapter
+                .rename_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+            adapter
+                .rename_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .rename_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .rename_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .rename_object(
+                    Some(&database),
+                    schema.as_deref(),
+                    &object_name,
+                    &object_type,
+                    &new_name,
+                )
+                .await
         }
     }
     .map_err(|e| format!("Failed to rename object: {}", e))
@@ -1621,8 +2249,12 @@ fn get_db_type_string(connection: &ActiveConnection) -> &'static str {
         ActiveConnection::SQLite(_) => "sqlite",
         ActiveConnection::DuckDb(_) => "duckdb",
         ActiveConnection::ClickHouse(_) => "clickhouse",
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(_) => "sqlite",
         ActiveConnection::JdbcBridge(_) => "jdbc",
         ActiveConnection::HttpSql(_) => "trino",
+        ActiveConnection::Rqlite(_) => "sqlite",
+        ActiveConnection::Turso(_) => "sqlite",
     }
 }
 
@@ -1728,6 +2360,25 @@ pub async fn build_table_search_filter(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::Turso(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_columns(None, schema.as_deref(), &table_name)

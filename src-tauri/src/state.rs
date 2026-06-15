@@ -10,6 +10,10 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
+#[cfg(feature = "firebird")]
+use crate::database::firebird::FirebirdAdapter;
+use crate::database::rqlite::RqliteAdapter;
+use crate::database::turso::TursoAdapter;
 #[cfg(feature = "oracle")]
 use crate::database::OracleAdapter;
 /// Core adapter types used in dispatch logic.
@@ -90,14 +94,18 @@ impl ServerConfig {
             "sqlite" => Ok(DatabaseType::SQLite),
             "duckdb" | "duck" => Ok(DatabaseType::DuckDb),
             "clickhouse" => Ok(DatabaseType::ClickHouse),
+            "firebird" => Ok(DatabaseType::Firebird),
             "oracle" => Ok(DatabaseType::Oracle),
             "db2" => Ok(DatabaseType::DB2),
             "h2" => Ok(DatabaseType::H2),
             "snowflake" => Ok(DatabaseType::Snowflake),
+            "tdengine" | "td" => Ok(DatabaseType::TDengine),
             "dm8" | "dm" => Ok(DatabaseType::DM8),
             "dm8_oracle" => Ok(DatabaseType::DM8Oracle),
             "trino" => Ok(DatabaseType::Trino),
             "presto" => Ok(DatabaseType::Presto),
+            "rqlite" => Ok(DatabaseType::RQLite),
+            "turso" | "libsql" => Ok(DatabaseType::Turso),
             "cockroachdb" => Ok(DatabaseType::CockroachDB),
             "redshift" => Ok(DatabaseType::Redshift),
             "mariadb" => Ok(DatabaseType::MariaDB),
@@ -179,10 +187,14 @@ pub enum ActiveConnection {
     SQLServer(Arc<Mutex<SqlServerAdapter>>),
     DuckDb(Arc<Mutex<DuckDbAdapter>>),
     ClickHouse(Arc<Mutex<ClickHouseAdapter>>),
+    #[cfg(feature = "firebird")]
+    Firebird(Arc<Mutex<FirebirdAdapter>>),
     #[cfg(feature = "oracle")]
     Oracle(Arc<Mutex<OracleAdapter>>),
     JdbcBridge(Arc<Mutex<JdbcBridgeAdapter>>),
     HttpSql(Arc<Mutex<HttpSqlAdapter>>),
+    Rqlite(Arc<Mutex<RqliteAdapter>>),
+    Turso(Arc<Mutex<TursoAdapter>>),
 }
 
 /// Application configuration.

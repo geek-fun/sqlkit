@@ -41,11 +41,24 @@ pub async fn connect_server(
             let a = adapter.lock().await;
             a.test_connection().await
         }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let a = adapter.lock().await;
+            a.test_connection().await
+        }
         ActiveConnection::JdbcBridge(adapter) => {
             let a = adapter.lock().await;
             a.test_connection().await
         }
         ActiveConnection::HttpSql(adapter) => {
+            let a = adapter.lock().await;
+            a.test_connection().await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let a = adapter.lock().await;
+            a.test_connection().await
+        }
+        ActiveConnection::Turso(adapter) => {
             let a = adapter.lock().await;
             a.test_connection().await
         }
@@ -70,8 +83,12 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
         ActiveConnection::SQLite(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::DuckDb(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::ClickHouse(adapter) => adapter.lock().await.disconnect().await,
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::HttpSql(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::Rqlite(adapter) => adapter.lock().await.disconnect().await,
+        ActiveConnection::Turso(adapter) => adapter.lock().await.disconnect().await,
     };
 
     if let Err(e) = disconnect_result {

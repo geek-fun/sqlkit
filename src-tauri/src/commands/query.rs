@@ -4,9 +4,12 @@
 //! and getting query execution plans.
 
 use crate::api_response::{db_error_to_api_error, ApiResponse};
+#[cfg(feature = "firebird")]
+use crate::database::FirebirdAdapter;
 use crate::database::{
     ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DuckDbAdapter, HttpSqlAdapter,
-    JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter,
+    JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter, SqlServerAdapter,
+    TursoAdapter,
 };
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
@@ -84,6 +87,10 @@ pub async fn execute_query(
             ClickHouse(ConnectionConfig),
             JdbcBridge(ConnectionConfig),
             HttpSql(ConnectionConfig),
+            #[cfg(feature = "firebird")]
+            Firebird(ConnectionConfig),
+            Rqlite(ConnectionConfig),
+            Turso(ConnectionConfig),
         }
 
         let temp_kind: Option<TempKind> = {
@@ -143,6 +150,17 @@ pub async fn execute_query(
                         None
                     }
                 }
+                #[cfg(feature = "firebird")]
+                ActiveConnection::Firebird(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempKind::Firebird(cfg))
+                    } else {
+                        None
+                    }
+                }
                 ActiveConnection::JdbcBridge(adapter) => {
                     let adapter = adapter.lock().await;
                     if Some(db.as_str()) != adapter.config.database.as_deref() {
@@ -159,6 +177,26 @@ pub async fn execute_query(
                         let mut cfg = adapter.config.clone();
                         cfg.database = Some(db.clone());
                         Some(TempKind::HttpSql(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::Rqlite(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempKind::Rqlite(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::Turso(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempKind::Turso(cfg))
                     } else {
                         None
                     }
@@ -190,6 +228,16 @@ pub async fn execute_query(
                 }
                 TempKind::HttpSql(cfg) => {
                     execute_with_temp_adapter(HttpSqlAdapter::new(cfg), &sql).await
+                }
+                #[cfg(feature = "firebird")]
+                TempKind::Firebird(cfg) => {
+                    execute_with_temp_adapter(FirebirdAdapter::new(cfg), &sql).await
+                }
+                TempKind::Rqlite(cfg) => {
+                    execute_with_temp_adapter(RqliteAdapter::new(cfg), &sql).await
+                }
+                TempKind::Turso(cfg) => {
+                    execute_with_temp_adapter(TursoAdapter::new(cfg), &sql).await
                 }
             };
         }
@@ -226,11 +274,24 @@ pub async fn execute_query(
             let adapter = adapter.lock().await;
             adapter.execute_query(&sql).await
         }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.execute_query(&sql).await
+        }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             adapter.execute_query(&sql).await
         }
         ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.execute_query(&sql).await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.execute_query(&sql).await
+        }
+        ActiveConnection::Turso(adapter) => {
             let adapter = adapter.lock().await;
             adapter.execute_query(&sql).await
         }
@@ -338,12 +399,28 @@ pub async fn explain_query(
             let explain_sql = format!("EXPLAIN {}", sql);
             adapter.execute_query(&explain_sql).await
         }
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(adapter) => {
+            let adapter = adapter.lock().await;
+            let explain_sql = format!("EXPLAIN {}", sql);
+            adapter.execute_query(&explain_sql).await
+        }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
             adapter.execute_query(&explain_sql).await
         }
         ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            let explain_sql = format!("EXPLAIN {}", sql);
+            adapter.execute_query(&explain_sql).await
+        }
+        ActiveConnection::Rqlite(adapter) => {
+            let adapter = adapter.lock().await;
+            let explain_sql = format!("EXPLAIN {}", sql);
+            adapter.execute_query(&explain_sql).await
+        }
+        ActiveConnection::Turso(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
             adapter.execute_query(&explain_sql).await

@@ -51,6 +51,10 @@ import verticaLogo from '@/assets/images/database-icons/vertica-logo.svg'
 import xugudbLogo from '@/assets/images/database-icons/xugudb-logo.svg'
 import yashandbLogo from '@/assets/images/database-icons/yashandb-logo.svg'
 import yugabytedbLogo from '@/assets/images/database-icons/yugabytedb-logo.svg'
+import firebirdLogo from '@/assets/images/database-icons/clickhouse-logo.svg'  // placeholder
+import rqliteLogo from '@/assets/images/database-icons/sqlite-logo.svg'  // RQLite is SQLite-based
+import tursoLogo from '@/assets/images/database-icons/sqlite-logo.svg'  // Turso is SQLite-based
+import tdengineLogo from '@/assets/images/database-icons/clickhouse-logo.svg'  // placeholder
 
 type DatabaseIconConfig = {
   icon: string
@@ -111,6 +115,10 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   CASSANDRA: { icon: cassandraLogo, color: 'bg-gray-100 dark:bg-gray-800/30' },
   IRIS: { icon: irisLogo, color: 'bg-teal-100 dark:bg-teal-900/30' },
   ACCESS: { icon: accessLogo, color: 'bg-red-100 dark:bg-red-900/30' },
+  FIREBIRD: { icon: firebirdLogo, color: 'bg-purple-100 dark:bg-purple-900/30' },
+  RQLITE: { icon: rqliteLogo, color: 'bg-green-100 dark:bg-green-900/30' },
+  TURSO: { icon: tursoLogo, color: 'bg-cyan-100 dark:bg-cyan-900/30' },
+  TDENGINE: { icon: tdengineLogo, color: 'bg-amber-100 dark:bg-amber-900/30' },
 }
 
 export function useDatabaseIcon() {

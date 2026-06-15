@@ -1,4 +1,9 @@
+use crate::database::config::DatabaseType;
+#[cfg(feature = "firebird")]
+use crate::database::firebird::FirebirdAdapter;
+use crate::database::rqlite::RqliteAdapter;
 use crate::database::strategy::{resolve_effective_type, ConnectionStrategy, CoreDatabaseType};
+use crate::database::turso::TursoAdapter;
 use crate::database::{
     clickhouse::ClickHouseAdapter, config::ConnectionConfig, duckdb::DuckDbAdapter,
     http_sql::HttpSqlAdapter, jdbc_bridge::JdbcBridgeAdapter, ConnectionStatus, DatabaseAdapter,
@@ -17,8 +22,8 @@ pub async fn create_and_connect_adapter(
     conn_config: ConnectionConfig,
 ) -> Result<ActiveConnection, String> {
     // Normalize the db_type string to a DatabaseType enum
-    let db_type = db_type_to_enum(db_type)?;
-    let strategy = resolve_effective_type(db_type);
+    let db_type_enum = db_type_to_enum(db_type)?;
+    let strategy = resolve_effective_type(db_type_enum);
 
     match strategy {
         ConnectionStrategy::Native(core) => {
@@ -63,6 +68,16 @@ pub async fn create_and_connect_adapter(
                     #[cfg(not(feature = "oracle"))]
                 Err("Oracle support requires the 'oracle' feature: cargo build --features oracle".to_string())
                 }
+                CoreDatabaseType::Firebird => {
+                    #[cfg(feature = "firebird")]
+                    {
+                        let mut adapter = FirebirdAdapter::new(conn_config);
+                        adapter.connect().await.map_err(|e| e.to_string())?;
+                        return Ok(ActiveConnection::Firebird(Arc::new(Mutex::new(adapter))));
+                    }
+                    #[cfg(not(feature = "firebird"))]
+                    Err("Firebird support requires the 'firebird' feature".into())
+                }
                 _ => Err(format!("Native adapter not yet implemented for {:?}", core)),
             }
         }
@@ -71,11 +86,23 @@ pub async fn create_and_connect_adapter(
             adapter.connect().await.map_err(|e| e.to_string())?;
             Ok(ActiveConnection::JdbcBridge(Arc::new(Mutex::new(adapter))))
         }
-        ConnectionStrategy::Http => {
-            let mut adapter = HttpSqlAdapter::new(conn_config);
-            adapter.connect().await.map_err(|e| e.to_string())?;
-            Ok(ActiveConnection::HttpSql(Arc::new(Mutex::new(adapter))))
-        }
+        ConnectionStrategy::Http => match db_type_enum {
+            DatabaseType::RQLite => {
+                let mut adapter = RqliteAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                Ok(ActiveConnection::Rqlite(Arc::new(Mutex::new(adapter))))
+            }
+            DatabaseType::Turso => {
+                let mut adapter = TursoAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                Ok(ActiveConnection::Turso(Arc::new(Mutex::new(adapter))))
+            }
+            _ => {
+                let mut adapter = HttpSqlAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                Ok(ActiveConnection::HttpSql(Arc::new(Mutex::new(adapter))))
+            }
+        },
     }
 }
 
@@ -129,6 +156,16 @@ pub async fn test_connection(
                 #[cfg(not(feature = "oracle"))]
                 Err("Oracle support requires the 'oracle' feature".to_string())
             }
+            CoreDatabaseType::Firebird => {
+                #[cfg(feature = "firebird")]
+                {
+                    let mut adapter = FirebirdAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    return adapter.test_connection().await.map_err(|e| e.to_string());
+                }
+                #[cfg(not(feature = "firebird"))]
+                Err("Firebird support requires the 'firebird' feature".into())
+            }
             _ => Err("Native adapter not yet implemented".into()),
         },
         ConnectionStrategy::JdbcBridge => {
@@ -136,11 +173,23 @@ pub async fn test_connection(
             adapter.connect().await.map_err(|e| e.to_string())?;
             adapter.test_connection().await.map_err(|e| e.to_string())
         }
-        ConnectionStrategy::Http => {
-            let mut adapter = HttpSqlAdapter::new(conn_config);
-            adapter.connect().await.map_err(|e| e.to_string())?;
-            adapter.test_connection().await.map_err(|e| e.to_string())
-        }
+        ConnectionStrategy::Http => match dt {
+            DatabaseType::RQLite => {
+                let mut adapter = RqliteAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                adapter.test_connection().await.map_err(|e| e.to_string())
+            }
+            DatabaseType::Turso => {
+                let mut adapter = TursoAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                adapter.test_connection().await.map_err(|e| e.to_string())
+            }
+            _ => {
+                let mut adapter = HttpSqlAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                adapter.test_connection().await.map_err(|e| e.to_string())
+            }
+        },
     }
 }
 
@@ -154,12 +203,16 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
         "sqlite" => Ok(DatabaseType::SQLite),
         "duckdb" | "duck_db" | "duck" => Ok(DatabaseType::DuckDb),
         "clickhouse" => Ok(DatabaseType::ClickHouse),
+        "firebird" => Ok(DatabaseType::Firebird),
         "oracle" => Ok(DatabaseType::Oracle),
         "db2" => Ok(DatabaseType::DB2),
         "h2" => Ok(DatabaseType::H2),
         "snowflake" => Ok(DatabaseType::Snowflake),
+        "tdengine" | "td" => Ok(DatabaseType::TDengine),
         "trino" => Ok(DatabaseType::Trino),
         "presto" => Ok(DatabaseType::Presto),
+        "rqlite" => Ok(DatabaseType::RQLite),
+        "turso" | "libsql" => Ok(DatabaseType::Turso),
         "cockroachdb" | "cockroach" => Ok(DatabaseType::CockroachDB),
         "redshift" => Ok(DatabaseType::Redshift),
         "mariadb" => Ok(DatabaseType::MariaDB),
