@@ -2,15 +2,19 @@ import type { DatabaseType } from '@/store'
 
 import clickhouseLogo from '@/assets/images/database-icons/clickhouse-logo.svg'
 import cockroachdbLogo from '@/assets/images/database-icons/cockroachdb-logo.svg'
+import databendLogo from '@/assets/images/database-icons/databend-logo.svg'
 import db2Logo from '@/assets/images/database-icons/db2-logo.svg'
 import dm8Logo from '@/assets/images/database-icons/dm8-logo.svg'
 import dm8oracleLogo from '@/assets/images/database-icons/dm8oracle-logo.svg'
+import dorisLogo from '@/assets/images/database-icons/doris-logo.svg'
 import duckdbLogo from '@/assets/images/database-icons/duckdb-logo.svg'
 import gaussdbLogo from '@/assets/images/database-icons/gaussdb-logo.svg'
 import gbaseLogo from '@/assets/images/database-icons/gbase-logo.svg'
+import goldendbLogo from '@/assets/images/database-icons/goldendb-logo.svg'
 import h2Logo from '@/assets/images/database-icons/h2-logo.svg'
 import highgoLogo from '@/assets/images/database-icons/highgo-logo.svg'
 import kingbaseesLogo from '@/assets/images/database-icons/kingbasees-logo.svg'
+import manticoreLogo from '@/assets/images/database-icons/manticore-logo.svg'
 import mariadbLogo from '@/assets/images/database-icons/mariadb-logo.svg'
 import mysqlLogo from '@/assets/images/database-icons/mysql-logo.svg'
 import oceanbaseLogo from '@/assets/images/database-icons/oceanbase-logo.svg'
@@ -19,16 +23,21 @@ import oracleLogo from '@/assets/images/database-icons/oracle-logo.svg'
 import polardbLogo from '@/assets/images/database-icons/polardb-logo.svg'
 import postgresqlLogo from '@/assets/images/database-icons/postgresql-logo.svg'
 import prestoLogo from '@/assets/images/database-icons/presto-logo.svg'
+import questdbLogo from '@/assets/images/database-icons/questdb-logo.svg'
 import redshiftLogo from '@/assets/images/database-icons/redshift-logo.svg'
+import selectdbLogo from '@/assets/images/database-icons/selectdb-logo.svg'
 import snowflakeLogo from '@/assets/images/database-icons/snowflake-logo.svg'
 import sqliteLogo from '@/assets/images/database-icons/sqlite-logo.svg'
 import sqlserverLogo from '@/assets/images/database-icons/sqlserver-logo.svg'
+import starrocksLogo from '@/assets/images/database-icons/starrocks-logo.svg'
 import tdsqlLogo from '@/assets/images/database-icons/tdsql-logo.svg'
 import tidbLogo from '@/assets/images/database-icons/tidb-logo.svg'
 import timescaledbLogo from '@/assets/images/database-icons/timescaledb-logo.svg'
 import trinoLogo from '@/assets/images/database-icons/trino-logo.svg'
 import uxdbLogo from '@/assets/images/database-icons/uxdb-logo.svg'
+import vastbaseLogo from '@/assets/images/database-icons/vastbase-logo.svg'
 import xugudbLogo from '@/assets/images/database-icons/xugudb-logo.svg'
+import yashandbLogo from '@/assets/images/database-icons/yashandb-logo.svg'
 import yugabytedbLogo from '@/assets/images/database-icons/yugabytedb-logo.svg'
 
 type DatabaseIconConfig = {
@@ -54,11 +63,20 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   UXDB: { icon: uxdbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   OPENGAUSS: { icon: opengaussLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   GBASE8C: { icon: gbaseLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  QUESTDB: { icon: questdbLogo, color: 'bg-green-100 dark:bg-green-900/30' },
+  VASTBASE: { icon: vastbaseLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  YASHANDB: { icon: yashandbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   TIDB: { icon: tidbLogo, color: 'bg-red-100 dark:bg-red-900/30' },
   OCEANBASE: { icon: oceanbaseLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   TDSQL: { icon: tdsqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   POLARDB: { icon: polardbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   DM8: { icon: dm8Logo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  DORIS: { icon: dorisLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
+  SELECTDB: { icon: selectdbLogo, color: 'bg-cyan-100 dark:bg-cyan-900/30' },
+  STARROCKS: { icon: starrocksLogo, color: 'bg-yellow-100 dark:bg-yellow-900/30' },
+  DATABEND: { icon: databendLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
+  GOLDENDB: { icon: goldendbLogo, color: 'bg-yellow-100 dark:bg-yellow-900/30' },
+  MANTICORESEARCH: { icon: manticoreLogo, color: 'bg-amber-100 dark:bg-amber-900/30' },
   ORACLE: { icon: oracleLogo, color: 'bg-red-100 dark:bg-red-900/30' },
   DB2: { icon: db2Logo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   H2: { icon: h2Logo, color: 'bg-green-100 dark:bg-green-900/30' },
