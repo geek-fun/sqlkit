@@ -1,10 +1,7 @@
 <script setup lang="ts">
+import type { ObjectInfo } from '@/datasources/browseApi'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { ObjectInfo } from '@/datasources/browseApi'
-import { browseApi } from '@/datasources/browseApi'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -15,13 +12,16 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from '@/composables/useNotifications'
+import { browseApi } from '@/datasources/browseApi'
 import DdlModal from './DdlModal.vue'
 
 type ListingType = 'VIEW' | 'PROCEDURE' | 'FUNCTION'
@@ -37,8 +37,8 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'openObject': [obj: ObjectInfo]
-  'refresh': []
+  openObject: [obj: ObjectInfo]
+  refresh: []
 }>()
 
 const { t } = useI18n()
@@ -230,7 +230,7 @@ async function copyDdlContext() {
       <Input
         v-model="searchQuery"
         :placeholder="t('components.listingTab.searchPlaceholder')"
-        class="text-xs h-7 flex-1"
+        class="text-xs flex-1 h-7"
       />
       <span class="text-xs text-muted-foreground">
         {{ filteredObjects.length }} / {{ objects.length }}
@@ -240,35 +240,35 @@ async function copyDdlContext() {
     <!-- Content -->
     <div class="flex-1 overflow-auto">
       <!-- Loading -->
-      <div v-if="loading" class="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+      <div v-if="loading" class="text-sm text-muted-foreground py-8 flex gap-2 items-center justify-center">
         <Spinner size="sm" />
         {{ t('common.loading') }}
       </div>
 
       <!-- Error -->
-      <div v-else-if="error" class="py-8 text-sm text-destructive text-center">
+      <div v-else-if="error" class="text-sm text-destructive py-8 text-center">
         {{ error }}
       </div>
 
       <!-- Empty state -->
-      <div v-else-if="filteredObjects.length === 0" class="py-8 text-sm text-muted-foreground text-center">
+      <div v-else-if="filteredObjects.length === 0" class="text-sm text-muted-foreground py-8 text-center">
         {{ searchQuery ? t('components.listingTab.noResults') : t('components.listingTab.empty') }}
       </div>
 
       <!-- Table -->
-      <table v-else class="w-full text-xs">
+      <table v-else class="text-xs w-full">
         <thead>
-          <tr class="text-left text-muted-foreground border-b">
-            <th class="px-3 py-1.5 font-medium">
+          <tr class="text-muted-foreground text-left border-b">
+            <th class="font-medium px-3 py-1.5">
               {{ t('components.listingTab.name') }}
             </th>
-            <th class="px-3 py-1.5 font-medium">
+            <th class="font-medium px-3 py-1.5">
               {{ t('components.listingTab.detail') }}
             </th>
-            <th class="px-3 py-1.5 font-medium">
+            <th class="font-medium px-3 py-1.5">
               {{ t('components.listingTab.ddl') }}
             </th>
-            <th class="px-3 py-1.5 font-medium">
+            <th class="font-medium px-3 py-1.5">
               {{ t('components.listingTab.actions') }}
             </th>
           </tr>
@@ -277,14 +277,14 @@ async function copyDdlContext() {
           <tr
             v-for="obj in filteredObjects"
             :key="obj.name"
-            class="border-b border-border/50 hover:bg-accent/50 cursor-pointer"
+            class="border-b border-border/50 cursor-pointer hover:bg-accent/50"
             @click="emit('openObject', obj)"
             @contextmenu="handleContextMenu($event, obj)"
           >
-            <td class="px-3 py-2 font-medium">
+            <td class="font-medium px-3 py-2">
               {{ obj.name }}
             </td>
-            <td class="px-3 py-2 text-muted-foreground max-w-[200px] truncate">
+            <td class="text-muted-foreground px-3 py-2 max-w-[200px] truncate">
               {{ obj.detail ?? '-' }}
             </td>
             <td class="px-3 py-2">
@@ -294,7 +294,7 @@ async function copyDdlContext() {
             </td>
             <td class="px-3 py-2">
               <div class="flex gap-1">
-                <Button variant="ghost" size="sm" class="text-xs h-6 text-destructive" @click.stop="confirmDrop(obj)">
+                <Button variant="ghost" size="sm" class="text-xs text-destructive h-6" @click.stop="confirmDrop(obj)">
                   {{ t('components.listingTab.drop') }}
                 </Button>
                 <Button variant="ghost" size="sm" class="text-xs h-6" @click.stop="confirmRename(obj)">

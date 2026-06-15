@@ -1,6 +1,6 @@
+import type { ObjectInfo } from '@/datasources/browseApi'
 import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
-import type { ObjectInfo } from '@/datasources/browseApi'
 import { browseApi } from '@/datasources/browseApi'
 import { useConnectionStore } from './connectionStore'
 

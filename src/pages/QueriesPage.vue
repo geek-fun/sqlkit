@@ -204,6 +204,7 @@ const listingTabObjects = computed(() => {
     case 'VIEW': return schemaObjects.views
     case 'PROCEDURE': return schemaObjects.procedures
     case 'FUNCTION': return schemaObjects.functions
+    default: return null
   }
 })
 

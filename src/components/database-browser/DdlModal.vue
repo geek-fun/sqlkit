@@ -26,10 +26,9 @@ async function copyDdl() {
   try {
     await navigator.clipboard.writeText(props.ddl)
     copySuccess.value = true
-    setTimeout(() => { copySuccess.value = false }, 2000)
+    setTimeout(() => (copySuccess.value = false), 2000)
   }
   catch {
-    // Fallback
     const ta = document.createElement('textarea')
     ta.value = props.ddl
     document.body.appendChild(ta)
@@ -37,7 +36,7 @@ async function copyDdl() {
     document.execCommand('copy')
     document.body.removeChild(ta)
     copySuccess.value = true
-    setTimeout(() => { copySuccess.value = false }, 2000)
+    setTimeout(() => (copySuccess.value = false), 2000)
   }
 }
 
@@ -49,8 +48,8 @@ const formattedDdl = computed(() => {
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="max-w-3xl max-h-[80vh] flex flex-col p-0 gap-0">
-      <div class="px-4 py-3 border-b flex items-center gap-2">
+    <DialogContent class="p-0 flex flex-col gap-0 max-h-[80vh] max-w-3xl">
+      <div class="px-4 py-3 border-b flex gap-2 items-center">
         <DialogTitle class="text-sm font-semibold flex-1 truncate">
           {{ title }}
         </DialogTitle>
@@ -75,8 +74,8 @@ const formattedDdl = computed(() => {
           {{ copySuccess ? t('common.copied') : t('common.copy') }}
         </Button>
       </div>
-      <div class="flex-1 overflow-auto p-4">
-        <pre class="text-xs font-mono leading-relaxed whitespace-pre-wrap break-all bg-muted rounded-md p-4 overflow-x-auto"><code>{{ formattedDdl }}</code></pre>
+      <div class="p-4 flex-1 overflow-auto">
+        <pre class="text-xs leading-relaxed font-mono p-4 rounded-md bg-muted whitespace-pre-wrap break-all overflow-x-auto"><code>{{ formattedDdl }}</code></pre>
       </div>
     </DialogContent>
   </Dialog>

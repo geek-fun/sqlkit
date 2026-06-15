@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { invoke } from '@tauri-apps/api/core'
 import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { invoke } from '@tauri-apps/api/core'
 import { Spinner } from '@/components/ui/spinner'
 
 type ColumnInfo = {
@@ -55,33 +55,33 @@ onMounted(fetchColumns)
 
 <template>
   <div class="p-3 flex-1 overflow-auto">
-    <div v-if="loading" class="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground">
+    <div v-if="loading" class="text-sm text-muted-foreground py-8 flex gap-2 items-center justify-center">
       <Spinner size="sm" />
       {{ t('common.loading') }}
     </div>
-    <div v-else-if="error" class="py-8 text-sm text-destructive text-center">
+    <div v-else-if="error" class="text-sm text-destructive py-8 text-center">
       {{ error }}
     </div>
-    <div v-else class="rounded-md border">
-      <table class="w-full text-xs">
+    <div v-else class="border rounded-md">
+      <table class="text-xs w-full">
         <thead>
           <tr class="text-left bg-muted/50">
-            <th class="px-3 py-2 font-medium">
+            <th class="font-medium px-3 py-2">
               {{ t('components.schemaTab.column') }}
             </th>
-            <th class="px-3 py-2 font-medium">
+            <th class="font-medium px-3 py-2">
               {{ t('components.schemaTab.type') }}
             </th>
-            <th class="px-3 py-2 font-medium">
+            <th class="font-medium px-3 py-2">
               {{ t('components.schemaTab.nullable') }}
             </th>
-            <th class="px-3 py-2 font-medium">
+            <th class="font-medium px-3 py-2">
               {{ t('components.schemaTab.default') }}
             </th>
-            <th class="px-3 py-2 font-medium">
+            <th class="font-medium px-3 py-2">
               {{ t('components.schemaTab.key') }}
             </th>
-            <th class="px-3 py-2 font-medium">
+            <th class="font-medium px-3 py-2">
               {{ t('components.schemaTab.autoIncrement') }}
             </th>
           </tr>
@@ -92,12 +92,14 @@ onMounted(fetchColumns)
             :key="col.name"
             class="border-t border-border/50 hover:bg-accent/30"
           >
-            <td class="px-3 py-1.5 font-medium">
+            <td class="font-medium px-3 py-1.5">
               {{ col.name }}
             </td>
-            <td class="px-3 py-1.5 font-mono text-muted-foreground">
+            <td class="text-muted-foreground font-mono px-3 py-1.5">
               {{ col.data_type }}
-              <template v-if="col.max_length">({{ col.max_length }})</template>
+              <template v-if="col.max_length">
+                ({{ col.max_length }})
+              </template>
               <template v-else-if="col.precision != null">
                 ({{ col.precision }}{{ col.scale != null ? `, ${col.scale}` : '' }})
               </template>
@@ -106,7 +108,7 @@ onMounted(fetchColumns)
               <span v-if="col.nullable" class="text-muted-foreground">YES</span>
               <span v-else class="text-destructive font-medium">NO</span>
             </td>
-            <td class="px-3 py-1.5 font-mono text-muted-foreground max-w-[150px] truncate">
+            <td class="text-muted-foreground font-mono px-3 py-1.5 max-w-[150px] truncate">
               {{ col.default_value ?? '—' }}
             </td>
             <td class="px-3 py-1.5">

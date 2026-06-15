@@ -737,7 +737,7 @@ defineExpose({ fetchSavedQueryFiles })
             <path d="m9 18 6-6-6-6" />
           </svg>
           <span class="flex-1">{{ t('components.databaseBrowser.sections.views') }}</span>
-          <span class="text-xs text-muted-foreground bg-muted rounded px-1.5 py-0.5">{{ viewsCount }}</span>
+          <span class="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">{{ viewsCount }}</span>
         </button>
         <div v-if="showViews" class="py-1">
           <div
@@ -781,7 +781,7 @@ defineExpose({ fetchSavedQueryFiles })
             <path d="m9 18 6-6-6-6" />
           </svg>
           <span class="flex-1">{{ t('components.databaseBrowser.sections.procedures') }}</span>
-          <span class="text-xs text-muted-foreground bg-muted rounded px-1.5 py-0.5">{{ proceduresCount }}</span>
+          <span class="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">{{ proceduresCount }}</span>
         </button>
         <div v-if="showProcedures" class="py-1">
           <div
@@ -825,7 +825,7 @@ defineExpose({ fetchSavedQueryFiles })
             <path d="m9 18 6-6-6-6" />
           </svg>
           <span class="flex-1">{{ t('components.databaseBrowser.sections.functions') }}</span>
-          <span class="text-xs text-muted-foreground bg-muted rounded px-1.5 py-0.5">{{ functionsCount }}</span>
+          <span class="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">{{ functionsCount }}</span>
         </button>
         <div v-if="showFunctions" class="py-1">
           <div
