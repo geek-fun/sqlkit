@@ -559,7 +559,7 @@ export const enUS = {
       shortcuts: {
         execute: 'Execute query ({key}Enter)',
         explain: 'Explain query (F6)',
-        format: 'Format SQL ({key}Shift+F)',
+        format: 'Format SQL (Shift+Alt+F)',
         save: 'Save ({key}S)',
         saveAs: 'Save As .sql file',
         comment: 'Toggle comment ({key}/)',

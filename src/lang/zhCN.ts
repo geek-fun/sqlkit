@@ -540,7 +540,7 @@ export const zhCN = {
       shortcuts: {
         execute: '执行查询 ({key}Enter)',
         explain: '解释查询 (F6)',
-        format: '格式化SQL ({key}Shift+F)',
+        format: '格式化SQL (Shift+Alt+F)',
         save: '保存 ({key}S)',
         saveAs: '另存为 .sql 文件',
         comment: '切换注释 ({key}/)',

@@ -271,8 +271,8 @@ function getActiveDialect(): string | null {
   return resolveDialect(dbType)
 }
 
-function handleFormatSql(): string {
-  const content = activeTab.value?.content || ''
+function handleFormatSql(sql?: string): string {
+  const content = sql ?? activeTab.value?.content ?? ''
   if (!content.trim())
     return content
 
@@ -822,14 +822,15 @@ function closeResultPanel() {
                       @click="handleToolbarFormat"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                        <polyline points="14 2 14 8 20 8" />
+                        <path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2 2 0 0 0 0-2.82l-1.18-1.18a2 2 0 0 0-2.82 0z" />
+                        <line x1="9" y1="13" x2="15" y2="19" />
+                        <path d="M3 21h4l10.85-10.85" />
                       </svg>
                       {{ t('pages.queries.editor.format') }}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{{ t('pages.queries.shortcuts.format', { key: modifierKey }) }}</p>
+                    <p>{{ t('pages.queries.shortcuts.format') }}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

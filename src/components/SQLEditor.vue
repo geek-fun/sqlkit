@@ -46,9 +46,10 @@ const emit = defineEmits<{
 
 const editorContainer = ref<HTMLElement | null>(null)
 const { isDark } = useTheme()
-const { modifierKey } = usePlatform()
+const { modifierKey, altKey } = usePlatform()
 
 const cmdKey = modifierKey
+const formatKey = computed(() => `Shift+${altKey.value}F`)
 
 const defaultPlaceholder = computed(() =>
   `-- Enter your SQL query here\n-- Press ${modifierKey.value}Enter to execute`,
@@ -243,7 +244,7 @@ defineExpose({ getValue, setValue, handleFormat })
         </li>
         <li @click="handleContextMenuFormat">
           <span>Format</span>
-          <span class="shortcut">{{ cmdKey }}Shift+F</span>
+          <span class="shortcut">{{ formatKey }}</span>
         </li>
         <li @click="handleContextMenuCopy">
           <span>Copy</span>

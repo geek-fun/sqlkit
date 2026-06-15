@@ -349,7 +349,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     })
 
     if (callbacks.onFormat) {
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF, () => {
+      editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
         callbacks.onFormat?.()
       })
     }

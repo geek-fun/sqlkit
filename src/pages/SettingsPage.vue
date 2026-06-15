@@ -59,7 +59,7 @@ function handleTabSizeChange(val: string | number) {
   }
 }
 
-const indentWidthInput = ref(String(appStore.editorConfig.indentWidth))
+const indentWidthInput = ref(String(appStore.editorConfig.indentWidth ?? 2))
 const indentWidthError = ref('')
 
 function handleIndentWidthChange(val: string | number) {
@@ -74,7 +74,7 @@ function handleIndentWidthChange(val: string | number) {
   }
 }
 
-const lineWidthInput = ref(String(appStore.editorConfig.lineWidth))
+const lineWidthInput = ref(String(appStore.editorConfig.lineWidth ?? 120))
 const lineWidthError = ref('')
 
 function handleLineWidthChange(val: string | number) {
