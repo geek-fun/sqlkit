@@ -81,6 +81,10 @@ rand = "0.8"
 flate2 = "1.0"
 tar = "0.4"
 
+# TOML parsing (drivers.toml)
+toml = "0.8"
+sha2 = "0.10"
+
 # Database expansion adapters
 duckdb = { version = "1.10503", optional = true }
 # Pure Rust Oracle TNS implementation, optional feature

@@ -62,7 +62,12 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         ClickHouse => ConnectionStrategy::Native(CoreDatabaseType::ClickHouse),
 
         // JDBC bridge (Java subprocess)
-        Oracle => ConnectionStrategy::Native(CoreDatabaseType::Oracle),
+        Oracle => {
+            #[cfg(feature = "oracle")]
+            { ConnectionStrategy::Native(CoreDatabaseType::Oracle) }
+            #[cfg(not(feature = "oracle"))]
+            { ConnectionStrategy::JdbcBridge }
+        },
         DB2 => ConnectionStrategy::JdbcBridge,
         H2 => ConnectionStrategy::JdbcBridge,
         Snowflake => ConnectionStrategy::JdbcBridge,

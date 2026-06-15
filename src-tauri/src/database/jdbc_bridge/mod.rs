@@ -18,10 +18,13 @@
 pub mod adapter;
 pub mod download;
 pub mod error_classifier;
+pub mod fallback;
 pub mod jre;
 pub mod launcher;
 pub mod pool;
+pub mod progress;
 pub mod protocol;
+pub mod registry;
 
 pub use adapter::JdbcBridgeAdapter;
 pub use launcher::JdbcBridgeLauncher;

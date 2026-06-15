@@ -186,6 +186,14 @@ pub fn run() {
             commands::store_delete,
             commands::store_clear,
             // Connection management
+            // JDBC driver management commands
+            commands::check_jre_status,
+            commands::download_jre,
+            commands::remove_jre,
+            commands::list_drivers,
+            commands::download_driver,
+            commands::remove_driver,
+            // Connection management
             commands::save_connection,
             commands::list_connections,
             commands::delete_connection,

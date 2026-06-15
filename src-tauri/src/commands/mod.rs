@@ -3,6 +3,7 @@ pub mod connection;
 pub mod converter;
 pub mod file_operations;
 pub mod helpers;
+pub mod jdbc;
 pub mod query;
 pub mod server;
 pub mod store;

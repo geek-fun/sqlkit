@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { ThemeType, useAppStore } from '@/store/appStore'
 import AiSettings from '@/views/setting/ai-settings.vue'
+import JreDriverSection from '@/views/setting/jre-driver-section.vue'
 
 const appStore = useAppStore()
 const { t, locale: _locale } = useI18n()
@@ -395,6 +396,9 @@ async function handleCheckUpdates() {
 
           <!-- AI Settings -->
           <AiSettings />
+
+          <!-- JRE & JDBC Drivers -->
+          <JreDriverSection />
 
           <!-- Query Card -->
           <Card>

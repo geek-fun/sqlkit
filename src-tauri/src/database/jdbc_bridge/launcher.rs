@@ -7,6 +7,7 @@ use crate::database::error::{DbError, DbResult};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::fs;
 
 use super::protocol::{JdbcRequest, JdbcResponse};
 
@@ -87,6 +88,69 @@ impl JdbcBridgeLauncher {
         Ok(())
     }
 
+    /// Start the Java bridge process with additional driver JARs on the classpath.
+    pub fn start_with_drivers(&mut self, driver_jars: Vec<PathBuf>) -> DbResult<()> {
+        let java = Self::detect_java().ok_or_else(|| {
+            DbError::Connection(
+                "Java not found. Install a JRE or call download_managed_jre() to use the bundled JRE."
+                    .to_string(),
+            )
+        })?;
+
+        if !self.jar_path.exists() {
+            return Err(DbError::Connection(format!(
+                "JDBC bridge JAR not found at {}. Run download_bridge_plugin() first.",
+                self.jar_path.display()
+            )));
+        }
+
+        // Build classpath: bridge JAR + driver JARs
+        let mut classpath = self.jar_path.to_string_lossy().to_string();
+        for jar in &driver_jars {
+            if jar.exists() {
+                classpath.push_str(&format!(":{}", jar.display()));
+            }
+        }
+
+        let mut child = Command::new(&java)
+            .args(["-cp", &classpath, "sqlkit.bridge.BridgeMain"])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+            .map_err(|e| DbError::Connection(format!("Failed to start JDBC bridge: {}", e)))?;
+
+        let stdin = child
+            .stdin
+            .take()
+            .ok_or_else(|| DbError::Connection("Failed to capture bridge stdin".to_string()))?;
+
+        self.process = Some(child);
+        self.stdin = Some(stdin);
+
+        // Wait briefly and check if the process is still alive
+        std::thread::sleep(std::time::Duration::from_millis(500));
+        if let Some(ref mut child) = self.process {
+            match child.try_wait() {
+                Ok(Some(status)) => {
+                    return Err(DbError::Connection(format!(
+                        "JDBC bridge exited immediately with code: {}",
+                        status
+                    )));
+                }
+                Ok(None) => { /* still running, good */ }
+                Err(e) => {
+                    return Err(DbError::Connection(format!(
+                        "Error checking bridge process: {}",
+                        e
+                    )));
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     /// Send a request and receive a response.
     pub fn send_request(&mut self, req: &JdbcRequest) -> DbResult<JdbcResponse> {
         let process = self.process.as_mut().ok_or_else(|| {
@@ -128,7 +192,13 @@ impl JdbcBridgeLauncher {
             .map_err(|e| DbError::Connection(format!("Failed to parse bridge response: {}", e)))?;
 
         if let Some(ref err) = resp.error {
-            return Err(DbError::Connection(format!("JDBC bridge error: {}", err)));
+            let error_type = resp.error_type.as_deref().unwrap_or("unknown");
+            return Err(match error_type {
+                "version_incompatible" => DbError::DriverVersionIncompatible(err.clone()),
+                "authentication_failed" => DbError::Authentication(err.clone()),
+                "network_error" | "timeout" => DbError::Connection(err.clone()),
+                _ => DbError::Connection(format!("JDBC bridge error: {}", err)),
+            });
         }
 
         Ok(resp)

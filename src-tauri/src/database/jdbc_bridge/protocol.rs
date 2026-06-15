@@ -53,6 +53,8 @@ pub struct JdbcResponse {
     pub result: Option<serde_json::Value>,
     #[serde(default)]
     pub error: Option<String>,
+    #[serde(default)]
+    pub error_type: Option<String>,
 }
 
 // ── Connection parameters ──

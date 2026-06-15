@@ -317,6 +317,46 @@ export const zhCN = {
           auto: '自动（跟随系统）',
         },
       },
+      jre: {
+        title: 'JRE 与驱动',
+        description: '管理 Java 运行环境和 JDBC 驱动',
+        jreCard: {
+          title: 'Java 运行环境',
+          description: 'JDBC 桥接连接所需（Oracle、DB2、H2、Derby 等）',
+          status: {
+            installed: '已安装',
+            notInstalled: '未安装',
+            checking: '检查中...',
+            managed: '管理',
+            system: '系统',
+          },
+          actions: {
+            download: '下载 JRE',
+            remove: '移除 JRE',
+            redownload: '重新下载',
+          },
+        },
+        driversCard: {
+          title: 'JDBC 驱动',
+          description: '数据库专用的 JDBC 驱动文件',
+          label: {
+            versions: '个版本',
+          },
+          status: {
+            installed: '已安装',
+            notInstalled: '未安装',
+            loading: '加载驱动列表...',
+          },
+          actions: {
+            download: '下载',
+            remove: '移除',
+          },
+          empty: {
+            title: '暂无驱动',
+            message: '连接 JDBC 数据库时将自动下载。',
+          },
+        },
+      },
       editor: {
         title: '编辑器',
         description: '配置SQL编辑器的行为和外观',

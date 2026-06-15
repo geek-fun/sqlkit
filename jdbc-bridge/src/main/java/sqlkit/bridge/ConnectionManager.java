@@ -29,7 +29,7 @@ public class ConnectionManager {
     public void connect(String connId, String url, String username,
                         String password, String driverClass,
                         List<String> driverJars,
-                        int minPool, int maxPool) throws Exception {
+                        int minPool, int maxPool) throws ClassifiedException, Exception {
         if (pools.containsKey(connId)) {
             throw new Exception("Connection already exists: " + connId);
         }
@@ -64,7 +64,8 @@ public class ConnectionManager {
             // ok
         } catch (Exception e) {
             ds.close();
-            throw new Exception("Failed to verify connection: " + e.getMessage());
+            ErrorClassifier.ErrorType errorType = ErrorClassifier.classify(e.getMessage());
+            throw new ClassifiedException("Failed to verify connection: " + e.getMessage(), e, errorType);
         }
 
         pools.put(connId, ds);

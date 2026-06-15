@@ -3,5 +3,7 @@ export type { AgentMessage, AgentSession, AttachedSourceRow, ConfirmationRuleRow
 export { connectionApi } from './connectionApi'
 export type { ConnectionStatus, ServerConfig } from './connectionApi'
 export * from './fileApi'
+export { jdbcApi } from './jdbcApi'
+export type { DriverInfo, JreStatus } from './jdbcApi'
 export { storeApi } from './storeApi'
 export type { QueryHistoryItem } from './storeApi'

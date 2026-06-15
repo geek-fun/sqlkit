@@ -79,6 +79,12 @@ public class ProtocolHandler {
             }
 
             return response;
+        } catch (ClassifiedException e) {
+            ObjectNode errorResp = MAPPER.createObjectNode();
+            errorResp.put("id", id);
+            errorResp.put("error", e.getMessage());
+            errorResp.put("error_type", e.getErrorType().name().toLowerCase());
+            return errorResp;
         } catch (Exception e) {
             ObjectNode errorResp = MAPPER.createObjectNode();
             errorResp.put("id", id);
