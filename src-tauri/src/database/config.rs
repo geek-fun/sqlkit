@@ -94,6 +94,30 @@ pub enum DatabaseType {
     Snowflake,
     /// Apache Derby — JDBC bridge.
     Derby,
+    /// Apache Hive — JDBC bridge.
+    Hive,
+    /// Databricks SQL — JDBC bridge.
+    Databricks,
+    /// SAP HANA — JDBC bridge.
+    Hana,
+    /// Teradata — JDBC bridge.
+    Teradata,
+    /// Vertica — JDBC bridge.
+    Vertica,
+    /// Exasol — JDBC bridge.
+    Exasol,
+    /// Google BigQuery — JDBC bridge.
+    BigQuery,
+    /// IBM Informix — JDBC bridge.
+    Informix,
+    /// Apache Kylin — JDBC bridge.
+    Kylin,
+    /// Apache Cassandra — JDBC bridge.
+    Cassandra,
+    /// InterSystems IRIS — JDBC bridge.
+    Iris,
+    /// Microsoft Access — JDBC bridge.
+    Access,
     /// 达梦 DM8 (Oracle mode, primary) — JDBC bridge.
     DM8Oracle,
     /// 虚谷 XuguDB — JDBC bridge.
