@@ -4,6 +4,8 @@
 //! The state includes connection managers for each database type and application configuration.
 
 use crate::database::config::ConnectionConfig;
+use crate::ssh::config::TransportLayerConfig;
+use crate::ssh::TunnelManager;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -61,6 +63,9 @@ pub struct ServerConfig {
     /// Additional metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, String>>,
+    /// Transport layer configuration (SSH tunnels).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub transport_layers: Option<Vec<TransportLayerConfig>>,
 }
 
 impl ServerConfig {
@@ -77,6 +82,7 @@ impl ServerConfig {
             database: None,
             ssl_mode: None,
             metadata: None,
+            transport_layers: None,
         }
     }
 
@@ -153,6 +159,10 @@ impl ServerConfig {
             config = config.with_ssl_mode(ssl);
         }
 
+        if let Some(ref layers) = self.transport_layers {
+            config = config.with_transport_layers(layers.clone());
+        }
+
         Ok(config)
     }
 }
@@ -183,6 +193,8 @@ pub struct AppConfig {
 pub struct AppState {
     /// Active database connections indexed by connection ID.
     pub connections: Arc<Mutex<HashMap<String, ActiveConnection>>>,
+    /// SSH tunnel lifecycle manager.
+    pub tunnels: TunnelManager,
 }
 
 impl AppState {
@@ -190,6 +202,7 @@ impl AppState {
     pub fn new() -> Self {
         Self {
             connections: Arc::new(Mutex::new(HashMap::new())),
+            tunnels: TunnelManager::new(),
         }
     }
 }
