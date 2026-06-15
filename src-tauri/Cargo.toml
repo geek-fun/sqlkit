@@ -88,6 +88,10 @@ sha2 = "0.10"
 
 # Database expansion adapters
 duckdb = { version = "1.10503", optional = true }
+
+russh = "0.60"
+portpicker = "0.1.1"
+pageant = "0.2"
 # Pure Rust Oracle TNS implementation, optional feature
 oracle-rs = { version = "0.1", optional = true }
 
