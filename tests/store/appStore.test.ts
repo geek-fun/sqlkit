@@ -64,12 +64,12 @@ describe('appStore', () => {
 
       expect(store.editorConfig).toEqual({
         fontSize: 14,
-        fontWeight: 'normal',
-        fontFamily: 'Monaco, Menlo, Consolas, monospace',
         tabSize: 2,
         wordWrap: true,
         showLineNumbers: true,
         showMinimap: false,
+        indentWidth: 2,
+        lineWidth: 120,
       })
     })
 
@@ -162,7 +162,7 @@ describe('appStore', () => {
       store.setEditorConfig({ fontSize: 16 })
 
       expect(store.editorConfig.fontSize).toBe(16)
-      expect(store.editorConfig.fontWeight).toBe('normal') // unchanged
+      expect(store.editorConfig.indentWidth).toBe(2) // unchanged
     })
 
     it('should update multiple editor config values', () => {

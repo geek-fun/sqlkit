@@ -44,8 +44,6 @@ function handleFontSizeChange(val: string | number) {
   }
 }
 
-const fontFamilyInput = ref(appStore.editorConfig.fontFamily)
-
 const tabSizeInput = ref(String(appStore.editorConfig.tabSize))
 const tabSizeError = ref('')
 
@@ -58,6 +56,36 @@ function handleTabSizeChange(val: string | number) {
   else {
     tabSizeError.value = ''
     appStore.setEditorConfig({ tabSize: num })
+  }
+}
+
+const indentWidthInput = ref(String(appStore.editorConfig.indentWidth ?? 2))
+const indentWidthError = ref('')
+
+function handleIndentWidthChange(val: string | number) {
+  indentWidthInput.value = String(val)
+  const num = Number(val)
+  if (!Number.isInteger(num) || num < 1 || num > 8) {
+    indentWidthError.value = t('pages.settings.editor.indentWidthError')
+  }
+  else {
+    indentWidthError.value = ''
+    appStore.setEditorConfig({ indentWidth: num })
+  }
+}
+
+const lineWidthInput = ref(String(appStore.editorConfig.lineWidth ?? 120))
+const lineWidthError = ref('')
+
+function handleLineWidthChange(val: string | number) {
+  lineWidthInput.value = String(val)
+  const num = Number(val)
+  if (!Number.isInteger(num) || num < 40 || num > 200) {
+    lineWidthError.value = t('pages.settings.editor.lineWidthError')
+  }
+  else {
+    lineWidthError.value = ''
+    appStore.setEditorConfig({ lineWidth: num })
   }
 }
 
@@ -290,19 +318,6 @@ async function handleCheckUpdates() {
                 </div>
               </div>
 
-              <!-- Font Family -->
-              <div class="gap-4 grid grid-cols-2 items-start">
-                <div class="space-y-1">
-                  <Label>{{ t('pages.settings.editor.fontFamily') }}</Label>
-                  <p class="text-xs text-muted-foreground">
-                    {{ t('pages.settings.editor.fontFamilyHelp') }}
-                  </p>
-                </div>
-                <p class="text-sm text-muted-foreground font-mono px-3 py-2 border border-border rounded-md bg-muted cursor-default select-none">
-                  {{ fontFamilyInput }}
-                </p>
-              </div>
-
               <!-- Tab Size -->
               <div class="gap-4 grid grid-cols-2 items-start">
                 <div class="space-y-1">
@@ -322,6 +337,52 @@ async function handleCheckUpdates() {
                   />
                   <p v-if="tabSizeError" class="text-xs text-destructive">
                     {{ tabSizeError }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Indent Width -->
+              <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.editor.indentWidth') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.editor.indentWidthHelp') }}
+                  </p>
+                </div>
+                <div class="space-y-1">
+                  <Input
+                    type="number"
+                    :model-value="indentWidthInput"
+                    min="1"
+                    max="8"
+                    class="w-28"
+                    @update:model-value="handleIndentWidthChange($event)"
+                  />
+                  <p v-if="indentWidthError" class="text-xs text-destructive">
+                    {{ indentWidthError }}
+                  </p>
+                </div>
+              </div>
+
+              <!-- Line Width -->
+              <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="space-y-1">
+                  <Label>{{ t('pages.settings.editor.lineWidth') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.editor.lineWidthHelp') }}
+                  </p>
+                </div>
+                <div class="space-y-1">
+                  <Input
+                    type="number"
+                    :model-value="lineWidthInput"
+                    min="40"
+                    max="200"
+                    class="w-28"
+                    @update:model-value="handleLineWidthChange($event)"
+                  />
+                  <p v-if="lineWidthError" class="text-xs text-destructive">
+                    {{ lineWidthError }}
                   </p>
                 </div>
               </div>

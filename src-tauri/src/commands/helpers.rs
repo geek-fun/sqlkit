@@ -12,6 +12,8 @@ use crate::database::{
     mysql::MySQLAdapter, postgres::PostgresAdapter, sqlite::SQLiteAdapter,
     sqlserver::SqlServerAdapter,
 };
+use crate::ssh::TunnelManager;
+use crate::ssh::start_transport_layers;
 use crate::state::ActiveConnection;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -253,5 +255,46 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
         "iris" | "intersystems_iris" => Ok(DatabaseType::Iris),
         "access" | "ms_access" | "microsoft_access" => Ok(DatabaseType::Access),
         _ => Err(format!("Unsupported database type: {}", db_type)),
+    }
+}
+
+/// Returns true for database types that operate on local files rather than network connections.
+/// SSH tunneling is not applicable for these types.
+fn is_file_based_db(db_type: &crate::database::DatabaseType) -> bool {
+    matches!(
+        db_type,
+        crate::database::DatabaseType::SQLite | crate::database::DatabaseType::DuckDb
+    )
+}
+
+/// Resolve the effective host and port for a connection, accounting for SSH tunnels.
+/// If transport layers are configured, starts the tunnel and returns `127.0.0.1:local_port`.
+/// Otherwise returns the original `(host, port)` for direct connection.
+pub async fn connection_host_port(
+    connection_id: &str,
+    config: &ConnectionConfig,
+    tunnels: &TunnelManager,
+) -> Result<(String, u16), String> {
+    if config.transport_layers.is_empty() {
+        return Ok((config.host.clone(), config.port));
+    }
+    if is_file_based_db(&config.db_type) {
+        return Ok((config.host.clone(), config.port));
+    }
+
+    let layers: Vec<crate::ssh::config::TransportLayerConfig> = config
+        .transport_layers
+        .iter()
+        .filter(|layer| layer.enabled())
+        .cloned()
+        .collect();
+
+    if layers.is_empty() {
+        return Ok((config.host.clone(), config.port));
+    }
+
+    match start_transport_layers(connection_id, &layers, &config.host, config.port, tunnels).await? {
+        Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),
+        None => Ok((config.host.clone(), config.port)),
     }
 }

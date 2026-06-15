@@ -19,12 +19,12 @@ export enum LanguageType {
 
 export type EditorConfig = {
   fontSize: number
-  fontWeight: string
-  fontFamily: string
   tabSize: number
   wordWrap: boolean
   showLineNumbers: boolean
   showMinimap: boolean
+  indentWidth: number
+  lineWidth: number
 }
 
 export type QueryConfig = {
@@ -189,12 +189,12 @@ export const useAppStore = defineStore('app', {
     uiThemeType: ThemeType.LIGHT,
     editorConfig: {
       fontSize: 14,
-      fontWeight: 'normal',
-      fontFamily: 'Monaco, Menlo, Consolas, monospace',
       tabSize: 2,
       wordWrap: true,
       showLineNumbers: true,
       showMinimap: false,
+      indentWidth: 2,
+      lineWidth: 120,
     },
     queryConfig: {
       defaultLimit: 1000,

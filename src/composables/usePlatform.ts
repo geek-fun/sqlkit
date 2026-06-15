@@ -31,12 +31,16 @@ function usePlatform() {
   // Full modifier string for display: ⌘+ on Mac, Ctrl+ on others
   const modifierKey = computed(() => isMac.value ? '⌘' : 'Ctrl+')
 
+  // Alt modifier for display: ⌥ on Mac, Alt+ on others
+  const altKey = computed(() => isMac.value ? '⌥' : 'Alt+')
+
   return {
     isMac,
     isWindows,
     isLinux,
     cmdKey,
     modifierKey,
+    altKey,
     platform: platformCache,
   }
 }

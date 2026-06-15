@@ -19,6 +19,7 @@ type Props = {
   height?: string
   placeholder?: string
   isExecuting?: boolean
+  formatSql?: (sql: string) => string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -33,6 +34,7 @@ const props = withDefaults(defineProps<Props>(), {
   height: '400px',
   placeholder: '',
   isExecuting: false,
+  formatSql: undefined,
 })
 
 const emit = defineEmits<{
@@ -44,9 +46,10 @@ const emit = defineEmits<{
 
 const editorContainer = ref<HTMLElement | null>(null)
 const { isDark } = useTheme()
-const { modifierKey } = usePlatform()
+const { modifierKey, altKey } = usePlatform()
 
 const cmdKey = modifierKey
+const formatKey = computed(() => `Shift+${altKey.value}F`)
 
 const defaultPlaceholder = computed(() =>
   `-- Enter your SQL query here\n-- Press ${modifierKey.value}Enter to execute`,
@@ -125,6 +128,7 @@ onMounted(() => {
       contextMenuLine.value = lineNumber
       contextMenuVisible.value = true
     },
+    onFormat: () => handleFormat(),
   })
 
   if (editorInstance) {
@@ -168,9 +172,42 @@ function handleContextMenuExecute() {
   executeAtLine(line)
 }
 
+function handleFormat() {
+  if (!editorInstance || !props.formatSql)
+    return
+
+  const selection = editorInstance.getSelection()
+  const model = editorInstance.getModel()
+  if (!model)
+    return
+
+  // If there's a non-empty selection, format only the selected text
+  if (selection && !selection.isEmpty()) {
+    const selectedText = model.getValueInRange(selection)
+    const formatted = props.formatSql(selectedText)
+    if (formatted !== selectedText) {
+      editorInstance.executeEdits('format', [
+        {
+          range: selection,
+          text: formatted,
+          forceMoveMarkers: false,
+        },
+      ])
+    }
+  }
+  else {
+    // Format the entire document
+    const fullText = getValue()
+    const formatted = props.formatSql(fullText)
+    if (formatted !== fullText) {
+      setValue(formatted)
+    }
+  }
+}
+
 function handleContextMenuFormat() {
   hideContextMenu()
-  editorInstance?.trigger('contextmenu', 'editor.action.formatDocument', {})
+  handleFormat()
 }
 
 async function handleContextMenuCopy() {
@@ -183,7 +220,7 @@ async function handleContextMenuCopy() {
     await navigator.clipboard.writeText(statementText)
 }
 
-defineExpose({ getValue, setValue })
+defineExpose({ getValue, setValue, handleFormat })
 </script>
 
 <template>
@@ -207,7 +244,7 @@ defineExpose({ getValue, setValue })
         </li>
         <li @click="handleContextMenuFormat">
           <span>Format</span>
-          <span class="shortcut">{{ cmdKey }}I</span>
+          <span class="shortcut">{{ formatKey }}</span>
         </li>
         <li @click="handleContextMenuCopy">
           <span>Copy</span>

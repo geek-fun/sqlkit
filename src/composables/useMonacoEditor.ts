@@ -198,6 +198,7 @@ export type EditorCallbacks = {
   onGutterExecute?: ExecuteGutterCallback
   onGutterContextMenu?: (lineNumber: number, x: number, y: number) => void
   onSave?: (query: string) => void
+  onFormat?: () => void
 }
 
 export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialValue: Ref<string>, options: MonacoEditorOptions = {}) {
@@ -347,16 +348,14 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
       editor?.trigger('keyboard', 'editor.action.commentLine', {})
     })
 
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyI, () => {
-      editor?.trigger('keyboard', 'editor.action.formatDocument', {})
-    })
+    if (callbacks.onFormat) {
+      editor.addCommand(monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF, () => {
+        callbacks.onFormat?.()
+      })
+    }
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Space, () => {
       editor?.trigger('keyboard', 'editor.action.triggerSuggest', {})
-    })
-
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF, () => {
-      editor?.trigger('keyboard', 'editor.action.formatDocument', {})
     })
 
     return editor

@@ -1,4 +1,5 @@
 use crate::database::{ConnectionStatus, DatabaseAdapter};
+use crate::ssh::TunnelManager;
 use crate::state::{ActiveConnection, AppState};
 use tauri::State;
 
@@ -8,7 +9,12 @@ pub async fn connect_server(
     state: State<'_, AppState>,
 ) -> Result<ConnectionStatus, String> {
     let id = config.id.clone();
-    let conn_config = config.to_connection_config()?;
+    let mut conn_config = config.to_connection_config()?;
+
+    let (host, port) =
+        crate::commands::helpers::connection_host_port(&id, &conn_config, &state.tunnels).await?;
+    conn_config.host = host;
+    conn_config.port = port;
 
     let connection =
         crate::commands::helpers::create_and_connect_adapter(&config.db_type, conn_config).await?;
@@ -70,6 +76,8 @@ pub async fn connect_server(
 
 #[tauri::command]
 pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result<(), String> {
+    state.tunnels.stop_tunnel(&id).await;
+
     let mut connections = state.connections.lock().await;
 
     let connection = connections

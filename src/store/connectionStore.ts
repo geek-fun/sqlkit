@@ -232,14 +232,17 @@ export enum ConnectionStatus {
   ERROR = 'error',
 }
 
+export type SshAuthMethodType = 'password' | 'privateKey' | 'agent'
+
 export type SSHTunnelConfig = {
   enabled: boolean
   host: string
   port: number
   username: string
-  authMethod: 'password' | 'privateKey'
+  authMethod: SshAuthMethodType
   password?: string
   privateKey?: string
+  privateKeyPassphrase?: string
 }
 
 export type ServerConnection = {
@@ -262,6 +265,111 @@ type ConnectionStoreState = {
   activeConnectionId: string | null
   connectionStatus: Record<string, ConnectionStatus>
   currentDatabases: Record<string, string>
+}
+
+function safeBool(value: unknown, fallback: boolean): boolean {
+  return typeof value === 'boolean' ? value : fallback
+}
+
+function safeStr(value: unknown, fallback: string): string {
+  return typeof value === 'string' ? value : fallback
+}
+
+function safePort(value: unknown): number {
+  if (typeof value === 'number')
+    return value
+  if (typeof value === 'string') {
+    const parsed = Number.parseInt(value, 10)
+    return Number.isNaN(parsed) ? 22 : parsed
+  }
+  return 22
+}
+
+function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfig | undefined {
+  if (!Array.isArray(transportLayers) || transportLayers.length === 0) {
+    return undefined
+  }
+
+  const sshLayer = transportLayers.find(
+    (layer: unknown) => typeof layer === 'object' && layer !== null && (layer as Record<string, unknown>).type === 'ssh',
+  ) as Record<string, unknown> | undefined
+  if (!sshLayer) {
+    return undefined
+  }
+
+  const authMethodRaw = sshLayer.auth_method
+  const authMethod = typeof authMethodRaw === 'object' && authMethodRaw !== null
+    ? (authMethodRaw as Record<string, unknown>)
+    : undefined
+
+  if (authMethod && authMethod.method === 'agent') {
+    return {
+      enabled: safeBool(sshLayer.enabled, true),
+      host: safeStr(sshLayer.host, ''),
+      port: safePort(sshLayer.port),
+      username: safeStr(sshLayer.username, ''),
+      authMethod: 'agent',
+    }
+  }
+
+  let method: 'password' | 'privateKey' = 'password'
+  let password: string | undefined
+  let privateKey: string | undefined
+  let passphrase: string | undefined
+
+  if (authMethod) {
+    if (authMethod.method === 'password') {
+      method = 'password'
+      password = safeStr(authMethod.password, '')
+    }
+    else if (authMethod.method === 'privateKey') {
+      method = 'privateKey'
+      privateKey = safeStr(authMethod.private_key_path, '')
+      passphrase = typeof authMethod.passphrase === 'string' ? authMethod.passphrase : undefined
+    }
+  }
+
+  return {
+    enabled: safeBool(sshLayer.enabled, true),
+    host: safeStr(sshLayer.host, ''),
+    port: safePort(sshLayer.port),
+    username: safeStr(sshLayer.username, ''),
+    authMethod: method,
+    password,
+    privateKey,
+    privateKeyPassphrase: passphrase,
+  }
+}
+
+export function buildTransportLayers(sshTunnel?: SSHTunnelConfig): import('@/datasources/connectionApi').TransportLayerConfig[] | null {
+  if (!sshTunnel?.enabled || !sshTunnel.host) {
+    return null
+  }
+
+  let authMethod: import('@/datasources/connectionApi').SshAuthMethod
+
+  switch (sshTunnel.authMethod) {
+    case 'password':
+      authMethod = { method: 'password', password: sshTunnel.password || '' }
+      break
+    case 'privateKey':
+      authMethod = { method: 'privateKey', private_key_path: sshTunnel.privateKey || '', passphrase: sshTunnel.privateKeyPassphrase || null }
+      break
+    default:
+      authMethod = { method: 'agent' }
+      break
+  }
+
+  return [{
+    type: 'ssh',
+    host: sshTunnel.host,
+    port: sshTunnel.port,
+    username: sshTunnel.username,
+    auth_method: authMethod,
+    enabled: true,
+    connect_timeout_secs: 10,
+    keepalive_interval_secs: 30,
+  }]
 }
 
 export const useConnectionStore = defineStore('connectionStore', {
@@ -330,7 +438,7 @@ export const useConnectionStore = defineStore('connectionStore', {
             clientKeyPath: item.ssl_client_key as string | undefined,
             trustServerCertificate: item.trust_server_certificate as boolean | undefined,
           },
-          sshTunnel: item.ssh_tunnel as SSHTunnelConfig | undefined,
+          sshTunnel: extractSshTunnelFromTransport(item.transport_layers),
           isConnected: item.is_connected as boolean | undefined,
           lastUsed: item.last_used ? new Date(item.last_used as string) : undefined,
         }))
@@ -343,9 +451,10 @@ export const useConnectionStore = defineStore('connectionStore', {
 
     async saveConnection(connection: ServerConnection): Promise<{ success: boolean, message: string }> {
       try {
-        const id = connection.id || crypto.randomUUID()
+        const transportLayers = buildTransportLayers(connection.sshTunnel)
+
         const serverConfig = {
-          id,
+          id: connection.id || crypto.randomUUID(),
           name: connection.name,
           db_type: dbTypeToBackend[connection.type] || 'PostgreSQL',
           host: connection.host,
@@ -358,6 +467,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           ssl_client_cert: connection.ssl.clientCertPath || null,
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
+          transport_layers: transportLayers,
         }
 
         const resultId = await connectionApi.save(serverConfig)
@@ -388,6 +498,8 @@ export const useConnectionStore = defineStore('connectionStore', {
 
     async testConnection(connection: ServerConnection): Promise<boolean> {
       try {
+        const transportLayers = buildTransportLayers(connection.sshTunnel)
+
         const serverConfig = {
           id: connection.id || crypto.randomUUID(),
           name: connection.name,
@@ -402,6 +514,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           ssl_client_cert: connection.ssl.clientCertPath || null,
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
+          transport_layers: transportLayers,
         }
 
         const result = await connectionApi.test(serverConfig)
@@ -422,6 +535,8 @@ export const useConnectionStore = defineStore('connectionStore', {
       this.connectionStatus[connectionId] = ConnectionStatus.CONNECTING
 
       try {
+        const transportLayers = buildTransportLayers(connection.sshTunnel)
+
         const serverConfig = {
           id: connection.id!,
           name: connection.name,
@@ -436,6 +551,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           ssl_client_cert: connection.ssl.clientCertPath || null,
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
+          transport_layers: transportLayers,
         }
 
         const result = await connectionApi.connect(serverConfig)
