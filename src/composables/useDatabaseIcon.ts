@@ -107,7 +107,7 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   EXASOL: { icon: exasolLogo, color: 'bg-amber-100 dark:bg-amber-900/30' },
   BIGQUERY: { icon: bigqueryLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   INFORMIX: { icon: informixLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
-  KYLIN: { icon: kylinLogo, color: 'bg-slate-800 dark:bg-slate-200/30' },
+  KYLIN: { icon: kylinLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   CASSANDRA: { icon: cassandraLogo, color: 'bg-gray-100 dark:bg-gray-800/30' },
   IRIS: { icon: irisLogo, color: 'bg-teal-100 dark:bg-teal-900/30' },
   ACCESS: { icon: accessLogo, color: 'bg-red-100 dark:bg-red-900/30' },

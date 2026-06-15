@@ -119,13 +119,12 @@ impl DriverRegistry {
 ///
 /// Respects per-version `maven_group_override` and `maven_artifact_override`;
 /// falls back to the base group/artifact when those are `None`.
-pub fn resolve_maven_url(
-    entry: &DriverVersion,
-    base_group: &str,
-    base_artifact: &str,
-) -> String {
+pub fn resolve_maven_url(entry: &DriverVersion, base_group: &str, base_artifact: &str) -> String {
     let group = entry.maven_group_override.as_deref().unwrap_or(base_group);
-    let artifact = entry.maven_artifact_override.as_deref().unwrap_or(base_artifact);
+    let artifact = entry
+        .maven_artifact_override
+        .as_deref()
+        .unwrap_or(base_artifact);
     let version = &entry.version;
     let group_path = group.replace('.', "/");
     let classifier_suffix = entry
@@ -166,7 +165,7 @@ pub fn build_jdbc_url(
                 .replace(";ProjectId=", "")
                 .replace(":INFORMIXSERVER=", "");
             // Trim trailing separators that may be left behind
-            url.trim_end_matches(&[';', '&', '/', '?'][..]).to_string()
+            url.trim_end_matches(&[';', '&', '?'][..]).to_string()
         }
     }
 }
@@ -213,7 +212,10 @@ mod tests {
     #[test]
     fn test_registry_loads_from_embedded_toml() {
         let registry = DriverRegistry::load();
-        assert!(!registry.databases.is_empty(), "registry should contain at least one database");
+        assert!(
+            !registry.databases.is_empty(),
+            "registry should contain at least one database"
+        );
         // Sanity: keys we know exist
         assert!(registry.databases.contains_key("oracle"));
         assert!(registry.databases.contains_key("db2"));
@@ -382,6 +384,72 @@ mod tests {
     }
 
     #[test]
+    fn test_build_jdbc_url_dangler_cleanup() {
+        // Each tuple: (template, expected result when database is None)
+        let cases: Vec<(&str, &str)> = vec![
+            // Databricks: ";httpPath=" prefix cleaned up
+            (
+                "jdbc:databricks://{host}:{port};httpPath={database}",
+                "jdbc:databricks://localhost:443",
+            ),
+            // Teradata: "/DATABASE=" prefix cleaned up
+            (
+                "jdbc:teradata://{host}/DATABASE={database}",
+                "jdbc:teradata://localhost",
+            ),
+            // Exasol: ";schema=" prefix cleaned up
+            (
+                "jdbc:exa:{host}:{port};schema={database}",
+                "jdbc:exa:localhost:8563",
+            ),
+            // BigQuery: ";ProjectId=" prefix cleaned up
+            (
+                "jdbc:bigquery://{host}:{port};ProjectId={database}",
+                "jdbc:bigquery://localhost:443",
+            ),
+            // Informix: ":INFORMIXSERVER=" prefix cleaned up
+            (
+                "jdbc:informix-sqli://{host}:{port}/{database}:INFORMIXSERVER=myinst",
+                "jdbc:informix-sqli://localhost:1526/myinst",
+            ),
+            // Snowflake: trailing "?" and "&" trimmed after cleanup
+            (
+                "jdbc:snowflake://{host}.snowflakecomputing.com?warehouse={database}&db={database}",
+                "jdbc:snowflake://localhost.snowflakecomputing.com?warehouse=&db=",
+            ),
+        ];
+
+        for (idx, (template, expected)) in cases.iter().enumerate() {
+            let port: u16 = match idx {
+                0 => 443,  // Databricks
+                1 => 0,    // Teradata (no port in template)
+                2 => 8563, // Exasol
+                3 => 443,  // BigQuery
+                4 => 1526, // Informix
+                5 => 0,    // Snowflake (no port in template)
+                _ => 0,
+            };
+            let config = DatabaseDriverConfig {
+                name: format!("test-db-{idx}"),
+                class_name: "test.Driver".into(),
+                maven_group: "test".into(),
+                maven_artifact: "test".into(),
+                jdbc_url_template: template.to_string(),
+                default_port: None,
+                min_jre_version: None,
+                version_error_signatures: vec![],
+                versions: vec![],
+            };
+            let url = build_jdbc_url(&config, "localhost", port, None);
+            assert_eq!(
+                url,
+                expected.to_string(),
+                "case {idx}: template='{template}'"
+            );
+        }
+    }
+
+    #[test]
     fn test_registry_key_oracle_returns_oracle() {
         assert_eq!(
             DriverRegistry::registry_key(DatabaseType::Oracle),
@@ -399,17 +467,53 @@ mod tests {
 
     #[test]
     fn test_registry_key_new_jdbc_types() {
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Hive), Some("hive"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Databricks), Some("databricks"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Hana), Some("hana"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Teradata), Some("teradata"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Vertica), Some("vertica"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Exasol), Some("exasol"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::BigQuery), Some("bigquery"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Informix), Some("informix"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Kylin), Some("kylin"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Cassandra), Some("cassandra"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Iris), Some("iris"));
-        assert_eq!(DriverRegistry::registry_key(DatabaseType::Access), Some("access"));
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Hive),
+            Some("hive")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Databricks),
+            Some("databricks")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Hana),
+            Some("hana")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Teradata),
+            Some("teradata")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Vertica),
+            Some("vertica")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Exasol),
+            Some("exasol")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::BigQuery),
+            Some("bigquery")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Informix),
+            Some("informix")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Kylin),
+            Some("kylin")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Cassandra),
+            Some("cassandra")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Iris),
+            Some("iris")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::Access),
+            Some("access")
+        );
     }
 }
