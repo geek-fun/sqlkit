@@ -20,7 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { toast } from '@/composables/useNotifications'
-import { DatabaseType, dbTypeToBackend, resolveDatabase } from '@/store'
+import { DatabaseType, buildTransportLayers, dbTypeToBackend, resolveDatabase } from '@/store'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import SslConfigSection from './ssl/SslConfigSection.vue'
 
@@ -108,7 +108,7 @@ const showAdvanced = ref(false)
 function toggleSsh(checked: boolean) {
   if (!formData.value.sshTunnel) {
     formData.value.sshTunnel = {
-      enabled: true,
+      enabled: checked,
       host: '',
       port: 22,
       username: '',
@@ -312,9 +312,7 @@ async function handleTestConnection() {
       ssl_client_cert: formData.value.ssl.clientCertPath || null,
       ssl_client_key: formData.value.ssl.clientKeyPath || null,
       trust_server_certificate: formData.value.ssl.trustServerCertificate ?? null,
-      transport_layers: formData.value.sshTunnel?.enabled
-        ? [{ type: 'ssh', host: formData.value.sshTunnel.host, port: formData.value.sshTunnel.port, username: formData.value.sshTunnel.username, auth_method: formData.value.sshTunnel.authMethod === 'password' ? { method: 'password', password: formData.value.sshTunnel.password || '' } : formData.value.sshTunnel.authMethod === 'privateKey' ? { method: 'privateKey', private_key_path: formData.value.sshTunnel.privateKey || '', passphrase: formData.value.sshTunnel.privateKeyPassphrase || null } : { method: 'agent' }, enabled: true, connect_timeout_secs: 10, keepalive_interval_secs: 30 }]
-        : null,
+      transport_layers: buildTransportLayers(formData.value.sshTunnel),
     }
 
     const result = await invoke<{ is_connected: boolean, server_version?: string }>('test_connection', { config })
