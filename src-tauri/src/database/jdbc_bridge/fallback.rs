@@ -12,8 +12,8 @@ use super::download;
 
 /// Result of trying a single driver version in the fallback chain.
 pub enum DriverAttempt {
-    /// Connection succeeded, with the conn_id to use.
-    Connected(String),
+    /// Connection succeeded, with conn_id and the launcher.
+    Connected(String, Arc<Mutex<JdbcBridgeLauncher>>),
     /// Version incompatibility — eligible for fallback.
     VersionMismatch(String),
     /// Fatal error — abort, do not fall back.
@@ -109,7 +109,7 @@ pub async fn try_driver(
                 let conn_id = resp.result
                     .and_then(|v| v.as_str().map(|s| s.to_string()))
                     .unwrap_or_else(|| format!("conn_{}", uuid::Uuid::new_v4()));
-                DriverAttempt::Connected(conn_id)
+                DriverAttempt::Connected(conn_id, launcher)
             }
         }
         Ok(Err(e)) => {
@@ -142,7 +142,7 @@ pub async fn run_fallback_chain(
     database: Option<&str>,
     username: &str,
     password: &Option<String>,
-) -> DbResult<(String, String)> {
+) -> DbResult<(String, String, Arc<Mutex<JdbcBridgeLauncher>>)> {
     let registry = DriverRegistry::load();
     let config = registry.get_config(db_type).ok_or_else(|| {
         DbError::Connection(format!("No driver registry entry for {:?}", db_type))
@@ -173,8 +173,8 @@ pub async fn run_fallback_chain(
         )
         .await
         {
-            DriverAttempt::Connected(conn_id) => {
-                return Ok((version.version.clone(), conn_id));
+            DriverAttempt::Connected(conn_id, launcher) => {
+                return Ok((version.version.clone(), conn_id, launcher));
             }
             DriverAttempt::VersionMismatch(msg) => {
                 last_version_error = Some(msg);
