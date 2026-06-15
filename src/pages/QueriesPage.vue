@@ -870,7 +870,11 @@ function closeResultPanel() {
               :error="activeTab?.error"
               :is-executing="activeTab?.isExecuting"
               :execution-time="activeTab?.executionTime"
+              :sql="activeTab?.content"
+              :connection-id="getConnectionId() ?? undefined"
+              :database="activeTab?.database"
               @close="closeResultPanel"
+              @refresh="handleNewTab"
             />
           </template>
         </div>
