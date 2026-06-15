@@ -113,7 +113,15 @@ impl ServerConfig {
             "gbase8c" => Ok(DatabaseType::GBase8c),
             "xugudb" | "xugu" => Ok(DatabaseType::XuguDB),
             "gbase8a" => Ok(DatabaseType::GBase8a),
-            "derby" => Ok(DatabaseType::Derby),
+            "doris" => Ok(DatabaseType::Doris),
+            "selectdb" => Ok(DatabaseType::SelectDB),
+            "starrocks" => Ok(DatabaseType::StarRocks),
+            "databend" => Ok(DatabaseType::Databend),
+            "goldendb" => Ok(DatabaseType::GoldenDB),
+            "manticore" | "manticore_search" => Ok(DatabaseType::ManticoreSearch),
+            "questdb" => Ok(DatabaseType::QuestDB),
+            "vastbase" => Ok(DatabaseType::Vastbase),
+            "yashandb" => Ok(DatabaseType::YashanDB),
             _ => Err(format!("Unsupported database type: {}", self.db_type)),
         }
     }
