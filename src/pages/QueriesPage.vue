@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { StatementToExecute } from '@/composables/useSqlStatements'
 import type { TableInfo } from '@/store/databaseStore'
+import { invoke } from '@tauri-apps/api/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
@@ -9,6 +10,7 @@ import ListingTab from '@/components/database-browser/ListingTab.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { Button } from '@/components/ui/button'
+import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import {
   Select,
   SelectContent,
@@ -38,6 +40,11 @@ const selectedDatabase = ref<string>('')
 const selectedSchema = ref<string>('')
 const queryTabsRef = ref<InstanceType<typeof QueryTabs>>()
 const databaseBrowserRef = ref<InstanceType<typeof DatabaseBrowser>>()
+
+// ── Destructive action dialog state ──
+const destructiveDialogOpen = ref(false)
+const destructiveAction = ref<{ type: 'drop' | 'truncate', table: TableInfo, database: string, schema?: string } | null>(null)
+const isDestructiveActionExecuting = ref(false)
 const showOrphanTabDialog = ref(false)
 const orphanTabToHandle = ref<string | null>(null)
 
@@ -345,6 +352,54 @@ function handleExportData(_table: TableInfo, _database: string, _schema?: string
   // TODO: Implement export data functionality
 }
 
+function handleDropTable(table: TableInfo, database: string, schema?: string) {
+  destructiveAction.value = { type: 'drop', table, database, schema }
+  destructiveDialogOpen.value = true
+}
+
+function handleTruncateTable(table: TableInfo, database: string, schema?: string) {
+  destructiveAction.value = { type: 'truncate', table, database, schema }
+  destructiveDialogOpen.value = true
+}
+
+async function handleDestructiveConfirm() {
+  const action = destructiveAction.value
+  if (!action)
+    return
+
+  isDestructiveActionExecuting.value = true
+  const connId = getActiveConnectionId()
+  if (!connId) {
+    toast.error('No active connection')
+    isDestructiveActionExecuting.value = false
+    return
+  }
+
+  const schemaPrefix = action.schema ? `"${action.schema}".` : ''
+  const qualifiedName = `${schemaPrefix}"${action.table.name}"`
+  const sql = action.type === 'drop'
+    ? `DROP TABLE IF EXISTS ${qualifiedName};`
+    : `TRUNCATE TABLE ${qualifiedName};`
+
+  try {
+    await invoke('execute_query', {
+      connectionId: connId,
+      sql,
+    })
+    const actionLabel = action.type === 'drop' ? 'dropped' : 'truncated'
+    toast.success(`Table ${actionLabel} successfully`)
+    destructiveDialogOpen.value = false
+    destructiveAction.value = null
+    databaseBrowserRef.value?.refreshTree()
+  }
+  catch (err) {
+    toast.error(`Failed to ${action.type} table: ${err instanceof Error ? err.message : String(err)}`)
+  }
+  finally {
+    isDestructiveActionExecuting.value = false
+  }
+}
+
 function handleSelectTable(table: TableInfo, database: string, schema?: string) {
   const connId = getActiveConnectionId()
   if (!connId)
@@ -559,6 +614,8 @@ function closeResultPanel() {
             @select-top-n="handleSelectTopN"
             @view-structure="handleViewStructure"
             @export-data="handleExportData"
+            @drop-table="handleDropTable"
+            @truncate-table="handleTruncateTable"
             @open-saved-query="handleOpenSavedQuery"
             @create-new-query="handleNewTab"
             @open-listing-tab="handleOpenListingTab"
@@ -811,6 +868,27 @@ function closeResultPanel() {
         </div>
       </div>
     </div>
+
+    <!-- Destructive Action Confirmation Dialog (Drop/Truncate Table) -->
+    <DestructiveConfirmDialog
+      v-if="destructiveAction"
+      v-model:open="destructiveDialogOpen"
+      :title="destructiveAction.type === 'drop'
+        ? t('components.destructiveDialog.dropTable.title')
+        : t('components.destructiveDialog.truncateTable.title')"
+      :message="destructiveAction.type === 'drop'
+        ? t('components.destructiveDialog.dropTable.message', { table: destructiveAction.table.name })
+        : t('components.destructiveDialog.truncateTable.message', { table: destructiveAction.table.name })"
+      :detail="destructiveAction.type === 'drop'
+        ? t('components.destructiveDialog.dropTable.detail')
+        : t('components.destructiveDialog.truncateTable.detail')"
+      :confirm-label="destructiveAction.type === 'drop'
+        ? t('components.destructiveDialog.dropTable.confirm')
+        : t('components.destructiveDialog.truncateTable.confirm')"
+      :loading="isDestructiveActionExecuting"
+      @confirm="handleDestructiveConfirm"
+      @update:open="(v) => { if (!v) destructiveAction = null }"
+    />
 
     <!-- Orphan Tab Warning Dialog -->
     <AlertDialog v-model:open="showOrphanTabDialog">

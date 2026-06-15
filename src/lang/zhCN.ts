@@ -710,6 +710,8 @@ export const zhCN = {
         viewStructure: '查看结构',
         createScript: 'CREATE脚本',
         exportData: '导出数据',
+        dropTable: '删除表',
+        truncateTable: '清空',
       },
       savedQueryActions: {
         open: '打开',
@@ -731,6 +733,8 @@ export const zhCN = {
       noResults: '执行查询以查看结果',
     },
     dataTableView: {
+      searchPlaceholder: '搜索所有列...',
+      clearSearch: '清除搜索',
       filterPlaceholder: '过滤（SQL WHERE 子句，例如 age > 18 AND status = \'active\'）',
       clearFilter: '清除过滤',
       refresh: '刷新',
@@ -785,6 +789,32 @@ export const zhCN = {
     },
     header: {
       appName: 'SQLKit',
+    },
+    destructiveDialog: {
+      deleteRow: {
+        title: '确认删除',
+        message: '从表 "{table}" 中删除 {count} 行？',
+        detail: '此操作无法撤销。',
+        confirm: '删除',
+      },
+      dropTable: {
+        title: '删除表',
+        message: '删除表 "{table}"？',
+        detail: '将永久删除该表及其所有数据。此操作无法撤销。',
+        confirm: '删除',
+      },
+      truncateTable: {
+        title: '清空表',
+        message: '清空表 "{table}"？',
+        detail: '将删除全部 {count} 行数据。此操作无法撤销。',
+        confirm: '清空',
+      },
+      deleteConnection: {
+        title: '删除连接',
+        message: '删除连接 "{name}"？',
+        detail: '将删除已保存的连接配置。当前活跃连接将被断开。',
+        confirm: '删除',
+      },
     },
   },
   updater: {

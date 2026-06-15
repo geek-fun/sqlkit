@@ -48,6 +48,8 @@ const emit = defineEmits<{
   (e: 'selectTopN', table: TableInfo, database: string, schema?: string, n?: number): void
   (e: 'viewStructure', table: TableInfo, database: string, schema?: string): void
   (e: 'exportData', table: TableInfo, database: string, schema?: string): void
+  (e: 'dropTable', table: TableInfo, database: string, schema?: string): void
+  (e: 'truncateTable', table: TableInfo, database: string, schema?: string): void
   (e: 'update:selectedDatabase', database: string): void
   (e: 'update:selectedSchema', schema: string): void
   (e: 'openSavedQuery', filePath: string): void
@@ -407,13 +409,15 @@ function handleContextMenu(event: MouseEvent, node: TreeNode) {
   showContextMenu.value = true
 }
 
-type ContextAction = 'createScript' | 'selectTopN' | 'viewStructure' | 'exportData'
+type ContextAction = 'createScript' | 'selectTopN' | 'viewStructure' | 'exportData' | 'dropTable' | 'truncateTable'
 
 const contextActionEmitters: Record<ContextAction, (metadata: TreeNodeMetadata) => void> = {
   createScript: metadata => emit('createScript', metadata, metadata.database, metadata.schema),
   selectTopN: metadata => emit('selectTopN', metadata, metadata.database, metadata.schema, 100),
   viewStructure: metadata => emit('viewStructure', metadata, metadata.database, metadata.schema),
   exportData: metadata => emit('exportData', metadata, metadata.database, metadata.schema),
+  dropTable: metadata => emit('dropTable', metadata, metadata.database, metadata.schema),
+  truncateTable: metadata => emit('truncateTable', metadata, metadata.database, metadata.schema),
 }
 
 function handleContextAction(action: ContextAction) {
@@ -566,7 +570,7 @@ const iconMap: Record<IconType, string> = {
 
 const getIcon = (type: IconType) => iconMap[type] || iconMap.column
 
-defineExpose({ fetchSavedQueryFiles })
+defineExpose({ fetchSavedQueryFiles, refreshTree })
 </script>
 
 <template>
@@ -982,6 +986,21 @@ defineExpose({ fetchSavedQueryFiles })
             <line x1="12" x2="12" y1="15" y2="3" />
           </svg>
           {{ t('components.databaseBrowser.contextMenu.exportData') }}
+        </div>
+        <div class="my-1 bg-border h-px" />
+        <div
+          class="text-sm text-destructive px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-foreground hover:bg-destructive/10"
+          @click="handleContextAction('dropTable')"
+        >
+          <span class="i-carbon-trash-can mr-2 shrink-0 h-3.5 w-3.5" />
+          {{ t('components.databaseBrowser.contextMenu.dropTable') }}
+        </div>
+        <div
+          class="text-sm text-destructive px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-foreground hover:bg-destructive/10"
+          @click="handleContextAction('truncateTable')"
+        >
+          <span class="i-carbon-clean mr-2 shrink-0 h-3.5 w-3.5" />
+          {{ t('components.databaseBrowser.contextMenu.truncateTable') }}
         </div>
       </div>
     </div>

@@ -70,6 +70,7 @@ pub mod manager;
 pub mod mysql;
 pub mod pool;
 pub mod postgres;
+pub mod search;
 pub mod sqlite;
 pub mod sqlserver;
 pub mod strategy;

@@ -4,7 +4,7 @@
 //! including databases, schemas, tables, columns, and table data.
 
 use crate::database::{
-    ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo, IndexInfo, MySQLAdapter, ObjectInfo,
+    search, ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo, IndexInfo, MySQLAdapter, ObjectInfo,
     PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo, TriggerInfo,
 };
 use crate::state::{ActiveConnection, AppState};
@@ -1554,6 +1554,135 @@ fn extract_count(result: QueryResult) -> Result<u64, String> {
             _ => None,
         })
         .ok_or_else(|| "Failed to extract row count from query result".to_string())
+}
+
+/// Map an [`ActiveConnection`] variant to the db_type string used by
+/// [`quote_identifier`] and [`search::build_table_search_where`].
+fn get_db_type_string(connection: &ActiveConnection) -> &'static str {
+    match connection {
+        ActiveConnection::Postgres(_) => "postgres",
+        ActiveConnection::MySQL(_) => "mysql",
+        ActiveConnection::SQLServer(_) => "sqlserver",
+        ActiveConnection::SQLite(_) => "sqlite",
+        ActiveConnection::DuckDb(_) => "duckdb",
+        ActiveConnection::ClickHouse(_) => "clickhouse",
+        ActiveConnection::JdbcBridge(_) => "jdbc",
+        ActiveConnection::HttpSql(_) => "trino",
+    }
+}
+
+/// Build a SQL WHERE clause that searches across all text and numeric columns in a table.
+///
+/// The generated WHERE clause uses dialect-aware casting and LIKE matching,
+/// skipping BLOB/BINARY/geometry columns entirely. The frontend can pass the
+/// returned string as the `filter` parameter to [`get_table_data`] and [`get_table_count`]
+/// to show only matching rows.
+///
+/// # Arguments
+///
+/// * `connection_id` - ID of the active connection
+/// * `database` - Database name containing the table
+/// * `schema` - Optional schema name (PostgreSQL, SQL Server)
+/// * `table_name` - Table name to search
+/// * `search_term` - The user's search term
+/// * `state` - Application state
+///
+/// # Returns
+///
+/// A WHERE clause string like `(LOWER(CAST("col1" AS TEXT)) LIKE '%term%' OR ...)`,
+/// or an empty string if no searchable columns are found.
+#[tauri::command]
+pub async fn build_table_search_filter(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    table_name: String,
+    search_term: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    let db_type = get_db_type_string(connection);
+
+    let columns = match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            if Some(database.as_str()) != adapter.config.database.as_deref() {
+                let mut temp_config = adapter.config.clone();
+                drop(adapter);
+                temp_config.database = Some(database.clone());
+                let mut temp = PostgresAdapter::new(temp_config);
+                temp.connect()
+                    .await
+                    .map_err(|e| format!("Failed to connect to database '{}': {}", database, e))?;
+                temp.list_columns(None, schema.as_deref(), &table_name)
+                    .await
+            } else {
+                adapter
+                    .list_columns(None, schema.as_deref(), &table_name)
+                    .await
+            }
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(Some(&database), None, &table_name)
+                .await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            if Some(database.as_str()) != adapter.config.database.as_deref() {
+                let mut temp_config = adapter.config.clone();
+                drop(adapter);
+                temp_config.database = Some(database.clone());
+                let mut temp = SqlServerAdapter::new(temp_config);
+                temp.connect()
+                    .await
+                    .map_err(|e| format!("Failed to connect to database '{}': {}", database, e))?;
+                temp.list_columns(None, schema.as_deref(), &table_name)
+                    .await
+            } else {
+                adapter
+                    .list_columns(None, schema.as_deref(), &table_name)
+                    .await
+            }
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_columns(None, None, &table_name).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(Some(&database), None, &table_name)
+                .await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter
+                .list_columns(None, schema.as_deref(), &table_name)
+                .await
+        }
+    }
+    .map_err(|e| format!("Failed to list columns for search: {}", e))?;
+
+    let where_clause = search::build_table_search_where(db_type, &columns, &search_term);
+    Ok(where_clause.unwrap_or_default())
 }
 
 // Tests for browse commands are temporarily disabled.

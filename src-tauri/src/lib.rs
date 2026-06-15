@@ -218,6 +218,7 @@ pub fn run() {
             commands::get_object_ddl,
             commands::drop_object,
             commands::rename_object,
+            commands::build_table_search_filter,
             // File operations commands
             commands::save_query_file,
             commands::load_query_file,
