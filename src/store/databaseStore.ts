@@ -1,5 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
+import type { ObjectInfo } from '@/datasources/browseApi'
+import { browseApi } from '@/datasources/browseApi'
 import { useConnectionStore } from './connectionStore'
 
 export type TableInfo = {
@@ -16,10 +18,17 @@ export type DatabaseSchema = {
   is_system: boolean
 }
 
+export type SchemaObjects = {
+  views: ObjectInfo[]
+  procedures: ObjectInfo[]
+  functions: ObjectInfo[]
+}
+
 export type DatabaseMetadata = {
   databases: DatabaseSchema[]
   schemas: Record<string, string[]>
   tables: Record<string, TableInfo[]>
+  objects: Record<string, SchemaObjects>
   lastRefresh: string
 }
 
@@ -28,6 +37,7 @@ type DatabaseStoreState = {
   selectedDatabase: string | null
   selectedSchema: string | null
   loading: boolean
+  fetching: Record<string, boolean>
 }
 
 export const useDatabaseStore = defineStore('databases', {
@@ -36,6 +46,7 @@ export const useDatabaseStore = defineStore('databases', {
     selectedDatabase: null,
     selectedSchema: null,
     loading: false,
+    fetching: {},
   }),
 
   getters: {
@@ -89,6 +100,7 @@ export const useDatabaseStore = defineStore('databases', {
             databases: result,
             schemas: {},
             tables: {},
+            objects: {},
             lastRefresh: new Date().toISOString(),
           }
         }
@@ -159,6 +171,37 @@ export const useDatabaseStore = defineStore('databases', {
       finally {
         this.loading = false
       }
+    },
+
+    async fetchSchemaObjects(connectionId: string, database: string, schema: string) {
+      const objectKey = `${database}.${schema}`
+      if (this.fetching[objectKey]) {
+        return
+      }
+      this.fetching = { ...this.fetching, [objectKey]: true }
+
+      try {
+        const [views, procedures, functions] = await Promise.all([
+          browseApi.listViews(connectionId, database, schema),
+          browseApi.listProcedures(connectionId, database, schema),
+          browseApi.listFunctions(connectionId, database, schema),
+        ])
+
+        const meta = this.metadata[connectionId]
+        if (meta) {
+          meta.objects[objectKey] = { views, procedures, functions }
+        }
+      }
+      catch (error) {
+        console.error('Failed to fetch schema objects:', error)
+      }
+      finally {
+        this.fetching = { ...this.fetching, [objectKey]: false }
+      }
+    },
+
+    getSchemaObjects(connectionId: string, database: string, schema: string): SchemaObjects | null {
+      return this.metadata[connectionId]?.objects[`${database}.${schema}`] ?? null
     },
 
     clearMetadata(connectionId: string) {
