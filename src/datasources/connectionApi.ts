@@ -1,9 +1,9 @@
 import { invoke } from '@tauri-apps/api/core'
 
-export type SshAuthMethod =
-  | { method: 'password'; password: string }
-  | { method: 'privateKey'; private_key_path: string; passphrase?: string | null }
-  | { method: 'agent' }
+export type SshAuthMethod
+  = | { method: 'password', password: string }
+    | { method: 'privateKey', private_key_path: string, passphrase?: string | null }
+    | { method: 'agent' }
 
 // Matches Rust's internally-tagged serde enum:
 // #[serde(tag = "type")] → { "type": "ssh", "host": "...", ... } (flattened)

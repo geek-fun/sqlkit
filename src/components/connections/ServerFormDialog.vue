@@ -810,12 +810,12 @@ function handleSave() {
           <Button
             variant="ghost"
             size="sm"
-            class="w-full justify-between text-muted-foreground"
+            class="text-muted-foreground w-full justify-between"
             @click="showAdvanced = !showAdvanced"
           >
             Advanced Configuration
             <svg
-              :class="['h-4 w-4 transition-transform', showAdvanced ? 'rotate-180' : '']"
+              class="h-4 w-4 transition-transform" :class="[showAdvanced ? 'rotate-180' : '']"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
@@ -828,15 +828,15 @@ function handleSave() {
             </svg>
           </Button>
 
-          <div v-if="showAdvanced" class="mt-3 space-y-4 border rounded-md p-4">
-            <div class="flex items-center gap-2">
+          <div v-if="showAdvanced" class="mt-3 p-4 border rounded-md space-y-4">
+            <div class="flex gap-2 items-center">
               <input
                 id="use-ssh"
                 type="checkbox"
-                class="h-4 w-4 rounded border-gray-300"
+                class="border-gray-300 rounded h-4 w-4"
                 :checked="formData.sshTunnel?.enabled ?? false"
                 @change="(e: Event) => toggleSsh((e.target as HTMLInputElement).checked)"
-              />
+              >
               <Label for="use-ssh">Use SSH Tunnel</Label>
             </div>
 
@@ -865,9 +865,15 @@ function handleSave() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectGroup>
-                      <SelectItem value="password">Password</SelectItem>
-                      <SelectItem value="privateKey">Private Key</SelectItem>
-                      <SelectItem value="agent">SSH Agent</SelectItem>
+                      <SelectItem value="password">
+                        Password
+                      </SelectItem>
+                      <SelectItem value="privateKey">
+                        Private Key
+                      </SelectItem>
+                      <SelectItem value="agent">
+                        SSH Agent
+                      </SelectItem>
                     </SelectGroup>
                   </SelectContent>
                 </Select>
@@ -892,7 +898,9 @@ function handleSave() {
               </template>
 
               <template v-if="formData.sshTunnel.authMethod === 'agent'">
-                <p class="text-sm text-muted-foreground">Using system SSH agent - no additional configuration needed.</p>
+                <p class="text-sm text-muted-foreground">
+                  Using system SSH agent - no additional configuration needed.
+                </p>
               </template>
             </template>
           </div>
