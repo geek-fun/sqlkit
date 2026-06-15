@@ -17,6 +17,8 @@
 
 pub mod adapter;
 pub mod download;
+pub mod error_classifier;
+pub mod jre;
 pub mod launcher;
 pub mod pool;
 pub mod protocol;

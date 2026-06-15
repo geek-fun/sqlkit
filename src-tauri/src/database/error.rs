@@ -15,6 +15,10 @@ pub enum DbError {
     #[error("Connection error: {0}")]
     Connection(String),
 
+    /// Driver version is incompatible with the database server.
+    #[error("Driver version incompatible: {0}")]
+    DriverVersionIncompatible(String),
+
     /// Authentication failures.
     #[error("Authentication failed: {0}")]
     Authentication(String),
