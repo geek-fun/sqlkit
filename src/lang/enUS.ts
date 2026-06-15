@@ -750,6 +750,8 @@ export const enUS = {
       noResults: 'Execute a query to see results',
     },
     dataTableView: {
+      searchPlaceholder: 'Search all columns...',
+      clearSearch: 'Clear search',
       filterPlaceholder: 'Filter (SQL WHERE clause, e.g. age > 18 AND status = \'active\')',
       clearFilter: 'Clear filter',
       refresh: 'Refresh',

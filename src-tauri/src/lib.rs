@@ -208,6 +208,7 @@ pub fn run() {
             commands::get_table_count,
             commands::update_table_row,
             commands::delete_table_row,
+            commands::build_table_search_filter,
             // File operations commands
             commands::save_query_file,
             commands::load_query_file,
