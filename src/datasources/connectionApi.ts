@@ -1,5 +1,23 @@
 import { invoke } from '@tauri-apps/api/core'
 
+export type SshAuthMethod =
+  | { method: 'password'; password: string }
+  | { method: 'privateKey'; private_key_path: string; passphrase?: string | null }
+  | { method: 'agent' }
+
+// Matches Rust's internally-tagged serde enum:
+// #[serde(tag = "type")] → { "type": "ssh", "host": "...", ... } (flattened)
+export type TransportLayerConfig = {
+  type: 'ssh'
+  host: string
+  port: number
+  username: string
+  auth_method: SshAuthMethod
+  enabled: boolean
+  connect_timeout_secs: number
+  keepalive_interval_secs: number
+}
+
 export type ServerConfig = {
   id: string
   name: string
@@ -14,6 +32,7 @@ export type ServerConfig = {
   ssl_client_cert?: string | null
   ssl_client_key?: string | null
   trust_server_certificate?: boolean | null
+  transport_layers?: TransportLayerConfig[] | null
 }
 
 export type ConnectionStatus = {
