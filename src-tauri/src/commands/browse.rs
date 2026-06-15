@@ -4,7 +4,8 @@
 //! including databases, schemas, tables, columns, and table data.
 
 use crate::database::{
-    ColumnInfo, DatabaseAdapter, DatabaseSchema, MySQLAdapter, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo,
+    ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo, IndexInfo, MySQLAdapter, ObjectInfo,
+    PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo, TriggerInfo,
 };
 use crate::state::{ActiveConnection, AppState};
 use serde::{Deserialize, Serialize};
@@ -1079,6 +1080,466 @@ pub async fn delete_table_row(
     }
 
     Ok(())
+}
+
+/// List all views in the given schema.
+#[tauri::command]
+pub async fn list_views(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<ObjectInfo>, String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(None, None).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(None, schema.as_deref()).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_views(Some(&database), schema.as_deref()).await
+        }
+    }
+    .map_err(|e| format!("Failed to list views: {}", e))
+}
+
+/// List all procedures in the given schema.
+#[tauri::command]
+pub async fn list_procedures(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<ObjectInfo>, String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_procedures(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_procedures(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_procedures(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_procedures(None, None).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_procedures(None, schema.as_deref()).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_procedures(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_procedures(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_procedures(Some(&database), schema.as_deref()).await
+        }
+    }
+    .map_err(|e| format!("Failed to list procedures: {}", e))
+}
+
+/// List all functions in the given schema.
+#[tauri::command]
+pub async fn list_functions(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<Vec<ObjectInfo>, String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_functions(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_functions(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_functions(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_functions(None, None).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_functions(None, schema.as_deref()).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_functions(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_functions(Some(&database), schema.as_deref()).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_functions(Some(&database), schema.as_deref()).await
+        }
+    }
+    .map_err(|e| format!("Failed to list functions: {}", e))
+}
+
+/// List all triggers for a table.
+#[tauri::command]
+pub async fn list_triggers(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    table: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<TriggerInfo>, String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_triggers(None, None, &table).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_triggers(None, schema.as_deref(), &table).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_triggers(Some(&database), schema.as_deref(), &table).await
+        }
+    }
+    .map_err(|e| format!("Failed to list triggers: {}", e))
+}
+
+/// List all indexes for a table.
+#[tauri::command]
+pub async fn list_indexes(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    table: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<IndexInfo>, String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_indexes(None, None, &table).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_indexes(None, schema.as_deref(), &table).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_indexes(Some(&database), schema.as_deref(), &table).await
+        }
+    }
+    .map_err(|e| format!("Failed to list indexes: {}", e))
+}
+
+/// List all foreign keys for a table.
+#[tauri::command]
+pub async fn list_foreign_keys(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    table: String,
+    state: State<'_, AppState>,
+) -> Result<Vec<ForeignKeyInfo>, String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_foreign_keys(None, None, &table).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_foreign_keys(None, schema.as_deref(), &table).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.list_foreign_keys(Some(&database), schema.as_deref(), &table).await
+        }
+    }
+    .map_err(|e| format!("Failed to list foreign keys: {}", e))
+}
+
+/// Get DDL source for a database object.
+#[tauri::command]
+pub async fn get_object_ddl(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    object_name: String,
+    object_type: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_object_ddl(None, None, &object_name, &object_type).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_object_ddl(None, schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+    }
+    .map_err(|e| format!("Failed to get object DDL: {}", e))
+}
+
+/// Drop a database object.
+#[tauri::command]
+pub async fn drop_object(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    object_name: String,
+    object_type: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.drop_object(None, None, &object_name, &object_type).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.drop_object(None, schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.drop_object(Some(&database), schema.as_deref(), &object_name, &object_type).await
+        }
+    }
+    .map_err(|e| format!("Failed to drop object: {}", e))
+}
+
+/// Rename a database object.
+#[tauri::command]
+pub async fn rename_object(
+    connection_id: String,
+    database: String,
+    schema: Option<String>,
+    object_name: String,
+    object_type: String,
+    new_name: String,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let connections = state.connections.lock().await;
+    let connection = connections
+        .get(&connection_id)
+        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+    match connection {
+        ActiveConnection::Postgres(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+        }
+        ActiveConnection::MySQL(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+        }
+        ActiveConnection::SQLServer(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+        }
+        ActiveConnection::SQLite(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.rename_object(None, None, &object_name, &object_type, &new_name).await
+        }
+        ActiveConnection::DuckDb(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.rename_object(None, schema.as_deref(), &object_name, &object_type, &new_name).await
+        }
+        ActiveConnection::ClickHouse(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+        }
+        ActiveConnection::JdbcBridge(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+        }
+        ActiveConnection::HttpSql(adapter) => {
+            let adapter = adapter.lock().await;
+            adapter.rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name).await
+        }
+    }
+    .map_err(|e| format!("Failed to rename object: {}", e))
 }
 
 /// Extract a COUNT(*) value from a single-cell query result.
