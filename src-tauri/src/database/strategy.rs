@@ -46,12 +46,13 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         PostgreSQL => ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL),
         // PG wire protocol compat
         CockroachDB | Redshift | YugabyteDB | TimescaleDB | KingbaseES | GaussDB | HighGo
-        | UXDB | OpenGauss | GBase8c => ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL),
+        | UXDB | OpenGauss | GBase8c | QuestDB | Vastbase | YashanDB => ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL),
 
         // Native MySQL adapter
         MySQL => ConnectionStrategy::Native(CoreDatabaseType::MySQL),
         // MySQL wire protocol compat
-        MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 => {
+        MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 | Doris | SelectDB | StarRocks
+        | Databend | GoldenDB | ManticoreSearch => {
             ConnectionStrategy::Native(CoreDatabaseType::MySQL)
         }
 
@@ -104,8 +105,13 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
     use DatabaseType::*;
     match db {
         PostgreSQL | CockroachDB | Redshift | YugabyteDB | TimescaleDB | KingbaseES | GaussDB
-        | HighGo | UXDB | OpenGauss | GBase8c => Some(5432),
-        MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 => Some(3306),
+        | HighGo | UXDB | OpenGauss | GBase8c | Vastbase => Some(5432),
+        QuestDB => Some(8812),
+        YashanDB => Some(1688),
+        MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 | GoldenDB => Some(3306),
+        Doris | SelectDB | StarRocks => Some(9030),
+        Databend => Some(3307),
+        ManticoreSearch => Some(9306),
         SqlServer => Some(1433),
         SQLite => None,
         DuckDb => None,
@@ -136,6 +142,9 @@ mod tests {
             DatabaseType::KingbaseES,
             DatabaseType::GaussDB,
             DatabaseType::HighGo,
+            DatabaseType::QuestDB,
+            DatabaseType::Vastbase,
+            DatabaseType::YashanDB,
         ] {
             assert!(
                 is_pg_family(db),
@@ -154,6 +163,12 @@ mod tests {
             DatabaseType::OceanBase,
             DatabaseType::TDSQL,
             DatabaseType::PolarDB,
+            DatabaseType::Doris,
+            DatabaseType::SelectDB,
+            DatabaseType::StarRocks,
+            DatabaseType::Databend,
+            DatabaseType::GoldenDB,
+            DatabaseType::ManticoreSearch,
         ] {
             assert!(
                 is_mysql_family(db),
@@ -210,5 +225,14 @@ mod tests {
         assert_eq!(default_port(DatabaseType::SqlServer), Some(1433));
         assert_eq!(default_port(DatabaseType::DM8Oracle), Some(5236));
         assert_eq!(default_port(DatabaseType::Oracle), Some(1521));
+        assert_eq!(default_port(DatabaseType::Doris), Some(9030));
+        assert_eq!(default_port(DatabaseType::SelectDB), Some(9030));
+        assert_eq!(default_port(DatabaseType::StarRocks), Some(9030));
+        assert_eq!(default_port(DatabaseType::Databend), Some(3307));
+        assert_eq!(default_port(DatabaseType::GoldenDB), Some(3306));
+        assert_eq!(default_port(DatabaseType::ManticoreSearch), Some(9306));
+        assert_eq!(default_port(DatabaseType::QuestDB), Some(8812));
+        assert_eq!(default_port(DatabaseType::Vastbase), Some(5432));
+        assert_eq!(default_port(DatabaseType::YashanDB), Some(1688));
     }
 }

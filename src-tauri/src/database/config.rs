@@ -49,6 +49,12 @@ pub enum DatabaseType {
     OpenGauss,
     /// 南大通用 GBase 8c — PG wire protocol.
     GBase8c,
+    /// QuestDB — PG wire protocol.
+    QuestDB,
+    /// 海量数据库 Vastbase — PG wire protocol.
+    Vastbase,
+    /// 崖山数据库 YashanDB — PG wire protocol.
+    YashanDB,
 
     // ── MySQL wire protocol compatible (reuse MySQLAdapter) ──
     /// MariaDB — MySQL wire protocol.
@@ -63,6 +69,18 @@ pub enum DatabaseType {
     PolarDB,
     /// 达梦 DM8 (MySQL mode, secondary) — MySQL wire protocol alias.
     DM8,
+    /// Apache Doris — MySQL wire protocol.
+    Doris,
+    /// SelectDB (Doris fork) — MySQL wire protocol.
+    SelectDB,
+    /// StarRocks — MySQL wire protocol.
+    StarRocks,
+    /// Databend — MySQL wire protocol.
+    Databend,
+    /// GoldenDB — MySQL wire protocol.
+    GoldenDB,
+    /// Manticore Search — MySQL wire protocol.
+    ManticoreSearch,
 
     // ── JDBC bridge (Java subprocess, lazy download) ──
     /// Oracle Database — oracle-rs (native, optional feature).
