@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-06-15
+
+### Added
+
+- Support for 12 new JDBC databases: database type variants with strategy routing, driver registry entries, string-to-enum parsing, driver download and fallback support, frontend DatabaseType entries, database icons, connection form dropdown entries, and i18n translations
+
+### Fixed
+
+- Review issues and code quality improvements
+
 ## [0.5.3] - 2026-06-15
 
 ### Added
