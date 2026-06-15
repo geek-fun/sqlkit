@@ -1,2 +1,6 @@
 export { useAgentContext } from './useAgentContext'
+export { useDataGridCopy } from './useDataGridCopy'
+export { useDataGridFilter } from './useDataGridFilter'
+export { useDataGridSelection } from './useDataGridSelection'
+export { useDataGridSort } from './useDataGridSort'
 export { useDataStudioChatAgent } from './useDataStudioChatAgent'
