@@ -4,11 +4,11 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
+use super::download;
 use super::error_classifier::{classify_connection_error, ErrorCategory};
 use super::launcher::JdbcBridgeLauncher;
 use super::protocol::{ConnectParams, JdbcMethod, JdbcRequest};
-use super::registry::{DriverRegistry, DriverVersion, DatabaseDriverConfig};
-use super::download;
+use super::registry::{DatabaseDriverConfig, DriverRegistry, DriverVersion};
 
 /// Result of trying a single driver version in the fallback chain.
 pub enum DriverAttempt {
@@ -32,15 +32,19 @@ pub async fn try_driver(
     password: &Option<String>,
 ) -> DriverAttempt {
     let url = super::registry::build_jdbc_url(config, host, port, database);
-    let jar_path = download::driver_jar_path_for_version(
-        db_type_from_config(config),
-        &version.version,
-    );
+    let jar_path =
+        download::driver_jar_path_for_version(db_type_from_config(config), &version.version);
 
     // Download driver if not cached
     if !jar_path.exists() {
-        let maven_group = version.maven_group_override.as_deref().unwrap_or(&config.maven_group);
-        let maven_artifact = version.maven_artifact_override.as_deref().unwrap_or(&config.maven_artifact);
+        let maven_group = version
+            .maven_group_override
+            .as_deref()
+            .unwrap_or(&config.maven_group);
+        let maven_artifact = version
+            .maven_artifact_override
+            .as_deref()
+            .unwrap_or(&config.maven_artifact);
         match download::download_driver_from_maven(
             maven_group,
             maven_artifact,
@@ -48,7 +52,9 @@ pub async fn try_driver(
             &jar_path,
             &version.jar_sha256,
             version.maven_classifier.as_deref(),
-        ).await {
+        )
+        .await
+        {
             Ok(_) => {}
             Err(e) => return DriverAttempt::Fatal(e),
         }
@@ -79,32 +85,28 @@ pub async fn try_driver(
         pool_max: 5,
     }) {
         Ok(v) => v,
-        Err(e) => return DriverAttempt::Fatal(DbError::Connection(format!(
-            "Failed to serialize connect params: {}",
-            e,
-        ))),
+        Err(e) => {
+            return DriverAttempt::Fatal(DbError::Connection(format!(
+                "Failed to serialize connect params: {}",
+                e,
+            )))
+        }
     };
 
     let req = JdbcRequest::new(JdbcMethod::Connect, params);
 
     // 30s timeout per attempt
-    let conn_result = tokio::time::timeout(
-        std::time::Duration::from_secs(30),
-        async {
-            let mut guard = launcher.lock().await;
-            guard.send_request(&req)
-        },
-    )
+    let conn_result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
+        let mut guard = launcher.lock().await;
+        guard.send_request(&req)
+    })
     .await;
 
     match conn_result {
         Ok(Ok(resp)) => {
             if let Some(ref err) = resp.error {
-                let category = classify_connection_error(
-                    db_type_from_config(config),
-                    err,
-                    &all_patterns,
-                );
+                let category =
+                    classify_connection_error(db_type_from_config(config), err, &all_patterns);
                 match category {
                     ErrorCategory::VersionIncompatible => {
                         DriverAttempt::VersionMismatch(err.clone())
@@ -112,7 +114,8 @@ pub async fn try_driver(
                     _ => DriverAttempt::Fatal(DbError::Connection(err.clone())),
                 }
             } else {
-                let conn_id = resp.result
+                let conn_id = resp
+                    .result
                     .and_then(|v| v.as_str().map(|s| s.to_string()))
                     .unwrap_or_else(|| format!("conn_{}", uuid::Uuid::new_v4()));
                 DriverAttempt::Connected(conn_id, launcher)
@@ -120,22 +123,17 @@ pub async fn try_driver(
         }
         Ok(Err(e)) => {
             let msg = e.to_string();
-            let category = classify_connection_error(
-                db_type_from_config(config),
-                &msg,
-                &all_patterns,
-            );
+            let category =
+                classify_connection_error(db_type_from_config(config), &msg, &all_patterns);
             match category {
                 ErrorCategory::VersionIncompatible => DriverAttempt::VersionMismatch(msg),
                 ErrorCategory::Timeout => DriverAttempt::Fatal(DbError::Timeout(msg)),
                 _ => DriverAttempt::Fatal(e),
             }
         }
-        Err(_) => {
-            DriverAttempt::Fatal(DbError::Timeout(
-                "Connection attempt timed out after 30s".to_string(),
-            ))
-        }
+        Err(_) => DriverAttempt::Fatal(DbError::Timeout(
+            "Connection attempt timed out after 30s".to_string(),
+        )),
     }
 }
 
@@ -153,9 +151,9 @@ pub async fn run_fallback_chain(
     let config = registry.get_config(db_type).ok_or_else(|| {
         DbError::Connection(format!("No driver registry entry for {:?}", db_type))
     })?;
-    let chain = registry.get_driver_chain(db_type).ok_or_else(|| {
-        DbError::Connection(format!("No driver chain for {:?}", db_type))
-    })?;
+    let chain = registry
+        .get_driver_chain(db_type)
+        .ok_or_else(|| DbError::Connection(format!("No driver chain for {:?}", db_type)))?;
 
     // Ensure JRE and bridge JAR are installed
     if !super::jre::is_managed_jre_installed() {
@@ -168,17 +166,7 @@ pub async fn run_fallback_chain(
     let mut last_version_error: Option<String> = None;
 
     for version in chain.iter() {
-        match try_driver(
-            config,
-            version,
-            host,
-            port,
-            database,
-            username,
-            password,
-        )
-        .await
-        {
+        match try_driver(config, version, host, port, database, username, password).await {
             DriverAttempt::Connected(conn_id, launcher) => {
                 return Ok((version.version.clone(), conn_id, launcher));
             }

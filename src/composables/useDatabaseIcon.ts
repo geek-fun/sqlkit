@@ -111,6 +111,10 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   CASSANDRA: { icon: cassandraLogo, color: 'bg-gray-100 dark:bg-gray-800/30' },
   IRIS: { icon: irisLogo, color: 'bg-teal-100 dark:bg-teal-900/30' },
   ACCESS: { icon: accessLogo, color: 'bg-red-100 dark:bg-red-900/30' },
+  FIREBIRD: { icon: clickhouseLogo, color: 'bg-purple-100 dark:bg-purple-900/30' },
+  RQLITE: { icon: sqliteLogo, color: 'bg-green-100 dark:bg-green-900/30' },
+  TURSO: { icon: sqliteLogo, color: 'bg-cyan-100 dark:bg-cyan-900/30' },
+  TDENGINE: { icon: clickhouseLogo, color: 'bg-amber-100 dark:bg-amber-900/30' },
 }
 
 export function useDatabaseIcon() {

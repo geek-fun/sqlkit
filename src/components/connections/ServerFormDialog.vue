@@ -98,6 +98,10 @@ const defaultPorts: Record<string, number> = {
   [DatabaseType.CASSANDRA]: 9042,
   [DatabaseType.IRIS]: 1972,
   [DatabaseType.ACCESS]: 0,
+  [DatabaseType.FIREBIRD]: 3050,
+  [DatabaseType.RQLITE]: 4001,
+  [DatabaseType.TURSO]: 443,
+  [DatabaseType.TDENGINE]: 6030,
 }
 
 const defaultConnection: ServerConnection = {
@@ -439,6 +443,12 @@ function handleSave() {
                     {{ t('components.serverForm.databaseTypes.duckdb') }}
                   </div>
                 </SelectItem>
+                <SelectItem :value="DatabaseType.FIREBIRD">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.FIREBIRD)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.firebird') }}
+                  </div>
+                </SelectItem>
                 <SelectItem :value="DatabaseType.TIDB">
                   <div class="flex gap-2 items-center">
                     <img :src="getDatabaseIcon(DatabaseType.TIDB)" alt="" class="h-5 w-5 object-contain">
@@ -595,6 +605,18 @@ function handleSave() {
                     {{ t('components.serverForm.databaseTypes.presto') }}
                   </div>
                 </SelectItem>
+                <SelectItem :value="DatabaseType.RQLITE">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.RQLITE)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.rqlite') }}
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.TURSO">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.TURSO)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.turso') }}
+                  </div>
+                </SelectItem>
               </SelectGroup>
 
               <SelectGroup>
@@ -736,6 +758,13 @@ function handleSave() {
                   <div class="flex gap-2 items-center">
                     <img :src="getDatabaseIcon(DatabaseType.ACCESS)" alt="" class="h-5 w-5 object-contain">
                     {{ t('components.serverForm.databaseTypes.access') }}
+                    <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
+                  </div>
+                </SelectItem>
+                <SelectItem :value="DatabaseType.TDENGINE">
+                  <div class="flex gap-2 items-center">
+                    <img :src="getDatabaseIcon(DatabaseType.TDENGINE)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.tdengine') }}
                     <span class="text-xs text-muted-foreground ml-auto">{{ t('components.serverForm.databaseBadges.jdbc') }}</span>
                   </div>
                 </SelectItem>

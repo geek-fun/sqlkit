@@ -7,10 +7,7 @@ use serde::Serialize;
 pub enum ConnectionProgress {
     /// Downloading the managed JRE.
     #[serde(rename_all = "snake_case")]
-    JreDownload {
-        downloaded: u64,
-        total: u64,
-    },
+    JreDownload { downloaded: u64, total: u64 },
     /// Extracting the JRE archive.
     JreExtract,
     /// Downloading a specific JDBC driver JAR.
@@ -45,7 +42,5 @@ pub enum ConnectionProgress {
     },
     /// Fatal error — abort.
     #[serde(rename_all = "snake_case")]
-    Error {
-        error: String,
-    },
+    Error { error: String },
 }

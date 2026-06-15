@@ -14,6 +14,7 @@ pub enum CoreDatabaseType {
     SQLite,
     DuckDb,
     ClickHouse,
+    Firebird,
     Oracle,
     DB2,
     H2,
@@ -46,7 +47,9 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         PostgreSQL => ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL),
         // PG wire protocol compat
         CockroachDB | Redshift | YugabyteDB | TimescaleDB | KingbaseES | GaussDB | HighGo
-        | UXDB | OpenGauss | GBase8c | QuestDB | Vastbase | YashanDB => ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL),
+        | UXDB | OpenGauss | GBase8c | QuestDB | Vastbase | YashanDB => {
+            ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL)
+        }
 
         // Native MySQL adapter
         MySQL => ConnectionStrategy::Native(CoreDatabaseType::MySQL),
@@ -61,17 +64,23 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         SQLite => ConnectionStrategy::Native(CoreDatabaseType::SQLite),
         DuckDb => ConnectionStrategy::Native(CoreDatabaseType::DuckDb),
         ClickHouse => ConnectionStrategy::Native(CoreDatabaseType::ClickHouse),
+        Firebird => ConnectionStrategy::Native(CoreDatabaseType::Firebird),
 
         // JDBC bridge (Java subprocess)
         Oracle => {
             #[cfg(feature = "oracle")]
-            { ConnectionStrategy::Native(CoreDatabaseType::Oracle) }
+            {
+                ConnectionStrategy::Native(CoreDatabaseType::Oracle)
+            }
             #[cfg(not(feature = "oracle"))]
-            { ConnectionStrategy::JdbcBridge }
-        },
+            {
+                ConnectionStrategy::JdbcBridge
+            }
+        }
         DB2 => ConnectionStrategy::JdbcBridge,
         H2 => ConnectionStrategy::JdbcBridge,
         Snowflake => ConnectionStrategy::JdbcBridge,
+        TDengine => ConnectionStrategy::JdbcBridge,
         DM8Oracle => ConnectionStrategy::JdbcBridge,
         XuguDB => ConnectionStrategy::JdbcBridge,
         GBase8a => ConnectionStrategy::JdbcBridge,
@@ -91,6 +100,7 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
 
         // HTTP SQL bridge
         Trino | Presto => ConnectionStrategy::Http,
+        RQLite | Turso => ConnectionStrategy::Http,
     }
 }
 
@@ -128,10 +138,12 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
         SQLite => None,
         DuckDb => None,
         ClickHouse => Some(8123),
+        Firebird => Some(3050),
         Oracle => Some(1521),
         DB2 => Some(50000),
         H2 => Some(9092),
         Snowflake => Some(443),
+        TDengine => Some(6030),
         DM8Oracle => Some(5236),
         XuguDB => Some(5138),
         GBase8a => Some(5258),
@@ -150,6 +162,8 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
         Access => Some(0),
         Trino => Some(8080),
         Presto => Some(8080),
+        RQLite => Some(4001),
+        Turso => Some(443),
     }
 }
 
@@ -203,6 +217,15 @@ mod tests {
     }
 
     #[test]
+    fn test_firebird_routes_to_native() {
+        assert_eq!(
+            resolve_effective_type(DatabaseType::Firebird),
+            ConnectionStrategy::Native(CoreDatabaseType::Firebird),
+            "Firebird should route to native Firebird adapter"
+        );
+    }
+
+    #[test]
     fn test_oracle_routes_to_native() {
         assert_eq!(
             resolve_effective_type(DatabaseType::Oracle),
@@ -217,6 +240,7 @@ mod tests {
             DatabaseType::DB2,
             DatabaseType::H2,
             DatabaseType::Snowflake,
+            DatabaseType::TDengine,
             DatabaseType::DM8Oracle,
             DatabaseType::XuguDB,
             DatabaseType::GBase8a,
@@ -245,7 +269,12 @@ mod tests {
 
     #[test]
     fn test_http_types() {
-        for db in [DatabaseType::Trino, DatabaseType::Presto] {
+        for db in [
+            DatabaseType::Trino,
+            DatabaseType::Presto,
+            DatabaseType::RQLite,
+            DatabaseType::Turso,
+        ] {
             assert_eq!(
                 resolve_effective_type(db),
                 ConnectionStrategy::Http,
@@ -283,5 +312,9 @@ mod tests {
         assert_eq!(default_port(DatabaseType::Cassandra), Some(9042));
         assert_eq!(default_port(DatabaseType::Iris), Some(1972));
         assert_eq!(default_port(DatabaseType::Access), Some(0));
+        assert_eq!(default_port(DatabaseType::Firebird), Some(3050));
+        assert_eq!(default_port(DatabaseType::RQLite), Some(4001));
+        assert_eq!(default_port(DatabaseType::Turso), Some(443));
+        assert_eq!(default_port(DatabaseType::TDengine), Some(6030));
     }
 }

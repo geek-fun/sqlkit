@@ -61,7 +61,9 @@ pub fn verify_sha256(path: &Path, expected_hex: &str) -> DbResult<()> {
     if !actual.eq_ignore_ascii_case(expected_hex) {
         return Err(DbError::Connection(format!(
             "SHA-256 mismatch for {}: expected {}, got {}",
-            path.display(), expected_hex, actual
+            path.display(),
+            expected_hex,
+            actual
         )));
     }
     Ok(())

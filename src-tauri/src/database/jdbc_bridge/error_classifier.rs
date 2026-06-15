@@ -142,11 +142,8 @@ mod tests {
     #[test]
     fn test_classify_version_no_match() {
         let patterns = vec!["ORA-28040".into()];
-        let result = classify_connection_error(
-            DatabaseType::Oracle,
-            "Something else entirely",
-            &patterns,
-        );
+        let result =
+            classify_connection_error(DatabaseType::Oracle, "Something else entirely", &patterns);
         assert_ne!(result, ErrorCategory::VersionIncompatible);
     }
 
@@ -188,7 +185,8 @@ mod tests {
 
     #[test]
     fn test_classify_generic_auth() {
-        let result = classify_connection_error(DatabaseType::H2, "wrong user name or password", &[]);
+        let result =
+            classify_connection_error(DatabaseType::H2, "wrong user name or password", &[]);
         assert_eq!(result, ErrorCategory::Authentication);
     }
 
@@ -204,11 +202,8 @@ mod tests {
 
     #[test]
     fn test_classify_host_unknown() {
-        let result = classify_connection_error(
-            DatabaseType::MySQL,
-            "Unknown host 'db.example.com'",
-            &[],
-        );
+        let result =
+            classify_connection_error(DatabaseType::MySQL, "Unknown host 'db.example.com'", &[]);
         assert_eq!(result, ErrorCategory::Network);
     }
 
@@ -234,19 +229,22 @@ mod tests {
 
     #[test]
     fn test_classify_connect_timeout() {
-        let result = classify_connection_error(DatabaseType::Oracle, "connect timed out after 30000ms", &[]);
+        let result =
+            classify_connection_error(DatabaseType::Oracle, "connect timed out after 30000ms", &[]);
         assert_eq!(result, ErrorCategory::Timeout);
     }
 
     #[test]
     fn test_classify_timeout_broad() {
-        let result = classify_connection_error(DatabaseType::Oracle, "timeout occurred during auth", &[]);
+        let result =
+            classify_connection_error(DatabaseType::Oracle, "timeout occurred during auth", &[]);
         assert_eq!(result, ErrorCategory::Timeout);
     }
 
     #[test]
     fn test_classify_unknown() {
-        let result = classify_connection_error(DatabaseType::Oracle, "Something went horribly wrong", &[]);
+        let result =
+            classify_connection_error(DatabaseType::Oracle, "Something went horribly wrong", &[]);
         assert_eq!(result, ErrorCategory::Unknown);
     }
 

@@ -507,7 +507,12 @@ pub async fn validate_llm_config(
     let resolved_base = base_url
         .filter(|u| !u.is_empty())
         .unwrap_or_else(|| provider_adapter::default_base_url(api_compat));
-    let client = create_http_client(&proxy_mode.as_deref().unwrap_or("none"), http_proxy, None, None);
+    let client = create_http_client(
+        &proxy_mode.as_deref().unwrap_or("none"),
+        http_proxy,
+        None,
+        None,
+    );
     match api_compat {
         "anthropic" => {
             let url = format!(

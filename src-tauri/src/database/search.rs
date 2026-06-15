@@ -142,7 +142,11 @@ fn quote_identifier(identifier: &str, db_type: &str) -> String {
 ///
 /// An SQL WHERE clause like `(LOWER(CAST("col1" AS TEXT)) LIKE '%term%' OR ...)`
 /// or `None` if no searchable columns or empty term.
-pub fn build_table_search_where(db_type: &str, columns: &[ColumnInfo], term: &str) -> Option<String> {
+pub fn build_table_search_where(
+    db_type: &str,
+    columns: &[ColumnInfo],
+    term: &str,
+) -> Option<String> {
     let term = term.trim();
     if term.is_empty() {
         return None;
@@ -166,8 +170,10 @@ pub fn build_table_search_where(db_type: &str, columns: &[ColumnInfo], term: &st
         .map(|col| {
             let quoted = quote_identifier(&col.name, db_type);
             let category = classify_column(&col.data_type);
-            let text_condition =
-                format!("LOWER(CAST({} AS {})) LIKE '%{}%'", quoted, cast_type, lower_term);
+            let text_condition = format!(
+                "LOWER(CAST({} AS {})) LIKE '%{}%'",
+                quoted, cast_type, lower_term
+            );
 
             match category {
                 ColumnCategory::Text => text_condition,
@@ -294,10 +300,25 @@ mod tests {
 
     #[test]
     fn test_classify_text_types() {
-        for t in &["varchar", "char", "text", "nvarchar", "nchar", "ntext", "uuid", "enum",
-                     "name", "json", "jsonb", "xml", "date", "time", "timestamp", "timestamptz",
-                     "bpchar"]
-        {
+        for t in &[
+            "varchar",
+            "char",
+            "text",
+            "nvarchar",
+            "nchar",
+            "ntext",
+            "uuid",
+            "enum",
+            "name",
+            "json",
+            "jsonb",
+            "xml",
+            "date",
+            "time",
+            "timestamp",
+            "timestamptz",
+            "bpchar",
+        ] {
             assert_eq!(
                 classify_column(t),
                 ColumnCategory::Text,
@@ -309,11 +330,33 @@ mod tests {
 
     #[test]
     fn test_classify_numeric_types() {
-        for t in &["integer", "int", "int4", "int8", "int16", "bigint", "smallint", "tinyint",
-                     "serial", "bigserial", "smallserial", "numeric", "decimal", "float", "float4",
-                     "float8", "double", "double precision", "real", "money", "smallmoney",
-                     "number", "bool", "boolean", "bit"]
-        {
+        for t in &[
+            "integer",
+            "int",
+            "int4",
+            "int8",
+            "int16",
+            "bigint",
+            "smallint",
+            "tinyint",
+            "serial",
+            "bigserial",
+            "smallserial",
+            "numeric",
+            "decimal",
+            "float",
+            "float4",
+            "float8",
+            "double",
+            "double precision",
+            "real",
+            "money",
+            "smallmoney",
+            "number",
+            "bool",
+            "boolean",
+            "bit",
+        ] {
             assert_eq!(
                 classify_column(t),
                 ColumnCategory::Numeric,
@@ -325,9 +368,22 @@ mod tests {
 
     #[test]
     fn test_classify_skip_types() {
-        for t in &["blob", "binary", "bytea", "varbinary", "image", "geometry", "geography",
-                     "point", "linestring", "polygon", "circle", "box", "path", "interval"]
-        {
+        for t in &[
+            "blob",
+            "binary",
+            "bytea",
+            "varbinary",
+            "image",
+            "geometry",
+            "geography",
+            "point",
+            "linestring",
+            "polygon",
+            "circle",
+            "box",
+            "path",
+            "interval",
+        ] {
             assert_eq!(
                 classify_column(t),
                 ColumnCategory::Skip,
@@ -386,10 +442,7 @@ mod tests {
         let cols = [col("age", "integer")];
         // "abc" is not a valid number, so only text search
         let result = build_table_search_where("postgres", &cols, "abc").unwrap();
-        assert_eq!(
-            result,
-            "(LOWER(CAST(\"age\" AS TEXT)) LIKE '%abc%')"
-        );
+        assert_eq!(result, "(LOWER(CAST(\"age\" AS TEXT)) LIKE '%abc%')");
     }
 
     #[test]
@@ -410,10 +463,7 @@ mod tests {
     fn test_mysql_text_search() {
         let cols = [col("name", "varchar")];
         let result = build_table_search_where("mysql", &cols, "alice").unwrap();
-        assert_eq!(
-            result,
-            "(LOWER(CAST(`name` AS CHAR)) LIKE '%alice%')"
-        );
+        assert_eq!(result, "(LOWER(CAST(`name` AS CHAR)) LIKE '%alice%')");
     }
 
     #[test]
@@ -450,40 +500,28 @@ mod tests {
     fn test_sqlite_text_search() {
         let cols = [col("name", "text")];
         let result = build_table_search_where("sqlite", &cols, "alice").unwrap();
-        assert_eq!(
-            result,
-            "(LOWER(CAST(\"name\" AS TEXT)) LIKE '%alice%')"
-        );
+        assert_eq!(result, "(LOWER(CAST(\"name\" AS TEXT)) LIKE '%alice%')");
     }
 
     #[test]
     fn test_duckdb_search() {
         let cols = [col("name", "varchar")];
         let result = build_table_search_where("duckdb", &cols, "test").unwrap();
-        assert_eq!(
-            result,
-            "(LOWER(CAST(\"name\" AS TEXT)) LIKE '%test%')"
-        );
+        assert_eq!(result, "(LOWER(CAST(\"name\" AS TEXT)) LIKE '%test%')");
     }
 
     #[test]
     fn test_clickhouse_search() {
         let cols = [col("name", "String")];
         let result = build_table_search_where("clickhouse", &cols, "test").unwrap();
-        assert_eq!(
-            result,
-            "(LOWER(CAST(`name` AS CHAR)) LIKE '%test%')"
-        );
+        assert_eq!(result, "(LOWER(CAST(`name` AS CHAR)) LIKE '%test%')");
     }
 
     #[test]
     fn test_jdbc_search() {
         let cols = [col("name", "varchar")];
         let result = build_table_search_where("jdbc", &cols, "test").unwrap();
-        assert_eq!(
-            result,
-            "(LOWER(CAST(\"name\" AS VARCHAR)) LIKE '%test%')"
-        );
+        assert_eq!(result, "(LOWER(CAST(\"name\" AS VARCHAR)) LIKE '%test%')");
     }
 
     #[test]
@@ -491,10 +529,7 @@ mod tests {
         let cols = [col("name", "varchar")];
         let result = build_table_search_where("trino", &cols, "test").unwrap();
         // Trino does not quote identifiers by default
-        assert_eq!(
-            result,
-            "(LOWER(CAST(name AS VARCHAR)) LIKE '%test%')"
-        );
+        assert_eq!(result, "(LOWER(CAST(name AS VARCHAR)) LIKE '%test%')");
     }
 
     #[test]
@@ -502,10 +537,7 @@ mod tests {
         let cols = [col("name", "text")];
         // Single quotes must be escaped
         let result = build_table_search_where("postgres", &cols, "o'neil").unwrap();
-        assert_eq!(
-            result,
-            "(LOWER(CAST(\"name\" AS TEXT)) LIKE '%o''neil%')"
-        );
+        assert_eq!(result, "(LOWER(CAST(\"name\" AS TEXT)) LIKE '%o''neil%')");
     }
 
     #[test]
@@ -579,7 +611,10 @@ mod tests {
     }
 
     fn row(pairs: &[(&str, JsonValue)]) -> HashMap<String, JsonValue> {
-        pairs.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()
+        pairs
+            .iter()
+            .map(|(k, v)| (k.to_string(), v.clone()))
+            .collect()
     }
 
     #[test]
@@ -592,8 +627,16 @@ mod tests {
 
     #[test]
     fn test_result_where_no_pk_fallback() {
-        let cols = [col("name", "varchar"), col("age", "integer"), col("avatar", "bytea")];
-        let r = row(&[("name", json!("alice")), ("age", json!(30)), ("avatar", json!(null))]);
+        let cols = [
+            col("name", "varchar"),
+            col("age", "integer"),
+            col("avatar", "bytea"),
+        ];
+        let r = row(&[
+            ("name", json!("alice")),
+            ("age", json!(30)),
+            ("avatar", json!(null)),
+        ]);
         let result = build_search_result_where("postgres", &cols, &r).unwrap();
         // Should use name and age (searchable), skip bytea
         assert!(result.contains("\"name\" = 'alice'"));
@@ -604,8 +647,16 @@ mod tests {
 
     #[test]
     fn test_result_where_mixed_pk_and_regular() {
-        let cols = [pk_col("id", "int"), pk_col("lang", "varchar"), col("name", "text")];
-        let r = row(&[("id", json!(1)), ("lang", json!("en")), ("name", json!("hello"))]);
+        let cols = [
+            pk_col("id", "int"),
+            pk_col("lang", "varchar"),
+            col("name", "text"),
+        ];
+        let r = row(&[
+            ("id", json!(1)),
+            ("lang", json!("en")),
+            ("name", json!("hello")),
+        ]);
         let result = build_search_result_where("postgres", &cols, &r).unwrap();
         // Only PKs should be used
         assert!(result.contains("\"id\" = 1"));

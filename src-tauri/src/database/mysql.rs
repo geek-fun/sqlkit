@@ -667,30 +667,16 @@ impl DatabaseAdapter for MySQLAdapter {
             std::collections::HashMap::new();
 
         for row in rows {
-            let constraint_name: String = row
-                .get::<String, _>("constraint_name")
-                .unwrap_or_default();
-            let source_table: String = row
-                .get::<String, _>("source_table")
-                .unwrap_or_default();
-            let source_column: String = row
-                .get::<String, _>("source_column")
-                .unwrap_or_default();
-            let target_schema: Option<String> = row
-                .get::<Option<String>, _>("target_schema")
-                .flatten();
-            let target_table: String = row
-                .get::<String, _>("target_table")
-                .unwrap_or_default();
-            let target_column: String = row
-                .get::<String, _>("target_column")
-                .unwrap_or_default();
-            let on_update: Option<String> = row
-                .get::<Option<String>, _>("UPDATE_RULE")
-                .flatten();
-            let on_delete: Option<String> = row
-                .get::<Option<String>, _>("DELETE_RULE")
-                .flatten();
+            let constraint_name: String =
+                row.get::<String, _>("constraint_name").unwrap_or_default();
+            let source_table: String = row.get::<String, _>("source_table").unwrap_or_default();
+            let source_column: String = row.get::<String, _>("source_column").unwrap_or_default();
+            let target_schema: Option<String> =
+                row.get::<Option<String>, _>("target_schema").flatten();
+            let target_table: String = row.get::<String, _>("target_table").unwrap_or_default();
+            let target_column: String = row.get::<String, _>("target_column").unwrap_or_default();
+            let on_update: Option<String> = row.get::<Option<String>, _>("UPDATE_RULE").flatten();
+            let on_delete: Option<String> = row.get::<Option<String>, _>("DELETE_RULE").flatten();
 
             // Use constraint_name + source_table as key to handle same-named
             // constraints across different tables
@@ -933,14 +919,10 @@ impl DatabaseAdapter for MySQLAdapter {
 
         for row in rows {
             let column_name: String = row.get_opt(0).and_then(|r| r.ok()).unwrap_or_default();
-            let referenced_schema: Option<String> =
-                row.get_opt(1).and_then(|r| r.ok()).flatten();
-            let referenced_table: String =
-                row.get_opt(2).and_then(|r| r.ok()).unwrap_or_default();
-            let referenced_column: String =
-                row.get_opt(3).and_then(|r| r.ok()).unwrap_or_default();
-            let constraint_name: String =
-                row.get_opt(4).and_then(|r| r.ok()).unwrap_or_default();
+            let referenced_schema: Option<String> = row.get_opt(1).and_then(|r| r.ok()).flatten();
+            let referenced_table: String = row.get_opt(2).and_then(|r| r.ok()).unwrap_or_default();
+            let referenced_column: String = row.get_opt(3).and_then(|r| r.ok()).unwrap_or_default();
+            let constraint_name: String = row.get_opt(4).and_then(|r| r.ok()).unwrap_or_default();
             let on_update: Option<String> = row.get_opt(5).and_then(|r| r.ok()).flatten();
             let on_delete: Option<String> = row.get_opt(6).and_then(|r| r.ok()).flatten();
 

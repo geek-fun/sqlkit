@@ -28,6 +28,8 @@ pub enum DatabaseType {
     DuckDb,
     /// ClickHouse (HTTP protocol).
     ClickHouse,
+    /// Firebird (native, embedded via `fbclient`).
+    Firebird,
 
     // ── PG wire protocol compatible (reuse PostgresAdapter) ──
     /// CockroachDB — PG wire protocol.
@@ -92,6 +94,8 @@ pub enum DatabaseType {
     H2,
     /// Snowflake — JDBC bridge.
     Snowflake,
+    /// TDengine — JDBC bridge.
+    TDengine,
     /// Apache Derby — JDBC bridge.
     Derby,
     /// Apache Hive — JDBC bridge.
@@ -130,6 +134,10 @@ pub enum DatabaseType {
     Trino,
     /// Presto — HTTP SQL API.
     Presto,
+    /// RQLite — HTTP SQL API.
+    RQLite,
+    /// Turso (libsql) — HTTP SQL API.
+    Turso,
 }
 
 /// SSL/TLS mode for connections.

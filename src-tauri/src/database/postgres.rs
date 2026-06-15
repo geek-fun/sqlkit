@@ -1120,7 +1120,6 @@ impl DatabaseAdapter for PostgresAdapter {
         _database: Option<&str>,
         _schema: Option<&str>,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
-
         let pool = self
             .pool
             .as_ref()
@@ -1518,18 +1517,18 @@ impl DatabaseAdapter for PostgresAdapter {
                 let indexdef: String = row.get(2);
 
                 // Extract index type from definition
-                let index_type = if indexdef.contains("USING BTREE") || indexdef.contains("USING btree")
-                {
-                    "BTREE"
-                } else if indexdef.contains("USING HASH") || indexdef.contains("USING hash") {
-                    "HASH"
-                } else if indexdef.contains("USING GIN") || indexdef.contains("USING gin") {
-                    "GIN"
-                } else if indexdef.contains("USING GIST") || indexdef.contains("USING gist") {
-                    "GIST"
-                } else {
-                    "BTREE"
-                };
+                let index_type =
+                    if indexdef.contains("USING BTREE") || indexdef.contains("USING btree") {
+                        "BTREE"
+                    } else if indexdef.contains("USING HASH") || indexdef.contains("USING hash") {
+                        "HASH"
+                    } else if indexdef.contains("USING GIN") || indexdef.contains("USING gin") {
+                        "GIN"
+                    } else if indexdef.contains("USING GIST") || indexdef.contains("USING gist") {
+                        "GIST"
+                    } else {
+                        "BTREE"
+                    };
 
                 let is_unique = indexdef.to_uppercase().contains("UNIQUE");
                 let is_primary = indexdef.to_uppercase().contains("PRIMARY KEY");
@@ -1745,7 +1744,11 @@ impl DatabaseAdapter for PostgresAdapter {
         }
 
         let schema_filter = schema.unwrap_or("public");
-        let qualified = format!("\"{}\".\"{}\"", schema_filter.replace('"', "\"\""), object_name.replace('"', "\"\""));
+        let qualified = format!(
+            "\"{}\".\"{}\"",
+            schema_filter.replace('"', "\"\""),
+            object_name.replace('"', "\"\"")
+        );
 
         let sql = match object_type.to_uppercase().as_str() {
             "VIEW" => format!("DROP VIEW IF EXISTS {} CASCADE", qualified),
@@ -1800,7 +1803,11 @@ impl DatabaseAdapter for PostgresAdapter {
         }
 
         let schema_filter = schema.unwrap_or("public");
-        let qualified = format!("\"{}\".\"{}\"", schema_filter.replace('"', "\"\""), object_name.replace('"', "\"\""));
+        let qualified = format!(
+            "\"{}\".\"{}\"",
+            schema_filter.replace('"', "\"\""),
+            object_name.replace('"', "\"\"")
+        );
         let new_quoted = format!("\"{}\"", new_name.replace('"', "\"\""));
 
         let sql = match object_type.to_uppercase().as_str() {

@@ -1,6 +1,6 @@
-use serde::Serialize;
-use crate::database::jdbc_bridge::{registry::DriverRegistry, jre, download};
 use crate::database::config::DatabaseType;
+use crate::database::jdbc_bridge::{download, jre, registry::DriverRegistry};
+use serde::Serialize;
 
 #[derive(Serialize)]
 pub struct JreStatus {
@@ -47,9 +47,7 @@ pub async fn check_jre_status() -> Result<JreStatus, String> {
 
 #[tauri::command]
 pub async fn download_jre() -> Result<(), String> {
-    jre::download_managed_jre()
-        .await
-        .map_err(|e| e.to_string())
+    jre::download_managed_jre().await.map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -64,7 +62,9 @@ pub async fn list_drivers() -> Result<Vec<DriverInfo>, String> {
     for (key, config) in &registry.databases {
         let installed = config.versions.iter().any(|v| {
             let db_type = db_type_from_registry_key(key);
-            db_type.map(|dt| download::is_driver_version_installed(dt, &v.version)).unwrap_or(false)
+            db_type
+                .map(|dt| download::is_driver_version_installed(dt, &v.version))
+                .unwrap_or(false)
         });
         result.push(DriverInfo {
             db_type: key.clone(),
@@ -80,14 +80,29 @@ pub async fn list_drivers() -> Result<Vec<DriverInfo>, String> {
 pub async fn download_driver(db_type: String) -> Result<(), String> {
     let dt = parse_db_type(&db_type).map_err(|e| e.to_string())?;
     let registry = DriverRegistry::load();
-    let config = registry.get_config(dt).ok_or_else(|| format!("No registry entry for {}", db_type))?;
+    let config = registry
+        .get_config(dt)
+        .ok_or_else(|| format!("No registry entry for {}", db_type))?;
     if let Some(version) = config.versions.first() {
-        let maven_group = version.maven_group_override.as_deref().unwrap_or(&config.maven_group);
-        let maven_artifact = version.maven_artifact_override.as_deref().unwrap_or(&config.maven_artifact);
+        let maven_group = version
+            .maven_group_override
+            .as_deref()
+            .unwrap_or(&config.maven_group);
+        let maven_artifact = version
+            .maven_artifact_override
+            .as_deref()
+            .unwrap_or(&config.maven_artifact);
         let dest = download::driver_jar_path_for_version(dt, &version.version);
-        download::download_driver_from_maven(maven_group, maven_artifact, &version.version, &dest, &version.jar_sha256, version.maven_classifier.as_deref())
-            .await
-            .map_err(|e| e.to_string())?;
+        download::download_driver_from_maven(
+            maven_group,
+            maven_artifact,
+            &version.version,
+            &dest,
+            &version.jar_sha256,
+            version.maven_classifier.as_deref(),
+        )
+        .await
+        .map_err(|e| e.to_string())?;
     }
     Ok(())
 }
@@ -96,7 +111,9 @@ pub async fn download_driver(db_type: String) -> Result<(), String> {
 pub async fn remove_driver(db_type: String) -> Result<(), String> {
     let dt = parse_db_type(&db_type).map_err(|e| e.to_string())?;
     let registry = DriverRegistry::load();
-    let config = registry.get_config(dt).ok_or_else(|| format!("No registry entry for {}", db_type))?;
+    let config = registry
+        .get_config(dt)
+        .ok_or_else(|| format!("No registry entry for {}", db_type))?;
     for version in &config.versions {
         let path = download::driver_jar_path_for_version(dt, &version.version);
         if path.exists() {
