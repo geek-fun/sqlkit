@@ -3,6 +3,7 @@
 //! This module defines configuration structures for establishing database connections
 //! with support for various database types and connection options.
 
+use crate::ssh::config::TransportLayerConfig;
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
@@ -213,6 +214,9 @@ pub struct ConnectionConfig {
     /// Connection pooling configuration.
     #[serde(default)]
     pub pool_config: PoolConfig,
+    /// Transport layer configuration (SSH tunnels, proxies).
+    #[serde(default)]
+    pub transport_layers: Vec<TransportLayerConfig>,
 }
 
 impl ConnectionConfig {
@@ -237,6 +241,7 @@ impl ConnectionConfig {
             trust_server_certificate: false,
             options: std::collections::HashMap::new(),
             pool_config: PoolConfig::default(),
+            transport_layers: Vec::new(),
         }
     }
 
@@ -261,6 +266,12 @@ impl ConnectionConfig {
     /// Set the pool configuration.
     pub fn with_pool_config(mut self, pool_config: PoolConfig) -> Self {
         self.pool_config = pool_config;
+        self
+    }
+
+    /// Set the transport layer configuration.
+    pub fn with_transport_layers(mut self, layers: Vec<TransportLayerConfig>) -> Self {
+        self.transport_layers = layers;
         self
     }
 

@@ -1,5 +1,6 @@
 pub mod api_response;
 pub mod database;
+pub mod ssh;
 pub mod transfer;
 
 // Application state management

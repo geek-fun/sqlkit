@@ -20,7 +20,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { toast } from '@/composables/useNotifications'
-import { DatabaseType, dbTypeToBackend, resolveDatabase } from '@/store'
+import { buildTransportLayers, DatabaseType, dbTypeToBackend, resolveDatabase } from '@/store'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import SslConfigSection from './ssl/SslConfigSection.vue'
 
@@ -115,6 +115,22 @@ const formData = ref<ServerConnection>({ ...defaultConnection })
 const testStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
 const testError = ref<string>('')
 const formErrors = ref<Record<string, string>>({})
+const showAdvanced = ref(false)
+
+function toggleSsh(checked: boolean) {
+  if (!formData.value.sshTunnel) {
+    formData.value.sshTunnel = {
+      enabled: checked,
+      host: '',
+      port: 22,
+      username: '',
+      authMethod: 'password',
+    }
+  }
+  else {
+    formData.value.sshTunnel = { ...formData.value.sshTunnel, enabled: checked }
+  }
+}
 
 // SQLite-specific state
 const sqliteTab = ref<'file' | 'in-memory'>('file')
@@ -308,6 +324,7 @@ async function handleTestConnection() {
       ssl_client_cert: formData.value.ssl.clientCertPath || null,
       ssl_client_key: formData.value.ssl.clientKeyPath || null,
       trust_server_certificate: formData.value.ssl.trustServerCertificate ?? null,
+      transport_layers: buildTransportLayers(formData.value.sshTunnel),
     }
 
     const result = await invoke<{ is_connected: boolean, server_version?: string }>('test_connection', { config })
@@ -881,6 +898,107 @@ function handleSave() {
           :db-type="formData.type"
           :errors="formErrors"
         />
+
+        <!-- Advanced Configuration: SSH Tunnel -->
+        <div v-if="!isFileBased" class="pt-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            class="text-muted-foreground w-full justify-between"
+            @click="showAdvanced = !showAdvanced"
+          >
+            Advanced Configuration
+            <svg
+              class="h-4 w-4 transition-transform" :class="[showAdvanced ? 'rotate-180' : '']"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </Button>
+
+          <div v-if="showAdvanced" class="mt-3 p-4 border rounded-md space-y-4">
+            <div class="flex gap-2 items-center">
+              <input
+                id="use-ssh"
+                type="checkbox"
+                class="border-gray-300 rounded h-4 w-4"
+                :checked="formData.sshTunnel?.enabled ?? false"
+                @change="(e: Event) => toggleSsh((e.target as HTMLInputElement).checked)"
+              >
+              <Label for="use-ssh">Use SSH Tunnel</Label>
+            </div>
+
+            <template v-if="formData.sshTunnel?.enabled">
+              <div class="space-y-2">
+                <Label for="ssh-host">SSH Host</Label>
+                <Input id="ssh-host" v-model="formData.sshTunnel.host" placeholder="ssh.example.com" />
+              </div>
+
+              <div class="gap-4 grid grid-cols-2">
+                <div class="space-y-2">
+                  <Label for="ssh-port">SSH Port</Label>
+                  <Input id="ssh-port" v-model.number="formData.sshTunnel.port" type="number" placeholder="22" />
+                </div>
+                <div class="space-y-2">
+                  <Label for="ssh-user">Username</Label>
+                  <Input id="ssh-user" v-model="formData.sshTunnel.username" placeholder="username" autocomplete="off" />
+                </div>
+              </div>
+
+              <div class="space-y-2">
+                <Label for="ssh-auth">Auth Method</Label>
+                <Select v-model="formData.sshTunnel.authMethod">
+                  <SelectTrigger id="ssh-auth">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectItem value="password">
+                        Password
+                      </SelectItem>
+                      <SelectItem value="privateKey">
+                        Private Key
+                      </SelectItem>
+                      <SelectItem value="agent">
+                        SSH Agent
+                      </SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <template v-if="formData.sshTunnel.authMethod === 'password'">
+                <div class="space-y-2">
+                  <Label for="ssh-password">SSH Password</Label>
+                  <Input id="ssh-password" v-model="formData.sshTunnel.password" type="password" placeholder="SSH password" autocomplete="off" />
+                </div>
+              </template>
+
+              <template v-if="formData.sshTunnel.authMethod === 'privateKey'">
+                <div class="space-y-2">
+                  <Label for="ssh-key">Private Key Path</Label>
+                  <Input id="ssh-key" v-model="formData.sshTunnel.privateKey" placeholder="/path/to/id_rsa" />
+                </div>
+                <div class="space-y-2">
+                  <Label for="ssh-passphrase">Passphrase (optional)</Label>
+                  <Input id="ssh-passphrase" v-model="formData.sshTunnel.privateKeyPassphrase" type="password" placeholder="Key passphrase" autocomplete="off" />
+                </div>
+              </template>
+
+              <template v-if="formData.sshTunnel.authMethod === 'agent'">
+                <p class="text-sm text-muted-foreground">
+                  Using system SSH agent - no additional configuration needed.
+                </p>
+              </template>
+            </template>
+          </div>
+        </div>
 
         <!-- Test Connection Status -->
         <div

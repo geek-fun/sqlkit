@@ -2,6 +2,7 @@ export { useAccountStore } from './accountStore'
 export { LanguageType, ThemeType, useAppStore } from './appStore'
 export type { ChatRuntimeConfig, EditorConfig, FeatureModelRoute, LlmProvider, ModelRef, QueryConfig } from './appStore'
 export {
+  buildTransportLayers,
   ConnectionStatus,
   DatabaseType,
   dbTypeToBackend,
