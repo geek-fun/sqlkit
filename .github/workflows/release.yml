@@ -92,8 +92,8 @@ jobs:
         if: runner.os == 'Windows'
         uses: robinraju/release-downloader@v1.4
         with:
-          repository: "duckdb/duckdb"
-          tag: "v1.5.3"
+          repository: duckdb/duckdb
+          tag: v1.5.3
           fileName: libduckdb-windows-amd64.zip
           out-file-path: .
 

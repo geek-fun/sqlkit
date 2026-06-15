@@ -89,5 +89,8 @@ oracle-rs = { version = "0.1", optional = true }
 [features]
 default = [ "duckdb-bundled" ]
 duckdb = [ "dep:duckdb" ]
-duckdb-bundled = [ "dep:duckdb", "duckdb/bundled" ]
+duckdb-bundled = [
+  "dep:duckdb",
+  "duckdb/bundled",
+]
 oracle = [ "dep:oracle-rs" ]
