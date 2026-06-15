@@ -820,7 +820,7 @@ watch(
 
 <template>
   <div class="data-table-view flex flex-col h-full" @click="showColumnMenu = false">
-<!-- Sub-page navigation bar -->
+    <!-- Sub-page navigation bar -->
     <div class="border-b bg-muted/30 flex">
       <button
         v-for="page in subPages"
@@ -943,101 +943,103 @@ watch(
           :title="t('components.dataTableView.refresh')"
           @click.stop="refresh"
         >
-<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :class="{ 'animate-spin': loading }">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :class="{ 'animate-spin': loading }">
             <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
             <path d="M21 3v5h-5" />
             <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
             <path d="M8 16H3v5" />
-        <!-- Column visibility dropdown -->
-        <div class="flex-shrink-0 relative">
-          <Button
-            variant="ghost"
-            size="icon"
-            class="h-7 w-7"
-            :title="t('components.dataTableView.columns')"
-            @click.stop="showColumnMenu = !showColumnMenu"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect width="18" height="18" x="3" y="3" rx="2" />
-              <path d="M9 3v18" />
-              <path d="M15 3v18" />
-            </svg>
-          </Button>
-
-          <div
-            v-if="showColumnMenu && data && data.columns.length > 0"
-            class="text-popover-foreground mt-1 border rounded-md bg-popover max-h-64 min-w-36 shadow-md right-0 top-full absolute z-50 overflow-auto"
-            @click.stop
-          >
-            <div class="text-xs text-muted-foreground font-semibold p-1 px-2 py-1.5 border-b">
-              {{ t('components.dataTableView.columns') }}
-            </div>
-            <div class="p-1">
-              <button
-                v-for="col in data.columns"
-                :key="col"
-                class="text-sm px-2 py-1 text-left rounded flex gap-2 w-full cursor-pointer items-center hover:bg-accent"
-                @click="toggleColumn(col)"
+            <!-- Column visibility dropdown -->
+            <div class="flex-shrink-0 relative">
+              <Button
+                variant="ghost"
+                size="icon"
+                class="h-7 w-7"
+                :title="t('components.dataTableView.columns')"
+                @click.stop="showColumnMenu = !showColumnMenu"
               >
-                <svg
-                  v-if="!hiddenColumns.has(col)"
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="text-primary flex-shrink-0"
-                >
-                  <polyline points="20 6 9 17 4 12" />
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect width="18" height="18" x="3" y="3" rx="2" />
+                  <path d="M9 3v18" />
+                  <path d="M15 3v18" />
                 </svg>
-                <span v-else class="flex-shrink-0 w-3 inline-block" />
-                <span class="truncate">{{ col }}</span>
-              </button>
+              </Button>
+
+              <div
+                v-if="showColumnMenu && data && data.columns.length > 0"
+                class="text-popover-foreground mt-1 border rounded-md bg-popover max-h-64 min-w-36 shadow-md right-0 top-full absolute z-50 overflow-auto"
+                @click.stop
+              >
+                <div class="text-xs text-muted-foreground font-semibold p-1 px-2 py-1.5 border-b">
+                  {{ t('components.dataTableView.columns') }}
+                </div>
+                <div class="p-1">
+                  <button
+                    v-for="col in data.columns"
+                    :key="col"
+                    class="text-sm px-2 py-1 text-left rounded flex gap-2 w-full cursor-pointer items-center hover:bg-accent"
+                    @click="toggleColumn(col)"
+                  >
+                    <svg
+                      v-if="!hiddenColumns.has(col)"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      class="text-primary flex-shrink-0"
+                    >
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                    <span v-else class="flex-shrink-0 w-3 inline-block" />
+                    <span class="truncate">{{ col }}</span>
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <!-- Delete Selected button -->
-        <Button
-          v-if="selectedRows.size > 0 && pkColumns.length > 0"
-          variant="destructive"
-          size="sm"
-          class="text-xs flex-shrink-0 h-7"
-          @click.stop="batchDeleteDialogOpen = true"
-        >
-          <span class="i-carbon-trash-can mr-1 h-3.5 w-3.5" />
-          Delete Selected ({{ selectedRows.size }})
-        </Button>
+            <!-- Delete Selected button -->
+            <Button
+              v-if="selectedRows.size > 0 && pkColumns.length > 0"
+              variant="destructive"
+              size="sm"
+              class="text-xs flex-shrink-0 h-7"
+              @click.stop="batchDeleteDialogOpen = true"
+            >
+              <span class="i-carbon-trash-can mr-1 h-3.5 w-3.5" />
+              Delete Selected ({{ selectedRows.size }})
+            </Button>
 
-        <!-- Export CSV button (current page) -->
-        <Button
-          variant="ghost"
-          size="icon"
-          class="flex-shrink-0 h-7 w-7"
-          :disabled="!data || data.rows.length === 0 || isExporting"
-          :title="t('components.dataTableView.exportCsv')"
-          @click.stop="exportCSV"
-        >
-          <Spinner v-if="isExporting" size="sm" />
-          <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" x2="12" y1="15" y2="3" />
+            <!-- Export CSV button (current page) -->
+            <Button
+              variant="ghost"
+              size="icon"
+              class="flex-shrink-0 h-7 w-7"
+              :disabled="!data || data.rows.length === 0 || isExporting"
+              :title="t('components.dataTableView.exportCsv')"
+              @click.stop="exportCSV"
+            >
+              <Spinner v-if="isExporting" size="sm" />
+              <svg v-else xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" x2="12" y1="15" y2="3" />
+              </svg>
+            </Button>
+
+            <!-- Apply Filters button -->
+            <Button
+              size="sm"
+              class="text-xs flex-shrink-0 h-7"
+              @click.stop="applyFilter"
+            >
+              {{ t('components.dataTableView.applyFilters') }}
+            </Button>
           </svg>
-        </Button>
-
-        <!-- Apply Filters button -->
-        <Button
-          size="sm"
-          class="text-xs flex-shrink-0 h-7"
-          @click.stop="applyFilter"
-        >
-          {{ t('components.dataTableView.applyFilters') }}
-        </Button>
+        </button>
       </div>
 
       <!-- Table area -->
