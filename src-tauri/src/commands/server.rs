@@ -7,6 +7,7 @@ use crate::database::ConnectionStatus;
 use crate::ssh::TunnelManager;
 use crate::state::ServerConfig;
 use tauri::State;
+use uuid::Uuid;
 
 /// Save or update a server connection configuration.
 ///
@@ -159,10 +160,10 @@ pub async fn test_connection(config: ServerConfig) -> Result<ConnectionStatus, S
     // Start SSH tunnel if transport layers are configured
     if !conn_config.transport_layers.is_empty() {
         let tunnels = TunnelManager::new();
-        let connection_id = "test_connection";
+        let connection_id = Uuid::new_v4().to_string();
 
         match crate::commands::helpers::connection_host_port(
-            connection_id,
+            &connection_id,
             &conn_config,
             &tunnels,
         )
@@ -173,13 +174,13 @@ pub async fn test_connection(config: ServerConfig) -> Result<ConnectionStatus, S
                 conn_config.port = port;
             }
             Err(e) => {
-                tunnels.stop_tunnel(connection_id).await;
+                tunnels.stop_tunnel(&connection_id).await;
                 return Err(e);
             }
         }
 
         let result = crate::commands::helpers::test_connection(&config.db_type, conn_config).await;
-        tunnels.stop_tunnel(connection_id).await;
+        tunnels.stop_tunnel(&connection_id).await;
         return result;
     }
 
