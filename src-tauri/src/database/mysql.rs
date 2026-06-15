@@ -9,7 +9,8 @@ use crate::database::{
     error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{
-        ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
+        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+        QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
     },
 };
 use async_trait::async_trait;
@@ -621,6 +622,373 @@ impl DatabaseAdapter for MySQLAdapter {
             description,
             metadata: HashMap::new(),
         })
+    }
+
+    async fn list_views(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        let mut conn = self.get_conn().await?;
+        let db_name = database
+            .or(schema)
+            .or(self.config.database.as_deref())
+            .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
+
+        let rows: Vec<Row> = conn
+            .exec(
+                "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_TYPE = 'VIEW' AND TABLE_SCHEMA = ? ORDER BY TABLE_NAME",
+                (db_name,),
+            )
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let views = rows
+            .into_iter()
+            .map(|row| {
+                let name: String = row.get(0).unwrap();
+                ObjectInfo {
+                    name,
+                    object_type: "VIEW".to_string(),
+                    schema: Some(db_name.to_string()),
+                    detail: None,
+                }
+            })
+            .collect();
+
+        Ok(views)
+    }
+
+    async fn list_procedures(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        let mut conn = self.get_conn().await?;
+        let db_name = database
+            .or(schema)
+            .or(self.config.database.as_deref())
+            .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
+
+        let rows: Vec<Row> = conn
+            .exec(
+                "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_TYPE = 'PROCEDURE' AND ROUTINE_SCHEMA = ? ORDER BY ROUTINE_NAME",
+                (db_name,),
+            )
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let procedures = rows
+            .into_iter()
+            .map(|row| {
+                let name: String = row.get(0).unwrap();
+                ObjectInfo {
+                    name,
+                    object_type: "PROCEDURE".to_string(),
+                    schema: Some(db_name.to_string()),
+                    detail: None,
+                }
+            })
+            .collect();
+
+        Ok(procedures)
+    }
+
+    async fn list_functions(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        let mut conn = self.get_conn().await?;
+        let db_name = database
+            .or(schema)
+            .or(self.config.database.as_deref())
+            .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
+
+        let rows: Vec<Row> = conn
+            .exec(
+                "SELECT ROUTINE_NAME FROM INFORMATION_SCHEMA.ROUTINES WHERE ROUTINE_TYPE = 'FUNCTION' AND ROUTINE_SCHEMA = ? ORDER BY ROUTINE_NAME",
+                (db_name,),
+            )
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let functions = rows
+            .into_iter()
+            .map(|row| {
+                let name: String = row.get(0).unwrap();
+                ObjectInfo {
+                    name,
+                    object_type: "FUNCTION".to_string(),
+                    schema: Some(db_name.to_string()),
+                    detail: None,
+                }
+            })
+            .collect();
+
+        Ok(functions)
+    }
+
+    async fn list_triggers(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<TriggerInfo>> {
+        let mut conn = self.get_conn().await?;
+        let db_name = database
+            .or(schema)
+            .or(self.config.database.as_deref())
+            .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
+
+        let rows: Vec<Row> = conn
+            .exec(
+                "SELECT TRIGGER_NAME, ACTION_TIMING, EVENT_MANIPULATION, ACTION_STATEMENT FROM INFORMATION_SCHEMA.TRIGGERS WHERE TRIGGER_SCHEMA = ? AND EVENT_OBJECT_TABLE = ?",
+                (db_name, table),
+            )
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let triggers = rows
+            .into_iter()
+            .map(|row| {
+                let name: String = row.get(0).unwrap();
+                let action_timing: String = row.get(1).unwrap();
+                let event: String = row.get(2).unwrap();
+                let ddl: Option<String> = row.get(3);
+                TriggerInfo {
+                    name,
+                    action_timing,
+                    event,
+                    ddl,
+                }
+            })
+            .collect();
+
+        Ok(triggers)
+    }
+
+    async fn list_indexes(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<IndexInfo>> {
+        let mut conn = self.get_conn().await?;
+        let db_name = database
+            .or(schema)
+            .or(self.config.database.as_deref())
+            .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
+
+        let query = format!("SHOW INDEX FROM `{}`.`{}`", db_name, table);
+        let rows: Vec<Row> = conn
+            .query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        // SHOW INDEX returns: Table, Non_unique, Key_name, Seq_in_index, Column_name, Collation, ...
+        let mut index_map: std::collections::HashMap<String, IndexInfo> =
+            std::collections::HashMap::new();
+
+        for row in rows {
+            let key_name: String = row.get(2).unwrap_or_default();
+            let column_name: String = row.get(4).unwrap_or_default();
+            let non_unique: i32 = row.get(1).unwrap_or(1);
+            let index_type: String = row.get(10).unwrap_or_else(|| "BTREE".to_string());
+            let is_unique = non_unique == 0;
+            let is_primary = key_name.to_uppercase() == "PRIMARY";
+
+            index_map
+                .entry(key_name.clone())
+                .and_modify(|idx| idx.columns.push(column_name.clone()))
+                .or_insert(IndexInfo {
+                    name: key_name,
+                    columns: vec![column_name],
+                    index_type,
+                    is_unique,
+                    is_primary,
+                });
+        }
+
+        let indexes: Vec<IndexInfo> = index_map.into_values().collect();
+        Ok(indexes)
+    }
+
+    async fn list_foreign_keys(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        let mut conn = self.get_conn().await?;
+        let db_name = database
+            .or(schema)
+            .or(self.config.database.as_deref())
+            .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
+
+        let rows: Vec<Row> = conn
+            .exec(
+                "SELECT kcu.COLUMN_NAME, kcu.REFERENCED_TABLE_SCHEMA, kcu.REFERENCED_TABLE_NAME, kcu.REFERENCED_COLUMN_NAME, kcu.CONSTRAINT_NAME, rc.UPDATE_RULE, rc.DELETE_RULE FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE kcu LEFT JOIN INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS rc ON kcu.CONSTRAINT_NAME = rc.CONSTRAINT_NAME AND kcu.CONSTRAINT_SCHEMA = rc.CONSTRAINT_SCHEMA WHERE kcu.TABLE_SCHEMA = ? AND kcu.TABLE_NAME = ? AND kcu.REFERENCED_TABLE_NAME IS NOT NULL ORDER BY kcu.CONSTRAINT_NAME, kcu.ORDINAL_POSITION",
+                (db_name, table),
+            )
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let mut fk_map: std::collections::HashMap<String, ForeignKeyInfo> =
+            std::collections::HashMap::new();
+
+        for row in rows {
+            let column_name: String = row.get_opt(0).and_then(|r| r.ok()).unwrap_or_default();
+            let referenced_schema: Option<String> =
+                row.get_opt(1).and_then(|r| r.ok()).flatten();
+            let referenced_table: String =
+                row.get_opt(2).and_then(|r| r.ok()).unwrap_or_default();
+            let referenced_column: String =
+                row.get_opt(3).and_then(|r| r.ok()).unwrap_or_default();
+            let constraint_name: String =
+                row.get_opt(4).and_then(|r| r.ok()).unwrap_or_default();
+            let on_update: Option<String> = row.get_opt(5).and_then(|r| r.ok()).flatten();
+            let on_delete: Option<String> = row.get_opt(6).and_then(|r| r.ok()).flatten();
+
+            fk_map
+                .entry(constraint_name.clone())
+                .and_modify(|fk| {
+                    fk.columns.push(column_name.clone());
+                    fk.referenced_columns.push(referenced_column.clone());
+                })
+                .or_insert(ForeignKeyInfo {
+                    constraint_name,
+                    columns: vec![column_name],
+                    referenced_schema,
+                    referenced_table,
+                    referenced_columns: vec![referenced_column],
+                    on_update,
+                    on_delete,
+                });
+        }
+
+        let foreign_keys: Vec<ForeignKeyInfo> = fk_map.into_values().collect();
+        Ok(foreign_keys)
+    }
+
+    async fn get_object_ddl(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<String> {
+        let mut conn = self.get_conn().await?;
+        let db_name = database
+            .or(schema)
+            .or(self.config.database.as_deref())
+            .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
+
+        let sql = match object_type.to_uppercase().as_str() {
+            "VIEW" => format!("SHOW CREATE VIEW `{}`.`{}`", db_name, object_name),
+            "PROCEDURE" => format!("SHOW CREATE PROCEDURE `{}`.`{}`", db_name, object_name),
+            "FUNCTION" => format!("SHOW CREATE FUNCTION `{}`.`{}`", db_name, object_name),
+            "TRIGGER" => format!("SHOW CREATE TRIGGER `{}`.`{}`", db_name, object_name),
+            _ => {
+                return Err(DbError::UnsupportedOperation(format!(
+                    "get_object_ddl not supported for type: {}",
+                    object_type
+                )))
+            }
+        };
+
+        let row: Row = conn
+            .query_first(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .ok_or_else(|| DbError::DatabaseNotFound(object_name.to_string()))?;
+
+        // SHOW CREATE VIEW puts DDL in column 1 (Create View), others use column 2
+        let ddl: String = if object_type.to_uppercase() == "VIEW" {
+            row.get_opt(1).and_then(|r| r.ok())
+        } else {
+            row.get_opt(2).and_then(|r| r.ok())
+        }
+        .ok_or_else(|| {
+            DbError::DatabaseNotFound(format!("Could not get DDL for {}", object_name))
+        })?;
+
+        Ok(ddl)
+    }
+
+    async fn drop_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<()> {
+        let mut conn = self.get_conn().await?;
+        let db_name = database
+            .or(schema)
+            .or(self.config.database.as_deref())
+            .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
+
+        let sql = match object_type.to_uppercase().as_str() {
+            "VIEW" => format!("DROP VIEW IF EXISTS `{}`.`{}`", db_name, object_name),
+            "PROCEDURE" => {
+                format!("DROP PROCEDURE IF EXISTS `{}`.`{}`", db_name, object_name)
+            }
+            "FUNCTION" => {
+                format!("DROP FUNCTION IF EXISTS `{}`.`{}`", db_name, object_name)
+            }
+            "TRIGGER" => {
+                format!("DROP TRIGGER IF EXISTS `{}`.`{}`", db_name, object_name)
+            }
+            _ => {
+                return Err(DbError::UnsupportedOperation(format!(
+                    "drop_object not supported for type: {}",
+                    object_type
+                )))
+            }
+        };
+
+        conn.query_drop(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn rename_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+        new_name: &str,
+    ) -> DbResult<()> {
+        let mut conn = self.get_conn().await?;
+        let db_name = database
+            .or(schema)
+            .or(self.config.database.as_deref())
+            .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
+
+        let sql = match object_type.to_uppercase().as_str() {
+            "TABLE" | "VIEW" => {
+                format!(
+                    "RENAME TABLE `{}`.`{}` TO `{}`.`{}`",
+                    db_name, object_name, db_name, new_name
+                )
+            }
+            _ => {
+                return Err(DbError::UnsupportedOperation(format!(
+                    "rename_object not supported for type: {}",
+                    object_type
+                )))
+            }
+        };
+
+        conn.query_drop(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
     }
 
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {

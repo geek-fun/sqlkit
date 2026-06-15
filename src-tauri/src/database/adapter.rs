@@ -7,7 +7,10 @@ use crate::database::{
     config::ConnectionConfig,
     error::{DbError, DbResult},
     pool::ConnectionPool,
-    types::{ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, TableInfo},
+    types::{
+        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+        QueryResult, TableInfo, TriggerInfo,
+    },
 };
 use async_trait::async_trait;
 use std::sync::Arc;
@@ -146,6 +149,97 @@ pub trait DatabaseAdapter: Send + Sync {
         _table: &str,
     ) -> DbResult<TableInfo> {
         Err(DbError::unsupported("get_table_info"))
+    }
+
+    /// List all views in a schema.
+    async fn list_views(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        Err(DbError::unsupported("list_views"))
+    }
+
+    /// List all procedures in a schema.
+    async fn list_procedures(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        Err(DbError::unsupported("list_procedures"))
+    }
+
+    /// List all functions in a schema.
+    async fn list_functions(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        Err(DbError::unsupported("list_functions"))
+    }
+
+    /// List all triggers for a table.
+    async fn list_triggers(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        _table: &str,
+    ) -> DbResult<Vec<TriggerInfo>> {
+        Err(DbError::unsupported("list_triggers"))
+    }
+
+    /// List all indexes for a table.
+    async fn list_indexes(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        _table: &str,
+    ) -> DbResult<Vec<IndexInfo>> {
+        Err(DbError::unsupported("list_indexes"))
+    }
+
+    /// List all foreign keys for a table.
+    async fn list_foreign_keys(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        _table: &str,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        Err(DbError::unsupported("list_foreign_keys"))
+    }
+
+    /// Get the DDL source for an object.
+    async fn get_object_ddl(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        _object_name: &str,
+        _object_type: &str,
+    ) -> DbResult<String> {
+        Err(DbError::unsupported("get_object_ddl"))
+    }
+
+    /// Drop a database object.
+    async fn drop_object(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        _object_name: &str,
+        _object_type: &str,
+    ) -> DbResult<()> {
+        Err(DbError::unsupported("drop_object"))
+    }
+
+    /// Rename a database object.
+    async fn rename_object(
+        &self,
+        _database: Option<&str>,
+        _schema: Option<&str>,
+        _object_name: &str,
+        _object_type: &str,
+        _new_name: &str,
+    ) -> DbResult<()> {
+        Err(DbError::unsupported("rename_object"))
     }
 
     /// Get the connection pool.

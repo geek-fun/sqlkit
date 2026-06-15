@@ -20,6 +20,12 @@ export type TableViewMeta = {
   schema?: string
 }
 
+export type ListingTabMeta = {
+  type: 'VIEW' | 'PROCEDURE' | 'FUNCTION'
+  database: string
+  schema?: string
+}
+
 export type QueryTab = {
   id: string
   name: string
@@ -35,6 +41,7 @@ export type QueryTab = {
   error?: ApiError | string
   executionTime?: number
   tableView?: TableViewMeta
+  listingTab?: ListingTabMeta
   /** If set, this tab is orphaned from the specified connection and cannot execute queries */
   orphanFromConnectionId?: string
 }
@@ -115,6 +122,38 @@ export const useTabStore = defineStore('tabs', {
         isExecuting: false,
         hasUnsavedChanges: false,
         tableView: { tableName, database, schema },
+      }
+      this.tabs = [...this.tabs, tab]
+      this.activeTabId = tab.id
+      return tab
+    },
+
+    openListingTab(connectionId: string, database: string, type: 'VIEW' | 'PROCEDURE' | 'FUNCTION', schema?: string): QueryTab {
+      const existing = this.tabs.find(
+        t => t.listingTab
+          && t.listingTab.type === type
+          && t.listingTab.database === database
+          && (t.listingTab.schema ?? null) === (schema ?? null)
+          && t.connectionId === connectionId
+          && !t.orphanFromConnectionId,
+      )
+      if (existing) {
+        this.activeTabId = existing.id
+        return existing
+      }
+
+      const typeLabel = type === 'VIEW' ? 'Views' : type === 'PROCEDURE' ? 'Procedures' : 'Functions'
+      const tabName = schema ? `${typeLabel} — ${schema}` : `${typeLabel} — ${database}`
+      const tab: QueryTab = {
+        id: generateId(),
+        name: tabName,
+        content: '',
+        connectionId,
+        database,
+        schema,
+        isExecuting: false,
+        hasUnsavedChanges: false,
+        listingTab: { type, database, schema },
       }
       this.tabs = [...this.tabs, tab]
       this.activeTabId = tab.id

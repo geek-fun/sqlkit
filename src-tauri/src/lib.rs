@@ -208,6 +208,16 @@ pub fn run() {
             commands::get_table_count,
             commands::update_table_row,
             commands::delete_table_row,
+            // Schema object browsing commands
+            commands::list_views,
+            commands::list_procedures,
+            commands::list_functions,
+            commands::list_triggers,
+            commands::list_indexes,
+            commands::list_foreign_keys,
+            commands::get_object_ddl,
+            commands::drop_object,
+            commands::rename_object,
             commands::build_table_search_filter,
             // File operations commands
             commands::save_query_file,

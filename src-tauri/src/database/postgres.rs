@@ -9,7 +9,8 @@ use crate::database::{
     error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{
-        ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
+        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+        QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
     },
 };
 use async_trait::async_trait;
@@ -1112,6 +1113,642 @@ impl DatabaseAdapter for PostgresAdapter {
             description,
             metadata: HashMap::new(),
         })
+    }
+
+    async fn list_views(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = PostgresAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_views(None, schema).await;
+            }
+        }
+
+        let schema_filter = schema.unwrap_or("public");
+
+        let query = r#"
+            SELECT
+                table_name as name,
+                'VIEW' as object_type,
+                table_schema as schema_name,
+                view_definition as definition
+            FROM information_schema.views
+            WHERE table_schema = $1
+            ORDER BY table_name
+        "#;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let rows = client
+            .query(query, &[&schema_filter])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let views = rows
+            .iter()
+            .map(|row| {
+                let name: String = row.get(0);
+                let object_type: String = row.get(1);
+                let schema_name: String = row.get(2);
+                let definition: Option<String> = row.get(3);
+                let detail = definition.map(|def| {
+                    if def.len() > 100 {
+                        format!("{}...", &def[..100])
+                    } else {
+                        def
+                    }
+                });
+                ObjectInfo {
+                    name,
+                    object_type,
+                    schema: Some(schema_name),
+                    detail,
+                }
+            })
+            .collect();
+
+        Ok(views)
+    }
+
+    async fn list_procedures(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = PostgresAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_procedures(None, schema).await;
+            }
+        }
+
+        let schema_filter = schema.unwrap_or("public");
+
+        let query = r#"
+            SELECT
+                p.proname as name,
+                'PROCEDURE' as object_type,
+                n.nspname as schema_name,
+                pg_get_function_arguments(p.oid) as args,
+                pg_get_function_result(p.oid) as result_type
+            FROM pg_proc p
+            JOIN pg_namespace n ON p.pronamespace = n.oid
+            WHERE p.prokind = 'p'
+            AND n.nspname = $1
+            ORDER BY p.proname
+        "#;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let rows = client
+            .query(query, &[&schema_filter])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let procs = rows
+            .iter()
+            .map(|row| {
+                let name: String = row.get(0);
+                let object_type: String = row.get(1);
+                let schema_name: String = row.get(2);
+                let args: Option<String> = row.get(3);
+                let detail = args.map(|a| format!("({})", a));
+                ObjectInfo {
+                    name,
+                    object_type,
+                    schema: Some(schema_name),
+                    detail,
+                }
+            })
+            .collect();
+
+        Ok(procs)
+    }
+
+    async fn list_functions(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                let mut temp_config = self.config.clone();
+                temp_config.database = Some(db.to_string());
+                let mut temp_adapter = PostgresAdapter::new(temp_config);
+                temp_adapter.connect().await?;
+                return temp_adapter.list_functions(None, schema).await;
+            }
+        }
+
+        let schema_filter = schema.unwrap_or("public");
+
+        let query = r#"
+            SELECT
+                p.proname as name,
+                'FUNCTION' as object_type,
+                n.nspname as schema_name,
+                pg_get_function_arguments(p.oid) as args,
+                pg_get_function_result(p.oid) as result_type
+            FROM pg_proc p
+            JOIN pg_namespace n ON p.pronamespace = n.oid
+            WHERE p.prokind = 'f'
+            AND n.nspname = $1
+            ORDER BY p.proname
+        "#;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let rows = client
+            .query(query, &[&schema_filter])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let funcs = rows
+            .iter()
+            .map(|row| {
+                let name: String = row.get(0);
+                let object_type: String = row.get(1);
+                let schema_name: String = row.get(2);
+                let args: Option<String> = row.get(3);
+                let result_type: Option<String> = row.get(4);
+                let detail = match (args, result_type) {
+                    (Some(a), Some(r)) => Some(format!("({}) → {}", a, r)),
+                    (Some(a), None) => Some(format!("({})", a)),
+                    (None, Some(r)) => Some(r),
+                    _ => None,
+                };
+                ObjectInfo {
+                    name,
+                    object_type,
+                    schema: Some(schema_name),
+                    detail,
+                }
+            })
+            .collect();
+
+        Ok(funcs)
+    }
+
+    async fn list_triggers(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<TriggerInfo>> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot list triggers from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("public");
+
+        let query = r#"
+            SELECT
+                trigger_name,
+                action_timing,
+                event_manipulation,
+                action_statement
+            FROM information_schema.triggers
+            WHERE event_object_schema = $1
+            AND event_object_table = $2
+            ORDER BY trigger_name
+        "#;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let rows = client
+            .query(query, &[&schema_filter, &table])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let triggers = rows
+            .iter()
+            .map(|row| {
+                let name: String = row.get(0);
+                let action_timing: String = row.get(1);
+                let event: String = row.get(2);
+                let ddl: Option<String> = row.get(3);
+                TriggerInfo {
+                    name,
+                    action_timing,
+                    event,
+                    ddl,
+                }
+            })
+            .collect();
+
+        Ok(triggers)
+    }
+
+    async fn list_indexes(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<IndexInfo>> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot list indexes from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("public");
+
+        let query = r#"
+            SELECT
+                indexname,
+                indexdef,
+                tablename
+            FROM pg_indexes
+            WHERE schemaname = $1
+            AND tablename = $2
+            ORDER BY indexname
+        "#;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let rows = client
+            .query(query, &[&schema_filter, &table])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let indexes = rows
+            .iter()
+            .map(|row| {
+                let name: String = row.get(0);
+                let indexdef: String = row.get(2);
+
+                // Extract index type from definition
+                let index_type = if indexdef.contains("USING BTREE") || indexdef.contains("USING btree")
+                {
+                    "BTREE"
+                } else if indexdef.contains("USING HASH") || indexdef.contains("USING hash") {
+                    "HASH"
+                } else if indexdef.contains("USING GIN") || indexdef.contains("USING gin") {
+                    "GIN"
+                } else if indexdef.contains("USING GIST") || indexdef.contains("USING gist") {
+                    "GIST"
+                } else {
+                    "BTREE"
+                };
+
+                let is_unique = indexdef.to_uppercase().contains("UNIQUE");
+                let is_primary = indexdef.to_uppercase().contains("PRIMARY KEY");
+
+                // Extract columns from definition
+                let columns = if let Some(idx) = indexdef.find('(') {
+                    let rest = &indexdef[idx + 1..];
+                    if let Some(end) = rest.rfind(')') {
+                        rest[..end]
+                            .split(',')
+                            .map(|c| c.trim().trim_matches('"').to_string())
+                            .collect()
+                    } else {
+                        vec![]
+                    }
+                } else {
+                    vec![]
+                };
+
+                IndexInfo {
+                    name,
+                    columns,
+                    index_type: index_type.to_string(),
+                    is_unique,
+                    is_primary,
+                }
+            })
+            .collect();
+
+        Ok(indexes)
+    }
+
+    async fn list_foreign_keys(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot list foreign keys from a different database without reconnecting"
+                    .to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("public");
+
+        let query = r#"
+            SELECT
+                tc.constraint_name,
+                kcu.column_name,
+                ccu.table_schema AS referenced_schema,
+                ccu.table_name AS referenced_table,
+                ccu.column_name AS referenced_column,
+                rc.update_rule,
+                rc.delete_rule
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage ccu
+                ON tc.constraint_name = ccu.constraint_name
+                AND tc.table_schema = ccu.table_schema
+            JOIN information_schema.referential_constraints rc
+                ON tc.constraint_name = rc.constraint_name
+                AND tc.table_schema = rc.constraint_schema
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+            AND tc.table_schema = $1
+            AND tc.table_name = $2
+            ORDER BY tc.constraint_name, kcu.ordinal_position
+        "#;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let rows = client
+            .query(query, &[&schema_filter, &table])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        // Group by constraint name
+        let mut fk_map: std::collections::HashMap<String, ForeignKeyInfo> =
+            std::collections::HashMap::new();
+        for row in &rows {
+            let constraint_name: String = row.get(0);
+            let column_name: String = row.get(1);
+            let referenced_schema: Option<String> = row.get(2);
+            let referenced_table: String = row.get(3);
+            let referenced_column: String = row.get(4);
+            let on_update: Option<String> = row.get(5);
+            let on_delete: Option<String> = row.get(6);
+
+            fk_map
+                .entry(constraint_name.clone())
+                .and_modify(|fk| {
+                    fk.columns.push(column_name.clone());
+                    fk.referenced_columns.push(referenced_column.clone());
+                })
+                .or_insert(ForeignKeyInfo {
+                    constraint_name,
+                    columns: vec![column_name],
+                    referenced_schema,
+                    referenced_table,
+                    referenced_columns: vec![referenced_column],
+                    on_update,
+                    on_delete,
+                });
+        }
+
+        let foreign_keys: Vec<ForeignKeyInfo> = fk_map.into_values().collect();
+        Ok(foreign_keys)
+    }
+
+    async fn get_object_ddl(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<String> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot get DDL from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("public");
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        match object_type.to_uppercase().as_str() {
+            "VIEW" => {
+                let query = r#"
+                    SELECT view_definition
+                    FROM information_schema.views
+                    WHERE table_schema = $1 AND table_name = $2
+                "#;
+                let rows = client
+                    .query(query, &[&schema_filter, &object_name])
+                    .await
+                    .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+                rows.first()
+                    .map(|r| r.get::<_, String>(0))
+                    .ok_or_else(|| DbError::DatabaseNotFound(object_name.to_string()))
+            }
+            "PROCEDURE" | "FUNCTION" => {
+                let query = r#"
+                    SELECT pg_get_functiondef(p.oid)
+                    FROM pg_proc p
+                    JOIN pg_namespace n ON p.pronamespace = n.oid
+                    WHERE p.proname = $1 AND n.nspname = $2
+                "#;
+                let rows = client
+                    .query(query, &[&object_name, &schema_filter])
+                    .await
+                    .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+                rows.first()
+                    .map(|r| r.get::<_, String>(0))
+                    .ok_or_else(|| DbError::DatabaseNotFound(object_name.to_string()))
+            }
+            "TRIGGER" => {
+                let query = r#"
+                    SELECT pg_get_triggerdef(t.oid)
+                    FROM pg_trigger t
+                    JOIN pg_class c ON t.tgrelid = c.oid
+                    JOIN pg_namespace n ON c.relnamespace = n.oid
+                    WHERE t.tgname = $1 AND n.nspname = $2
+                "#;
+                let rows = client
+                    .query(query, &[&object_name, &schema_filter])
+                    .await
+                    .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+                rows.first()
+                    .map(|r| r.get::<_, String>(0))
+                    .ok_or_else(|| DbError::DatabaseNotFound(object_name.to_string()))
+            }
+            _ => Err(DbError::UnsupportedOperation(format!(
+                "get_object_ddl not supported for type: {}",
+                object_type
+            ))),
+        }
+    }
+
+    async fn drop_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<()> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot drop object from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("public");
+        let qualified = format!("\"{}\".\"{}\"", schema_filter.replace('"', "\"\""), object_name.replace('"', "\"\""));
+
+        let sql = match object_type.to_uppercase().as_str() {
+            "VIEW" => format!("DROP VIEW IF EXISTS {} CASCADE", qualified),
+            "PROCEDURE" => format!("DROP PROCEDURE IF EXISTS {} CASCADE", qualified),
+            "FUNCTION" => format!("DROP FUNCTION IF EXISTS {} CASCADE", qualified),
+            "TRIGGER" => {
+                // For triggers, we need the table name too
+                return Err(DbError::UnsupportedOperation(
+                    "Drop trigger requires table name; use DROP TRIGGER on table instead"
+                        .to_string(),
+                ));
+            }
+            "TABLE" => format!("DROP TABLE IF EXISTS {} CASCADE", qualified),
+            _ => {
+                return Err(DbError::UnsupportedOperation(format!(
+                    "drop_object not supported for type: {}",
+                    object_type
+                )))
+            }
+        };
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        client
+            .execute(&sql, &[])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn rename_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+        new_name: &str,
+    ) -> DbResult<()> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot rename object from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let schema_filter = schema.unwrap_or("public");
+        let qualified = format!("\"{}\".\"{}\"", schema_filter.replace('"', "\"\""), object_name.replace('"', "\"\""));
+        let new_quoted = format!("\"{}\"", new_name.replace('"', "\"\""));
+
+        let sql = match object_type.to_uppercase().as_str() {
+            "TABLE" => format!("ALTER TABLE {} RENAME TO {}", qualified, new_quoted),
+            "VIEW" => format!("ALTER VIEW {} RENAME TO {}", qualified, new_quoted),
+            "PROCEDURE" => format!("ALTER PROCEDURE {} RENAME TO {}", qualified, new_quoted),
+            "FUNCTION" => format!("ALTER FUNCTION {} RENAME TO {}", qualified, new_quoted),
+            _ => {
+                return Err(DbError::UnsupportedOperation(format!(
+                    "rename_object not supported for type: {}",
+                    object_type
+                )))
+            }
+        };
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        client
+            .execute(&sql, &[])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
     }
 
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {
