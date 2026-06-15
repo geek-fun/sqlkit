@@ -15,9 +15,8 @@ use tokio::sync::Mutex;
 
 use super::launcher::JdbcBridgeLauncher;
 use super::pool::JdbcBridgePool;
-use super::progress::ConnectionProgress;
 use super::protocol::{
-    ConnectParams, ConnectionStatusData, JdbcMethod, JdbcRequest, QueryResultData,
+    ConnectionStatusData, JdbcMethod, JdbcRequest, QueryResultData,
 };
 
 /// JDBC bridge adapter.

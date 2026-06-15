@@ -1,5 +1,4 @@
 use crate::database::{ConnectionStatus, DatabaseAdapter};
-use crate::ssh::TunnelManager;
 use crate::state::{ActiveConnection, AppState};
 use tauri::State;
 

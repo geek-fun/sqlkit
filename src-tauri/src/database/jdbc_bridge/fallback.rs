@@ -1,6 +1,5 @@
 use crate::database::config::DatabaseType;
 use crate::database::error::{DbError, DbResult};
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

@@ -225,10 +225,6 @@ pub fn db_error_to_api_error(error: &crate::database::DbError) -> ApiError {
         )
         .with_details(msg)
         .with_hint("Trying an older/newer driver version may resolve this"),
-        DbError::UnsupportedOperation(msg) => {
-            ApiError::new(error_codes::INVALID_CONFIGURATION, "Unsupported operation")
-                .with_details(msg)
-        }
     }
 }
 

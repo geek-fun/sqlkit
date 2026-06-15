@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-16
+
+### Added
+
+- Firebird, RQLite, Turso, and TDengine database adapters (#93)
+- SSH tunnel and transport layer support (#11, #91)
+
 ## [0.5.5] - 2026-06-16
 
 ### Added

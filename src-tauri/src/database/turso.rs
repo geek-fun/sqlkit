@@ -30,7 +30,7 @@ use std::time::Instant;
 // ---------------------------------------------------------------------------
 
 /// A single value cell in a Turso response row.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 struct TursoValue {
     /// The type discriminator: "null", "integer", "float", "text", "blob".
     #[serde(rename = "type")]
