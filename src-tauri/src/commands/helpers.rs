@@ -21,49 +21,51 @@ pub async fn create_and_connect_adapter(
     let strategy = resolve_effective_type(db_type);
 
     match strategy {
-        ConnectionStrategy::Native(core) => match core {
-            CoreDatabaseType::PostgreSQL => {
-                let mut adapter = PostgresAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::Postgres(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::MySQL => {
-                let mut adapter = MySQLAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::MySQL(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::SqlServer => {
-                let mut adapter = SqlServerAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::SQLServer(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::SQLite => {
-                let mut adapter = SQLiteAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::SQLite(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::DuckDb => {
-                let mut adapter = DuckDbAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::DuckDb(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::ClickHouse => {
-                let mut adapter = ClickHouseAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::ClickHouse(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::Oracle => {
-                #[cfg(feature = "oracle")]
-                {
-                    let mut adapter = crate::database::OracleAdapter::new(conn_config);
+        ConnectionStrategy::Native(core) => {
+            match core {
+                CoreDatabaseType::PostgreSQL => {
+                    let mut adapter = PostgresAdapter::new(conn_config);
                     adapter.connect().await.map_err(|e| e.to_string())?;
-                    return Ok(ActiveConnection::Oracle(Arc::new(Mutex::new(adapter))));
+                    Ok(ActiveConnection::Postgres(Arc::new(Mutex::new(adapter))))
                 }
-                #[cfg(not(feature = "oracle"))]
+                CoreDatabaseType::MySQL => {
+                    let mut adapter = MySQLAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::MySQL(Arc::new(Mutex::new(adapter))))
+                }
+                CoreDatabaseType::SqlServer => {
+                    let mut adapter = SqlServerAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::SQLServer(Arc::new(Mutex::new(adapter))))
+                }
+                CoreDatabaseType::SQLite => {
+                    let mut adapter = SQLiteAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::SQLite(Arc::new(Mutex::new(adapter))))
+                }
+                CoreDatabaseType::DuckDb => {
+                    let mut adapter = DuckDbAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::DuckDb(Arc::new(Mutex::new(adapter))))
+                }
+                CoreDatabaseType::ClickHouse => {
+                    let mut adapter = ClickHouseAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::ClickHouse(Arc::new(Mutex::new(adapter))))
+                }
+                CoreDatabaseType::Oracle => {
+                    #[cfg(feature = "oracle")]
+                    {
+                        let mut adapter = crate::database::OracleAdapter::new(conn_config);
+                        adapter.connect().await.map_err(|e| e.to_string())?;
+                        return Ok(ActiveConnection::Oracle(Arc::new(Mutex::new(adapter))));
+                    }
+                    #[cfg(not(feature = "oracle"))]
                 Err("Oracle support requires the 'oracle' feature: cargo build --features oracle".to_string())
+                }
+                _ => Err(format!("Native adapter not yet implemented for {:?}", core)),
             }
-            _ => Err(format!("Native adapter not yet implemented for {:?}", core)),
-        },
+        }
         ConnectionStrategy::JdbcBridge => {
             let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;

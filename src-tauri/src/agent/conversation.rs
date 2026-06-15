@@ -21,12 +21,16 @@ fn inflight_set() -> &'static Mutex<HashSet<String>> {
 }
 
 fn try_acquire_inflight(session_id: &str) -> bool {
-    let mut set = inflight_set().lock().expect("compact inflight set poisoned");
+    let mut set = inflight_set()
+        .lock()
+        .expect("compact inflight set poisoned");
     set.insert(session_id.to_string())
 }
 
 fn release_inflight(session_id: &str) {
-    let mut set = inflight_set().lock().expect("compact inflight set poisoned");
+    let mut set = inflight_set()
+        .lock()
+        .expect("compact inflight set poisoned");
     set.remove(session_id);
 }
 
@@ -156,11 +160,20 @@ pub fn append(
     let has_pending_tool_calls = role == "assistant"
         && serde_json::from_str::<serde_json::Value>(content)
             .ok()
-            .and_then(|v| v.get("tool_calls").and_then(|tc| tc.as_array()).map(|a| !a.is_empty()))
+            .and_then(|v| {
+                v.get("tool_calls")
+                    .and_then(|tc| tc.as_array())
+                    .map(|a| !a.is_empty())
+            })
             .unwrap_or(false);
     if !has_pending_tool_calls && auto_compact_enabled(settings) {
         if try_acquire_inflight(session_id) {
-            spawn_background_compact(db.clone(), app.clone(), settings.clone(), session_id.to_string());
+            spawn_background_compact(
+                db.clone(),
+                app.clone(),
+                settings.clone(),
+                session_id.to_string(),
+            );
         }
     }
     Ok(())
@@ -207,10 +220,7 @@ pub async fn prepare_for_llm(
                 if let Some(fallback_keep_pairs) = info.fallback_keep_pairs {
                     summary_payload["fallback_keep_pairs"] = json!(fallback_keep_pairs);
                 }
-                let _ = app.emit(
-                    "agent-loop-summary-injected",
-                    summary_payload,
-                );
+                let _ = app.emit("agent-loop-summary-injected", summary_payload);
             }
             Ok(None) => {}
             Err(compact_err) => {
@@ -255,10 +265,7 @@ fn spawn_background_compact(db: AgentDb, app: AppHandle, settings: Value, sessio
                 if let Some(fallback_keep_pairs) = info.fallback_keep_pairs {
                     summary_payload["fallback_keep_pairs"] = json!(fallback_keep_pairs);
                 }
-                let _ = app.emit(
-                    "agent-loop-summary-injected",
-                    summary_payload,
-                );
+                let _ = app.emit("agent-loop-summary-injected", summary_payload);
                 emit_usage(&app, &session_id, &settings, &db);
             }
             Ok(None) => {}

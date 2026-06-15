@@ -3,9 +3,7 @@ use crate::database::{
     config::ConnectionConfig,
     error::{DbError, DbResult},
     pool::ConnectionPool,
-    types::{
-        ConnectionStatus, QueryResult, QueryRow, QueryValue,
-    },
+    types::{ConnectionStatus, QueryResult, QueryRow, QueryValue},
 };
 use async_trait::async_trait;
 use std::collections::HashMap;
