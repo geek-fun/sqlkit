@@ -8,6 +8,7 @@ import ChatPanel from '@/components/chat-panel.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { disposeAgentRuntime, initAgentRuntime } from '@/composables/agentRuntime'
 import { useDataStudioChatAgent } from '@/composables/useDataStudioChatAgent'
+import { useAppStore } from '@/store'
 import { DatabaseType, useConnectionStore } from '@/store/connectionStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
 import ModifySourceModal from '@/views/data-studio/components/modify-source-modal.vue'
@@ -183,6 +184,15 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   disposeAgentRuntime()
 })
+
+const appStore = useAppStore()
+const { llmSettings } = storeToRefs(appStore)
+
+function syncAllProviderModels() {
+  llmSettings.value.providers
+    .filter(p => p.enabled)
+    .forEach(p => appStore.syncProviderModels(p.id).catch(() => {}))
+}
 </script>
 
 <template>
@@ -261,25 +271,27 @@ onBeforeUnmount(() => {
             @stop-loop="cancelSession"
             @confirm-tool-call="handleConfirmation"
             @model-change="onModelChange"
+            @model-picker-open="syncAllProviderModels"
           >
             <template #toolbar-left>
-              <!-- Source chips -->
+              <!-- Connected source chips -->
               <button
                 v-for="(source, idx) in activeSessionSources"
                 :key="source.sourceId"
-                class="text-[11px] text-muted-foreground font-medium px-2 border border-border rounded-full bg-muted/50 inline-flex gap-1 h-6 max-w-[120px] cursor-pointer transition-colors items-center hover:text-foreground hover:border-foreground/30"
+                class="source-chip"
                 :title="t('dataStudio.modifySource.title')"
                 @click="openModifyModal(idx)"
               >
                 <span class="i-carbon-data-base shrink-0 h-3.5 w-3.5" />
-                <span class="truncate">{{ source.alias }}</span>
-                <span class="i-carbon-settings opacity-60 shrink-0 h-3 w-3" />
+                <span class="source-chip-name">{{ source.alias }}</span>
+                <span class="source-chip-edit i-carbon-settings h-3 w-3" />
               </button>
 
               <!-- Add source dropdown -->
-              <div ref="addSourcePickerRef" class="relative">
+              <div ref="addSourcePickerRef" class="add-source-picker">
                 <button
-                  class="text-muted-foreground rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-muted"
+                  class="icon-button-sm"
+                  :aria-expanded="addSourceOpen"
                   :title="t('dataStudio.addSource.title')"
                   @click.stop="addSourceOpen = !addSourceOpen"
                 >
@@ -287,55 +299,77 @@ onBeforeUnmount(() => {
                 </button>
 
                 <Transition name="menu-rise">
-                  <div
-                    v-if="addSourceOpen"
-                    class="mb-2 border border-border rounded-xl bg-popover w-72 shadow-lg bottom-full left-0 absolute z-50 overflow-hidden"
-                    @click.stop
-                  >
-                    <div class="text-[11px] text-muted-foreground tracking-wide font-semibold px-3 pb-1.5 pt-2.5 uppercase">
+                  <div v-if="addSourceOpen" class="add-source-menu" @click.stop>
+                    <div class="add-source-menu-title">
                       {{ t('dataStudio.addSource.selectConnection') }}
                     </div>
-                    <div class="px-3 pb-2">
+
+                    <div class="add-source-search-wrap">
+                      <span class="add-source-search-icon i-carbon-search h-3.5 w-3.5" />
                       <input
                         v-model="addSourceQuery"
-                        class="text-sm px-2.5 py-1.5 outline-none border border-border rounded-md bg-background w-full focus:border-foreground/40"
+                        class="add-source-search"
                         :placeholder="t('dataStudio.addSource.searchPlaceholder')"
+                        autocomplete="off"
                       >
                     </div>
-                    <div class="border-t border-border max-h-48 overflow-y-auto">
+
+                    <div class="add-source-list">
                       <button
                         v-for="conn in filteredAddConnections"
                         :key="String(conn.id)"
-                        class="px-3 py-2 text-left border-b border-border/50 flex gap-2.5 w-full transition-colors items-center last:border-b-0 hover:bg-muted"
-                        :class="{ 'bg-muted': addSourceSelectedId === String(conn.id) }"
+                        class="add-source-item"
+                        :class="{ 'add-source-item--selected': addSourceSelectedId === String(conn.id) }"
                         @click="selectAddConnection(conn)"
                       >
-                        <div class="border border-border rounded bg-muted flex shrink-0 h-7 w-7 items-center justify-center">
-                          <span class="i-carbon-data-base text-muted-foreground h-4 w-4" />
+                        <div class="add-source-item-icon">
+                          <span class="i-carbon-data-base h-4 w-4" />
                         </div>
-                        <div class="flex-1 min-w-0">
-                          <div class="text-sm text-foreground font-medium truncate">
-                            {{ conn.name }}
-                          </div>
-                          <div class="text-[11px] text-muted-foreground truncate">
-                            {{ getConnectionMeta(conn) }}
-                          </div>
+                        <div class="add-source-item-info">
+                          <span class="add-source-item-name">{{ conn.name }}</span>
+                          <span class="add-source-item-meta">{{ getConnectionMeta(conn) }}</span>
                         </div>
                         <span
                           v-if="addSourceSelectedId === String(conn.id)"
-                          class="i-carbon-checkmark text-foreground shrink-0 h-3.5 w-3.5"
+                          class="i-carbon-checkmark text-foreground ml-auto shrink-0 h-3.5 w-3.5"
                         />
                       </button>
-                      <div v-if="filteredAddConnections.length === 0" class="text-xs text-muted-foreground p-4 text-center">
+                      <div v-if="filteredAddConnections.length === 0" class="add-source-empty">
                         {{ t('dataStudio.addSource.noConnections') }}
                       </div>
                     </div>
-                    <div class="px-3 py-2 border-t border-border bg-muted/20 flex items-center justify-between">
-                      <span class="text-[11px] text-muted-foreground font-semibold uppercase">
+
+                    <div v-if="addSourceSelectedId" class="add-source-permissions">
+                      <div class="add-source-permissions-header">
+                        <span class="i-carbon-security h-3.5 w-3.5" />
+                        <span class="text-xs font-semibold">
+                          {{ t('dataStudio.modifySource.accessPermissions') }}
+                        </span>
+                      </div>
+                      <div class="add-source-mode-row">
+                        <button
+                          class="mode-btn" :class="[addSourceMode === 'Ask' && 'mode-btn--active']"
+                          @click="addSourceMode = 'Ask'"
+                        >
+                          <span class="i-carbon-locked h-3.5 w-3.5" />
+                          <span>{{ t('dataStudio.modifySource.modeDefault') }}</span>
+                        </button>
+                        <button
+                          class="mode-btn" :class="[addSourceMode === 'Inherit' && 'mode-btn--active']"
+                          @click="addSourceMode = 'Inherit'"
+                        >
+                          <span class="i-carbon-link h-3.5 w-3.5" />
+                          <span>{{ t('dataStudio.modifySource.inheritTitle') }}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div class="add-source-footer">
+                      <span class="add-source-count">
                         {{ t('dataStudio.addSource.connectionsFound', { count: filteredAddConnections.length }) }}
                       </span>
                       <button
-                        class="text-xs text-primary-foreground font-medium px-2.5 py-1.5 rounded-md bg-primary inline-flex gap-1 transition-opacity items-center disabled:opacity-40 hover:opacity-90"
+                        class="add-source-connect-btn"
                         :disabled="!addSourceSelectedId"
                         @click="confirmAddSource"
                       >
@@ -347,41 +381,55 @@ onBeforeUnmount(() => {
                 </Transition>
               </div>
 
-              <!-- Permission mode button -->
-              <div v-if="activeSessionSources.length > 0" class="relative">
+              <!-- Permission mode picker -->
+              <div class="permission-picker">
                 <button
-                  class="text-xs text-foreground px-2 border border-border rounded-full bg-muted/50 inline-flex gap-1 h-6 cursor-pointer transition-colors items-center hover:bg-muted"
+                  class="permission-trigger"
+                  :disabled="activeSessionSources.length === 0"
+                  :aria-expanded="permissionMenuOpen"
                   :title="t('dataStudio.modifySource.accessPermissions')"
-                  @click.stop="permissionMenuOpen = !permissionMenuOpen"
+                  @click.stop="activeSessionSources.length > 0 && (permissionMenuOpen = !permissionMenuOpen)"
                 >
                   <span
-                    class="h-3.5 w-3.5"
+                    class="permission-trigger-icon h-4 w-4"
                     :class="sessionPermissionsMode === 'Auto' ? 'i-carbon-unlocked' : 'i-carbon-locked'"
                   />
-                  <span class="text-xs">
-                    {{ sessionPermissionsMode === 'Auto' ? t('dataStudio.modifySource.inheritTitle') : t('dataStudio.modifySource.modeDefault') }}
+                  <span class="permission-trigger-label">
+                    {{ sessionPermissionsMode === 'Auto' ? t('dataStudio.modifySource.modeFull') : t('dataStudio.modifySource.modeDefault') }}
                   </span>
+                  <span class="permission-trigger-chevron i-carbon-chevron-down h-3 w-3" />
                 </button>
-                <div
-                  v-if="permissionMenuOpen"
-                  class="mb-2 p-1.5 border border-border rounded-lg bg-popover min-w-[140px] shadow-lg bottom-full left-0 absolute z-50"
-                  @click.stop
-                >
+                <div v-if="permissionMenuOpen" class="permission-menu">
+                  <div class="permission-menu-title">
+                    {{ t('dataStudio.modifySource.accessPermissions') }}
+                  </div>
                   <button
-                    class="text-sm px-2.5 py-1.5 text-left rounded flex gap-2 w-full transition-colors items-center hover:bg-muted"
-                    :class="{ 'bg-muted': sessionPermissionsMode === 'Ask' }"
+                    class="permission-menu-item"
+                    :class="{ 'permission-menu-item--active': sessionPermissionsMode === 'Ask' }"
                     @click="setAutoMode(false)"
                   >
-                    <span class="i-carbon-locked text-muted-foreground h-4 w-4" />
-                    <span>{{ t('dataStudio.modifySource.modeDefault') }}</span>
+                    <span class="permission-menu-icon i-carbon-locked h-4 w-4" />
+                    <span class="permission-menu-label">
+                      {{ t('dataStudio.modifySource.modeDefault') }}
+                    </span>
+                    <span
+                      v-if="sessionPermissionsMode === 'Ask'"
+                      class="permission-check i-carbon-checkmark h-3.5 w-3.5"
+                    />
                   </button>
                   <button
-                    class="text-sm px-2.5 py-1.5 text-left rounded flex gap-2 w-full transition-colors items-center hover:bg-muted"
-                    :class="{ 'bg-muted': sessionPermissionsMode === 'Auto' }"
+                    class="permission-menu-item"
+                    :class="{ 'permission-menu-item--active': sessionPermissionsMode === 'Auto' }"
                     @click="setAutoMode(true)"
                   >
-                    <span class="i-carbon-unlocked text-muted-foreground h-4 w-4" />
-                    <span>{{ t('dataStudio.modifySource.inheritTitle') }}</span>
+                    <span class="permission-menu-icon i-carbon-unlocked h-4 w-4" />
+                    <span class="permission-menu-label">
+                      {{ t('dataStudio.modifySource.modeFull') }}
+                    </span>
+                    <span
+                      v-if="sessionPermissionsMode === 'Auto'"
+                      class="permission-check i-carbon-checkmark h-3.5 w-3.5"
+                    />
                   </button>
                 </div>
               </div>
@@ -400,6 +448,463 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.data-studio-container {
+  background: hsl(var(--background));
+}
+
+.data-studio-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.data-studio-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid hsl(var(--border));
+  flex-shrink: 0;
+}
+
+.data-studio-conversation {
+  flex: 1;
+  min-height: 0;
+}
+
+.data-studio-history {
+  width: 288px;
+  flex-shrink: 0;
+  border-right: 1px solid hsl(var(--border));
+  overflow-y: auto;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.icon-button:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.icon-button--active {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.icon-button-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.icon-button-sm:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.source-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  max-width: 112px;
+  padding: 0 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9999px;
+  background: hsl(var(--muted) / 0.5);
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.source-chip:hover {
+  border-color: hsl(var(--foreground) / 0.3);
+  color: hsl(var(--foreground));
+}
+
+.source-chip-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.source-chip-edit {
+  opacity: 0;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+
+.source-chip:hover .source-chip-edit {
+  opacity: 0.6;
+}
+
+.source-chip:hover .source-chip-edit:hover {
+  opacity: 1;
+}
+
+/* ── Add source ── */
+
+.add-source-picker {
+  position: relative;
+}
+
+.add-source-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  width: 288px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--popover));
+  box-shadow: 0 8px 24px hsl(0 0% 0% / 0.12);
+  overflow: hidden;
+}
+
+.add-source-menu-title {
+  padding: 10px 12px 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.add-source-search-wrap {
+  position: relative;
+  margin: 0 12px 8px;
+}
+
+.add-source-search-icon {
+  position: absolute;
+  left: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: hsl(var(--muted-foreground) / 0.6);
+  pointer-events: none;
+}
+
+.add-source-search {
+  width: 100%;
+  padding: 7px 10px 7px 28px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  outline: none;
+}
+
+.add-source-search:focus {
+  border-color: hsl(var(--foreground) / 0.4);
+}
+
+.add-source-search::placeholder {
+  color: hsl(var(--muted-foreground) / 0.5);
+}
+
+.add-source-list {
+  max-height: 192px;
+  overflow-y: auto;
+}
+
+.add-source-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  transition: background-color 0.12s;
+}
+
+.add-source-item:last-child {
+  border-bottom: none;
+}
+
+.add-source-item:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+
+.add-source-item--selected {
+  background: hsl(var(--muted) / 0.5);
+}
+
+.add-source-item-icon {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 6px;
+  background: hsl(var(--muted));
+  flex-shrink: 0;
+}
+
+.add-source-item-icon .i-carbon-data-base {
+  color: hsl(var(--muted-foreground));
+}
+
+.add-source-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-source-item-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-source-item-meta {
+  display: block;
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.add-source-empty {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  padding: 16px;
+  text-align: center;
+}
+
+.add-source-permissions {
+  padding: 8px 12px;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.add-source-permissions-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: hsl(var(--muted-foreground));
+}
+
+.add-source-mode-row {
+  display: flex;
+  gap: 8px;
+}
+
+.mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.mode-btn:hover {
+  background: hsl(var(--muted) / 0.4);
+}
+
+.mode-btn--active {
+  border-color: hsl(var(--primary) / 0.5);
+  background: hsl(var(--primary) / 0.08);
+  color: hsl(var(--foreground));
+}
+
+.add-source-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-top: 1px solid hsl(var(--border));
+  background: hsl(var(--muted) / 0.2);
+}
+
+.add-source-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.add-source-connect-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 6px;
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.add-source-connect-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.add-source-connect-btn:not(:disabled):hover {
+  opacity: 0.9;
+}
+
+/* ── Permission picker ── */
+
+.permission-picker {
+  position: relative;
+}
+
+.permission-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 9999px;
+  background: hsl(var(--muted) / 0.5);
+  color: hsl(var(--muted-foreground));
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.permission-trigger:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.permission-trigger:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.permission-trigger:disabled:hover {
+  background: hsl(var(--muted) / 0.5);
+  color: hsl(var(--muted-foreground));
+}
+
+.permission-trigger-icon {
+  flex-shrink: 0;
+}
+
+.permission-trigger-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60px;
+}
+
+.permission-trigger-chevron {
+  flex-shrink: 0;
+  transition: transform 0.18s ease;
+}
+
+.permission-trigger[aria-expanded='true'] .permission-trigger-chevron {
+  transform: rotate(180deg);
+}
+
+.permission-menu {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  min-width: 160px;
+  padding: 6px;
+  border: 1px solid hsl(var(--border));
+  border-radius: 10px;
+  background: hsl(var(--popover));
+  box-shadow: 0 8px 24px hsl(0 0% 0% / 0.12);
+}
+
+.permission-menu-title {
+  padding: 4px 8px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground) / 0.6);
+}
+
+.permission-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.12s;
+}
+
+.permission-menu-item:hover {
+  background: hsl(var(--muted) / 0.5);
+}
+
+.permission-menu-icon {
+  color: hsl(var(--muted-foreground));
+  flex-shrink: 0;
+}
+
+.permission-menu-item--active .permission-menu-icon {
+  color: hsl(var(--primary));
+}
+
+.permission-menu-label {
+  flex: 1;
+}
+
+.permission-check {
+  color: hsl(var(--primary));
+  flex-shrink: 0;
+}
+
 .menu-rise-enter-active {
   animation: menu-rise 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }

@@ -8,6 +8,7 @@ import AgentMessageBubble from '@/components/agent-message-bubble.vue'
 import ContextIndicator from '@/components/context-indicator.vue'
 import ModelPicker from '@/components/model-picker.vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Spinner } from '@/components/ui/spinner'
 import { toast } from '@/composables/useNotifications'
 import { useAppStore } from '@/store'
 import ToolConfirmationCard from '@/views/data-studio/components/tool-confirmation-card.vue'
@@ -159,6 +160,8 @@ const modelGroups = computed(() =>
     })),
 )
 
+const hasModels = computed(() => modelGroups.value.some(g => g.models.length > 0))
+
 const featureRoute = computed(() =>
   props.feature === 'sidebarAssistant'
     ? llmSettings.value.models.sidebarAssistant
@@ -197,6 +200,8 @@ function adjustTextareaHeight(e: Event) {
   el.style.height = 'auto'
   el.style.height = `${Math.min(el.scrollHeight, 120)}px`
 }
+
+const canSend = computed(() => inputText.value.trim().length > 0 && !props.isLoading)
 
 // ── Model change ──────────────────────────────────────────────────────
 
@@ -387,7 +392,7 @@ onBeforeUnmount(() => {
               :settings="contextSettings"
             />
             <ModelPicker
-              v-if="showModelPicker"
+              v-if="showModelPicker && hasModels"
               :groups="modelGroups"
               :model-value="selectedModelId"
               :recent-model-ids="recentModelIds"
@@ -398,20 +403,13 @@ onBeforeUnmount(() => {
           </div>
 
           <button
-            v-if="!isLoading"
             class="send-button"
-            :disabled="!inputText.trim()"
-            @click="sendMessage"
+            :class="{ 'send-button--stop': isLoading }"
+            :disabled="!canSend && !isLoading"
+            @click="isLoading ? emit('stopLoop') : sendMessage()"
           >
-            <span class="i-carbon-arrow-up h-4 w-4" />
-          </button>
-          <button
-            v-else
-            class="send-button send-button--stop"
-            :title="t('dataStudio.agent.stop')"
-            @click="emit('stopLoop')"
-          >
-            <span class="i-carbon-stop-filled h-4 w-4" />
+            <Spinner v-if="isLoading" size="sm" />
+            <span v-else class="i-carbon-arrow-up h-4 w-4" />
           </button>
         </div>
       </div>
