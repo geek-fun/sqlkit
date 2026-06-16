@@ -58,7 +58,6 @@ const { llmSettings } = storeToRefs(appStore)
 const inputText = ref('')
 const scrollAreaRef = ref<{ viewportElement: HTMLElement | null } | null>(null)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
-const contextIndicatorRef = ref<{ refresh: () => Promise<void> } | null>(null)
 
 // ── Smart scroll ──────────────────────────────────────────────────────
 
@@ -354,7 +353,6 @@ onBeforeUnmount(() => {
         <div v-if="showModelPicker" class="flex gap-1 items-center">
           <ContextIndicator
             v-if="sessionId"
-            ref="contextIndicatorRef"
             :session-id="sessionId"
             :settings="contextSettings"
           />
