@@ -586,12 +586,12 @@ function closeContextMenu() {
 type IconType = 'table' | 'view' | 'database' | 'column' | 'schema' | 'file'
 
 const iconMap: Record<IconType, string> = {
-  database: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5V19A9 3 0 0 0 21 19V5"></path><path d="M3 12A9 3 0 0 0 21 12"></path></svg>`,
-  table: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>`,
-  view: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>`,
-  schema: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z"/></svg>`,
-  column: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>`,
-  file: `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>`,
+  database: 'i-carbon-data-base',
+  table: 'i-carbon-table',
+  view: 'i-carbon-view',
+  schema: 'i-carbon-folder',
+  column: 'i-carbon-columns',
+  file: 'i-carbon-document',
 }
 
 const getIcon = (type: IconType) => iconMap[type] || iconMap.column
@@ -614,32 +614,13 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           :title="t('components.databaseBrowser.refresh')"
           @click="refreshTree"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-            <path d="M21 3v5h-5" />
-            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-            <path d="M8 16H3v5" />
-          </svg>
+          <span class="i-carbon-refresh h-3.5 w-3.5" />
         </Button>
       </div>
 
       <!-- Search -->
       <div class="relative">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="14"
-          height="14"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="text-muted-foreground left-2 top-1/2 absolute -translate-y-1/2"
-        >
-          <circle cx="11" cy="11" r="8" />
-          <path d="m21 21-4.3-4.3" />
-        </svg>
+        <span class="i-carbon-search text-muted-foreground h-3.5 w-3.5 left-2 top-1/2 absolute -translate-y-1/2" />
         <Input
           v-model="searchQuery"
           :placeholder="t('components.databaseBrowser.search')"
@@ -709,21 +690,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
           @click="showTables = !showTables"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="transition-transform"
-            :class="{ 'rotate-90': showTables }"
-          >
-            <path d="m9 18 6-6-6-6" />
-          </svg>
+          <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showTables }" />
           {{ t('components.databaseBrowser.sections.tables') }}
         </button>
         <div v-if="showTables" class="py-1">
@@ -736,7 +703,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
             @dblclick="handleDoubleClick(table)"
             @contextmenu="handleContextMenu($event, table)"
           >
-            <span class="opacity-70 flex-shrink-0" v-html="getIcon('table')" />
+            <span class="opacity-70 flex-shrink-0" :class="getIcon('table')" />
             <span class="truncate">{{ table.name }}</span>
           </div>
           <div v-if="tablesAndViews.tables.length === 0 && !databaseStore.loading" class="text-xs text-muted-foreground px-2 py-2">
@@ -751,21 +718,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
           @click="toggleViews"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="transition-transform"
-            :class="{ 'rotate-90': showViews }"
-          >
-            <path d="m9 18 6-6-6-6" />
-          </svg>
+          <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showViews }" />
           <span class="flex-1">{{ t('components.databaseBrowser.sections.views') }}</span>
           <span class="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">{{ viewsCount }}</span>
         </button>
@@ -777,7 +730,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
             @click="handleViewClick(view)"
             @dblclick="handleOpenListingTab('VIEW')"
           >
-            <span class="opacity-70 flex-shrink-0" v-html="getIcon('view')" />
+            <span class="opacity-70 flex-shrink-0" :class="getIcon('view')" />
             <span class="truncate">{{ view.name }}</span>
           </div>
           <div
@@ -795,21 +748,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
           @click="toggleProcedures"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="transition-transform"
-            :class="{ 'rotate-90': showProcedures }"
-          >
-            <path d="m9 18 6-6-6-6" />
-          </svg>
+          <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showProcedures }" />
           <span class="flex-1">{{ t('components.databaseBrowser.sections.procedures') }}</span>
           <span class="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">{{ proceduresCount }}</span>
         </button>
@@ -821,7 +760,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
             @click="handleProcedureClick(proc)"
             @dblclick="handleOpenListingTab('PROCEDURE')"
           >
-            <span class="opacity-70 flex-shrink-0" v-html="getIcon('view')" />
+            <span class="opacity-70 flex-shrink-0" :class="getIcon('view')" />
             <span class="truncate">{{ proc.name }}</span>
           </div>
           <div
@@ -839,21 +778,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
           @click="toggleFunctions"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="transition-transform"
-            :class="{ 'rotate-90': showFunctions }"
-          >
-            <path d="m9 18 6-6-6-6" />
-          </svg>
+          <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showFunctions }" />
           <span class="flex-1">{{ t('components.databaseBrowser.sections.functions') }}</span>
           <span class="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted">{{ functionsCount }}</span>
         </button>
@@ -865,7 +790,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
             @click="handleFunctionClick(fn)"
             @dblclick="handleOpenListingTab('FUNCTION')"
           >
-            <span class="opacity-70 flex-shrink-0" v-html="getIcon('view')" />
+            <span class="opacity-70 flex-shrink-0" :class="getIcon('view')" />
             <span class="truncate">{{ fn.name }}</span>
           </div>
           <div
@@ -883,21 +808,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
           @click="showSavedQueries = !showSavedQueries"
         >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="12"
-            height="12"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="transition-transform"
-            :class="{ 'rotate-90': showSavedQueries }"
-          >
-            <path d="m9 18 6-6-6-6" />
-          </svg>
+          <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showSavedQueries }" />
           {{ t('components.databaseBrowser.sections.savedQueries') }}
           <Button
             variant="ghost"
@@ -906,19 +817,13 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
             :title="t('components.databaseBrowser.newQuery')"
             @click.stop="emit('createNewQuery')"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 12h14" />
-              <path d="M12 5v14" />
-            </svg>
+            <span class="i-carbon-add h-3 w-3" />
           </Button>
         </button>
         <div v-if="showSavedQueries" class="py-1">
           <!-- Loading state -->
           <div v-if="savedQueriesLoading" class="text-xs text-muted-foreground px-2 py-2 flex gap-2 items-center">
-            <svg class="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-            </svg>
+            <span class="i-carbon-loading h-3 w-3 animate-spin" />
             {{ t('components.databaseBrowser.loading') }}
           </div>
           <!-- File list -->
@@ -931,7 +836,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
             @contextmenu="handleSavedQueryContextMenu($event, file)"
           >
             <div class="flex gap-2 items-center">
-              <span class="opacity-70 flex-shrink-0" v-html="getIcon('file')" />
+              <span class="opacity-70 flex-shrink-0" :class="getIcon('file')" />
               <span class="truncate">{{ file.file_name }}</span>
             </div>
             <span class="text-xs text-muted-foreground pl-[calc(16px+8px)] truncate">{{ file.folder }}</span>
@@ -945,15 +850,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
 
       <!-- Loading state -->
       <div v-if="databaseStore.loading" class="text-sm text-muted-foreground py-4 text-center">
-        <svg
-          class="mx-auto mb-2 h-5 w-5 animate-spin"
-          xmlns="http://www.w3.org/2000/svg"
-          fill="none"
-          viewBox="0 0 24 24"
-        >
-          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-        </svg>
+        <span class="i-carbon-loading mx-auto mb-2 h-5 w-5 block animate-spin" />
         <p>{{ t('components.databaseBrowser.loading') }}</p>
       </div>
     </div>
@@ -970,13 +867,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleContextAction('selectTopN')"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-            <path d="m3 16 4 4 4-4" />
-            <path d="M7 20V4" />
-            <path d="M11 4h4" />
-            <path d="M11 8h7" />
-            <path d="M11 12h10" />
-          </svg>
+          <span class="i-carbon-arrow-down mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.contextMenu.selectTopN') }}
         </div>
         <div
@@ -984,11 +875,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleContextAction('viewStructure')"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-            <rect width="18" height="18" x="3" y="3" rx="2" />
-            <path d="M3 9h18" />
-            <path d="M9 21V9" />
-          </svg>
+          <span class="i-carbon-table mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.contextMenu.viewStructure') }}
         </div>
         <div
@@ -996,12 +883,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleContextAction('createScript')"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-            <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" />
-            <path d="M14 2v4a2 2 0 0 0 2 2h4" />
-            <path d="M10 12a1 1 0 0 0-1 1v1a1 1 0 0 1-1 1 1 1 0 0 1 1 1v1a1 1 0 0 0 1 1" />
-            <path d="M14 18a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1 1 1 0 0 1-1-1v-1a1 1 0 0 0-1-1" />
-          </svg>
+          <span class="i-carbon-code mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.contextMenu.createScript') }}
         </div>
         <div
@@ -1013,14 +895,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleContextAction('showErDiagram')"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-            <circle cx="12" cy="12" r="3" />
-            <circle cx="19" cy="5" r="2" />
-            <circle cx="5" cy="19" r="2" />
-            <line x1="12" y1="12" x2="13.65" y2="5.87" />
-            <line x1="12" y1="12" x2="6.35" y2="17.13" />
-            <line x1="12" y1="12" x2="17" y2="14" />
-          </svg>
+          <span class="i-carbon-diagram mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.contextMenu.showErDiagram') }}
         </div>
         <div
@@ -1028,11 +903,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleContextAction('exportData')"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" x2="12" y1="15" y2="3" />
-          </svg>
+          <span class="i-carbon-download mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.contextMenu.exportData') }}
         </div>
         <div class="my-1 bg-border h-px" />
@@ -1064,10 +935,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleSavedQueryOpen"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-            <path d="M5 12h14" />
-            <path d="M12 5v14" />
-          </svg>
+          <span class="i-carbon-folder-open mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.savedQueryActions.open') }}
         </div>
         <div class="my-1 bg-border h-px" />
@@ -1075,21 +943,14 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleSavedQueryReveal"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-            <path d="M21 3v5h-5" />
-          </svg>
+          <span class="i-carbon-folder mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.savedQueryActions.reveal') }}
         </div>
         <div
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
           @click="handleSavedQueryDelete"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-2">
-            <path d="M3 6h18" />
-            <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-            <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-          </svg>
+          <span class="i-carbon-trash-can mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.savedQueryActions.delete') }}
         </div>
       </div>

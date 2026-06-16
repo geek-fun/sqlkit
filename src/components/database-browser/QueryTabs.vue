@@ -233,10 +233,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
           :class="{ 'opacity-100': isActiveTab(tab.id) }"
           @click="handleCloseClick($event, tab)"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
+          <span class="i-carbon-close h-3 w-3" />
         </button>
       </div>
     </div>
@@ -249,10 +246,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
       :title="t('components.queryTabs.new')"
       @click="handleNewTab"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M5 12h14" />
-        <path d="M12 5v14" />
-      </svg>
+      <span class="i-carbon-add h-3.5 w-3.5" />
     </Button>
 
     <!-- Unsaved changes dialog -->
