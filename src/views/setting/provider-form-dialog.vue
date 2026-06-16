@@ -184,6 +184,7 @@ function beginReplaceApiKey() {
 function selectPreset(preset: Preset) {
   selectedPresetId.value = preset.id
   draft.value.kind = preset.kind
+  draft.value.name = preset.name
   draft.value.apiCompatibility = preset.apiCompatibility
   draft.value.baseUrl = preset.baseUrl
   formErrors.value = {}
