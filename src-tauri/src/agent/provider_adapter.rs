@@ -47,18 +47,6 @@ fn endpoint_for(api_compatibility: &str) -> &'static ApiEndpointConfig {
 }
 
 // ---------------------------------------------------------------------------
-// Default base URLs per mode
-// ---------------------------------------------------------------------------
-
-fn default_base_url_inner(api_compatibility: &str) -> &'static str {
-    match api_compatibility {
-        "local" => "http://127.0.0.1:11434/v1",
-        "anthropic" => "https://api.anthropic.com/v1",
-        _ => "https://api.openai.com/v1",
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Model ID extractors (dispatched via endpoint config function pointer)
 // ---------------------------------------------------------------------------
 
