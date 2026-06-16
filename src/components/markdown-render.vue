@@ -1,0 +1,244 @@
+<script setup lang="ts">
+import DOMPurify from 'dompurify'
+import hljs from 'highlight.js'
+import MarkdownIt from 'markdown-it'
+import taskLists from 'markdown-it-task-lists'
+import { onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { toast } from '@/composables/useNotifications'
+
+import 'highlight.js/styles/atom-one-dark.css'
+
+const props = defineProps<{
+  markdown: string
+}>()
+
+const { t } = useI18n()
+
+const parsedMarkdown = ref('')
+
+const md = new MarkdownIt({
+  linkify: true,
+  breaks: true,
+  highlight: (str: string, lang: string) => {
+    let highlightedCode = ''
+    const langName = lang || ''
+    if (langName && hljs.getLanguage(langName)) {
+      try {
+        highlightedCode = hljs.highlight(str, { language: langName, ignoreIllegals: true }).value
+      }
+      catch {
+        // highlight failed, fallback to escaped HTML
+      }
+    }
+    else {
+      highlightedCode = md.utils.escapeHtml(str)
+    }
+    const encodedCode = btoa(encodeURIComponent(str))
+    const langLabel = langName || 'text'
+    return `<div class="code-block-header">
+      <span class="code-block-lang">${langLabel}</span>
+      <div class="code-block-actions">
+        <svg class="code-action-btn" data-tooltip="Copy" data-action="copy" data-code="${encodedCode}" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path d="M28 10v18H10V10h18m0-2H10a2 2 0 0 0-2 2v18a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2z" fill="currentColor"/><path d="M4 18H2V4a2 2 0 0 1 2-2h14v2H4z" fill="currentColor"/></svg>
+      </div>
+    </div><code class="hljs code-block-content">${highlightedCode}</code>`
+  },
+})
+
+md.use(taskLists, { enabled: true, label: true, labelAfter: true })
+
+md.renderer.rules.table_open = () => '<div class="table-wrapper"><table>'
+md.renderer.rules.table_close = () => '</table></div>'
+
+const RENDER_THROTTLE_MS = 100
+let pendingValue: string | null = null
+let lastRenderAt = 0
+let trailingTimer: ReturnType<typeof setTimeout> | null = null
+
+function runRender(value: string) {
+  parsedMarkdown.value = DOMPurify.sanitize(md.render(value))
+  lastRenderAt = Date.now()
+  pendingValue = null
+}
+
+function scheduleRender(value: string) {
+  pendingValue = value
+  const elapsed = Date.now() - lastRenderAt
+  if (elapsed >= RENDER_THROTTLE_MS) {
+    if (trailingTimer) {
+      clearTimeout(trailingTimer)
+      trailingTimer = null
+    }
+    runRender(value)
+    return
+  }
+  if (trailingTimer)
+    return
+  trailingTimer = setTimeout(() => {
+    trailingTimer = null
+    if (pendingValue !== null)
+      runRender(pendingValue)
+  }, RENDER_THROTTLE_MS - elapsed)
+}
+
+watch(
+  () => props.markdown,
+  (newMarkdown) => {
+    scheduleRender(`${newMarkdown}`)
+  },
+  { immediate: true },
+)
+
+function handleActionClick(e: MouseEvent) {
+  const btn = (e.target as HTMLElement).closest('.code-action-btn') as HTMLElement | null
+  if (!btn)
+    return
+  const action = btn.getAttribute('data-action')
+  const encoded = btn.getAttribute('data-code')
+  if (!action || !encoded)
+    return
+  try {
+    const decoded = decodeURIComponent(atob(encoded))
+    if (action === 'copy') {
+      navigator.clipboard.writeText(decoded)
+      toast.success(t('notifications.codeCopied') || 'Copied')
+    }
+  }
+  catch {
+    // decode failed
+  }
+}
+
+onUnmounted(() => {
+  if (trailingTimer) {
+    clearTimeout(trailingTimer)
+    trailingTimer = null
+    if (pendingValue !== null)
+      runRender(pendingValue)
+  }
+})
+</script>
+
+<template>
+  <!-- eslint-disable-next-line vue/no-v-html -->
+  <div @click="handleActionClick" v-html="parsedMarkdown" />
+</template>
+
+<style>
+pre {
+  margin: 0;
+  padding: 0;
+  position: relative;
+}
+
+pre code[class*='language-'] {
+  display: block;
+  background: none;
+  padding: 0;
+  border: none;
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  line-height: inherit;
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 12px;
+  background: hsl(var(--muted) / 0.5);
+  border-bottom: 1px solid hsl(var(--border) / 0.5);
+  user-select: none;
+}
+
+.code-block-lang {
+  font-size: 11px;
+  font-weight: 500;
+  font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, monospace;
+  color: hsl(var(--muted-foreground) / 0.65);
+  text-transform: lowercase;
+}
+
+.code-block-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+pre:hover .code-block-actions {
+  opacity: 1;
+}
+
+.code-action-btn {
+  width: 15px;
+  height: 15px;
+  cursor: pointer;
+  color: hsl(var(--muted-foreground));
+  transition: color 0.12s ease;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.code-action-btn:hover {
+  color: hsl(var(--foreground));
+}
+
+.code-action-btn::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 5px);
+  right: 0;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  border: 1px solid hsl(var(--border));
+  font-size: 11px;
+  white-space: nowrap;
+  padding: 3px 7px;
+  border-radius: 4px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.1s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+}
+
+.code-action-btn:hover::after {
+  opacity: 1;
+}
+
+code.hljs.code-block-content {
+  display: block;
+  padding: 12px 16px;
+  overflow-x: auto;
+  font-size: 12px;
+  line-height: 1.6;
+  background: none;
+  border: none;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  margin: 8px 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-wrapper::-webkit-scrollbar {
+  height: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: hsl(var(--border));
+  border-radius: 2px;
+}
+
+.table-wrapper table {
+  margin: 0;
+}
+</style>

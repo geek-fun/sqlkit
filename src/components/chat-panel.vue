@@ -1,37 +1,174 @@
 <script setup lang="ts">
 import type { SessionProgress } from '@/store/dataStudioStore'
-import type { ChatMessage, ChatMessageStatus } from '@/types/chat'
-import { nextTick, ref, watch } from 'vue'
+import type { ChatMessage } from '@/types/chat'
+import { storeToRefs } from 'pinia'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import AgentMessageBubble from '@/components/agent-message-bubble.vue'
+import ContextIndicator from '@/components/context-indicator.vue'
+import ModelPicker from '@/components/model-picker.vue'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { toast } from '@/composables/useNotifications'
+import { useAppStore } from '@/store'
 import ToolConfirmationCard from '@/views/data-studio/components/tool-confirmation-card.vue'
 
-const props = defineProps<{
-  messages: ChatMessage[]
-  isLoading: boolean
-  error?: string
-  emptyHint?: string
-  inputPlaceholder?: string
-  sessionId?: string | null
-  contextSettings?: Record<string, unknown> | null
-  progress?: SessionProgress | null
-  stopReason?: string | null
-  stopMessage?: string | null
-  feature: string
-  compact?: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    messages: ChatMessage[]
+    isLoading: boolean
+    error?: string
+    emptyHint?: string
+    inputPlaceholder?: string
+    sessionId?: string | null
+    contextSettings?: Record<string, unknown> | null
+    progress?: SessionProgress | null
+    stopReason?: string | null
+    stopMessage?: string | null
+    feature?: string
+    compact?: boolean
+    showModelPicker?: boolean
+  }>(),
+  {
+    error: undefined,
+    emptyHint: undefined,
+    inputPlaceholder: undefined,
+    sessionId: null,
+    contextSettings: null,
+    progress: null,
+    stopReason: null,
+    stopMessage: null,
+    feature: 'dataStudio',
+    compact: false,
+    showModelPicker: true,
+  },
+)
 
 const emit = defineEmits<{
-  'send': [message: string]
-  'stopLoop': []
-  'confirmToolCall': [msgId: string, event: { toolCallId: string, action: 'allow_once' | 'allow_always' | 'deny' | 'deny_always' | 'cancel' }]
-  'model-change': [modelId: string]
-  'model-picker-open': []
+  send: [message: string]
+  stopLoop: []
+  confirmToolCall: [msgId: string, event: { toolCallId: string, action: 'allow_once' | 'allow_always' | 'deny' | 'deny_always' | 'cancel' }]
+  modelChange: [modelId: string]
+  modelPickerOpen: []
 }>()
 
 const { t } = useI18n()
+const appStore = useAppStore()
+const { llmSettings } = storeToRefs(appStore)
+
 const inputText = ref('')
-const messagesContainer = ref<HTMLElement | null>(null)
+const scrollAreaRef = ref<{ viewportElement: HTMLElement | null } | null>(null)
 const inputRef = ref<HTMLTextAreaElement | null>(null)
+const contextIndicatorRef = ref<{ refresh: () => Promise<void> } | null>(null)
+
+// ── Smart scroll ──────────────────────────────────────────────────────
+
+const STICKY_THRESHOLD_PX = 32
+const stickToBottom = ref(true)
+
+const getViewport = (): HTMLElement | null => scrollAreaRef.value?.viewportElement ?? null
+
+function isNearBottom(el: HTMLElement): boolean {
+  const distance = el.scrollHeight - (el.scrollTop + el.clientHeight)
+  return distance <= STICKY_THRESHOLD_PX
+}
+
+let scrollRafId = 0
+
+function scrollToBottomForce() {
+  if (!stickToBottom.value)
+    return
+  if (scrollRafId)
+    cancelAnimationFrame(scrollRafId)
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = 0
+    const el = getViewport()
+    if (!el)
+      return
+    el.scrollTop = el.scrollHeight
+  })
+}
+
+function scrollToBottomBatched() {
+  if (!stickToBottom.value || scrollRafId)
+    return
+  scrollRafId = requestAnimationFrame(() => {
+    scrollRafId = 0
+    const el = getViewport()
+    if (!el)
+      return
+    el.scrollTop = el.scrollHeight
+  })
+}
+
+function forceScrollToBottom() {
+  stickToBottom.value = true
+  if (scrollRafId)
+    cancelAnimationFrame(scrollRafId)
+  scrollRafId = 0
+  const el = getViewport()
+  if (el)
+    el.scrollTop = el.scrollHeight
+}
+
+function handleViewportScroll() {
+  const el = getViewport()
+  if (!el)
+    return
+  stickToBottom.value = isNearBottom(el)
+}
+
+watch(
+  () => props.messages.length,
+  () => requestAnimationFrame(() => scrollToBottomForce()),
+)
+
+watch(
+  () => {
+    const msgs = props.messages
+    if (msgs.length === 0)
+      return ''
+    const last = msgs[msgs.length - 1]
+    return `${last.content?.length ?? 0}:${(last as any).thinking?.length ?? 0}:${(last as any).toolCalls?.length ?? 0}`
+  },
+  () => scrollToBottomBatched(),
+)
+
+// ── Model picker ──────────────────────────────────────────────────────
+
+const iterationIndexMap = computed<Record<string, number>>(() => {
+  let count = 0
+  return props.messages.reduce<Record<string, number>>((acc, msg) => {
+    if (msg.role === 'assistant' && (msg as any).toolCalls?.length) {
+      acc[msg.id] = count++
+    }
+    return acc
+  }, {})
+})
+
+const modelGroups = computed(() =>
+  llmSettings.value.providers
+    .filter(provider => provider.enabled && (provider.models ?? []).length > 0)
+    .map(provider => ({
+      id: provider.id,
+      label: provider.name,
+      models: (provider.models ?? []).map(modelId => ({
+        id: `${provider.id}::${modelId}`,
+        label: modelId,
+        providerConfigId: provider.id,
+      })),
+    })),
+)
+
+const featureRoute = computed(() =>
+  props.feature === 'sidebarAssistant'
+    ? llmSettings.value.models.sidebarAssistant
+    : llmSettings.value.models.dataStudio,
+)
+
+const selectedModelId = computed(() => featureRoute.value.selectedModelId ?? undefined)
+const recentModelIds = computed(() => (selectedModelId.value ? [selectedModelId.value] : []))
+
+// ── Input ─────────────────────────────────────────────────────────────
 
 function sendMessage() {
   const text = inputText.value.trim()
@@ -39,6 +176,7 @@ function sendMessage() {
     return
   emit('send', text)
   inputText.value = ''
+  forceScrollToBottom()
 }
 
 function handleContinue() {
@@ -54,41 +192,49 @@ function handleKeydown(e: KeyboardEvent) {
   }
 }
 
-watch(() => props.messages.length, async () => {
-  await nextTick()
-  if (messagesContainer.value) {
-    messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-  }
-})
-
-function statusLabel(status: ChatMessageStatus): string {
-  switch (status) {
-    case 'pending': return '...'
-    case 'streaming': return '...'
-    case 'error': return `[${t('common.error')}]`
-    default: return ''
-  }
-}
-
-function messageClass(role: string): string {
-  if (role === 'user')
-    return 'bg-primary/10 ml-8'
-  if (role === 'system')
-    return 'bg-muted/30 text-xs text-muted-foreground italic text-center'
-  return 'bg-muted/30 mr-8'
-}
-
-function alignClass(role: string): string {
-  if (role === 'user')
-    return 'justify-end'
-  return 'justify-start'
-}
-
 function adjustTextareaHeight(e: Event) {
   const el = e.target as HTMLTextAreaElement
   el.style.height = 'auto'
   el.style.height = `${Math.min(el.scrollHeight, 120)}px`
 }
+
+// ── Model change ──────────────────────────────────────────────────────
+
+async function onModelChange(modelId: string) {
+  emit('modelChange', modelId)
+  await appStore.setFeatureModelRoute(props.feature as 'sidebarAssistant' | 'dataStudio', {
+    selectedModelId: modelId,
+    useRecommendedModel: false,
+  })
+  const ok = await appStore.verifyModelAvailability(modelId)
+  if (!ok)
+    toast.warning(t('dataStudio.modelUnavailable') || 'Selected model is not available')
+}
+
+function onModelPickerOpen() {
+  emit('modelPickerOpen')
+  llmSettings.value.providers
+    .filter(p => p.enabled)
+    .forEach(p => appStore.syncProviderModels(p.id).catch(() => {}))
+}
+
+// ── Lifecycle ─────────────────────────────────────────────────────────
+
+onMounted(async () => {
+  await nextTick()
+  const el = getViewport()
+  el?.addEventListener('scroll', handleViewportScroll, { passive: true })
+  forceScrollToBottom()
+})
+
+onBeforeUnmount(() => {
+  const el = getViewport()
+  el?.removeEventListener('scroll', handleViewportScroll)
+  if (scrollRafId)
+    cancelAnimationFrame(scrollRafId)
+})
+
+// ── Status helpers ────────────────────────────────────────────────────
 </script>
 
 <template>
@@ -99,111 +245,59 @@ function adjustTextareaHeight(e: Event) {
     </div>
 
     <!-- Messages area -->
-    <div ref="messagesContainer" class="px-4 py-4 flex-1 overflow-y-auto space-y-3">
-      <!-- Empty state -->
-      <div v-if="messages.length === 0 && !isLoading" class="text-center flex flex-col h-full items-center justify-center">
-        <div class="i-carbon-ibm-watsonx-assistant text-muted-foreground/20 mb-4 h-16 w-16" />
-        <p class="text-sm text-muted-foreground max-w-xs">
-          <slot name="empty">
-            {{ emptyHint || t('dataStudio.agent.emptyState') }}
-          </slot>
-        </p>
-      </div>
-
-      <!-- Message bubbles -->
-      <div v-for="msg in messages" :key="msg.id" :class="alignClass(msg.role)" class="flex">
-        <div class="px-3 py-2 rounded-lg max-w-[80%]" :class="[messageClass(msg.role)]">
-          <!-- Preparing indicator -->
-          <div v-if="msg.preparingInProgress" class="text-sm text-muted-foreground flex gap-2 items-center">
-            <span class="i-carbon-loading h-4 w-4 animate-spin" />
-            <span>{{ t('dataStudio.agent.preparing') }}</span>
-          </div>
-
-          <!-- Compaction marker -->
-          <div v-else-if="msg.compaction" class="text-xs text-muted-foreground/60">
-            <div class="flex gap-1.5 items-center">
-              <span class="i-carbon-compress h-3 w-3" />
-              <span>{{ msg.compaction.summary }}</span>
-            </div>
-          </div>
-
-          <!-- Normal content -->
-          <div v-else class="text-sm whitespace-pre-wrap break-words">
-            {{ msg.content }}
-            <span v-if="msg.status === 'streaming' || msg.status === 'pending'" class="ml-0.5 bg-current h-4 w-2 inline-block animate-pulse" />
-            <span v-if="msg.status === 'error'" class="text-destructive">{{ statusLabel(msg.status) }}</span>
-          </div>
-
-          <!-- Thinking content -->
-          <div v-if="msg.thinking && msg.role === 'assistant'" class="mt-1 pt-1 border-t border-border/30">
-            <details class="text-xs text-muted-foreground/60">
-              <summary class="cursor-pointer transition-colors hover:text-foreground">
-                {{ t('dataStudio.agent.thinking') }}{{ msg.thinkingDuration ? ` (${msg.thinkingDuration}s)` : '' }}
-              </summary>
-              <div class="mt-1 whitespace-pre-wrap">
-                {{ msg.thinking }}
-              </div>
-            </details>
-          </div>
-
-          <!-- Tool calls -->
-          <div v-if="msg.toolCalls && msg.toolCalls.length > 0 && msg.role === 'assistant'" class="mt-2 space-y-1">
-            <div v-for="tc in msg.toolCalls" :key="tc.id" class="text-xs">
-              <div class="flex gap-1.5 items-center" :class="tc.status === 'error' ? 'text-destructive' : 'text-muted-foreground'">
-                <span
-                  :class="tc.status === 'done' ? 'i-carbon-checkmark' : tc.status === 'error' ? 'i-carbon-warning' : 'i-carbon-tool-box'"
-                  class="shrink-0 h-3.5 w-3.5"
-                />
-                <span class="font-mono">{{ tc.toolName }}</span>
-                <span v-if="tc.durationMs" class="opacity-60">({{ tc.durationMs }}ms)</span>
-              </div>
-              <div v-if="tc.result" class="text-muted-foreground/60 mt-0.5 max-w-full truncate">
-                {{ tc.result }}
-                <button
-                  v-if="tc.resultTruncated"
-                  class="ml-1 underline hover:text-foreground"
-                  :title="t('dataStudio.agent.viewFullResult')"
-                >
-                  {{ t('dataStudio.agent.viewMore') }}
-                </button>
-              </div>
-            </div>
-          </div>
+    <div class="flex-1 min-h-0">
+      <ScrollArea ref="scrollAreaRef" class="h-full">
+        <!-- Empty state -->
+        <div v-if="messages.length === 0 && !isLoading" class="px-4 text-center flex flex-col h-full items-center justify-center">
+          <div class="i-carbon-ibm-watsonx-assistant text-muted-foreground/20 mb-4 h-16 w-16" />
+          <p class="text-sm text-muted-foreground max-w-xs">
+            <slot name="empty">
+              {{ emptyHint || t('dataStudio.agent.emptyState') }}
+            </slot>
+          </p>
         </div>
-      </div>
 
-      <!-- Tool confirmation cards (shown separately) -->
-      <div v-for="msg in messages" :key="`conf-${msg.id}`">
-        <ToolConfirmationCard
-          v-for="tc in (msg.toolCalls?.filter(tc => tc.requiresConfirmation && tc.status === 'pending') ?? [])"
-          :key="tc.id"
-          :tool-call="tc"
-          @confirm="emit('confirmToolCall', msg.id, $event)"
+        <!-- Message bubbles -->
+        <AgentMessageBubble
+          v-for="msg in messages"
+          :key="msg.id"
+          :message="msg"
+          :iteration-index="iterationIndexMap[msg.id]"
         />
-      </div>
 
-      <!-- Error banner -->
-      <div v-if="error" class="text-sm text-destructive p-3 border border-destructive/20 rounded-lg bg-destructive/10 flex gap-2 items-center">
-        <span class="i-carbon-warning shrink-0 h-4 w-4" />
-        <span>{{ error }}</span>
-      </div>
+        <!-- Tool confirmation cards -->
+        <div v-for="msg in messages" :key="`conf-${msg.id}`">
+          <ToolConfirmationCard
+            v-for="tc in ((msg as any).toolCalls?.filter((tc: any) => tc.requiresConfirmation && tc.status === 'pending') ?? [])"
+            :key="tc.id"
+            :tool-call="tc"
+            @confirm="emit('confirmToolCall', msg.id, $event)"
+          />
+        </div>
 
-      <!-- Progress indicator -->
-      <div v-if="isLoading && progress" class="text-xs text-muted-foreground py-1 flex gap-2 items-center justify-center">
-        <span class="i-carbon-loading h-3.5 w-3.5 animate-spin" />
-        <span v-if="progress.phase === 'iterating'">
-          {{ t('dataStudio.agent.iteration') }} {{ progress.iter }}/{{ progress.maxIter }}
-        </span>
-        <span v-else-if="progress.phase === 'waiting_llm'">
-          {{ t('dataStudio.agent.waitingModel') }}
-        </span>
-        <span v-else-if="progress.phase === 'compacting'">
-          {{ t('dataStudio.agent.compacting') }}
-        </span>
-        <span v-else-if="progress.phase === 'preparing'">
-          {{ t('dataStudio.agent.preparing') }}
-        </span>
-      </div>
+        <!-- Error banner -->
+        <div v-if="error" class="text-sm text-destructive mx-4 mb-2 p-3 border border-destructive/20 rounded-lg bg-destructive/10 flex gap-2 items-center">
+          <span class="i-carbon-warning shrink-0 h-4 w-4" />
+          <span>{{ error }}</span>
+        </div>
+
+        <!-- Progress indicator -->
+        <div v-if="isLoading && progress" class="text-xs text-muted-foreground py-1 flex gap-2 items-center justify-center">
+          <span class="i-carbon-loading h-3.5 w-3.5 animate-spin" />
+          <span v-if="progress.phase === 'iterating'">
+            {{ t('dataStudio.agent.iteration') }} {{ progress.iter }}/{{ progress.maxIter }}
+          </span>
+          <span v-else-if="progress.phase === 'waiting_llm'">
+            {{ t('dataStudio.agent.waitingModel') }}
+          </span>
+          <span v-else-if="progress.phase === 'compacting'">
+            {{ t('dataStudio.agent.compacting') }}
+          </span>
+          <span v-else-if="progress.phase === 'preparing'">
+            {{ t('dataStudio.agent.preparing') }}
+          </span>
+        </div>
+      </ScrollArea>
     </div>
 
     <!-- Stop banner -->
@@ -253,6 +347,24 @@ function adjustTextareaHeight(e: Event) {
             :disabled="isLoading"
             @keydown="handleKeydown"
             @input="adjustTextareaHeight"
+          />
+        </div>
+
+        <!-- Toolbar center: ModelPicker + ContextIndicator -->
+        <div v-if="showModelPicker" class="flex gap-1 items-center">
+          <ContextIndicator
+            v-if="sessionId"
+            ref="contextIndicatorRef"
+            :session-id="sessionId"
+            :settings="contextSettings"
+          />
+          <ModelPicker
+            :groups="modelGroups"
+            :model-value="selectedModelId"
+            :recent-model-ids="recentModelIds"
+            :compact="compact"
+            @open="onModelPickerOpen"
+            @update:model-value="onModelChange"
           />
         </div>
 

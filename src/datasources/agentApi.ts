@@ -71,6 +71,17 @@ export type ConfirmationRuleRow = {
   created_at: string
 }
 
+export type ContextUsage = {
+  session_id: string
+  used_tokens: number
+  capacity: number
+  context_window: number
+  output_reserve: number
+  trigger_at: number
+  should_compact: boolean
+  model: string
+}
+
 export const agentApi = {
   // Tool discovery
   getAvailableTools: async (sourceKinds?: string[]): Promise<ToolsResponse> => {
@@ -280,5 +291,6 @@ export const saveAttachedSource = agentApi.saveAttachedSource
 export const deleteAttachedSource = agentApi.deleteAttachedSource
 export const compactAgentSession = agentApi.compactAgentSession
 export const getAgentContextUsage = agentApi.getAgentContextUsage
+export const onAgentContextUsage = agentApi.onAgentContextUsage
 
 export default agentApi
