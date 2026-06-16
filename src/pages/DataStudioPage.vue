@@ -37,6 +37,9 @@ const {
   activeSessionSources,
   lastSettings,
   initContextSettings,
+  stopReason,
+  stopMessage,
+  progress,
 } = useDataStudioChatAgent()
 
 function handleConfirmation(msgId: string, event: { toolCallId: string, action: 'allow_once' | 'allow_always' | 'deny' | 'deny_always' | 'cancel' }) {
@@ -249,6 +252,9 @@ onBeforeUnmount(() => {
             :input-placeholder="t('dataStudio.inputPlaceholder')"
             :session-id="activeSession?.id ?? null"
             :context-settings="lastSettings"
+            :stop-reason="stopReason"
+            :stop-message="stopMessage"
+            :progress="progress"
             feature="dataStudio"
             compact
             @send="sendMessage"

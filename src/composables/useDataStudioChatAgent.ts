@@ -172,6 +172,14 @@ export function useDataStudioChatAgent() {
     })
   }
 
+  const stopReason = computed(() => activeSession.value?.stopReason ?? null)
+  const stopMessage = computed(() => activeSession.value?.stopMessage ?? null)
+  const progress = computed(() =>
+    dataStudioStore.activeSessionId
+      ? dataStudioStore.getSessionProgress(dataStudioStore.activeSessionId)
+      : null,
+  )
+
   return {
     isLoading: agent.isLoading,
     error: agent.error,
@@ -186,5 +194,8 @@ export function useDataStudioChatAgent() {
     clearChat: agent.clearChat,
     attachedSources,
     confirmationRules,
+    stopReason,
+    stopMessage,
+    progress,
   }
 }

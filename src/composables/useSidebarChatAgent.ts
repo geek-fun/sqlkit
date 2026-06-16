@@ -133,5 +133,12 @@ export function useSidebarChatAgent() {
     handleConfirmation: agent.handleConfirmation,
     cancelSession: agent.cancelSession,
     clearChat: agent.clearChat,
+    stopReason: computed(() => activeSession.value?.stopReason ?? null),
+    stopMessage: computed(() => activeSession.value?.stopMessage ?? null),
+    progress: computed(() =>
+      dataStudioStore.sidebarSessionId
+        ? dataStudioStore.getSessionProgress(dataStudioStore.sidebarSessionId)
+        : null,
+    ),
   }
 }

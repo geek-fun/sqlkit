@@ -80,6 +80,8 @@ function scrollToBottomForce() {
     cancelAnimationFrame(scrollRafId)
   scrollRafId = requestAnimationFrame(() => {
     scrollRafId = 0
+    if (!stickToBottom.value)
+      return
     const el = getViewport()
     if (!el)
       return
