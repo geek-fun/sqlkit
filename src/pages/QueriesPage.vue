@@ -747,15 +747,18 @@ function closeResultPanel() {
             class="flex-1"
           />
 
-          <!-- Invalid table-view state (connection mismatch - tab being closed) -->
+          <!-- Invalid table-view state (no active connection) -->
           <div
             v-else-if="activeTab?.tableView && !isTableViewConnectionValid"
             class="flex flex-1 items-center justify-center"
           >
             <div class="text-muted-foreground text-center">
-              <span class="i-carbon-loading mx-auto mb-2 h-8 w-8 block animate-spin" />
+              <span class="i-carbon-warning mx-auto mb-2 h-8 w-8 block" />
               <p class="text-sm">
-                {{ t('pages.queries.status.executing') }}
+                {{ t('pages.queries.status.connectionLost') }}
+              </p>
+              <p class="text-xs mt-1">
+                {{ t('pages.queries.status.reconnecting') }}
               </p>
             </div>
           </div>
