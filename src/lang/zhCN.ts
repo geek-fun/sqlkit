@@ -704,6 +704,8 @@ export const zhCN = {
       labelStatus: '状态',
       compactNow: '立即压缩',
       compacting: '压缩中…',
+      compactSuccess: '上下文已压缩',
+      compactFailed: '压缩失败：{error}',
       statusIdle: '空闲',
       statusOverThresholdOff: '超过阈值（自动压缩已关闭）',
       statusAutoCompactOff: '自动压缩已关闭',

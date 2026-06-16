@@ -704,6 +704,8 @@ export const enUS = {
       labelStatus: 'Status',
       compactNow: 'Compact now',
       compacting: 'Compacting…',
+      compactSuccess: 'Context compacted',
+      compactFailed: 'Compact failed: {error}',
       statusIdle: 'Idle',
       statusOverThresholdOff: 'Over threshold (auto-compact OFF)',
       statusAutoCompactOff: 'Auto-compact OFF',
