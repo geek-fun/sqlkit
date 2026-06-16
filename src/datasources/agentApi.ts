@@ -85,7 +85,8 @@ export const agentApi = {
 
   // Session CRUD
   loadAgentSessions: async (): Promise<AgentSession[]> => {
-    return jsonify.parse(await invoke<string>('load_agent_sessions'))
+    const raw = await invoke<string>('load_agent_sessions')
+    return raw ? jsonify.parse(raw) : []
   },
 
   createAgentSession: async (title: string, sources?: string, permissionsMode?: string, modelId?: string | null): Promise<AgentSession> => {
@@ -176,7 +177,8 @@ export const agentApi = {
 
   // Attached sources
   loadAttachedSources: async (): Promise<AttachedSourceRow[]> => {
-    return jsonify.parse(await invoke<string>('load_attached_sources'))
+    const raw = await invoke<string>('load_attached_sources')
+    return raw ? jsonify.parse(raw) : []
   },
 
   saveAttachedSource: async (id: string, kind: string, alias?: string, name?: string, databaseType?: string, fileType?: string, filePath?: string, connectionId?: number | null): Promise<AttachedSourceRow> => {
