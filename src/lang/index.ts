@@ -6,7 +6,8 @@ function detectLocale(): string {
   try {
     const stored = localStorage.getItem('lang') || 'auto'
     return stored === 'auto' ? (navigator.language === 'zh-CN' ? 'zhCN' : 'enUS') : stored
-  } catch {
+  }
+  catch {
     return 'enUS'
   }
 }
@@ -24,7 +25,8 @@ const lang = createI18n({
 // Re-register locale messages on Vite HMR to prevent stale references.
 // eval() prevents ts-jest from parsing import.meta as syntax in CJS.
 try {
-  const viteMeta: { hot?: { accept: Function } } = eval('import.meta')
+  // eslint-disable-next-line no-eval
+  const viteMeta: { hot?: { accept: (...args: any[]) => void } } = eval('import.meta')
   if (viteMeta.hot) {
     viteMeta.hot.accept(['./enUS', './zhCN'], ([newEnUS, newZhCN]: any) => {
       if (newEnUS)
@@ -34,7 +36,7 @@ try {
     })
   }
 }
-catch {} /* eslint-disable-line no-empty */
+catch {}
 
 const useLang = useI18n
 
