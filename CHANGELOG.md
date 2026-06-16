@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-16
+
+### Added
+
+- Visual query execution plan as structured tree with cost highlighting (#94)
+
 ## [0.6.0] - 2026-06-16
 
 ### Added
