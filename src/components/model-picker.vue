@@ -168,106 +168,106 @@ function selectModel(value: string) {
 
 <style scoped>
 .model-picker-panel {
-  display: flex
-  max-height: 420px
-  flex-direction: column
+  display: flex;
+  max-height: 420px;
+  flex-direction: column;
 }
 
 .model-picker-header {
-  display: flex
-  align-items: flex-start
-  justify-content: space-between
-  padding: 14px 14px 8px
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 14px 8px;
 }
 
 .model-picker-title {
-  font-size: 14px
-  font-weight: 700
-  letter-spacing: 0.03em
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
 }
 
 .model-picker-subtitle {
-  margin-top: 2px
-  font-size: 10px
-  text-transform: uppercase
-  color: hsl(var(--muted-foreground) / 0.6)
+  margin-top: 2px;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground) / 0.6);
 }
 
 .model-picker-list {
-  overflow-y: auto
-  padding: 0 8px 12px
+  overflow-y: auto;
+  padding: 0 8px 12px;
 }
 
 .model-picker-section + .model-picker-section {
-  margin-top: 10px
+  margin-top: 10px;
 }
 
 .model-picker-heading {
-  padding: 0 6px 6px
-  font-size: 11px
-  font-weight: 700
-  color: hsl(var(--primary) / 0.8)
+  padding: 0 6px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: hsl(var(--primary) / 0.8);
 }
 
 .model-picker-row {
-  display: flex
-  width: 100%
-  align-items: center
-  justify-content: space-between
-  gap: 10px
-  border-radius: 8px
-  padding: 6px 8px
-  text-align: left
-  color: hsl(var(--foreground))
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-radius: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  color: hsl(var(--foreground));
 }
 
 .model-picker-row:hover {
-  background: hsl(var(--muted) / 0.4)
+  background: hsl(var(--muted) / 0.4);
 }
 
 .model-picker-row.selected .model-picker-name {
-  color: hsl(var(--primary))
+  color: hsl(var(--primary));
 }
 
 .model-picker-row.selected .model-picker-checkmark {
-  color: hsl(var(--primary))
+  color: hsl(var(--primary));
 }
 
 .model-picker-main {
-  display: flex
-  min-width: 0
-  align-items: center
-  gap: 8px
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
 }
 
 .model-picker-dot {
-  height: 8px
-  width: 8px
-  border-radius: 9999px
-  background: transparent
+  height: 8px;
+  width: 8px;
+  border-radius: 9999px;
+  background: transparent;
 }
 
 .model-picker-dot.active {
-  background: hsl(var(--primary))
+  background: hsl(var(--primary));
 }
 
 .model-picker-name {
-  min-width: 0
-  overflow: hidden
-  text-overflow: ellipsis
-  white-space: nowrap
-  font-size: 13px
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
 }
 
 .model-picker-provider,
 .model-picker-meta {
-  font-size: 11px
-  color: hsl(var(--muted-foreground))
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
 }
 
 .model-picker-empty {
-  padding: 14px 8px
-  font-size: 12px
-  color: hsl(var(--muted-foreground))
+  padding: 14px 8px;
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
 }
 </style>
