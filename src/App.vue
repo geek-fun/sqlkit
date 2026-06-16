@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { UnlistenFn } from '@tauri-apps/api/event'
 import { listen } from '@tauri-apps/api/event'
-import { onMounted, onUnmounted } from 'vue'
+import { storeToRefs } from 'pinia'
+import { onMounted, onUnmounted, watch } from 'vue'
 import { RouterView } from 'vue-router'
 import AppNotifications from '@/components/ui/notification/AppNotifications.vue'
 import { useAppUpdater } from '@/composables/useAppUpdater'
@@ -9,13 +10,18 @@ import { useAccountStore } from '@/store/accountStore'
 import { useAppStore } from '@/store/appStore'
 
 const appStore = useAppStore()
+const { themeType } = storeToRefs(appStore)
 const accountStore = useAccountStore()
 const { checkForUpdates } = useAppUpdater()
+
+// Apply theme immediately on store hydration (before first render) and whenever it changes
+watch(themeType, (newTheme) => {
+  appStore.setThemeType(newTheme)
+}, { immediate: true })
 
 let unlistenAuth: UnlistenFn | null = null
 
 onMounted(async () => {
-  appStore.setThemeType(appStore.themeType)
   checkForUpdates(false)
 
   unlistenAuth = await listen<{

@@ -102,22 +102,6 @@ fn connection_config_from_settings(settings: &Value) -> Value {
 }
 
 // ---------------------------------------------------------------------------
-// Helper: extract string list from settings (e.g. attached sources)
-// ---------------------------------------------------------------------------
-
-fn get_settings_string_array(settings: &Value, key: &str) -> Vec<String> {
-    settings
-        .get(key)
-        .and_then(|v| v.as_array())
-        .map(|arr| {
-            arr.iter()
-                .filter_map(|v| v.as_str().map(String::from))
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-// ---------------------------------------------------------------------------
 // Helper: build the system prompt for the agent
 // ---------------------------------------------------------------------------
 
@@ -144,51 +128,6 @@ fn build_system_prompt(settings: &Value) -> String {
     }
 
     prompt
-}
-
-// ---------------------------------------------------------------------------
-// Helper: build the list of tools from attached sources
-// ---------------------------------------------------------------------------
-
-fn build_tools_list(settings: &Value) -> Vec<Value> {
-    let sources = get_settings_string_array(settings, "attachedSources");
-    let _db_types: Vec<String> = sources
-        .iter()
-        .filter_map(|s| {
-            // Source identifiers may be like "postgres:conn-id" or connection ids
-            if s.contains(':') {
-                s.split(':').next().map(String::from)
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    // Get all capabilities tagged as agent tools
-    let registry = crate::capabilities::registry::registry();
-    let mut tools: Vec<Value> = registry
-        .agent_tools()
-        .iter()
-        .map(|cap| {
-            let mut schema = cap.input_schema.clone();
-            // Tag with the capability name so the LLM can call it
-            if let Some(obj) = schema.as_object_mut() {
-                obj.insert("name".to_string(), json!(cap.name));
-                obj.insert("description".to_string(), json!(cap.description));
-            }
-            schema
-        })
-        .collect();
-
-    // Deduplicate by name
-    tools.sort_by(|a, b| {
-        let an = a.get("name").and_then(|v| v.as_str()).unwrap_or("");
-        let bn = b.get("name").and_then(|v| v.as_str()).unwrap_or("");
-        an.cmp(bn)
-    });
-    tools.dedup_by(|a, b| a.get("name") == b.get("name"));
-
-    tools
 }
 
 // ---------------------------------------------------------------------------
@@ -509,7 +448,11 @@ pub async fn run_agent_loop(
 
     // Build system prompt and tools list once
     let system_prompt = build_system_prompt(&settings);
-    let tools = build_tools_list(&settings);
+    let tools: Vec<Value> = settings
+        .get("tools")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
     let has_tools = !tools.is_empty();
 
     // Mark session as active
@@ -1747,7 +1690,11 @@ async fn run_agent_loop_inner(
     let connection_config = connection_config_from_settings(settings);
 
     let system_prompt = build_system_prompt(settings);
-    let tools = build_tools_list(settings);
+    let tools: Vec<Value> = settings
+        .get("tools")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
     let has_tools = !tools.is_empty();
 
     let _ = update_session_status(agent_db, session_id, "running");

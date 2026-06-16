@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Button } from '@/components/ui/button'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 type ModelCategory = 'general' | 'reasoning' | 'coding' | 'fast' | 'vision'
@@ -50,8 +49,8 @@ watch(open, (value) => {
 
 const triggerClasses = computed(() =>
   props.compact
-    ? 'h-7 rounded-full px-2 text-xs bg-muted/40 hover:bg-muted/60 min-w-0 flex-1 max-w-[140px]'
-    : 'h-8 rounded-full px-3 bg-muted/50 hover:bg-muted min-w-[180px]',
+    ? 'h-7 rounded-full px-2 text-xs bg-muted/40 hover:bg-muted/60 min-w-0 flex-1 max-w-[140px] inline-flex items-center justify-center cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring model-picker-trigger'
+    : 'h-8 rounded-full px-3 bg-muted/50 hover:bg-muted min-w-[180px] inline-flex items-center justify-center cursor-pointer transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring model-picker-trigger',
 )
 
 const panelClasses = computed(() =>
@@ -91,10 +90,10 @@ function selectModel(value: string) {
 <template>
   <Popover v-model:open="open">
     <PopoverTrigger as-child>
-      <Button variant="ghost" :class="triggerClasses">
+      <button :class="triggerClasses">
         <span class="text-left truncate">{{ selectedLabel }}</span>
         <span class="i-carbon-chevron-down ml-1 opacity-70 shrink-0 h-3 w-3" />
-      </Button>
+      </button>
     </PopoverTrigger>
     <PopoverContent align="end" :class="panelClasses">
       <div class="model-picker-panel">
@@ -269,5 +268,9 @@ function selectModel(value: string) {
   padding: 14px 8px;
   font-size: 12px;
   color: hsl(var(--muted-foreground));
+}
+
+.model-picker-trigger {
+  border: 1px solid hsl(var(--border));
 }
 </style>

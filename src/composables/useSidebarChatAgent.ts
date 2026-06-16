@@ -2,6 +2,7 @@ import type { ComputedRef, Ref } from 'vue'
 import type { UseChatAgentConfig } from './useChatAgent'
 import type { AgentSession, AgentToolCall, AgentToolCallStatus, ConfirmationRule } from '@/store/dataStudioStore'
 import type {
+  ChatContextConfig,
   ChatMessage,
   ChatMessageRole,
   ChatMessageStatus,
@@ -12,6 +13,8 @@ import { storeToRefs } from 'pinia'
 import { computed } from 'vue'
 import { useAppStore } from '@/store/appStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
+import { useTabStore } from '@/store/tabStore'
+import { clearSessionRuntime } from './agentRuntime'
 import { useChatAgent } from './useChatAgent'
 
 function adaptSidebarSession(session: AgentSession): ChatSession {
@@ -54,8 +57,27 @@ export function useSidebarChatAgent() {
     return found ? adaptSidebarSession(found) : undefined
   })
 
-  // Sidebar has no database context
-  const contextProvider = () => ({ connections: {} })
+  const contextProvider = () => {
+    const tabStore = useTabStore()
+    const activeTab = tabStore.activeTab
+    const context: ChatContextConfig = {}
+
+    if (activeTab?.connectionId) {
+      context.connections = {
+        [activeTab.name || 'active']: {
+          connectionId: activeTab.connectionId,
+          dbType: 'SQL',
+          permissions: { read: true, create: false, update: false, delete: false },
+        },
+      }
+    }
+
+    if (activeTab?.content) {
+      context.activePanel = { editorContent: activeTab.content }
+    }
+
+    return context
+  }
 
   const config: UseChatAgentConfig = {
     feature: 'sidebarAssistant',
@@ -122,6 +144,14 @@ export function useSidebarChatAgent() {
     })
   }
 
+  const startNewSession = () => {
+    const oldSessionId = dataStudioStore.sidebarSessionId
+    if (oldSessionId) {
+      clearSessionRuntime(oldSessionId)
+    }
+    dataStudioStore.sidebarSessionId = undefined
+  }
+
   return {
     isLoading: agent.isLoading,
     error: agent.error,
@@ -130,6 +160,7 @@ export function useSidebarChatAgent() {
     lastSettings: agent.lastSettings,
     initContextSettings: agent.initContextSettings,
     sendMessage,
+    startNewSession,
     handleConfirmation: agent.handleConfirmation,
     cancelSession: agent.cancelSession,
     clearChat: agent.clearChat,

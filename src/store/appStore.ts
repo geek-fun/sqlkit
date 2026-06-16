@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { storeApi } from '@/datasources/storeApi'
+import { lang } from '@/lang'
 
 export enum ThemeType {
   AUTO = 'auto',
@@ -208,7 +209,16 @@ export const useAppStore = defineStore('app', {
       chat: { ...CHAT_RUNTIME_DEFAULTS },
     },
   }),
-  persist: true,
+  persist: {
+    pick: [
+      'themeType',
+      'languageType',
+      'uiThemeType',
+      'editorConfig',
+      'queryConfig',
+      'sidebarCollapsed',
+    ],
+  },
   getters: {
     queryTimeout: (state): number => state.queryConfig.queryTimeout,
     defaultLimit: (state): number => state.queryConfig.defaultLimit,
@@ -301,43 +311,48 @@ export const useAppStore = defineStore('app', {
 
     // ── Provider CRUD ────────────────────────────────────────────────────
 
-    addProvider(provider: LlmProvider) {
+    async addProvider(provider: LlmProvider) {
       this.llmSettings = {
         ...this.llmSettings,
         providers: [...this.llmSettings.providers, provider],
       }
+      await this.persistLlmSettings()
     },
 
-    removeProvider(providerId: string) {
+    async removeProvider(providerId: string) {
       this.llmSettings = {
         ...this.llmSettings,
         providers: this.llmSettings.providers.filter(p => p.id !== providerId),
       }
+      await this.persistLlmSettings()
     },
 
-    updateProvider(providerId: string, updates: Partial<LlmProvider>) {
+    async updateProvider(providerId: string, updates: Partial<LlmProvider>) {
       this.llmSettings = {
         ...this.llmSettings,
         providers: this.llmSettings.providers.map(p =>
           p.id === providerId ? { ...p, ...updates } : p,
         ),
       }
+      await this.persistLlmSettings()
     },
 
-    toggleProviderEnabled(providerId: string) {
+    async toggleProviderEnabled(providerId: string) {
       this.llmSettings = {
         ...this.llmSettings,
         providers: this.llmSettings.providers.map(p =>
           p.id === providerId ? { ...p, enabled: !p.enabled } : p,
         ),
       }
+      await this.persistLlmSettings()
     },
 
-    reorderProviders(providers: LlmProvider[]) {
+    async reorderProviders(providers: LlmProvider[]) {
       this.llmSettings = {
         ...this.llmSettings,
         providers,
       }
+      await this.persistLlmSettings()
     },
 
     // ── LLM/Agent configuration ──────────────────────────────────────────
@@ -402,8 +417,15 @@ export const useAppStore = defineStore('app', {
     async getFeatureModelConfig(feature: 'sidebarAssistant' | 'dataStudio'): Promise<{ provider: LlmProvider, model: ModelRef }> {
       await this.fetchLlmSettings()
       const resolved = this.getResolvedFeatureModel(feature)
-      if (!resolved)
-        throw new Error('No LLM provider configured. Please configure an AI provider in Settings.')
+      if (!resolved) {
+        const locale = lang.global.locale.value || 'enUS'
+        const raw = lang.global.messages as Record<string, any>
+        const localeMsgs = raw[locale] || raw.enUS || raw.zhCN || {}
+        const msg = (localeMsgs.settings || localeMsgs)?.ai?.missing
+          || localeMsgs['settings.ai.missing']
+          || 'No AI model configured. Please add a provider and select a model in Settings.'
+        throw new Error(msg)
+      }
       return resolved
     },
 
