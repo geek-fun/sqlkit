@@ -261,15 +261,32 @@ describe('appStore', () => {
   })
 
   describe('llm initial state', () => {
-    it('should have default providers', () => {
+    it('should have empty providers by default', () => {
       const store = useAppStore()
 
-      expect(store.llmSettings.providers).toHaveLength(10)
-      expect(store.llmSettings.providers[0].id).toBe('openai')
-      expect(store.llmSettings.providers[0].name).toBe('OpenAI')
-      expect(store.llmSettings.providers[0].enabled).toBe(true)
+      expect(store.llmSettings.providers).toHaveLength(0)
     })
   })
+
+  const sampleProvider = {
+    id: 'openai',
+    name: 'OpenAI',
+    apiCompatibility: 'openai',
+    apiKey: '',
+    baseUrl: 'https://api.openai.com/v1',
+    enabled: true,
+    models: ['gpt-4o', 'gpt-4o-mini'],
+  }
+
+  const anthropicProvider = {
+    id: 'anthropic',
+    name: 'Anthropic',
+    apiCompatibility: 'anthropic',
+    apiKey: '',
+    baseUrl: 'https://api.anthropic.com/v1',
+    enabled: false,
+    models: ['claude-sonnet-4-20250514'],
+  }
 
   describe('addProvider', () => {
     it('should add a provider to the list', () => {
@@ -350,6 +367,7 @@ describe('appStore', () => {
   describe('updateProvider', () => {
     it('should update partial fields of a provider', () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
 
       store.updateProvider('openai', { name: 'Updated OpenAI' })
 
@@ -360,6 +378,7 @@ describe('appStore', () => {
 
     it('should update apiKey and baseUrl', () => {
       const store = useAppStore()
+      store.addProvider({ ...anthropicProvider })
 
       store.updateProvider('anthropic', { apiKey: 'sk-ant-new', baseUrl: 'https://custom.anthropic.com' })
 
@@ -370,6 +389,7 @@ describe('appStore', () => {
 
     it('should no-op when id is not found', () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
       const original = [...store.llmSettings.providers]
 
       store.updateProvider('non-existent', { name: 'Changed' })
@@ -379,6 +399,7 @@ describe('appStore', () => {
 
     it('should not mutate the original provider object', () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
       const originalProvider = store.llmSettings.providers.find(p => p.id === 'openai')
 
       store.updateProvider('openai', { name: 'Changed' })
@@ -391,6 +412,7 @@ describe('appStore', () => {
   describe('toggleProviderEnabled', () => {
     it('should toggle enabled from true to false', () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
       expect(store.llmSettings.providers.find(p => p.id === 'openai')?.enabled).toBe(true)
 
       store.toggleProviderEnabled('openai')
@@ -400,6 +422,8 @@ describe('appStore', () => {
 
     it('should toggle enabled from false to true', () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
+      store.addProvider({ ...anthropicProvider })
       expect(store.llmSettings.providers.find(p => p.id === 'anthropic')?.enabled).toBe(false)
 
       store.toggleProviderEnabled('anthropic')
@@ -409,6 +433,7 @@ describe('appStore', () => {
 
     it('should no-op when id is not found', () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
       const original = [...store.llmSettings.providers]
 
       store.toggleProviderEnabled('non-existent')
@@ -420,16 +445,20 @@ describe('appStore', () => {
   describe('reorderProviders', () => {
     it('should replace the providers array with new order', () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider, id: 'a', name: 'A' })
+      store.addProvider({ ...sampleProvider, id: 'b', name: 'B' })
+      store.addProvider({ ...sampleProvider, id: 'c', name: 'C' })
       const reversed = [...store.llmSettings.providers].reverse()
 
       store.reorderProviders(reversed)
 
-      expect(store.llmSettings.providers[0].id).toBe('lm-studio')
-      expect(store.llmSettings.providers[1].id).toBe('ollama')
+      expect(store.llmSettings.providers[0].id).toBe('c')
+      expect(store.llmSettings.providers[1].id).toBe('b')
     })
 
     it('should accept empty array', () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
 
       store.reorderProviders([])
 
@@ -440,6 +469,7 @@ describe('appStore', () => {
   describe('getFeatureModelConfig', () => {
     it('should return first enabled provider and its first model', async () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
 
       const config = await store.getFeatureModelConfig('dataStudio')
 
@@ -449,6 +479,7 @@ describe('appStore', () => {
 
     it('should resolve with default provider when no stored settings', async () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
 
       const config = await store.getFeatureModelConfig('dataStudio')
 
@@ -462,25 +493,28 @@ describe('appStore', () => {
   describe('verifyModelAvailability', () => {
     it('should return true for an enabled provider model', async () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
 
-      const available = await store.verifyModelAvailability('gpt-4o')
+      const available = await store.verifyModelAvailability('openai::gpt-4o')
 
       expect(available).toBe(true)
     })
 
     it('should return false for a non-existent model', async () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
 
-      const available = await store.verifyModelAvailability('non-existent-model')
+      const available = await store.verifyModelAvailability('openai::non-existent-model')
 
       expect(available).toBe(false)
     })
 
     it('should return false when the provider is disabled', async () => {
       const store = useAppStore()
+      store.addProvider({ ...sampleProvider })
       store.toggleProviderEnabled('openai')
 
-      const available = await store.verifyModelAvailability('gpt-4o')
+      const available = await store.verifyModelAvailability('openai::gpt-4o')
 
       expect(available).toBe(false)
     })
