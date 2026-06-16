@@ -5,6 +5,7 @@ import type { ChatContextConfig, ChatMessage, ChatMessageStatus, ChatPermissions
 import { ulid } from 'ulidx'
 import { computed, ref } from 'vue'
 import { agentApi } from '@/datasources/agentApi'
+import { useDataStudioStore } from '@/store/dataStudioStore'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -250,16 +251,22 @@ function buildSystemPrompt({ schema, sources, permissionsMode }: {
 // ─── Composable ──────────────────────────────────────────────────────────────
 
 export function useChatAgent(config: UseChatAgentConfig) {
-  const isLoading = ref(false)
-  const error = ref<string | undefined>()
-  const lastSettings = ref<Record<string, unknown> | null>(null)
-
-  // ── Computed ──────────────────────────────────────────────────────────────
+  const localError = ref<string | undefined>()
+  const dataStudioStore = useDataStudioStore()
 
   const activeSession = computed(() => config.sessionStore.activeSession.value)
 
-  const isLoadingComputed = computed(() => isLoading.value)
-  const errorComputed = computed(() => error.value)
+  const isLoading = computed(
+    () =>
+      activeSession.value?.status === 'running'
+      || activeSession.value?.status === 'waiting_confirmation',
+  )
+  const error = computed(
+    () =>
+      localError.value
+      ?? (activeSession.value ? dataStudioStore.getSessionError(activeSession.value.id) : undefined),
+  )
+  const lastSettings = ref<Record<string, unknown> | null>(null)
 
   // ── Event Listener Management ────────────────────────────────────────────
 
@@ -367,9 +374,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
     }
     catch (err) {
       const message = err instanceof Error ? err.message : String(err)
+      localError.value = message
       config.sessionStore.setSessionStatus(sessionId, 'error')
 
-      // Add error message to session
       const errorMsg: ChatMessage = {
         id: ulid(),
         role: 'system',
@@ -382,18 +389,16 @@ export function useChatAgent(config: UseChatAgentConfig) {
   }
 
   const sendMessage = async (options: SendMessageOptions) => {
-    isLoading.value = true
-    error.value = undefined
+    localError.value = undefined
 
     try {
-      // 1. Ensure a session exists
       const sessionId = await config.sessionStore.getOrCreateSession()
+      dataStudioStore.clearSessionError(sessionId)
 
       if (config.sessionStore.clearSessionStop) {
         config.sessionStore.clearSessionStop(sessionId)
       }
 
-      // 2. Create user message
       const userMessage: ChatMessage = {
         id: ulid(),
         role: 'user',
@@ -403,16 +408,16 @@ export function useChatAgent(config: UseChatAgentConfig) {
       }
       config.sessionStore.addMessage(sessionId, userMessage)
 
-      // 3. Get context for tool discovery
+      dataStudioStore.insertPreparingPlaceholder()
+      dataStudioStore.setSessionProgress(sessionId, { phase: 'preparing' })
+
       const context = options.context ?? config.contextProvider?.()
       const connections = context?.connections ?? {}
 
-      // Extract unique database types for tool discovery
       const dbTypes = [...new Set(
         Object.values(connections).map(c => c.dbType),
       )].filter(Boolean)
 
-      // 4. Get available tools from backend for the relevant database types
       let toolsResponse
       try {
         toolsResponse = await agentApi.getAvailableTools(
@@ -424,7 +429,6 @@ export function useChatAgent(config: UseChatAgentConfig) {
         toolsResponse = { tools: [], metadata: {} }
       }
 
-      // 5. Store tools in runtime cache
       sessionRuntimes.value = {
         ...sessionRuntimes.value,
         [sessionId]: {
@@ -433,7 +437,16 @@ export function useChatAgent(config: UseChatAgentConfig) {
         },
       }
 
-      // 5b. Fetch schema context for each attached connection
+      const { useAppStore } = await import('@/store/appStore')
+      const appStore = useAppStore()
+      try {
+        await appStore.getFeatureModelConfig(config.feature)
+      }
+      catch (err) {
+        localError.value = err instanceof Error ? err.message : String(err)
+        return
+      }
+
       let schemaContext = ''
       if (connections && Object.keys(connections).length > 0) {
         const schemaParts: string[] = []
@@ -454,16 +467,11 @@ export function useChatAgent(config: UseChatAgentConfig) {
         }
       }
 
-      // 6. Run the agent loop with schema context
-      isLoading.value = true
       await runAgentLoop(sessionId, options.content, schemaContext)
     }
     catch (err) {
-      error.value = err instanceof Error ? err.message : String(err)
+      localError.value = err instanceof Error ? err.message : String(err)
       console.error('[useChatAgent] sendMessage error:', err)
-    }
-    finally {
-      isLoading.value = false
     }
   }
 
@@ -565,14 +573,33 @@ export function useChatAgent(config: UseChatAgentConfig) {
   }
 
   const initContextSettings = async () => {
-    config.contextProvider?.()
+    if (lastSettings.value)
+      return
+    try {
+      const { useAppStore } = await import('@/store/appStore')
+      const appStore = useAppStore()
+      const { provider, model } = await appStore.getFeatureModelConfig(config.feature)
+      lastSettings.value = {
+        provider: provider.name,
+        apiCompatibility: provider.apiCompatibility,
+        model: model.label,
+        apiKey: provider.apiKey ?? '',
+        baseUrl: provider.baseUrl,
+        httpProxy: provider.proxy || undefined,
+        proxyMode: provider.proxyMode ?? 'none',
+        contextWindowOverride: provider.contextWindowOverride,
+      }
+    }
+    catch {
+      lastSettings.value = null
+    }
   }
 
   // ── Return ────────────────────────────────────────────────────────────────
 
   return {
-    isLoading: isLoadingComputed,
-    error: errorComputed,
+    isLoading,
+    error,
     activeSession,
     lastSettings,
     initContextSettings,

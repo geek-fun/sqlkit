@@ -48,14 +48,4 @@ export default defineConfig({
       },
     },
   },
-  content: {
-    pipeline: {
-      include: [
-        // Default includes
-        /\.(vue|svelte|[jt]sx|mdx?|astro|elm|php|phtml|html)($|\?)/,
-        // Include src directory
-        'src/**/*.{vue,js,ts,jsx,tsx}',
-      ],
-    },
-  },
 })

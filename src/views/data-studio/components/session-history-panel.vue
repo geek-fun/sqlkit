@@ -1,80 +1,244 @@
 <script setup lang="ts">
+import { computed } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useI18n } from 'vue-i18n'
-import { useDataStudioStore } from '@/store/dataStudioStore'
+import { useDataStudioStore, type AgentSession } from '@/store/dataStudioStore'
 
 const emit = defineEmits<{
   select: [sessionId: string]
   delete: [sessionId: string]
-  newSession: []
+  'new-session': []
   close: []
 }>()
 
 const { t } = useI18n()
 const dataStudioStore = useDataStudioStore()
+const { sessions, activeSessionId } = storeToRefs(dataStudioStore)
 
-function formatDate(timestamp: number): string {
-  const d = new Date(timestamp)
+const sortedSessions = computed(() =>
+  [...sessions.value].sort((a, b) => {
+    const aTime = a.updated_at ?? 0
+    const bTime = b.updated_at ?? 0
+    return bTime - aTime
+  }),
+)
+
+const sessionLabel = (session: AgentSession): string => {
+  if (session.title && session.title !== t('dataStudio.history.newSession'))
+    return session.title
+  const sourceLabel = session.sources
+    .filter(source => !source.detached)
+    .map(source => source.alias)
+    .join(', ')
+  if (sourceLabel)
+    return sourceLabel
+  const firstUser = session.messages.find(m => m.role === 'user')
+  if (firstUser?.content) {
+    return firstUser.content.length > 40 ? `${firstUser.content.slice(0, 40)}…` : firstUser.content
+  }
+  return session.title || t('dataStudio.history.newSession')
+}
+
+const formatTime = (session: AgentSession): string => {
+  const ts = session.updated_at ?? 0
+  if (!ts)
+    return ''
+  const d = new Date(ts)
   const now = new Date()
-  const diff = now.getTime() - d.getTime()
-  if (diff < 60000)
-    return t('dataStudio.history.justNow')
-  if (diff < 3600000)
-    return t('dataStudio.history.minutesAgo', { count: Math.floor(diff / 60000) })
-  if (diff < 86400000)
-    return t('dataStudio.history.hoursAgo', { count: Math.floor(diff / 3600000) })
-  return d.toLocaleDateString()
+  const diffMs = now.getTime() - d.getTime()
+  const diffDays = Math.floor(diffMs / 86400000)
+  if (diffDays === 0)
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (diffDays === 1)
+    return t('dataStudio.history.yesterday')
+  if (diffDays < 7)
+    return d.toLocaleDateString([], { weekday: 'short' })
+  return d.toLocaleDateString([], { month: 'short', day: 'numeric' })
 }
 </script>
 
 <template>
-  <div class="bg-background flex flex-col h-full">
-    <div class="px-4 py-3 border-b border-border flex items-center justify-between">
-      <span class="text-xs text-muted-foreground tracking-wider font-semibold uppercase">
-        {{ t('dataStudio.history.title') }}
-      </span>
-      <div class="flex gap-1 items-center">
+  <div class="history-panel">
+    <div class="history-header">
+      <span class="history-title">{{ t('dataStudio.history.title') }}</span>
+      <div class="history-header-actions">
         <button
-          class="i-carbon-add text-muted-foreground rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
+          class="icon-btn"
           :title="t('dataStudio.history.newSession')"
-          @click="emit('newSession')"
-        />
+          @click="emit('new-session')"
+        >
+          <span class="i-carbon-add h-4 w-4" />
+        </button>
         <button
-          class="i-carbon-close text-muted-foreground rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
+          class="icon-btn"
           :title="t('common.buttons.close')"
           @click="emit('close')"
-        />
+        >
+          <span class="i-carbon-close h-4 w-4" />
+        </button>
       </div>
     </div>
-    <div class="flex-1 overflow-y-auto">
-      <div v-if="dataStudioStore.sessions.length === 0" class="text-xs text-muted-foreground p-4 text-center">
+
+    <div class="session-list">
+      <div v-if="sortedSessions.length === 0" class="empty-hint">
         {{ t('dataStudio.history.noSessions') }}
       </div>
-      <button
-        v-for="session in dataStudioStore.sessions"
+      <div
+        v-for="session in sortedSessions"
         :key="session.id"
-        class="px-4 py-3 text-left border-b border-border/50 w-full transition-colors hover:bg-muted/50"
-        :class="{ 'bg-muted/30': session.id === dataStudioStore.activeSessionId || session.id === dataStudioStore.sidebarSessionId }"
+        class="session-item"
+        :class="{ 'session-item--active': session.id === activeSessionId }"
         @click="emit('select', session.id)"
       >
-        <div class="text-sm text-foreground font-medium truncate">
-          {{ session.title }}
+        <div class="session-item-body">
+          <span class="session-name">{{ sessionLabel(session) }}</span>
+          <span class="session-meta">{{ formatTime(session) }}</span>
         </div>
-        <div class="text-xs text-muted-foreground mt-0.5">
-          {{ session.messages.length }} {{ t('dataStudio.history.messages') }}
-          · {{ formatDate(session.updated_at) }}
-        </div>
-        <div class="mt-1 flex gap-1 items-center">
-          <span
-            class="text-[10px] px-1.5 py-0.5 rounded-full"
-            :class="session.status === 'running' ? 'bg-green-500/10 text-green-600' : 'bg-muted text-muted-foreground'"
-          >
-            {{ session.status }}
-          </span>
-          <span v-if="session.sources.length > 0" class="text-[10px] text-muted-foreground">
-            {{ session.sources.length }} {{ t('dataStudio.history.sources') }}
-          </span>
-        </div>
-      </button>
+        <button
+          class="delete-btn"
+          :title="t('dataStudio.history.delete')"
+          @click.stop="emit('delete', session.id)"
+        >
+          <span class="i-carbon-trash-can h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.history-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid hsl(var(--border));
+  flex-shrink: 0;
+}
+
+.history-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.history-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: hsl(var(--muted-foreground));
+}
+
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.icon-btn:hover {
+  background: hsl(var(--muted));
+  color: hsl(var(--foreground));
+}
+
+.session-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.empty-hint {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  text-align: center;
+  padding: 20px 0;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.15s;
+}
+
+.session-item:hover {
+  background: hsl(var(--muted));
+}
+
+.session-item--active {
+  background: hsl(var(--muted));
+  border-color: hsl(var(--border));
+}
+
+.session-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: hsl(var(--foreground));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.session-meta {
+  font-size: 11px;
+  color: hsl(var(--muted-foreground));
+}
+
+.delete-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+
+.session-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  background: hsl(var(--destructive) / 0.1);
+  color: hsl(var(--destructive));
+}
+</style>

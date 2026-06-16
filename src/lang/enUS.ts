@@ -401,6 +401,7 @@ export const enUS = {
       ai: {
         title: 'AI Settings',
         description: 'Configure AI model providers and chat behavior',
+        missing: 'No AI model configured. Please add a provider and select a model in Settings.',
         providerList: {
           title: 'Providers',
           description: 'Manage your AI model providers',
@@ -629,7 +630,7 @@ export const enUS = {
     },
   },
   dataStudio: {
-    title: 'Data Studio',
+    title: 'DATA STUDIO BETA',
     subtitle: 'AI-powered SQL data analysis',
     inputPlaceholder: 'Ask a question about your data...',
     modelUnavailable: 'Selected model is not available',
@@ -639,9 +640,13 @@ export const enUS = {
       justNow: 'Just now',
       minutesAgo: '{count}m ago',
       hoursAgo: '{count}h ago',
+      yesterday: 'Yesterday',
       noSessions: 'No previous sessions',
       messages: 'messages',
       sources: 'sources',
+      delete: 'Delete session',
+      sessionFallback: 'Chat',
+      empty: 'No sessions yet',
     },
     agent: {
       emptyState: 'Ask a question or describe the query you want to run.',

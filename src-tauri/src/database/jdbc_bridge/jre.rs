@@ -160,6 +160,14 @@ pub async fn download_managed_jre() -> DbResult<()> {
         .await
         .map_err(|e| DbError::Connection(format!("Failed to download JRE: {}", e)))?;
 
+    if !response.status().is_success() {
+        return Err(DbError::Connection(format!(
+            "Failed to download JRE: HTTP {} from {}",
+            response.status(),
+            url
+        )));
+    }
+
     let bytes = response
         .bytes()
         .await
@@ -187,6 +195,12 @@ pub async fn download_managed_jre() -> DbResult<()> {
             archive
                 .unpack(&parent)
                 .map_err(|e| format!("Failed to extract JRE: {}", e))?;
+        } else if archive_name.ends_with(".zip") {
+            let mut archive = zip::ZipArchive::new(file)
+                .map_err(|e| format!("Failed to open zip archive: {}", e))?;
+            archive
+                .extract(&parent)
+                .map_err(|e| format!("Failed to extract JRE zip: {}", e))?;
         }
 
         for entry in std::fs::read_dir(&parent)

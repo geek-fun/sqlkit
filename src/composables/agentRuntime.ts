@@ -1,23 +1,19 @@
 import type { ToolDefinition, ToolMetadata } from '@/datasources/agentApi'
-import type {
-  AgentSession,
-  AgentSessionStopReason,
-  AgentToolCall,
-  AgentToolCallStatus,
-  PermissionsMode,
-  RiskLevel,
-} from '@/store/dataStudioStore'
-import { agentApi } from '@/datasources/agentApi'
-import { useDataStudioStore } from '@/store/dataStudioStore'
+import type { AgentSession, AgentSessionStopReason, AgentToolCall } from '@/store/dataStudioStore'
+import { ulid } from 'ulidx'
+import {
+  agentApi,
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+} from '@/datasources/agentApi'
+import {
+
+  useDataStudioStore,
+} from '@/store/dataStudioStore'
 
 type SessionRuntime = {
   tools?: Array<ToolDefinition>
   metadata?: Record<string, ToolMetadata>
 }
-
-// ─── Module-level State ──────────────────────────────────────────────────────
 
 const sessionRuntimes = new Map<string, SessionRuntime>()
 let runtimeInitPromise: Promise<void> | null = null
@@ -25,341 +21,369 @@ let runtimeInitialized = false
 let runtimeDisposed = false
 let runtimeUnlisteners: Array<() => void> = []
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function hasStreamingMessage(session: AgentSession): string | undefined {
-  const messages = session.messages
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].status === 'streaming')
-      return messages[i].id
-  }
-  return undefined
+function getSessionRuntime(sessionId: string): SessionRuntime {
+  if (!sessionRuntimes.has(sessionId))
+    sessionRuntimes.set(sessionId, {})
+  return sessionRuntimes.get(sessionId)!
 }
 
-function hasPendingMessage(session: AgentSession): string | undefined {
-  const messages = session.messages
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].status === 'pending')
-      return messages[i].id
-  }
-  return undefined
-}
-
-function findMessageByToolCallId(session: AgentSession, toolCallId: string): string | undefined {
-  const messages = session.messages
-  for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].toolCalls?.some(tc => tc.id === toolCallId))
-      return messages[i].id
-  }
-  return undefined
-}
-
-function getToolRiskLevel(runtime: SessionRuntime | undefined, toolName: string): RiskLevel {
-  const risk = runtime?.metadata?.[toolName]?.riskLevel
-  if (risk === 'destructive')
-    return 'destructive'
-  if (risk === 'elevated')
-    return 'elevated'
-  return 'safe'
-}
-
-function shouldRequireConfirmation(mode: PermissionsMode, risk: RiskLevel): boolean {
-  return !(mode === 'Auto' && risk === 'safe')
-}
-
-function isDeniedByRule(rule: { action: string } | undefined): boolean {
-  return rule?.action === 'deny'
-}
-
-function getPendingConfirmation(session: AgentSession): boolean {
-  return session.status === 'waiting_confirmation'
-}
-
-// ─── Runtime Management ──────────────────────────────────────────────────────
-
-export function getSessionRuntime(sessionId: string): SessionRuntime {
-  let runtime = sessionRuntimes.get(sessionId)
-  if (!runtime) {
-    runtime = {}
-    sessionRuntimes.set(sessionId, runtime)
-  }
-  return runtime
-}
-
-export function clearSessionRuntime(sessionId: string): void {
+function clearSessionRuntime(sessionId: string) {
   sessionRuntimes.delete(sessionId)
 }
 
-export async function initAgentRuntime(): Promise<void> {
+function getSessionById(sessions: Array<AgentSession>, sessionId: string): AgentSession | undefined {
+  return sessions.find(s => s.id === sessionId)
+}
+
+function shouldRequireConfirmation(session: AgentSession, toolName: string, riskLevel: AgentToolCall['riskLevel']): boolean {
+  const rule = useDataStudioStore().findConfirmationRule(session.id, toolName)
+  if (rule?.action === 'allow' || rule?.action === 'deny')
+    return false
+  if (riskLevel === 'safe')
+    return false
+  if (riskLevel === 'destructive')
+    return true
+  return session.permissionsMode !== 'Auto'
+}
+
+function isDeniedByRule(sessionId: string, toolName: string): boolean {
+  return useDataStudioStore().findConfirmationRule(sessionId, toolName)?.action === 'deny'
+}
+
+async function initAgentRuntime(): Promise<void> {
   if (runtimeInitialized)
     return
-
-  // Reset disposed flag to allow re-initialization after disposeAgentRuntime()
   runtimeDisposed = false
 
-  const init = async () => {
-    const unlisteners: Array<() => void> = []
+  const unlisteners: Array<() => void> = []
 
-    // ── Streaming content delta ─────────────────────────────────────────────
+  unlisteners.push(
+    await agentApi.onAgentLoopDelta(({ session_id, content }) => {
+      const store = useDataStudioStore()
+      store.removePreparingPlaceholder()
+      const session = getSessionById(store.sessions, session_id)
+      if (!session)
+        return
 
-    unlisteners.push(
-      await agentApi.onAgentLoopDelta((payload) => {
-        const store = useDataStudioStore()
-        const session = store.activeSession
-        if (!session)
-          return
+      const streamingMsg = [...session.messages]
+        .reverse()
+        .find(message => message.role === 'assistant' && message.status === 'streaming')
 
-        const messageId = hasStreamingMessage(session) ?? hasPendingMessage(session)
-        if (!messageId)
-          return
+      if (streamingMsg) {
+        store.updateStreamingContent(streamingMsg.id, content, session_id)
+        return
+      }
 
-        const message = session.messages.find(m => m.id === messageId)
-        if (message?.status === 'pending')
-          store.setMessageStatus(messageId, 'streaming')
+      const lastAssistant = [...session.messages]
+        .reverse()
+        .find(message => message.role === 'assistant')
+      const hasUnresolvedTools = lastAssistant?.toolCalls?.some(
+        toolCall => toolCall.status === 'executing' || toolCall.status === 'pending',
+      )
 
-        store.updateStreamingContent(messageId, payload.content)
-        store.removePreparingPlaceholder()
-      }),
-    )
+      if (!hasUnresolvedTools) {
+        store.addMessage({
+          id: ulid(),
+          role: 'assistant',
+          content,
+          status: 'streaming',
+          timestamp: Date.now(),
+        }, session_id)
+      }
+    }),
+  )
 
-    // ── Streaming thinking delta ────────────────────────────────────────────
+  unlisteners.push(
+    await agentApi.onAgentLoopThinkingDelta(({ session_id, content }) => {
+      const store = useDataStudioStore()
+      store.removePreparingPlaceholder()
+      const session = getSessionById(store.sessions, session_id)
+      if (!session)
+        return
 
-    unlisteners.push(
-      await agentApi.onAgentLoopThinkingDelta((payload) => {
-        const store = useDataStudioStore()
-        const session = store.activeSession
-        if (!session)
-          return
+      const streamingMsg = [...session.messages]
+        .reverse()
+        .find(message => message.role === 'assistant' && message.status === 'streaming')
 
-        const messageId = hasStreamingMessage(session) ?? hasPendingMessage(session)
-        if (!messageId)
-          return
+      if (streamingMsg) {
+        store.updateStreamingThinking(streamingMsg.id, content, session_id)
+        return
+      }
 
-        const message = session.messages.find(m => m.id === messageId)
-        if (message?.status === 'pending')
-          store.setMessageStatus(messageId, 'streaming')
+      store.addMessage({
+        id: ulid(),
+        role: 'assistant',
+        content: '',
+        thinking: content,
+        status: 'streaming',
+        timestamp: Date.now(),
+      }, session_id)
+    }),
+  )
 
-        store.updateStreamingThinking(messageId, payload.content)
-      }),
-    )
+  unlisteners.push(
+    await agentApi.onAgentLoopToolCall(({ session_id, tool_call_id, tool_name, arguments: args }) => {
+      const store = useDataStudioStore()
+      store.removePreparingPlaceholder()
+      const session = getSessionById(store.sessions, session_id)
+      if (!session)
+        return
 
-    // ── Tool call ───────────────────────────────────────────────────────────
+      const runtime = getSessionRuntime(session_id)
+      const riskLevel = (runtime.metadata?.[tool_name]?.riskLevel as AgentToolCall['riskLevel']) ?? 'elevated'
+      const needsConfirmation = shouldRequireConfirmation(session, tool_name, riskLevel)
+      const denied = isDeniedByRule(session_id, tool_name)
 
-    unlisteners.push(
-      await agentApi.onAgentLoopToolCall((payload) => {
-        const store = useDataStudioStore()
-        const session = store.activeSession
-        if (!session || getPendingConfirmation(session))
-          return
+      const toolCall: AgentToolCall = {
+        id: tool_call_id,
+        toolName: tool_name,
+        args: JSON.stringify(args ?? {}),
+        status: denied ? 'denied' : needsConfirmation ? 'pending' : 'executing',
+        riskLevel,
+        requiresConfirmation: needsConfirmation,
+      }
 
-        const runtime = getSessionRuntime(payload.session_id)
-        const riskLevel = getToolRiskLevel(runtime, payload.tool_name)
-        const rule = store.findConfirmationRule(payload.session_id, payload.tool_name)
+      const streamingAssistant = [...session.messages]
+        .reverse()
+        .find(message => message.role === 'assistant' && message.status === 'streaming')
+      const lastAssistant
+        = streamingAssistant
+          ?? [...session.messages].reverse().find(message => message.role === 'assistant')
 
-        const toolCall: AgentToolCall = {
-          id: payload.tool_call_id,
-          toolName: payload.tool_name,
-          args: JSON.stringify(payload.arguments),
-          status: 'pending',
-          riskLevel,
-          requiresConfirmation: false,
-        }
+      if (lastAssistant) {
+        store.setMessageToolCalls(lastAssistant.id, [
+          ...(lastAssistant.toolCalls ?? []),
+          toolCall,
+        ], session_id)
+      }
+      else {
+        store.addMessage({
+          id: ulid(),
+          role: 'assistant',
+          content: '',
+          status: 'streaming',
+          timestamp: Date.now(),
+          toolCalls: [toolCall],
+        }, session_id)
+      }
 
-        const messageId = hasStreamingMessage(session) ?? hasPendingMessage(session)
-        if (messageId) {
-          const existing = session.messages.find(m => m.id === messageId)?.toolCalls ?? []
-          store.setMessageToolCalls(messageId, [...existing, toolCall])
-        }
+      if (denied) {
+        agentApi.confirmToolCall(tool_call_id, false).catch(() => undefined)
+        return
+      }
 
-        if (isDeniedByRule(rule)) {
-          agentApi.confirmToolCall(payload.tool_call_id, false)
-          if (messageId)
-            store.updateToolCallStatus(messageId, payload.tool_call_id, 'denied')
-          return
-        }
+      if (!needsConfirmation) {
+        agentApi.confirmToolCall(tool_call_id, true).catch(() => undefined)
+      }
+      else {
+        store.setSessionStatus(session_id, 'waiting_confirmation')
+      }
+    }),
+  )
 
-        if (!shouldRequireConfirmation(session.permissionsMode, riskLevel)) {
-          agentApi.confirmToolCall(payload.tool_call_id, true)
-          if (messageId)
-            store.updateToolCallStatus(messageId, payload.tool_call_id, 'confirmed')
-          return
-        }
+  unlisteners.push(
+    await agentApi.onAgentLoopToolResult(({ session_id, tool_call_id, envelope, error }) => {
+      const store = useDataStudioStore()
+      const session = getSessionById(store.sessions, session_id)
+      if (!session)
+        return
 
-        // Confirmation IS required — mark the tool call accordingly so the UI shows the card
-        const updatedToolCall: AgentToolCall = { ...toolCall, requiresConfirmation: true }
-        if (messageId) {
-          const existing = session.messages.find(m => m.id === messageId)?.toolCalls ?? []
-          const filtered = existing.filter(tc => tc.id !== payload.tool_call_id)
-          store.setMessageToolCalls(messageId, [...filtered, updatedToolCall])
-          store.updateToolCallStatus(messageId, payload.tool_call_id, 'pending')
-        }
-        store.setSessionStatus(payload.session_id, 'waiting_confirmation')
-      }),
-    )
+      const assistantMsg = [...session.messages]
+        .reverse()
+        .find(
+          message =>
+            message.role === 'assistant'
+            && message.toolCalls?.some(toolCall => toolCall.id === tool_call_id),
+        )
 
-    // ── Tool result ─────────────────────────────────────────────────────────
+      if (assistantMsg) {
+        store.updateToolCallStatus(
+          assistantMsg.id,
+          tool_call_id,
+          error ? 'error' : 'done',
+          envelope.summary,
+          envelope.metadata?.duration_ms,
+          session_id,
+        )
 
-    unlisteners.push(
-      await agentApi.onAgentLoopToolResult((payload) => {
-        const store = useDataStudioStore()
-        const session = store.activeSession
-        if (!session)
-          return
-
-        const messageId = findMessageByToolCallId(session, payload.tool_call_id)
-        if (!messageId)
-          return
-
-        const status: AgentToolCallStatus = payload.error ? 'error' : 'done'
-        store.updateToolCallStatus(messageId, payload.tool_call_id, status)
-
-        if (payload.envelope.full_result) {
+        if (envelope.full_result) {
           store.toolResultFullBodies = {
             ...store.toolResultFullBodies,
-            [payload.tool_call_id]: payload.envelope.full_result,
+            [tool_call_id]: envelope.full_result,
           }
         }
-      }),
-    )
+      }
+    }),
+  )
 
-    // ── Step done ───────────────────────────────────────────────────────────
+  unlisteners.push(
+    await agentApi.onAgentLoopStepDone(({ session_id }) => {
+      const store = useDataStudioStore()
+      const session = getSessionById(store.sessions, session_id)
+      if (!session)
+        return
 
-    unlisteners.push(
-      await agentApi.onAgentLoopStepDone((_payload) => {
-        const store = useDataStudioStore()
-        const session = store.activeSession
-        if (!session)
-          return
+      const streamingMsg = [...session.messages]
+        .reverse()
+        .find(message => message.role === 'assistant' && message.status === 'streaming')
 
-        const messageId = hasStreamingMessage(session)
-        if (messageId)
-          store.setMessageStatus(messageId, 'done')
+      if (streamingMsg) {
+        store.setMessageStatus(streamingMsg.id, 'done', session_id)
+        store.removeOrphanedStreamingMessages(session_id)
+      }
+    }),
+  )
 
-        store.removeOrphanedStreamingMessages()
-      }),
-    )
+  unlisteners.push(
+    await agentApi.onAgentLoopDone(({ session_id }) => {
+      const store = useDataStudioStore()
+      const session = getSessionById(store.sessions, session_id)
+      if (session) {
+        session.messages
+          .filter(message => message.role === 'assistant' && message.status === 'streaming')
+          .forEach(message => store.setMessageStatus(message.id, 'done', session_id))
+      }
+      store.setSessionStatus(session_id, 'idle')
+      store.removeOrphanedStreamingMessages(session_id)
+      store.clearSessionError(session_id)
+    }),
+  )
 
-    // ── Session done ────────────────────────────────────────────────────────
+  unlisteners.push(
+    await agentApi.onAgentLoopStopped(({ session_id, reason, message }) => {
+      const store = useDataStudioStore()
+      const normalized = (['iteration_cap', 'wall_clock_budget', 'token_budget', 'llm_error'].includes(reason)
+        ? reason
+        : 'iteration_cap') as AgentSessionStopReason
+      store.setSessionStopped(session_id, normalized, message)
+      store.removeOrphanedStreamingMessages(session_id)
+      store.clearSessionProgress(session_id)
+      store.clearSessionError(session_id)
+    }),
+  )
 
-    unlisteners.push(
-      await agentApi.onAgentLoopDone((payload) => {
-        const store = useDataStudioStore()
-        store.setSessionStatus(payload.session_id, 'idle')
-        store.removeOrphanedStreamingMessages()
-        store.clearSessionProgress(payload.session_id)
-      }),
-    )
+  unlisteners.push(
+    await agentApi.onAgentLoopError(({ session_id, error }) => {
+      const store = useDataStudioStore()
+      const session = getSessionById(store.sessions, session_id)
 
-    // ── Session stopped ─────────────────────────────────────────────────────
+      store.setSessionStatus(session_id, 'error')
+      store.setSessionError(session_id, error)
+      store.clearSessionProgress(session_id)
 
-    unlisteners.push(
-      await agentApi.onAgentLoopStopped((payload) => {
-        const store = useDataStudioStore()
-        store.setSessionStopped(payload.session_id, payload.reason as AgentSessionStopReason, payload.message)
-        store.removeOrphanedStreamingMessages()
-        store.clearSessionProgress(payload.session_id)
-      }),
-    )
+      if (!session)
+        return
 
-    // ── Error ───────────────────────────────────────────────────────────────
+      const streamingMsgs = session.messages
+        .filter(message => message.role === 'assistant' && message.status === 'streaming')
 
-    unlisteners.push(
-      await agentApi.onAgentLoopError((payload) => {
-        const store = useDataStudioStore()
-        store.setSessionStatus(payload.session_id, 'error')
-        store.setSessionError(payload.session_id, payload.error)
-        store.removeOrphanedStreamingMessages()
-        store.clearSessionProgress(payload.session_id)
+      for (const msg of streamingMsgs)
+        store.setMessageStatus(msg.id, 'error', session_id)
+    }),
+  )
 
-        const session = store.activeSession
-        if (session) {
-          const messageId = hasStreamingMessage(session) ?? hasPendingMessage(session)
-          if (messageId)
-            store.setMessageStatus(messageId, 'error')
-        }
-      }),
-    )
+  unlisteners.push(
+    await agentApi.onAgentLoopSummaryInjected((payload) => {
+      const store = useDataStudioStore()
+      store.replaceCompactionInProgressWithMarker({
+        trigger: payload.trigger,
+        pre_tokens: payload.pre_tokens,
+        post_tokens: payload.post_tokens,
+        removed_count: payload.removed_count,
+        fallback_keep_pairs: payload.fallback_keep_pairs,
+      })
+    }),
+  )
 
-    // ── Compaction marker ───────────────────────────────────────────────────
+  unlisteners.push(
+    await agentApi.onAgentLoopIteration(({ session_id, iter_count, max_iterations }) => {
+      const store = useDataStudioStore()
+      store.setSessionProgress(session_id, {
+        phase: 'iterating',
+        iter: iter_count,
+        maxIter: max_iterations,
+      })
+    }),
+  )
 
-    unlisteners.push(
-      await agentApi.onAgentLoopSummaryInjected((payload) => {
-        const store = useDataStudioStore()
-        store.insertCompactionMarker({
-          summary: `Compacted ${payload.removed_count} messages`,
-          preTokens: payload.pre_tokens,
-          postTokens: payload.post_tokens,
-          trigger: payload.trigger,
-        })
-      }),
-    )
+  unlisteners.push(
+    await agentApi.onAgentLoopWaitingLlm(({ session_id, iter_count }) => {
+      const store = useDataStudioStore()
+      store.removePreparingPlaceholder()
+      store.setSessionProgress(session_id, {
+        phase: 'waiting_llm',
+        iter: iter_count,
+      })
+      const session = store.sessions.find(s => s.id === session_id)
+      if (
+        session
+        && !session.messages.some(m => m.role === 'assistant' && m.status === 'streaming')
+      ) {
+        store.addMessage({
+          id: ulid(),
+          role: 'assistant',
+          content: '',
+          status: 'streaming',
+          timestamp: Date.now(),
+        }, session_id)
+      }
+    }),
+  )
 
-    // ── Iteration ───────────────────────────────────────────────────────────
-
-    unlisteners.push(
-      await agentApi.onAgentLoopIteration((payload) => {
-        const store = useDataStudioStore()
-        store.setSessionProgress(payload.session_id, {
+  unlisteners.push(
+    await agentApi.onAgentLoopCompacting(({ session_id, phase }) => {
+      const store = useDataStudioStore()
+      if (phase === 'start') {
+        store.removePreparingPlaceholder()
+        store.setSessionProgress(session_id, { phase: 'compacting' })
+        store.addMessage({
+          id: `compacting-${session_id}`,
+          role: 'system',
+          content: '',
+          timestamp: Date.now(),
+          status: 'done',
+          compactionInProgress: true,
+        }, session_id)
+      }
+      else {
+        const existing = store.getSessionProgress(session_id)
+        store.setSessionProgress(session_id, {
           phase: 'iterating',
-          iter: payload.iter_count,
-          maxIter: payload.max_iterations,
+          iter: existing?.iter,
+          maxIter: existing?.maxIter,
         })
-      }),
-    )
+      }
+    }),
+  )
 
-    // ── Waiting for LLM ─────────────────────────────────────────────────────
+  unlisteners.push(
+    await agentApi.onAgentLoopWarning(({ session_id, warning }) => {
+      console.warn(`[AgentRuntime] Session ${session_id}: ${warning}`)
+    }),
+  )
 
-    unlisteners.push(
-      await agentApi.onAgentLoopWaitingLlm((payload) => {
-        const store = useDataStudioStore()
-        store.setSessionProgress(payload.session_id, {
-          phase: 'waiting_llm',
-          iter: payload.iter_count,
-        })
-      }),
-    )
-
-    // ── Compacting ──────────────────────────────────────────────────────────
-
-    unlisteners.push(
-      await agentApi.onAgentLoopCompacting((payload) => {
-        const store = useDataStudioStore()
-        if (payload.phase === 'start') {
-          store.setSessionProgress(payload.session_id, { phase: 'compacting' })
-        }
-        else {
-          store.clearSessionProgress(payload.session_id)
-        }
-      }),
-    )
-
-    // ── Warning ─────────────────────────────────────────────────────────────
-
-    unlisteners.push(
-      await agentApi.onAgentLoopWarning((payload) => {
-        console.warn(`[AgentRuntime] Session ${payload.session_id}: ${payload.warning}`)
-      }),
-    )
-
+  runtimeInitPromise = Promise.resolve().then(() => {
+    if (runtimeDisposed) {
+      unlisteners.forEach(unlisten => unlisten())
+      return
+    }
     runtimeUnlisteners = unlisteners
-  }
+    runtimeInitialized = true
+  })
 
-  runtimeInitPromise = init()
   await runtimeInitPromise
-  runtimeInitialized = true
 }
 
-export function disposeAgentRuntime(): void {
+function disposeAgentRuntime() {
   if (!runtimeInitialized || runtimeDisposed)
     return
-
-  for (const unlisten of runtimeUnlisteners) {
-    unlisten()
-  }
-
-  runtimeUnlisteners = []
-  sessionRuntimes.clear()
-  runtimeInitPromise = null
-  runtimeInitialized = false
   runtimeDisposed = true
+  for (const unlisten of runtimeUnlisteners)
+    unlisten()
+  runtimeUnlisteners = []
+  runtimeInitPromise = null
+  sessionRuntimes.clear()
+  runtimeInitialized = false
 }
+
+export { clearSessionRuntime, disposeAgentRuntime, getSessionRuntime, initAgentRuntime }

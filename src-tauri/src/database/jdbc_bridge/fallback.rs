@@ -154,8 +154,10 @@ pub async fn run_fallback_chain(
         .get_driver_chain(db_type)
         .ok_or_else(|| DbError::Connection(format!("No driver chain for {:?}", db_type)))?;
 
-    // Ensure JRE and bridge JAR are installed
-    if !super::jre::is_managed_jre_installed() {
+    // Ensure JRE and bridge JAR are installed.
+    // Only download managed JRE if no Java is available on the system
+    // (managed JRE → JAVA_HOME → PATH).
+    if super::jre::JreDetector::detect().is_none() {
         super::jre::download_managed_jre().await?;
     }
     if !download::is_bridge_installed() {

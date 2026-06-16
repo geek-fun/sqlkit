@@ -57,6 +57,14 @@
   border-color: hsl(var(--border));
 }
 
+html,
+body,
+#app {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));

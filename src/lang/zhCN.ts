@@ -401,6 +401,7 @@ export const zhCN = {
       ai: {
         title: 'AI 设置',
         description: '配置 AI 模型提供商和对话行为',
+        missing: '未配置 AI 模型。请在设置中添加提供商并选择模型。',
         providerList: {
           title: '提供商',
           description: '管理您的 AI 模型提供商',
@@ -629,7 +630,7 @@ export const zhCN = {
     },
   },
   dataStudio: {
-    title: '数据工作室',
+    title: '数据工作室 BETA',
     subtitle: 'AI驱动的SQL数据分析',
     inputPlaceholder: '询问关于您的数据的问题...',
     modelUnavailable: '所选模型不可用',
@@ -639,9 +640,13 @@ export const zhCN = {
       justNow: '刚刚',
       minutesAgo: '{count}分钟前',
       hoursAgo: '{count}小时前',
+      yesterday: '昨天',
       noSessions: '没有历史会话',
       messages: '条消息',
       sources: '个数据源',
+      delete: '删除会话',
+      sessionFallback: '对话',
+      empty: '暂无会话',
     },
     agent: {
       emptyState: '提出一个问题或描述您想要运行的查询。',

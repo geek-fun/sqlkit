@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import ChatPanel from '@/components/chat-panel.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { disposeAgentRuntime, initAgentRuntime } from '@/composables/agentRuntime'
+import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { useDataStudioChatAgent } from '@/composables/useDataStudioChatAgent'
 import { useAppStore } from '@/store'
 import { DatabaseType, useConnectionStore } from '@/store/connectionStore'
@@ -19,6 +20,8 @@ const connectionStore = useConnectionStore()
 const { connections } = storeToRefs(connectionStore)
 const dataStudioStore = useDataStudioStore()
 const { attachedSources, activeSession } = storeToRefs(dataStudioStore)
+
+const { getDatabaseIcon } = useDatabaseIcon()
 
 const AGENT_SUPPORTED_TYPES = new Set([
   DatabaseType.POSTGRESQL,
@@ -108,6 +111,10 @@ function getConnectionMeta(conn: ServerConnection): string {
   return `${label} • ${conn.host}:${conn.port}`
 }
 
+function getConnectionIcon(type: string): string {
+  return getDatabaseIcon(type as DatabaseType)
+}
+
 function selectAddConnection(conn: ServerConnection) {
   addSourceSelectedId.value = String(conn.id)
 }
@@ -119,24 +126,29 @@ async function confirmAddSource() {
   if (!conn || conn.id === undefined)
     return
 
-  const newSource = await dataStudioStore.addDatabaseSourceFromConnection({
-    connectionId: Number(conn.id),
-    name: conn.name,
-    databaseType: conn.type as 'POSTGRESQL' | 'MYSQL' | 'SQLSERVER' | 'SQLITE',
-    permissions: { read: true, create: false, update: false, delete: false },
-  })
+  try {
+    const newSource = await dataStudioStore.addDatabaseSourceFromConnection({
+      connectionId: Number(conn.id),
+      name: conn.name,
+      databaseType: conn.type as 'POSTGRESQL' | 'MYSQL' | 'SQLSERVER' | 'SQLITE',
+      permissions: { read: true, create: false, update: false, delete: false },
+    })
 
-  if (!dataStudioStore.activeSession) {
-    await dataStudioStore.getOrCreateSession()
+    if (!dataStudioStore.activeSession) {
+      await dataStudioStore.getOrCreateSession()
+    }
+    dataStudioStore.attachSourceToActiveSession(newSource.sourceId)
+    if (addSourceMode.value === 'Ask' && dataStudioStore.activeSession) {
+      dataStudioStore.updateSessionSourceMode(
+        newSource.sourceId,
+        'custom',
+      )
+    }
+    resetAddSourceState()
   }
-  dataStudioStore.attachSourceToActiveSession(newSource.sourceId)
-  if (addSourceMode.value === 'Ask' && dataStudioStore.activeSession) {
-    dataStudioStore.updateSessionSourceMode(
-      newSource.sourceId,
-      'custom',
-    )
+  catch (err) {
+    console.error('Failed to add data source:', err)
   }
-  resetAddSourceState()
 }
 
 function setAutoMode(auto: boolean) {
@@ -146,6 +158,8 @@ function setAutoMode(auto: boolean) {
 
 async function switchSession(sessionId: string) {
   dataStudioStore.setActiveSession(sessionId)
+  await dataStudioStore.reloadSessionMessages(sessionId)
+  await dataStudioStore.loadConfirmationRulesFromDb(sessionId)
   historyPanelOpen.value = false
 }
 
@@ -282,7 +296,11 @@ function syncAllProviderModels() {
                 :title="t('dataStudio.modifySource.title')"
                 @click="openModifyModal(idx)"
               >
-                <span class="i-carbon-data-base shrink-0 h-3.5 w-3.5" />
+                <img
+                  :src="getConnectionIcon(source.databaseType)"
+                  class="shrink-0 h-3.5 w-3.5 object-contain"
+                  :alt="source.databaseType"
+                >
                 <span class="source-chip-name">{{ source.alias }}</span>
                 <span class="source-chip-edit i-carbon-settings h-3 w-3" />
               </button>
@@ -323,7 +341,11 @@ function syncAllProviderModels() {
                         @click="selectAddConnection(conn)"
                       >
                         <div class="add-source-item-icon">
-                          <span class="i-carbon-data-base h-4 w-4" />
+                          <img
+                            :src="getConnectionIcon(conn.type)"
+                            class="h-4 w-4 object-contain"
+                            :alt="conn.type"
+                          >
                         </div>
                         <div class="add-source-item-info">
                           <span class="add-source-item-name">{{ conn.name }}</span>

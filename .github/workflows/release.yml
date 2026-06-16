@@ -189,9 +189,76 @@ jobs:
           includeUpdaterJson: true
           args: ${{ matrix.args }}
 
+  build-jre:
+    name: Build JRE (${{ matrix.name }})
+    needs: [check-version, prepare]
+    if: needs.check-version.outputs.is_new_version == 'true'
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: macOS ARM64
+            os: macos-latest
+            archive: jre-macos-aarch64.tar.gz
+            output: jre-macos-aarch64
+            pack: tar
+          - name: macOS x64
+            os: macos-13
+            archive: jre-macos-x64.tar.gz
+            output: jre-macos-x64
+            pack: tar
+          - name: Linux x64
+            os: ubuntu-latest
+            archive: jre-linux-x64.tar.gz
+            output: jre-linux-x64
+            pack: tar
+          - name: Windows x64
+            os: windows-latest
+            archive: jre-windows-x64.zip
+            output: jre-windows-x64
+            pack: zip
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Build minimal JRE with jlink
+        shell: bash
+        run: |
+          jlink \
+            --module-path "${{ env.JAVA_HOME }}/jmods" \
+            --add-modules java.base,java.sql \
+            --output ${{ matrix.output }} \
+            --strip-debug --no-man-pages --no-header-files --compress=2
+
+      - name: Package JRE archive
+        shell: bash
+        run: |
+          if [ "${{ matrix.pack }}" = "zip" ]; then
+            7z a -tzip ${{ matrix.archive }} ${{ matrix.output }}
+          else
+            tar czf ${{ matrix.archive }} ${{ matrix.output }}
+          fi
+
+      - name: Upload JRE to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload \
+            v${{ needs.check-version.outputs.version }} \
+            ${{ matrix.archive }} \
+            --name "jre/${{ matrix.archive }}" \
+            --clobber
+
   publish:
     name: Publish Release
-    needs: [check-version, prepare, build]
+    needs: [check-version, prepare, build, build-jre]
     if: needs.check-version.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
     permissions:
