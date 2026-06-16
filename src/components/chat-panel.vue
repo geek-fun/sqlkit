@@ -58,6 +58,7 @@ const { llmSettings } = storeToRefs(appStore)
 
 const inputText = ref('')
 const scrollAreaRef = ref<{ viewportElement: HTMLElement | null } | null>(null)
+const contextIndicatorRef = ref<{ refresh: () => Promise<void> } | null>(null)
 
 // ── Smart scroll ──────────────────────────────────────────────────────
 
@@ -184,19 +185,6 @@ function handleContinue() {
   if (props.isLoading)
     return
   emit('send', 'continue')
-}
-
-function handleKeydown(e: KeyboardEvent) {
-  if (e.key === 'Enter' && !e.shiftKey) {
-    e.preventDefault()
-    sendMessage()
-  }
-}
-
-function adjustTextareaHeight(e: Event) {
-  const el = e.target as HTMLTextAreaElement
-  el.style.height = 'auto'
-  el.style.height = `${Math.min(el.scrollHeight, 120)}px`
 }
 
 const canSend = computed(() => inputText.value.trim().length > 0 && !props.isLoading)
@@ -374,8 +362,7 @@ onBeforeUnmount(() => {
           spellcheck="false"
           data-form-type="other"
           :disabled="isLoading"
-          @keydown="handleKeydown"
-          @input="adjustTextareaHeight"
+          @keydown.enter.exact.prevent="sendMessage"
         />
 
         <div class="chat-toolbar">
@@ -386,8 +373,9 @@ onBeforeUnmount(() => {
           <div class="toolbar-center">
             <ContextIndicator
               v-if="sessionId"
+              ref="contextIndicatorRef"
               :session-id="sessionId"
-              :settings="contextSettings"
+              :settings="contextSettings ?? null"
             />
             <ModelPicker
               v-if="showModelPicker"
