@@ -67,6 +67,23 @@ SqlKit 是一个 **Agentic 数据库客户端** —— 它不仅执行 SQL，还
   <img src="https://img.shields.io/badge/and%20more...-555555?logoColor=white" />
 </p>
 
+## 安装
+
+<a href="https://www.geekfun.club/download">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white">
+    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white" alt="下载">
+  </picture>
+</a>
+&nbsp;
+<a href="https://github.com/geek-fun/sqlkit/releases">
+  <img src="https://img.shields.io/badge/Releases-GitHub-lightgrey?style=for-the-badge&logo=github" alt="Releases">
+</a>
+&nbsp;
+<a href="https://www.geekfun.club/products/sqlkit/">
+  <img src="https://img.shields.io/badge/官网-geekfun.club-blue?style=for-the-badge&logo=google-chrome&logoColor=white" alt="官网">
+</a>
+
 ## 功能特性
 
 ### Agentic 数据工作室
@@ -126,23 +143,6 @@ SqlKit 支持 **40+ 种数据库**，通过四种适配策略覆盖：
 - **macOS**（Apple Silicon 和 Intel）— 原生 `.dmg` 安装包
 - **Windows** — `.exe` 安装包
 - **Linux** — `.AppImage` 和 `.deb` 安装包
-
-## 安装
-
-<a href="https://www.geekfun.club/download">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white">
-    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white" alt="下载">
-  </picture>
-</a>
-
-**macOS** — `SqlKit_*_universal.dmg`（Apple Silicon & Intel）或 `SqlKit_universal.app.tar.gz`
-
-**Windows** — `SqlKit_*_x64-setup.exe` 或 `SqlKit_*_x64_en-US.msi`
-
-**Linux** — `SqlKit_*_amd64.AppImage` | `SqlKit_*_amd64.deb` | `SqlKit-*_x86_64.rpm`
-
-> 所有安装包均已签名并可校验 checksum。前往[官方网站下载](https://www.geekfun.club/download)或[浏览 GitHub Releases](https://github.com/geek-fun/sqlkit/releases)。
 
 ## 开发
 

@@ -67,6 +67,23 @@ SqlKit is an **agentic database client** — it doesn't just execute SQL, it und
   <img src="https://img.shields.io/badge/and%20more...-555555?logoColor=white" />
 </p>
 
+## Installation
+
+<a href="https://www.geekfun.club/download">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white">
+    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white" alt="Download">
+  </picture>
+</a>
+&nbsp;
+<a href="https://github.com/geek-fun/sqlkit/releases">
+  <img src="https://img.shields.io/badge/Releases-GitHub-lightgrey?style=for-the-badge&logo=github" alt="Releases">
+</a>
+&nbsp;
+<a href="https://www.geekfun.club/products/sqlkit/">
+  <img src="https://img.shields.io/badge/Website-geekfun.club-blue?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website">
+</a>
+
 ## Features
 
 ### Agentic Data Studio
@@ -126,23 +143,6 @@ Move data between any supported engines — PostgreSQL to ClickHouse, Oracle to 
 - **macOS** (Apple Silicon & Intel) — native `.dmg` installer
 - **Windows** — `.exe` installer
 - **Linux** — `.AppImage` and `.deb` packages
-
-## Installation
-
-<a href="https://www.geekfun.club/download">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white">
-    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white" alt="Download">
-  </picture>
-</a>
-
-**macOS** — `SqlKit_*_universal.dmg` (Apple Silicon & Intel) or `SqlKit_universal.app.tar.gz`
-
-**Windows** — `SqlKit_*_x64-setup.exe` or `SqlKit_*_x64_en-US.msi`
-
-**Linux** — `SqlKit_*_amd64.AppImage` | `SqlKit_*_amd64.deb` | `SqlKit-*_x86_64.rpm`
-
-> All assets are signed and checksum-verified. [Download from the official site](https://www.geekfun.club/download) or [browse GitHub Releases](https://github.com/geek-fun/sqlkit/releases).
 
 ## Development
 
