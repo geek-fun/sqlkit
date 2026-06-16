@@ -570,6 +570,8 @@ export const enUS = {
         rows: 'Rows',
         time: 'Time',
         executing: 'Executing...',
+        connectionLost: 'Connection lost. The database connection was closed.',
+        reconnecting: 'Reconnecting...',
       },
       notifications: {
         querySaved: 'Query saved',
