@@ -462,8 +462,9 @@ export const useAppStore = defineStore('app', {
     },
 
     async verifyModelAvailability(modelId: string): Promise<boolean> {
+      const [, bareName] = modelId.split('::')
       return this.llmSettings.providers.some(
-        p => p.enabled && (p.models ?? []).includes(modelId),
+        p => p.enabled && (p.models ?? []).includes(bareName || modelId),
       )
     },
 
