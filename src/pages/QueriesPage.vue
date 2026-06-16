@@ -850,9 +850,9 @@ function closeResultPanel() {
                       <span class="text-xs font-bold">A</span>
                     </Button>
                   </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{{ t('pages.queries.explain.analyzeToggle', { mode: explainAnalyzeMode ? 'ON' : 'OFF' }) }}</p>
-                    </TooltipContent>
+                  <TooltipContent>
+                    <p>{{ t('pages.queries.explain.analyzeToggle', { mode: explainAnalyzeMode ? 'ON' : 'OFF' }) }}</p>
+                  </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
 

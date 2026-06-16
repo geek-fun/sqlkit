@@ -44,7 +44,7 @@ const costColorClass = computed(() => {
       :class="{ 'border-green-300 dark:border-green-700': hasActual }"
       @click="toggle"
     >
-      <span class="shrink-0 h-3 w-2 rounded-full" :class="costColorClass" />
+      <span class="rounded-full shrink-0 h-3 w-2" :class="costColorClass" />
       <svg
         v-if="node.children.length > 0 && collapsed"
         class="text-muted-foreground shrink-0 h-3 w-3"

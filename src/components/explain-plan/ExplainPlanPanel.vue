@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ExplainResult } from '@/types/explainPlan'
+import type { ExplainPlanNode, ExplainResult } from '@/types/explainPlan'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Spinner } from '@/components/ui/spinner'
@@ -23,7 +23,7 @@ const mostExpensive = computed(() => props.explainResult?.mostExpensiveNode)
 const nodeCount = computed(() => {
   if (!props.explainResult?.nodes.length)
     return 0
-  function count(nodes: any[]): number {
+  function count(nodes: ExplainPlanNode[]): number {
     let c = nodes.length
     for (const n of nodes) {
       c += count(n.children || [])

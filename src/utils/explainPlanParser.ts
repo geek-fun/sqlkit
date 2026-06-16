@@ -593,9 +593,13 @@ export function parseMySqlAnalyzeText(text: string): ExplainPlanNode[] {
     const content = line.substring(arrowIdx + 2).trim()
 
     // Parse cost and rows from trailing "(cost=... rows=...)"
-    const costMatch = content.match(/\(cost=([\d.]+(?:\.\.[\d.]+)?)\s+rows=([\d.]+)\)/)
+    const costMatch = content.match(/\(cost=([\d.]+)\s+rows=([\d.]+)\)/)
     const costStr = costMatch?.[1]
-    const totalCost = costStr ? Number.parseFloat(costStr.replace('..', '.')) : undefined
+    const totalCost = costStr
+      ? Number.parseFloat(
+          costStr.includes('..') ? costStr.split('..')[1] : costStr,
+        )
+      : undefined
     const rows = costMatch?.[2] ? Number.parseFloat(costMatch[2]) : undefined
 
     // Extract details (text before the cost parentheses)

@@ -239,11 +239,11 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
     />
 
     <!-- Tab bar (Results | Explain) -->
-    <div class="flex h-9 shrink-0 items-center gap-1 border-b bg-muted/20 px-3 text-xs">
+    <div class="text-xs px-3 border-b bg-muted/20 flex shrink-0 gap-1 h-9 items-center">
       <Button
         size="sm"
         variant="ghost"
-        class="h-6 px-2 text-xs"
+        class="text-xs px-2 h-6"
         :class="activeOutputView === 'results' ? 'bg-accent text-accent-foreground' : ''"
         :disabled="!displayResults && !displayExecuting"
         @click="activeOutputView = 'results'"
@@ -253,7 +253,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
       <Button
         size="sm"
         variant="ghost"
-        class="h-6 px-2 text-xs"
+        class="text-xs px-2 h-6"
         :class="activeOutputView === 'explain' ? 'bg-accent text-accent-foreground' : ''"
         :disabled="!explainPlan && !isExplaining && !explainError"
         @click="activeOutputView = 'explain'"

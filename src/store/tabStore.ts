@@ -436,6 +436,7 @@ export const useTabStore = defineStore('tabs', {
           connectionId: connId,
           sql,
           analyze,
+          database: tab.database,
         })
 
         tab.explainPlan = parseExplainResult(
