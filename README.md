@@ -67,82 +67,52 @@ SqlKit is an **agentic database client** — it doesn't just execute SQL, it und
   <img src="https://img.shields.io/badge/and%20more...-555555?logoColor=white" />
 </p>
 
-## Why SqlKit?
-
-<table>
-  <tr>
-    <td width="50%">
-      <h3>🦀 Tauri Native, Not Electron</h3>
-      <p>Built with Rust + Tauri v2 — no Electron bloat, no JRE required. Ships as a small native binary with native performance. DBeaver needs Java; DataGrip needs the JetBrains runtime; TablePlus is macOS-only. SqlKit runs everywhere with nothing extra.</p>
-    </td>
-    <td width="50%">
-      <h3>🤖 Agentic Database Client</h3>
-      <p>Describe what you need in natural language — the agent writes queries, inspects schemas, optimizes slow SQL, explains execution plans, and returns results. It's not just a query editor with AI bolted on; it's an agent that understands your database and acts on your behalf. Supports OpenAI, Anthropic, DeepSeek, and Ollama. Bring your own key.</p>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <h3>🗄️ 40+ Databases, One Tool</h3>
-      <p>PostgreSQL, MySQL, Oracle, SQL Server, SQLite, DuckDB, ClickHouse, Firebird, MariaDB, CockroachDB, Redis, TiDB, OceanBase, Snowflake, DB2, H2, Trino, and more — with native, PG-wire-compatible, MySQL-wire-compatible, JDBC bridge, and HTTP adapters. All from a single interface.</p>
-    </td>
-    <td>
-      <h3>🔒 Privacy-First & Secure</h3>
-      <p>Encrypted credential storage backed by your OS keychain. SSH tunnel support for secure remote connections. No telemetry. Fully offline capable — your credentials and queries never leave your machine.</p>
-    </td>
-  </tr>
-</table>
-
 ## Features
 
-### Agentic SQL Assistant
+### Agentic Data Studio
 
-Describe what you need in natural language — the agent writes queries, inspects schemas, updates records, optimizes SQL, and returns results. It's a database agent that operates through conversation.
+Describe what you need in natural language — the agent reads your schema, writes queries, optimizes slow SQL, explains execution plans visually, and fixes errors on the spot. Supports OpenAI, Anthropic, DeepSeek, and Ollama. Bring your own key.
 
-- **Query generation** — natural language to SQL
-- **Schema inspection** — agent reads and explains your database schema
-- **Data operations** — CRUD, schema exploration, bulk actions through conversation
-- **SQL optimization** — rewrite slow queries for better performance
-- **Explain plans** — understand query execution visually
-- **Error fixing** — agent diagnoses and fixes SQL errors
+- **AI query generation** — natural language to SQL with schema-aware context
+- **SQL optimization** — rewrite slow queries and visualize execution plans
+- **Error fixing** — agent diagnoses and fixes SQL errors automatically
 - **Safety** — destructive operations require confirmation; credentials never exposed to the LLM
-- **Supported providers** — OpenAI, Anthropic, DeepSeek, Ollama
 
-### Data Studio
+### Lightweight & Native Performance
 
-A full-featured SQL editor powered by Monaco (VS Code engine) with syntax highlighting, autocomplete, and multi-tab support.
+Built with Rust + Tauri v2 — no Electron, no JRE, no bundled Chromium. Ships as a small native binary with native performance across macOS, Windows, and Linux. What other apps need a Java runtime or a JetBrains license for, SqlKit does in a single download.
 
-- **Monaco Editor** — VS Code-grade SQL editing with syntax highlighting and autocomplete
-- **Multi-tab** — work on multiple queries simultaneously with tab management
-- **Query history** — auto-saved, searchable, replayable
-- **Results grid** — paginated, sortable, with inline editing
-- **Export** — copy or export results as CSV, JSON, Markdown
-
-### Multi-Database Support
+### All Your Databases, One App
 
 SqlKit supports **40+ databases** across four adapter strategies:
 
 | Strategy | Databases |
 |----------|-----------|
 | **Native** (Rust) | PostgreSQL, MySQL, SQL Server, SQLite, DuckDB, ClickHouse, Firebird, Oracle, RQLite, Turso |
-| **PG-wire compat** (PostgreSQL adapter) | CockroachDB, Redshift, YugabyteDB, TimescaleDB, KingbaseES, GaussDB, HighGo, OpenGauss, GBase8c, QuestDB, Vastbase, YashanDB, and more |
-| **MySQL-wire compat** (MySQL adapter) | MariaDB, TiDB, OceanBase, TDSQL, PolarDB, DM8, Doris, SelectDB, StarRocks, Databend, GoldenDB, ManticoreSearch, and more |
-| **JDBC bridge** (Java) | DB2, H2, Snowflake, TDengine, Hive, Databricks, Hana, Teradata, Vertica, Exasol, BigQuery, Informix, Cassandra, and more |
-| **HTTP bridge** | Trino, Presto |
+| **PG-wire compat** | CockroachDB, Redshift, YugabyteDB, TimescaleDB, QuestDB, Vastbase, and more |
+| **MySQL-wire compat** | MariaDB, TiDB, OceanBase, StarRocks, Databend, ManticoreSearch, and more |
+| **JDBC bridge** | DB2, H2, Snowflake, TDengine, Hive, Databricks, Hana, Teradata, Vertica, Exasol, BigQuery, Informix, Cassandra, and more |
+| **HTTP bridge** | Trino, Presto, RQLite, Turso |
 
-### Schema Browser
+### Product-Grade Editor
 
-Explore and manage your database structure with a visual tree browser.
+Powered by Monaco (VS Code engine) with full SQL syntax highlighting, autocomplete, and multi-tab support. Browse schemas visually, inspect DDL, and search objects across databases.
 
-- **Database tree** — browse databases, schemas, tables, views, columns, indexes
+- **Monaco Editor** — VS Code-grade SQL editing with syntax highlighting and autocomplete
+- **Multi-tab** — work on multiple queries simultaneously with tab management
+- **Schema Browser** — tree view of databases, schemas, tables, columns, indexes
+- **Query history** — auto-saved, searchable, replayable
+- **Results grid** — paginated, sortable, with inline editing and CSV/JSON/Markdown export
 - **DDL viewer** — view CREATE statements for any object
 - **Object search** — quickly find tables, views, and procedures across schemas
-- **Table info** — column types, nullable, defaults, primary keys, foreign keys
 
-### Data Operations
+### Large Data Transfer
 
-- **Import / Export** — transfer data between databases in CSV, JSON formats
-- **Data transfer** — migrate data across different database engines
-- **Bulk operations** — handle large datasets with batch processing
+Move data between any supported engines — PostgreSQL to ClickHouse, Oracle to SQL Server, or MySQL to BigQuery. No intermediate files required.
+
+- **Cross-engine transfer** — migrate data between different database types with automatic type mapping
+- **Import / Export** — CSV, JSON, JSONL formats
+- **Bulk operations** — handle millions of records with batch processing
 
 ### Security & Connectivity
 

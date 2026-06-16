@@ -67,82 +67,52 @@ SqlKit 是一个 **Agentic 数据库客户端** —— 它不仅执行 SQL，还
   <img src="https://img.shields.io/badge/and%20more...-555555?logoColor=white" />
 </p>
 
-## 为什么选择 SqlKit？
-
-<table>
-  <tr>
-    <td width="50%">
-      <h3>🦀 Tauri 原生，非 Electron</h3>
-      <p>基于 Rust + Tauri v2 构建 —— 无 Electron 臃肿，无需 JRE。原生性能，体积小巧。DBeaver 需要 Java 运行时；DataGrip 需要 JetBrains 运行时；TablePlus 仅限 macOS。SqlKit 开箱即用，无额外依赖。</p>
-    </td>
-    <td width="50%">
-      <h3>🤖 Agentic 数据库客户端</h3>
-      <p>用自然语言描述你的需求 —— Agent 帮你写查询、检查 Schema、优化慢 SQL、分析执行计划并返回结果。这不只是简单套上 AI 的查询编辑器，而是一个真正理解你的数据库并替你操作的智能代理。兼容 OpenAI、Anthropic、DeepSeek 和 Ollama。自带密钥。</p>
-    </td>
-  </tr>
-  <tr>
-    <td>
-      <h3>🗄️ 40+ 数据库，一个工具</h3>
-      <p>PostgreSQL、MySQL、Oracle、SQL Server、SQLite、DuckDB、ClickHouse、Firebird、MariaDB、CockroachDB、Redis、TiDB、OceanBase、Snowflake、DB2、H2、Trino 等 —— 通过原生、PG 协议兼容、MySQL 协议兼容、JDBC 桥接和 HTTP 五种适配策略，统一界面无缝切换。</p>
-    </td>
-    <td>
-      <h3>🔒 隐私优先，安全可靠</h3>
-      <p>凭据经操作系统密钥链加密存储。支持 SSH 隧道安全远程连接。无遥测。完全离线可用 —— 你的凭据和查询记录不会离开你的电脑。</p>
-    </td>
-  </tr>
-</table>
-
 ## 功能特性
 
-### Agentic SQL 助手
+### Agentic 数据工作室
 
-用自然语言描述你的需求 —— Agent 帮你写查询、检查 Schema、更新数据、优化 SQL 并返回结果。这是一个通过对话替你操作数据库的智能代理。
+用自然语言描述需求 —— Agent 读取你的数据库 Schema，编写查询，优化慢 SQL，可视化执行计划，并自动修复错误。支持 OpenAI、Anthropic、DeepSeek 和 Ollama。自带密钥。
 
-- **查询生成** — 自然语言转 SQL
-- **Schema 检查** — Agent 读取并解释数据库结构
-- **数据操作** — 通过对话完成 CRUD、Schema 探索、批量操作
-- **SQL 优化** — 重写慢查询，提升性能
-- **执行计划** — 可视化查询执行过程
-- **错误修复** — Agent 诊断并修复 SQL 错误
+- **AI 查询生成** — 自然语言转 SQL，感知 Schema 上下文
+- **SQL 优化** — 重写慢查询，可视化执行计划
+- **错误修复** — Agent 自动诊断并修复 SQL 错误
 - **安全机制** — 破坏性操作需确认；凭据不暴露给 LLM
-- **支持的提供商** — OpenAI、Anthropic、DeepSeek、Ollama
 
-### 数据工作室
+### 轻量级原生性能
 
-基于 Monaco（VS Code 引擎）的全功能 SQL 编辑器，支持语法高亮、自动补全和多标签页。
+基于 Rust + Tauri v2 构建 —— 无 Electron 臃肿，无需 JRE，无捆绑 Chromium。原生性能，体积小巧，一个安装包即可在 macOS、Windows、Linux 上运行。别人需要 Java 运行时或 JetBrains 授权才能做的事，SqlKit 一个下载就搞定。
 
-- **Monaco 编辑器** — VS Code 级别的 SQL 编辑体验
-- **多标签页** — 同时处理多个查询
-- **查询历史** — 自动保存、可搜索、可回放
-- **结果表格** — 分页、排序、支持行内编辑
-- **导出** — 以 CSV、JSON、Markdown 格式导出结果
-
-### 多数据库支持
+### 所有数据库，一个应用
 
 SqlKit 支持 **40+ 种数据库**，通过四种适配策略覆盖：
 
 | 策略 | 数据库 |
 |------|--------|
 | **原生** (Rust) | PostgreSQL、MySQL、SQL Server、SQLite、DuckDB、ClickHouse、Firebird、Oracle、RQLite、Turso |
-| **PG 协议兼容** (复用 PostgreSQL 适配器) | CockroachDB、Redshift、YugabyteDB、TimescaleDB、KingbaseES、GaussDB、HighGo、OpenGauss、GBase8c、QuestDB、Vastbase、YashanDB 等 |
-| **MySQL 协议兼容** (复用 MySQL 适配器) | MariaDB、TiDB、OceanBase、TDSQL、PolarDB、DM8、Doris、SelectDB、StarRocks、Databend、GoldenDB、ManticoreSearch 等 |
-| **JDBC 桥接** (Java) | DB2、H2、Snowflake、TDengine、Hive、Databricks、Hana、Teradata、Vertica、Exasol、BigQuery、Informix、Cassandra 等 |
-| **HTTP 桥接** | Trino、Presto |
+| **PG 协议兼容** | CockroachDB、Redshift、YugabyteDB、TimescaleDB、QuestDB、Vastbase 等 |
+| **MySQL 协议兼容** | MariaDB、TiDB、OceanBase、StarRocks、Databend、ManticoreSearch 等 |
+| **JDBC 桥接** | DB2、H2、Snowflake、TDengine、Hive、Databricks、Hana、Teradata、Vertica、Exasol、BigQuery、Informix、Cassandra 等 |
+| **HTTP 桥接** | Trino、Presto、RQLite、Turso |
 
-### Schema 浏览器
+### 专业级编辑器
 
-可视化的树形结构浏览和管理数据库对象。
+基于 Monaco（VS Code 引擎）的全功能 SQL 编辑器，支持语法高亮、自动补全和多标签页。可视化浏览数据库结构、查看 DDL、跨库搜索对象。
 
-- **数据库树** — 浏览数据库、Schema、表、视图、列、索引
+- **Monaco 编辑器** — VS Code 级别的 SQL 编辑体验
+- **多标签页** — 同时处理多个查询
+- **Schema 浏览器** — 数据库、Schema、表、列、索引的树形结构浏览
+- **查询历史** — 自动保存、可搜索、可回放
+- **结果表格** — 分页、排序、行内编辑，支持 CSV/JSON/Markdown 导出
 - **DDL 查看器** — 查看任意对象的 CREATE 语句
 - **对象搜索** — 跨 Schema 快速查找表、视图和存储过程
-- **表信息** — 列类型、可空、默认值、主键、外键一览
 
-### 数据操作
+### 大规模数据传输
 
-- **导入 / 导出** — 以 CSV、JSON 格式跨数据库传输数据
-- **数据迁移** — 在不同数据库引擎之间迁移数据
-- **批量操作** — 批量处理大规模数据集
+在任何支持的引擎之间移动数据 —— PostgreSQL 到 ClickHouse、Oracle 到 SQL Server、MySQL 到 BigQuery。无需中间文件。
+
+- **跨引擎传输** — 不同类型数据库之间迁移数据，自动映射数据类型
+- **导入 / 导出** — CSV、JSON、JSONL 格式
+- **批量操作** — 处理数百万条记录
 
 ### 安全与连接
 
