@@ -69,9 +69,7 @@ struct RqliteResult {
     /// Positional row data (aligned with `columns`).
     #[serde(default)]
     values: Option<Vec<Vec<serde_json::Value>>>,
-    /// Last inserted row ID (for INSERT statements).
-    #[serde(default)]
-    last_insert_id: Option<i64>,
+
     /// Number of rows affected (for INSERT/UPDATE/DELETE).
     #[serde(default)]
     rows_affected: Option<i64>,
@@ -866,14 +864,12 @@ mod tests {
     fn test_parse_write_response() {
         let json = r#"{
             "results": [{
-                "last_insert_id": 42,
                 "rows_affected": 1
             }]
         }"#;
         let resp: RqliteResponse = serde_json::from_str(json).unwrap();
         assert_eq!(resp.results.len(), 1);
         let result = &resp.results[0];
-        assert_eq!(result.last_insert_id, Some(42));
         assert_eq!(result.rows_affected, Some(1));
     }
 

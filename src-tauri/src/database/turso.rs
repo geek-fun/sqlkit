@@ -77,9 +77,6 @@ struct TursoResponse {
 /// A single entry in the pipeline `results` array.
 #[derive(Debug, Deserialize)]
 struct TursoResultEntry {
-    /// Always "execute" for statement results.
-    #[serde(rename = "type")]
-    entry_type: String,
     response: TursoResponse,
 }
 
