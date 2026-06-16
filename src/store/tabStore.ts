@@ -1,8 +1,10 @@
 import type { ApiError, ApiResponse } from '@/types/api'
+import type { ExplainResult } from '@/types/explainPlan'
 import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 import { withMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { isApiError, isApiSuccess } from '@/types/api'
+import { parseExplainResult } from '@/utils/explainPlanParser'
 import { useConnectionStore } from './connectionStore'
 import { useHistoryStore } from './historyStore'
 
@@ -50,6 +52,12 @@ export type QueryTab = {
   listingTab?: ListingTabMeta
   /** If set, this tab is orphaned from the specified connection and cannot execute queries */
   orphanFromConnectionId?: string
+  /** Parsed explain plan result */
+  explainPlan?: ExplainResult
+  /** Explain plan error message */
+  explainError?: string | null
+  /** Whether an explain query is currently running */
+  isExplaining?: boolean
 }
 
 type TabStoreState = {
@@ -401,6 +409,62 @@ export const useTabStore = defineStore('tabs', {
       }
     },
 
+    async explainQuery(tabId: string, analyze = false) {
+      const tab = this.tabs.find(t => t.id === tabId)
+      if (!tab || tab.orphanFromConnectionId)
+        return
+
+      const sql = tab.content
+      if (!sql.trim())
+        return
+
+      const connId = tab.connectionId
+      if (!connId)
+        return
+
+      tab.isExplaining = true
+      tab.explainError = undefined
+      tab.explainPlan = undefined
+
+      try {
+        const result = await invoke<{
+          database_type: string
+          raw: string
+          format: string
+          analyze: boolean
+        }>('explain_query', {
+          connectionId: connId,
+          sql,
+          analyze,
+          database: tab.database,
+        })
+
+        tab.explainPlan = parseExplainResult(
+          result.raw,
+          result.database_type,
+          result.format as 'json' | 'text',
+          result.analyze,
+        )
+        tab.explainError = undefined
+      }
+      catch (error) {
+        tab.explainPlan = undefined
+        tab.explainError = String(error)
+      }
+      finally {
+        tab.isExplaining = false
+      }
+    },
+
+    clearExplain(tabId: string) {
+      const tab = this.tabs.find(t => t.id === tabId)
+      if (tab) {
+        tab.explainPlan = undefined
+        tab.explainError = undefined
+        tab.isExplaining = false
+      }
+    },
+
     setActiveTab(tabId: string) {
       if (this.tabs.find(t => t.id === tabId)) {
         this.activeTabId = tabId
@@ -431,5 +495,19 @@ export const useTabStore = defineStore('tabs', {
 
   persist: {
     pick: ['tabs', 'activeTabId'],
+    serializer: {
+      serialize: (data: any) => {
+        if (data.tabs) {
+          data.tabs = data.tabs.map((t: any) => ({
+            ...t,
+            explainPlan: undefined,
+            explainError: undefined,
+            isExplaining: false,
+          }))
+        }
+        return JSON.stringify(data)
+      },
+      deserialize: (data: string) => JSON.parse(data),
+    },
   },
 })

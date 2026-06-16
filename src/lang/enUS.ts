@@ -584,6 +584,43 @@ export const enUS = {
         acknowledge: 'Keep as Orphan',
         close: 'Close Tab',
       },
+      explain: {
+        title: 'Explain Plan',
+        treeView: 'Tree',
+        summaryView: 'Summary',
+        rawView: 'Raw',
+        analyze: 'Explain Analyze',
+        running: 'Generating explain plan...',
+        empty: 'No explain plan data',
+        nodeCount: '{count} nodes',
+        summary: {
+          totalCost: 'Estimated total cost: {cost}',
+          mostExpensive: 'Most expensive: {node}',
+          noCostData: 'No cost data',
+        },
+        node: {
+          rowEstimate: 'e:{rows}',
+          actualRows: 'a:{rows}',
+          discrepancyWarning: 'Actual rows significantly exceed estimate ({actual} vs {estimated}, {ratio}x)',
+        },
+        error: {
+          parseFailed: 'Failed to parse explain plan',
+          noPlan: 'No explain plan returned from database',
+        },
+        tabLabels: {
+          results: 'Results',
+          explain: 'Explain',
+        },
+        analyzeToggle: 'Toggle EXPLAIN ANALYZE mode (currently: {mode})',
+        columnHeaders: {
+          nodeType: 'Node Type',
+          relation: 'Relation',
+          index: 'Index',
+          cost: 'Cost',
+          rows: 'Rows',
+          details: 'Details',
+        },
+      },
     },
     dataStudio: {
       title: 'Data Studio',

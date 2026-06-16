@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { QueryResult } from '@/store/tabStore'
 import type { ApiError } from '@/types/api'
+import type { ExplainResult } from '@/types/explainPlan'
 import type { ColumnFilter, SortColumn } from '@/types/grid'
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ExplainPlanPanel } from '@/components/explain-plan'
 import DataGrid from '@/components/grid/DataGrid.vue'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
@@ -21,6 +23,9 @@ type Props = {
   connectionId?: string
   database?: string
   schema?: string
+  explainPlan?: ExplainResult | null
+  isExplaining?: boolean
+  explainError?: string | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -34,6 +39,9 @@ const props = withDefaults(defineProps<Props>(), {
   connectionId: undefined,
   database: undefined,
   schema: undefined,
+  explainPlan: null,
+  isExplaining: false,
+  explainError: null,
 })
 
 const emit = defineEmits<{
@@ -41,6 +49,18 @@ const emit = defineEmits<{
   (e: 'resize', height: number): void
   (e: 'refresh'): void
 }>()
+
+const activeOutputView = ref<'results' | 'explain'>('results')
+
+watch(() => props.explainPlan, (plan) => {
+  if (plan)
+    activeOutputView.value = 'explain'
+})
+
+watch(() => props.results, (res) => {
+  if (res && !props.explainPlan)
+    activeOutputView.value = 'results'
+})
 
 const { t } = useI18n()
 
@@ -218,120 +238,131 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
       @mousedown="startResize"
     />
 
-    <!-- Header -->
-    <div class="px-3 py-1.5 border-b bg-muted/30 flex flex-shrink-0 items-center justify-between">
-      <div class="flex gap-4 items-center">
-        <span class="text-sm font-medium">
-          {{ t('components.queryResult.title') }}
-        </span>
-        <div v-if="displayResults" class="text-xs text-muted-foreground flex gap-2 items-center">
-          <span v-if="displayResults.columns.length > 0">{{ t('components.queryResult.rows', { count: displayResults.rowCount }) }}</span>
-          <span v-else-if="displayResults.rowsAffected !== undefined">{{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}</span>
-          <span v-if="formattedTime">• {{ t('components.queryResult.time', { time: formattedTime }) }}</span>
-        </div>
+    <!-- Tab bar (Results | Explain) -->
+    <div class="text-xs px-3 border-b bg-muted/20 flex shrink-0 gap-1 h-9 items-center">
+      <Button
+        size="sm"
+        variant="ghost"
+        class="text-xs px-2 h-6"
+        :class="activeOutputView === 'results' ? 'bg-accent text-accent-foreground' : ''"
+        :disabled="!displayResults && !displayExecuting"
+        @click="activeOutputView = 'results'"
+      >
+        {{ t('pages.queries.explain.tabLabels.results') }}
+      </Button>
+      <Button
+        size="sm"
+        variant="ghost"
+        class="text-xs px-2 h-6"
+        :class="activeOutputView === 'explain' ? 'bg-accent text-accent-foreground' : ''"
+        :disabled="!explainPlan && !isExplaining && !explainError"
+        @click="activeOutputView = 'explain'"
+      >
+        {{ t('pages.queries.explain.tabLabels.explain') }}
+      </Button>
+      <div class="flex-1" />
+      <div v-if="displayResults && activeOutputView === 'results'" class="text-xs text-muted-foreground flex gap-2 items-center">
+        <span v-if="displayResults.columns.length > 0">{{ t('components.queryResult.rows', { count: displayResults.rowCount }) }}</span>
+        <span v-else-if="displayResults.rowsAffected !== undefined">{{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}</span>
+        <span v-if="formattedTime">• {{ t('components.queryResult.time', { time: formattedTime }) }}</span>
       </div>
-      <div class="flex gap-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6"
-          :title="t('components.dataTableView.refresh')"
-          @click="handleRefresh"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-            <path d="M21 3v5h-5" />
-            <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-            <path d="M8 16H3v5" />
-          </svg>
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          class="h-6 w-6"
-          :title="t('components.queryResult.close')"
-          @click="close"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </Button>
-      </div>
+      <Button
+        variant="ghost"
+        size="icon"
+        class="h-6 w-6"
+        :title="t('components.queryResult.close')"
+        @click="close"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 6 6 18" />
+          <path d="m6 6 12 12" />
+        </svg>
+      </Button>
     </div>
 
     <!-- Content -->
     <div class="flex-1 min-h-0">
-      <!-- Loading state -->
-      <div v-if="displayExecuting && !displayResults" class="flex h-full items-center justify-center">
-        <div class="text-center">
-          <Spinner class="mx-auto mb-2 h-8 w-8" />
-          <p class="text-sm text-muted-foreground">
-            {{ t('components.queryResult.executing') }}
-          </p>
+      <!-- Results view -->
+      <template v-if="activeOutputView === 'results'">
+        <!-- Loading state -->
+        <div v-if="displayExecuting && !displayResults" class="flex h-full items-center justify-center">
+          <div class="text-center">
+            <Spinner class="mx-auto mb-2 h-8 w-8" />
+            <p class="text-sm text-muted-foreground">
+              {{ t('components.queryResult.executing') }}
+            </p>
+          </div>
         </div>
-      </div>
 
-      <!-- Error state -->
-      <div v-else-if="displayError && !displayResults" class="p-4">
-        <div class="p-4 border border-destructive/30 rounded-md bg-destructive/5">
-          <div class="flex gap-3 items-start">
-            <span class="i-carbon-warning-alt text-destructive mt-0.5 flex-shrink-0 h-5 w-5" />
-            <div>
-              <p
-                v-for="(line, index) in (typeof displayError === 'string' ? displayError : formatApiError(displayError, t)).split('\n\n')"
-                :key="index"
-                class="text-sm text-destructive"
-              >
-                {{ line }}
-              </p>
+        <!-- Error state -->
+        <div v-else-if="displayError && !displayResults" class="p-4">
+          <div class="p-4 border border-destructive/30 rounded-md bg-destructive/5">
+            <div class="flex gap-3 items-start">
+              <span class="i-carbon-warning-alt text-destructive mt-0.5 flex-shrink-0 h-5 w-5" />
+              <div>
+                <p
+                  v-for="(line, index) in (typeof displayError === 'string' ? displayError : formatApiError(displayError, t)).split('\n\n')"
+                  :key="index"
+                  class="text-sm text-destructive"
+                >
+                  {{ line }}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      <!-- DataGrid (SELECT results with columns) -->
-      <DataGrid
-        v-else-if="displayResults && displayResults.columns.length > 0"
-        :columns="displayResults.columns"
-        :rows="displayResults.rows"
-        :row-count="displayResults.rowCount"
-        :execution-time-ms="displayExecutionTime"
-        :connection-id="connectionId"
-        :database="database"
-        :schema="schema"
-        :loading="displayExecuting"
-        :error="displayError ? String(displayError) : null"
-        @sort-change="handleSortChange"
-        @filter-change="handleFilterChange"
-        @refresh="handleRefresh"
+        <!-- DataGrid (SELECT results with columns) -->
+        <DataGrid
+          v-else-if="displayResults && displayResults.columns.length > 0"
+          :columns="displayResults.columns"
+          :rows="displayResults.rows"
+          :row-count="displayResults.rowCount"
+          :execution-time-ms="displayExecutionTime"
+          :connection-id="connectionId"
+          :database="database"
+          :schema="schema"
+          :loading="displayExecuting"
+          :error="displayError ? String(displayError) : null"
+          @sort-change="handleSortChange"
+          @filter-change="handleFilterChange"
+          @refresh="handleRefresh"
+        />
+
+        <!-- DML/DLL success (no columns returned) -->
+        <div v-else-if="displayResults && displayResults.columns.length === 0" class="flex h-full items-center justify-center">
+          <div class="text-muted-foreground text-center">
+            <span class="i-carbon-checkmark mx-auto mb-2 opacity-50 h-8 w-8 block" />
+            <p class="text-sm font-medium">
+              {{ t('components.queryResult.success') }}
+            </p>
+            <p v-if="displayResults.rowsAffected !== undefined" class="text-xs mt-1">
+              {{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}
+            </p>
+            <p v-else class="text-xs mt-1">
+              {{ t('components.queryResult.commandCompleted') }}
+            </p>
+          </div>
+        </div>
+
+        <!-- No results (no query executed yet) -->
+        <div v-else class="flex h-full items-center justify-center">
+          <div class="text-muted-foreground text-center">
+            <span class="i-carbon-document-blank mx-auto mb-2 opacity-40 h-8 w-8 block" />
+            <p class="text-sm">
+              {{ t('components.queryResult.noResults') }}
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <!-- Explain view -->
+      <ExplainPlanPanel
+        v-else
+        :explain-result="explainPlan"
+        :loading="isExplaining || false"
+        :error="explainError"
       />
-
-      <!-- DML/DLL success (no columns returned) -->
-      <div v-else-if="displayResults && displayResults.columns.length === 0" class="flex h-full items-center justify-center">
-        <div class="text-muted-foreground text-center">
-          <span class="i-carbon-checkmark mx-auto mb-2 opacity-50 h-8 w-8 block" />
-          <p class="text-sm font-medium">
-            {{ t('components.queryResult.success') }}
-          </p>
-          <p v-if="displayResults.rowsAffected !== undefined" class="text-xs mt-1">
-            {{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}
-          </p>
-          <p v-else class="text-xs mt-1">
-            {{ t('components.queryResult.commandCompleted') }}
-          </p>
-        </div>
-      </div>
-
-      <!-- No results (no query executed yet) -->
-      <div v-else class="flex h-full items-center justify-center">
-        <div class="text-muted-foreground text-center">
-          <span class="i-carbon-document-blank mx-auto mb-2 opacity-40 h-8 w-8 block" />
-          <p class="text-sm">
-            {{ t('components.queryResult.noResults') }}
-          </p>
-        </div>
-      </div>
     </div>
   </div>
 </template>

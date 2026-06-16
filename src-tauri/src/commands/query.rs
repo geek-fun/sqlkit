@@ -7,23 +7,58 @@ use crate::api_response::{db_error_to_api_error, ApiResponse};
 #[cfg(feature = "firebird")]
 use crate::database::FirebirdAdapter;
 use crate::database::{
-    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DuckDbAdapter, HttpSqlAdapter,
-    JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter, SqlServerAdapter,
-    TursoAdapter,
+    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DuckDbAdapter, ExplainResult,
+    HttpSqlAdapter, JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter,
+    SqlServerAdapter, TursoAdapter,
 };
 use crate::state::{ActiveConnection, AppState};
-use serde::{Deserialize, Serialize};
 use tauri::State;
 
-/// Query execution plan details.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QueryPlan {
-    /// Database-specific query plan representation.
-    pub plan: String,
-    /// Estimated cost (if available).
-    pub estimated_cost: Option<f64>,
-    /// Additional plan details.
-    pub details: Option<String>,
+/// Extract raw plan text from a QueryResult.
+/// For JSON format (single row, single column), extracts the JSON string cleanly.
+/// For text format, concatenates all rows with newlines, joining multi-column
+/// rows with ` | ` (the frontend parsers handle this for each database).
+fn extract_plan_text(result: &QueryResult) -> String {
+    use crate::database::QueryValue;
+    result
+        .rows
+        .iter()
+        .map(|row| {
+            row.values()
+                .map(|v| match v {
+                    QueryValue::String(s) => s.clone(),
+                    other => format!("{:?}", other),
+                })
+                .collect::<Vec<_>>()
+                .join(" | ")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Extract plan text from a QueryResult using the StmtText column.
+/// SQL Server SHOWPLAN_TEXT returns a single "StmtText" column.
+/// SQL Server STATISTICS PROFILE returns multiple columns including
+/// "StmtText" (plan tree text), "Rows", "PhysicalOp", etc.
+/// This function extracts only the "StmtText" column to avoid
+/// interleaving metadata into the plan text.
+fn extract_plan_text_for_sqlserver(result: &QueryResult) -> String {
+    use crate::database::QueryValue;
+    let has_stmt_col = result.columns.iter().any(|c| c == "StmtText");
+    if !has_stmt_col {
+        // Fall back to generic extraction if column not found
+        return extract_plan_text(result);
+    }
+    result
+        .rows
+        .iter()
+        .map(|row| match row.get("StmtText") {
+            Some(QueryValue::String(s)) => s.clone(),
+            Some(other) => format!("{:?}", other),
+            None => String::new(),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Connect a temporary adapter, execute a query, then disconnect.
@@ -331,6 +366,9 @@ pub async fn cancel_query(_query_id: String, _state: State<'_, AppState>) -> Res
 ///
 /// * `connection_id` - ID of the active connection
 /// * `sql` - SQL query to analyze
+/// * `analyze` - Whether to run EXPLAIN ANALYZE for actual runtime stats
+/// * `database` - Optional target database (creates a temporary connection if
+///   different from the active connection's database)
 /// * `state` - Application state
 ///
 /// # Returns
@@ -346,105 +384,497 @@ pub async fn cancel_query(_query_id: String, _state: State<'_, AppState>) -> Res
 pub async fn explain_query(
     connection_id: String,
     sql: String,
+    analyze: Option<bool>,
+    database: Option<String>,
     state: State<'_, AppState>,
-) -> Result<QueryPlan, String> {
-    // Basic SQL validation to prevent obvious injection attacks
+) -> Result<ExplainResult, String> {
     let sql_lower = sql.trim().to_lowercase();
 
-    // Check for dangerous patterns
     if sql_lower.contains(";") && !sql_lower.ends_with(";") {
         return Err("Multiple statements are not allowed in EXPLAIN queries".to_string());
     }
 
-    // Remove trailing semicolon for consistent processing
     let sql = sql.trim().trim_end_matches(';');
+    let analyze = analyze.unwrap_or(false);
 
+    // If a target database is specified we may need a temporary adapter.
+    // We hold the connections lock only long enough to clone the config, then
+    // release it before doing any network I/O.
+    if let Some(ref db) = database {
+        enum TempExplainKind {
+            Postgres(ConnectionConfig),
+            MySQL(ConnectionConfig),
+            SQLServer(ConnectionConfig),
+            DuckDb(ConnectionConfig),
+            ClickHouse(ConnectionConfig),
+            JdbcBridge(ConnectionConfig),
+            HttpSql(ConnectionConfig),
+            #[cfg(feature = "firebird")]
+            Firebird(ConnectionConfig),
+            Rqlite(ConnectionConfig),
+            Turso(ConnectionConfig),
+        }
+
+        let temp_kind: Option<TempExplainKind> = {
+            let connections = state.connections.lock().await;
+            let connection = connections
+                .get(&connection_id)
+                .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+
+            match connection {
+                ActiveConnection::Postgres(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::Postgres(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::MySQL(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::MySQL(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::SQLServer(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::SQLServer(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::SQLite(_) => None,
+                ActiveConnection::DuckDb(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::DuckDb(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::ClickHouse(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::ClickHouse(cfg))
+                    } else {
+                        None
+                    }
+                }
+                #[cfg(feature = "firebird")]
+                ActiveConnection::Firebird(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::Firebird(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::JdbcBridge(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::JdbcBridge(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::HttpSql(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::HttpSql(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::Rqlite(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::Rqlite(cfg))
+                    } else {
+                        None
+                    }
+                }
+                ActiveConnection::Turso(adapter) => {
+                    let adapter = adapter.lock().await;
+                    if Some(db.as_str()) != adapter.config.database.as_deref() {
+                        let mut cfg = adapter.config.clone();
+                        cfg.database = Some(db.clone());
+                        Some(TempExplainKind::Turso(cfg))
+                    } else {
+                        None
+                    }
+                }
+            }
+            // connections lock is dropped here, before any network I/O
+        };
+
+        if let Some(kind) = temp_kind {
+            return match kind {
+                TempExplainKind::Postgres(cfg) => {
+                    let database_type = "postgresql";
+                    let mut temp = PostgresAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let explain_sql = if analyze {
+                        format!("EXPLAIN (ANALYZE, FORMAT JSON) {}", sql)
+                    } else {
+                        format!("EXPLAIN (FORMAT JSON) {}", sql)
+                    };
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: "json".to_string(),
+                        analyze,
+                    })
+                }
+                TempExplainKind::MySQL(cfg) => {
+                    let database_type = "mysql";
+                    let mut temp = MySQLAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let (explain_sql, plan_format) = if analyze {
+                        (format!("EXPLAIN ANALYZE {}", sql), "text")
+                    } else {
+                        (format!("EXPLAIN FORMAT=JSON {}", sql), "json")
+                    };
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: plan_format.to_string(),
+                        analyze,
+                    })
+                }
+                TempExplainKind::SQLServer(cfg) => {
+                    let database_type = "sqlserver";
+                    let mut temp = SqlServerAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let settings = if analyze {
+                        "SET STATISTICS PROFILE ON"
+                    } else {
+                        "SET SHOWPLAN_TEXT ON"
+                    };
+                    let cleanup = if analyze {
+                        "SET STATISTICS PROFILE OFF"
+                    } else {
+                        "SET SHOWPLAN_TEXT OFF"
+                    };
+                    let explain_sql = format!("{}; {}; {}", settings, sql, cleanup);
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text_for_sqlserver(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: "text".to_string(),
+                        analyze,
+                    })
+                }
+                TempExplainKind::DuckDb(cfg) => {
+                    let database_type = "duckdb";
+                    let mut temp = DuckDbAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let explain_sql = if analyze {
+                        format!("EXPLAIN ANALYZE {}", sql)
+                    } else {
+                        format!("EXPLAIN {}", sql)
+                    };
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: "text".to_string(),
+                        analyze,
+                    })
+                }
+                TempExplainKind::ClickHouse(cfg) => {
+                    let database_type = "clickhouse";
+                    let mut temp = ClickHouseAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let explain_sql = format!("EXPLAIN {}", sql);
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: "text".to_string(),
+                        analyze,
+                    })
+                }
+                #[cfg(feature = "firebird")]
+                TempExplainKind::Firebird(cfg) => {
+                    let database_type = "firebird";
+                    let mut temp = FirebirdAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let explain_sql = format!("EXPLAIN {}", sql);
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: "text".to_string(),
+                        analyze,
+                    })
+                }
+                TempExplainKind::JdbcBridge(cfg) => {
+                    let database_type = "generic";
+                    let mut temp = JdbcBridgeAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let explain_sql = format!("EXPLAIN {}", sql);
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: "text".to_string(),
+                        analyze,
+                    })
+                }
+                TempExplainKind::HttpSql(cfg) => {
+                    let database_type = "generic";
+                    let mut temp = HttpSqlAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let explain_sql = format!("EXPLAIN {}", sql);
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: "text".to_string(),
+                        analyze,
+                    })
+                }
+                TempExplainKind::Rqlite(cfg) => {
+                    let database_type = "rqlite";
+                    let mut temp = RqliteAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let explain_sql = format!("EXPLAIN {}", sql);
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: "text".to_string(),
+                        analyze,
+                    })
+                }
+                TempExplainKind::Turso(cfg) => {
+                    let database_type = "turso";
+                    let mut temp = TursoAdapter::new(cfg);
+                    temp.connect().await.map_err(|e| {
+                        format!("Failed to connect to database for EXPLAIN: {}", e)
+                    })?;
+                    let explain_sql = format!("EXPLAIN {}", sql);
+                    let result = temp
+                        .execute_query(&explain_sql)
+                        .await
+                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+                    let raw = extract_plan_text(&result);
+                    let _ = temp.disconnect().await;
+                    Ok(ExplainResult {
+                        database_type: database_type.to_string(),
+                        raw,
+                        format: "text".to_string(),
+                        analyze,
+                    })
+                }
+            };
+        }
+    }
+
+    // Common path: use the already-connected adapter
     let connections = state.connections.lock().await;
 
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
 
-    // Execute explain query based on connection type
-    let result = match connection {
+    let database_type = match connection {
+        ActiveConnection::Postgres(_) => "postgresql",
+        ActiveConnection::MySQL(_) => "mysql",
+        ActiveConnection::SQLite(_) => "sqlite",
+        ActiveConnection::SQLServer(_) => "sqlserver",
+        ActiveConnection::DuckDb(_) => "duckdb",
+        ActiveConnection::ClickHouse(_) => "clickhouse",
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(_) => "firebird",
+        ActiveConnection::JdbcBridge(_) => "generic",
+        ActiveConnection::HttpSql(_) => "generic",
+        ActiveConnection::Rqlite(_) => "rqlite",
+        ActiveConnection::Turso(_) => "turso",
+    };
+
+    let (result, plan_format) = match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            let explain_sql = if analyze {
+                format!("EXPLAIN (ANALYZE, FORMAT JSON) {}", sql)
+            } else {
+                format!("EXPLAIN (FORMAT JSON) {}", sql)
+            };
+            (adapter.execute_query(&explain_sql).await, "json")
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            if analyze {
+                // MySQL EXPLAIN ANALYZE returns TREE text, not JSON
+                (adapter.execute_query(&format!("EXPLAIN ANALYZE {}", sql)).await, "text")
+            } else {
+                (adapter.execute_query(&format!("EXPLAIN FORMAT=JSON {}", sql)).await, "json")
+            }
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            // SQL Server uses SET SHOWPLAN_TEXT ON
-            let showplan_sql = format!("SET SHOWPLAN_TEXT ON; {}", sql);
-            adapter.execute_query(&showplan_sql).await
+            let settings = if analyze {
+                "SET STATISTICS PROFILE ON"
+            } else {
+                "SET SHOWPLAN_TEXT ON"
+            };
+            let cleanup = if analyze {
+                "SET STATISTICS PROFILE OFF"
+            } else {
+                "SET SHOWPLAN_TEXT OFF"
+            };
+            let explain_sql = format!("{}; {}; {}", settings, sql, cleanup);
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
-            // SQLite uses EXPLAIN QUERY PLAN
             let explain_sql = format!("EXPLAIN QUERY PLAN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::DuckDb(adapter) => {
             let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            let explain_sql = if analyze {
+                format!("EXPLAIN ANALYZE {}", sql)
+            } else {
+                format!("EXPLAIN {}", sql)
+            };
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         #[cfg(feature = "firebird")]
         ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::Rqlite(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::Turso(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
-    }
-    .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+    };
+    let result = result.map_err(|e| format!("EXPLAIN query failed: {}", e))?;
 
-    // Convert result to QueryPlan
-    let plan = result
-        .rows
-        .iter()
-        .map(|row| {
-            row.values()
-                .map(|v| format!("{:?}", v))
-                .collect::<Vec<_>>()
-                .join(" | ")
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
+    // SQL Server SHOWPLAN_TEXT returns a single "StmtText" column.
+    // STATISTICS PROFILE returns multiple columns — use StmtText-specific
+    // extraction to avoid interleaving metadata into the plan text.
+    let raw = if database_type == "sqlserver" {
+        extract_plan_text_for_sqlserver(&result)
+    } else {
+        extract_plan_text(&result)
+    };
 
-    Ok(QueryPlan {
-        plan,
-        estimated_cost: None,
-        details: Some(format!("{} rows in plan", result.rows.len())),
+    Ok(ExplainResult {
+        database_type: database_type.to_string(),
+        raw,
+        format: plan_format.to_string(),
+        analyze,
     })
 }
 
@@ -455,19 +885,6 @@ pub async fn explain_query(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_query_plan_structure() {
-        let plan = QueryPlan {
-            plan: "Seq Scan on users".to_string(),
-            estimated_cost: Some(1.0),
-            details: Some("1 row".to_string()),
-        };
-
-        assert_eq!(plan.plan, "Seq Scan on users");
-        assert_eq!(plan.estimated_cost, Some(1.0));
-        assert!(plan.details.is_some());
-    }
 
     #[test]
     fn test_sql_validation() {

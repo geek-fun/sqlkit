@@ -64,6 +64,7 @@ pub mod clickhouse;
 pub mod config;
 pub mod duckdb;
 pub mod error;
+pub mod explain;
 #[cfg(feature = "firebird")]
 pub mod firebird;
 pub mod http_sql;
@@ -91,6 +92,7 @@ pub use clickhouse::{ClickHouseAdapter, ClickHousePool};
 pub use config::{ConnectionConfig, DatabaseType, PoolConfig, SslMode};
 pub use duckdb::{DuckDbAdapter, DuckDbPool};
 pub use error::{DbError, DbResult};
+pub use explain::ExplainResult;
 #[cfg(feature = "firebird")]
 pub use firebird::{FirebirdAdapter, FirebirdPool};
 pub use http_sql::{HttpSqlAdapter, HttpSqlPool};
