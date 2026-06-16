@@ -372,7 +372,6 @@ onBeforeUnmount(() => {
 
           <div class="toolbar-center">
             <ContextIndicator
-              v-if="sessionId"
               ref="contextIndicatorRef"
               :session-id="sessionId"
               :settings="contextSettings ?? null"
