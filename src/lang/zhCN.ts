@@ -570,6 +570,8 @@ export const zhCN = {
         rows: '行数',
         time: '耗时',
         executing: '执行中...',
+        connectionLost: '连接已断开。数据库连接已关闭。',
+        reconnecting: '正在重新连接...',
       },
       notifications: {
         querySaved: '查询已保存',
