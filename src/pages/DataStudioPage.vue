@@ -797,15 +797,14 @@ function syncAllProviderModels() {
 .permission-trigger {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  height: 24px;
+  gap: 5px;
+  height: 26px;
   padding: 0 8px;
   border: 1px solid hsl(var(--border));
   border-radius: 9999px;
   background: hsl(var(--muted) / 0.5);
-  color: hsl(var(--muted-foreground));
-  font-size: 11px;
-  font-weight: 500;
+  color: hsl(var(--foreground));
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.15s;
 }
