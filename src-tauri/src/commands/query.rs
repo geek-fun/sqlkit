@@ -7,23 +7,58 @@ use crate::api_response::{db_error_to_api_error, ApiResponse};
 #[cfg(feature = "firebird")]
 use crate::database::FirebirdAdapter;
 use crate::database::{
-    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DuckDbAdapter, HttpSqlAdapter,
-    JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter, SqlServerAdapter,
-    TursoAdapter,
+    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DuckDbAdapter, ExplainResult,
+    HttpSqlAdapter, JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter,
+    SqlServerAdapter, TursoAdapter,
 };
 use crate::state::{ActiveConnection, AppState};
-use serde::{Deserialize, Serialize};
 use tauri::State;
 
-/// Query execution plan details.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct QueryPlan {
-    /// Database-specific query plan representation.
-    pub plan: String,
-    /// Estimated cost (if available).
-    pub estimated_cost: Option<f64>,
-    /// Additional plan details.
-    pub details: Option<String>,
+/// Extract raw plan text from a QueryResult.
+/// For JSON format (single row, single column), extracts the JSON string cleanly.
+/// For text format, concatenates all rows with newlines, joining multi-column
+/// rows with ` | ` (the frontend parsers handle this for each database).
+fn extract_plan_text(result: &QueryResult) -> String {
+    use crate::database::QueryValue;
+    result
+        .rows
+        .iter()
+        .map(|row| {
+            row.values()
+                .map(|v| match v {
+                    QueryValue::String(s) => s.clone(),
+                    other => format!("{:?}", other),
+                })
+                .collect::<Vec<_>>()
+                .join(" | ")
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Extract plan text from a QueryResult using the StmtText column.
+/// SQL Server SHOWPLAN_TEXT returns a single "StmtText" column.
+/// SQL Server STATISTICS PROFILE returns multiple columns including
+/// "StmtText" (plan tree text), "Rows", "PhysicalOp", etc.
+/// This function extracts only the "StmtText" column to avoid
+/// interleaving metadata into the plan text.
+fn extract_plan_text_for_sqlserver(result: &QueryResult) -> String {
+    use crate::database::QueryValue;
+    let has_stmt_col = result.columns.iter().any(|c| c == "StmtText");
+    if !has_stmt_col {
+        // Fall back to generic extraction if column not found
+        return extract_plan_text(result);
+    }
+    result
+        .rows
+        .iter()
+        .map(|row| match row.get("StmtText") {
+            Some(QueryValue::String(s)) => s.clone(),
+            Some(other) => format!("{:?}", other),
+            None => String::new(),
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// Connect a temporary adapter, execute a query, then disconnect.
@@ -346,18 +381,17 @@ pub async fn cancel_query(_query_id: String, _state: State<'_, AppState>) -> Res
 pub async fn explain_query(
     connection_id: String,
     sql: String,
+    analyze: Option<bool>,
     state: State<'_, AppState>,
-) -> Result<QueryPlan, String> {
-    // Basic SQL validation to prevent obvious injection attacks
+) -> Result<ExplainResult, String> {
     let sql_lower = sql.trim().to_lowercase();
 
-    // Check for dangerous patterns
     if sql_lower.contains(";") && !sql_lower.ends_with(";") {
         return Err("Multiple statements are not allowed in EXPLAIN queries".to_string());
     }
 
-    // Remove trailing semicolon for consistent processing
     let sql = sql.trim().trim_end_matches(';');
+    let analyze = analyze.unwrap_or(false);
 
     let connections = state.connections.lock().await;
 
@@ -365,86 +399,117 @@ pub async fn explain_query(
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
 
-    // Execute explain query based on connection type
-    let result = match connection {
+    let database_type = match connection {
+        ActiveConnection::Postgres(_) => "postgresql",
+        ActiveConnection::MySQL(_) => "mysql",
+        ActiveConnection::SQLite(_) => "sqlite",
+        ActiveConnection::SQLServer(_) => "sqlserver",
+        ActiveConnection::DuckDb(_) => "duckdb",
+        ActiveConnection::ClickHouse(_) => "clickhouse",
+        #[cfg(feature = "firebird")]
+        ActiveConnection::Firebird(_) => "firebird",
+        ActiveConnection::JdbcBridge(_) => "generic",
+        ActiveConnection::HttpSql(_) => "generic",
+        ActiveConnection::Rqlite(_) => "rqlite",
+        ActiveConnection::Turso(_) => "turso",
+    };
+
+    let (result, plan_format) = match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            let explain_sql = if analyze {
+                format!("EXPLAIN (ANALYZE, FORMAT JSON) {}", sql)
+            } else {
+                format!("EXPLAIN (FORMAT JSON) {}", sql)
+            };
+            (adapter.execute_query(&explain_sql).await, "json")
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            if analyze {
+                // MySQL EXPLAIN ANALYZE returns TREE text, not JSON
+                (adapter.execute_query(&format!("EXPLAIN ANALYZE {}", sql)).await, "text")
+            } else {
+                (adapter.execute_query(&format!("EXPLAIN FORMAT=JSON {}", sql)).await, "json")
+            }
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            // SQL Server uses SET SHOWPLAN_TEXT ON
-            let showplan_sql = format!("SET SHOWPLAN_TEXT ON; {}", sql);
-            adapter.execute_query(&showplan_sql).await
+            let settings = if analyze {
+                "SET STATISTICS PROFILE ON"
+            } else {
+                "SET SHOWPLAN_TEXT ON"
+            };
+            let cleanup = if analyze {
+                "SET STATISTICS PROFILE OFF"
+            } else {
+                "SET SHOWPLAN_TEXT OFF"
+            };
+            let explain_sql = format!("{}; {}; {}", settings, sql, cleanup);
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
-            // SQLite uses EXPLAIN QUERY PLAN
             let explain_sql = format!("EXPLAIN QUERY PLAN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::DuckDb(adapter) => {
             let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            let explain_sql = if analyze {
+                format!("EXPLAIN ANALYZE {}", sql)
+            } else {
+                format!("EXPLAIN {}", sql)
+            };
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         #[cfg(feature = "firebird")]
         ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::Rqlite(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
         ActiveConnection::Turso(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
-            adapter.execute_query(&explain_sql).await
+            (adapter.execute_query(&explain_sql).await, "text")
         }
-    }
-    .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+    };
+    let result = result.map_err(|e| format!("EXPLAIN query failed: {}", e))?;
 
-    // Convert result to QueryPlan
-    let plan = result
-        .rows
-        .iter()
-        .map(|row| {
-            row.values()
-                .map(|v| format!("{:?}", v))
-                .collect::<Vec<_>>()
-                .join(" | ")
-        })
-        .collect::<Vec<_>>()
-        .join("\n");
+    // SQL Server SHOWPLAN_TEXT returns a single "StmtText" column.
+    // STATISTICS PROFILE returns multiple columns — use StmtText-specific
+    // extraction to avoid interleaving metadata into the plan text.
+    let raw = if database_type == "sqlserver" {
+        extract_plan_text_for_sqlserver(&result)
+    } else {
+        extract_plan_text(&result)
+    };
 
-    Ok(QueryPlan {
-        plan,
-        estimated_cost: None,
-        details: Some(format!("{} rows in plan", result.rows.len())),
+    Ok(ExplainResult {
+        database_type: database_type.to_string(),
+        raw,
+        format: plan_format.to_string(),
+        analyze,
     })
 }
 
@@ -455,19 +520,6 @@ pub async fn explain_query(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_query_plan_structure() {
-        let plan = QueryPlan {
-            plan: "Seq Scan on users".to_string(),
-            estimated_cost: Some(1.0),
-            details: Some("1 row".to_string()),
-        };
-
-        assert_eq!(plan.plan, "Seq Scan on users");
-        assert_eq!(plan.estimated_cost, Some(1.0));
-        assert!(plan.details.is_some());
-    }
 
     #[test]
     fn test_sql_validation() {
