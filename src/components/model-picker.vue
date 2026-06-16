@@ -57,7 +57,7 @@ const triggerClasses = computed(() =>
 const panelClasses = computed(() =>
   props.compact
     ? 'w-[280px] p-0 bg-popover text-foreground border-border'
-    : 'w-[360px] p-0 bg-popover text-foreground border-border',
+    : 'w-[360px] p-0 bg-[#151515] text-white border-[#2b2b2b]',
 )
 
 const flattenedModels = computed(() => props.groups.flatMap(group => group.models))
