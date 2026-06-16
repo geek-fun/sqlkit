@@ -160,8 +160,6 @@ const modelGroups = computed(() =>
     })),
 )
 
-const hasModels = computed(() => modelGroups.value.some(g => g.models.length > 0))
-
 const featureRoute = computed(() =>
   props.feature === 'sidebarAssistant'
     ? llmSettings.value.models.sidebarAssistant
@@ -392,7 +390,7 @@ onBeforeUnmount(() => {
               :settings="contextSettings"
             />
             <ModelPicker
-              v-if="showModelPicker && hasModels"
+              v-if="showModelPicker"
               :groups="modelGroups"
               :model-value="selectedModelId"
               :recent-model-ids="recentModelIds"
