@@ -205,12 +205,12 @@ function fromBackendMessage(row: AgentApiMessage): AgentMessage {
     const parsed = JSON.parse(row.content) as {
       content?: string | null
       thinking?: string | null
-      tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> | null
+      tool_calls?: Array<{ id: string, function: { name: string, arguments: string } }> | null
     }
     if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      ('content' in parsed || 'thinking' in parsed || 'tool_calls' in parsed)
+      typeof parsed === 'object'
+      && parsed !== null
+      && ('content' in parsed || 'thinking' in parsed || 'tool_calls' in parsed)
     ) {
       const toolCalls: AgentToolCall[] = (parsed.tool_calls ?? []).map(tc => ({
         id: tc.id,
@@ -237,11 +237,12 @@ function fromBackendMessage(row: AgentApiMessage): AgentMessage {
   return { ...base, status: isLlmError ? 'error' : 'done', content: row.content }
 }
 
-const dedupAdjacentCompactions = (messages: AgentMessage[]): AgentMessage[] => {
+function dedupAdjacentCompactions(messages: AgentMessage[]): AgentMessage[] {
   let found = false
   return messages.reduceRight((acc, m) => {
     if (!m.compaction || !found) {
-      if (m.compaction) found = true
+      if (m.compaction)
+        found = true
       acc.unshift(m)
     }
     return acc
@@ -938,8 +939,12 @@ export const useDataStudioStore = defineStore('dataStudio', {
               backendMessages.map(fromBackendMessage),
             )
             const sources: SessionSource[] = (() => {
-              try { return s.sources ? JSON.parse(s.sources) : [] }
-              catch { return [] }
+              try {
+                return s.sources ? JSON.parse(s.sources) : []
+              }
+              catch {
+                return []
+              }
             })()
             return {
               id: s.id,
@@ -956,8 +961,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
         )
         this.sessions = loaded.filter(s => s.id !== '')
         if (backendSessions.length > 0) {
-          const stillValid =
-            this.activeSessionId && this.sessions.some(s => s.id === this.activeSessionId)
+          const stillValid
+            = this.activeSessionId && this.sessions.some(s => s.id === this.activeSessionId)
           if (!stillValid) {
             this.activeSessionId = this.sessions[0]?.id ?? undefined
           }

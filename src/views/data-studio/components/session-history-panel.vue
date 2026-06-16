@@ -1,13 +1,14 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import type { AgentSession } from '@/store/dataStudioStore'
 import { storeToRefs } from 'pinia'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useDataStudioStore, type AgentSession } from '@/store/dataStudioStore'
+import { useDataStudioStore } from '@/store/dataStudioStore'
 
 const emit = defineEmits<{
   select: [sessionId: string]
   delete: [sessionId: string]
-  'new-session': []
+  newSession: []
   close: []
 }>()
 
@@ -23,7 +24,7 @@ const sortedSessions = computed(() =>
   }),
 )
 
-const sessionLabel = (session: AgentSession): string => {
+function sessionLabel(session: AgentSession): string {
   if (session.title && session.title !== t('dataStudio.history.newSession'))
     return session.title
   const sourceLabel = session.sources
@@ -39,7 +40,7 @@ const sessionLabel = (session: AgentSession): string => {
   return session.title || t('dataStudio.history.newSession')
 }
 
-const formatTime = (session: AgentSession): string => {
+function formatTime(session: AgentSession): string {
   const ts = session.updated_at ?? 0
   if (!ts)
     return ''
@@ -65,7 +66,7 @@ const formatTime = (session: AgentSession): string => {
         <button
           class="icon-btn"
           :title="t('dataStudio.history.newSession')"
-          @click="emit('new-session')"
+          @click="emit('newSession')"
         >
           <span class="i-carbon-add h-4 w-4" />
         </button>
