@@ -13,6 +13,13 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAppStore } from '@/store/appStore'
 
 const props = defineProps<{
@@ -77,6 +84,10 @@ const selectedPresetId = ref<string | null>(null)
 // ── Computed ──────────────────────────────────────────────────────────────────
 
 const isEdit = computed(() => props.provider != null)
+
+const isCustomProvider = computed(() =>
+  selectedPresetId.value?.startsWith('custom-') ?? false,
+)
 
 const isApiCompatibilityReadonly = computed(() => {
   if (isEdit.value)
@@ -249,21 +260,26 @@ watch(() => props.open, (open) => {
       <!-- Provider type selector — only in create mode -->
       <div v-if="!isEdit" class="space-y-2">
         <Label>{{ t('pages.settings.ai.form.providerType') }}</Label>
-        <div class="gap-2 gap-y-2 grid grid-cols-3 max-h-[280px] overflow-y-auto">
-          <button
-            v-for="preset in presets"
-            :key="preset.id"
-            type="button"
-            class="text-sm font-medium px-3 py-2.5 border rounded-lg flex transition-colors items-center justify-center" :class="[
-              selectedPresetId === preset.id
-                ? 'border-primary bg-primary/10 text-primary'
-                : 'border-input bg-background hover:bg-accent hover:text-accent-foreground',
-            ]"
-            @click="selectPreset(preset)"
-          >
-            {{ preset.name }}
-          </button>
-        </div>
+        <Select
+          :model-value="selectedPresetId ?? ''"
+          @update:model-value="(val: string) => {
+            const preset = presets.find(p => p.id === val)
+            if (preset) selectPreset(preset)
+          }"
+        >
+          <SelectTrigger>
+            <SelectValue :placeholder="t('pages.settings.ai.form.providerTypeHelp')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem
+              v-for="preset in presets"
+              :key="preset.id"
+              :value="preset.id"
+            >
+              {{ preset.name }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       <!-- Form fields -->
@@ -282,8 +298,8 @@ watch(() => props.open, (open) => {
           </p>
         </div>
 
-        <!-- API Compatibility -->
-        <div class="space-y-1">
+        <!-- API Compatibility (only for custom providers) -->
+        <div v-if="isCustomProvider" class="space-y-1">
           <Label for="api-compatibility">{{ t('pages.settings.ai.form.apiCompatibility') }}</Label>
           <Input
             id="api-compatibility"
@@ -359,8 +375,8 @@ watch(() => props.open, (open) => {
           </div>
         </div>
 
-        <!-- Base URL -->
-        <div class="space-y-1">
+        <!-- Base URL (only for custom providers) -->
+        <div v-if="isCustomProvider" class="space-y-1">
           <Label for="base-url">{{ t('pages.settings.ai.form.baseUrl') }}</Label>
           <Input
             id="base-url"
