@@ -24,11 +24,11 @@ pub enum DatabaseType {
     SqlServer,
     /// SQLite.
     SQLite,
-    /// DuckDB (embedded, bundled C lib via `duckdb` crate).
+    /// DuckDB — JDBC bridge.
     DuckDb,
     /// ClickHouse (HTTP protocol).
     ClickHouse,
-    /// Firebird (native, embedded via `fbclient`).
+    /// Firebird — JDBC bridge.
     Firebird,
 
     // ── PG wire protocol compatible (reuse PostgresAdapter) ──
@@ -58,6 +58,24 @@ pub enum DatabaseType {
     Vastbase,
     /// 崖山数据库 YashanDB — PG wire protocol.
     YashanDB,
+    /// Greenplum / Cloudberry / Greengage — MPP analytics, PG wire protocol.
+    Greenplum,
+    /// EnterpriseDB (EDB) — PostgreSQL enterprise, PG wire protocol.
+    EnterpriseDB,
+    /// CrateDB — distributed real-time SQL, PG wire protocol.
+    CrateDB,
+    /// Materialize — streaming materialized SQL, PG wire protocol.
+    Materialize,
+    /// RisingWave — streaming SQL, PG wire protocol.
+    RisingWave,
+    /// Babelfish — PG with SQL Server protocol, PG wire protocol.
+    Babelfish,
+    /// Google AlloyDB — cloud PostgreSQL fork, PG wire protocol.
+    AlloyDB,
+    /// Cloud SQL for PostgreSQL — Google managed PG, PG wire protocol.
+    CloudSQLPG,
+    /// Fujitsu Enterprise Postgres — PG fork, PG wire protocol.
+    FujitsuPG,
 
     // ── MySQL wire protocol compatible (reuse MySQLAdapter) ──
     /// MariaDB — MySQL wire protocol.
@@ -84,9 +102,15 @@ pub enum DatabaseType {
     GoldenDB,
     /// Manticore Search — MySQL wire protocol.
     ManticoreSearch,
+    /// SingleStore (MemSQL) — distributed real-time SQL, MySQL wire protocol.
+    SingleStoreMemSQL,
+    /// Cloud SQL for MySQL — Google managed MySQL, MySQL wire protocol.
+    CloudSQLMySQL,
+    /// NDB Cluster — MySQL in-memory cluster, MySQL wire protocol.
+    NDBCluster,
 
     // ── JDBC bridge (Java subprocess, lazy download) ──
-    /// Oracle Database — oracle-rs (native, optional feature).
+    /// Oracle Database — JDBC bridge.
     Oracle,
     /// IBM DB2 — JDBC bridge.
     DB2,

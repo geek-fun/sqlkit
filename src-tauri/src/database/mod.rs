@@ -62,17 +62,12 @@
 pub mod adapter;
 pub mod clickhouse;
 pub mod config;
-pub mod duckdb;
 pub mod error;
 pub mod explain;
-#[cfg(feature = "firebird")]
-pub mod firebird;
 pub mod http_sql;
 pub mod jdbc_bridge;
 pub mod manager;
 pub mod mysql;
-#[cfg(feature = "oracle")]
-pub mod oracle;
 pub mod pool;
 pub mod postgres;
 pub mod rqlite;
@@ -90,17 +85,12 @@ mod tests;
 pub use adapter::DatabaseAdapter;
 pub use clickhouse::{ClickHouseAdapter, ClickHousePool};
 pub use config::{ConnectionConfig, DatabaseType, PoolConfig, SslMode};
-pub use duckdb::{DuckDbAdapter, DuckDbPool};
 pub use error::{DbError, DbResult};
 pub use explain::ExplainResult;
-#[cfg(feature = "firebird")]
-pub use firebird::{FirebirdAdapter, FirebirdPool};
 pub use http_sql::{HttpSqlAdapter, HttpSqlPool};
 pub use jdbc_bridge::{JdbcBridgeAdapter, JdbcBridgeLauncher, JdbcBridgePool};
 pub use manager::{ConnectionManager, ConnectionMetadata, ManagerStats};
 pub use mysql::{MySQLAdapter, MySQLPool};
-#[cfg(feature = "oracle")]
-pub use oracle::OracleAdapter;
 pub use pool::{ConnectionPool, PoolStats};
 pub use postgres::{PostgresAdapter, PostgresPool};
 pub use rqlite::{RqliteAdapter, RqlitePool};

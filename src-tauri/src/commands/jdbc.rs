@@ -126,6 +126,8 @@ pub async fn remove_driver(db_type: String) -> Result<(), String> {
 fn parse_db_type(s: &str) -> Result<DatabaseType, String> {
     match s.to_lowercase().as_str() {
         "oracle" => Ok(DatabaseType::Oracle),
+        "duckdb" | "duck" => Ok(DatabaseType::DuckDb),
+        "firebird" => Ok(DatabaseType::Firebird),
         "db2" => Ok(DatabaseType::DB2),
         "h2" => Ok(DatabaseType::H2),
         "derby" => Ok(DatabaseType::Derby),
@@ -152,6 +154,8 @@ fn parse_db_type(s: &str) -> Result<DatabaseType, String> {
 fn db_type_from_registry_key(key: &str) -> Option<DatabaseType> {
     match key {
         "oracle" => Some(DatabaseType::Oracle),
+        "duckdb" => Some(DatabaseType::DuckDb),
+        "firebird" => Some(DatabaseType::Firebird),
         "db2" => Some(DatabaseType::DB2),
         "h2" => Some(DatabaseType::H2),
         "derby" => Some(DatabaseType::Derby),

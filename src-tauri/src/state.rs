@@ -12,15 +12,11 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-#[cfg(feature = "firebird")]
-use crate::database::firebird::FirebirdAdapter;
 use crate::database::rqlite::RqliteAdapter;
 use crate::database::turso::TursoAdapter;
-#[cfg(feature = "oracle")]
-use crate::database::OracleAdapter;
 /// Core adapter types used in dispatch logic.
 use crate::database::{
-    clickhouse::ClickHouseAdapter, duckdb::DuckDbAdapter, http_sql::HttpSqlAdapter,
+    clickhouse::ClickHouseAdapter, http_sql::HttpSqlAdapter,
     jdbc_bridge::JdbcBridgeAdapter, mysql::MySQLAdapter, postgres::PostgresAdapter,
     sqlite::SQLiteAdapter, sqlserver::SqlServerAdapter,
 };
@@ -136,6 +132,18 @@ impl ServerConfig {
             "questdb" => Ok(DatabaseType::QuestDB),
             "vastbase" => Ok(DatabaseType::Vastbase),
             "yashandb" => Ok(DatabaseType::YashanDB),
+            "greenplum" | "cloudberry" | "greengage" => Ok(DatabaseType::Greenplum),
+            "edb" | "enterprisedb" => Ok(DatabaseType::EnterpriseDB),
+            "cratedb" | "crate" => Ok(DatabaseType::CrateDB),
+            "materialize" => Ok(DatabaseType::Materialize),
+            "risingwave" | "rising_wave" => Ok(DatabaseType::RisingWave),
+            "babelfish" => Ok(DatabaseType::Babelfish),
+            "alloydb" | "google_alloydb" => Ok(DatabaseType::AlloyDB),
+            "cloudsqlpg" | "cloud_sql_pg" => Ok(DatabaseType::CloudSQLPG),
+            "fujitsupg" | "fujitsu_pg" => Ok(DatabaseType::FujitsuPG),
+            "singlestore" | "memsql" | "single_store" => Ok(DatabaseType::SingleStoreMemSQL),
+            "cloudsqlmysql" | "cloud_sql_mysql" => Ok(DatabaseType::CloudSQLMySQL),
+            "ndbcluster" | "ndb_cluster" => Ok(DatabaseType::NDBCluster),
             "derby" => Ok(DatabaseType::Derby),
             "hive" => Ok(DatabaseType::Hive),
             "databricks" => Ok(DatabaseType::Databricks),
@@ -164,6 +172,7 @@ impl ServerConfig {
         }
 
         let db_lower = self.db_type.to_lowercase();
+        // DuckDB is file-based, uses JDBC bridge with jdbc:duckdb:{filepath}
         if db_lower == "sqlite" || db_lower == "duckdb" || db_lower == "duck" {
             config = config.with_database(&self.host);
         } else if let Some(ref database) = self.database {
@@ -189,18 +198,14 @@ impl ServerConfig {
 }
 
 /// Active database connection wrapper used by the application state.
+/// DuckDB, Firebird, and Oracle now use the JdbcBridge variant.
 #[derive(Clone)]
 pub enum ActiveConnection {
     Postgres(Arc<Mutex<PostgresAdapter>>),
     MySQL(Arc<Mutex<MySQLAdapter>>),
     SQLite(Arc<Mutex<SQLiteAdapter>>),
     SQLServer(Arc<Mutex<SqlServerAdapter>>),
-    DuckDb(Arc<Mutex<DuckDbAdapter>>),
     ClickHouse(Arc<Mutex<ClickHouseAdapter>>),
-    #[cfg(feature = "firebird")]
-    Firebird(Arc<Mutex<FirebirdAdapter>>),
-    #[cfg(feature = "oracle")]
-    Oracle(Arc<Mutex<OracleAdapter>>),
     JdbcBridge(Arc<Mutex<JdbcBridgeAdapter>>),
     HttpSql(Arc<Mutex<HttpSqlAdapter>>),
     Rqlite(Arc<Mutex<RqliteAdapter>>),

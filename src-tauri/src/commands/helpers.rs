@@ -1,12 +1,10 @@
 use crate::database::config::DatabaseType;
-#[cfg(feature = "firebird")]
-use crate::database::firebird::FirebirdAdapter;
 use crate::database::rqlite::RqliteAdapter;
 use crate::database::strategy::{resolve_effective_type, ConnectionStrategy, CoreDatabaseType};
 use crate::database::turso::TursoAdapter;
 use crate::database::{
-    clickhouse::ClickHouseAdapter, config::ConnectionConfig, duckdb::DuckDbAdapter,
-    http_sql::HttpSqlAdapter, jdbc_bridge::JdbcBridgeAdapter, ConnectionStatus, DatabaseAdapter,
+    clickhouse::ClickHouseAdapter, config::ConnectionConfig, http_sql::HttpSqlAdapter,
+    jdbc_bridge::JdbcBridgeAdapter, ConnectionStatus, DatabaseAdapter,
 };
 use crate::database::{
     mysql::MySQLAdapter, postgres::PostgresAdapter, sqlite::SQLiteAdapter,
@@ -50,35 +48,10 @@ pub async fn create_and_connect_adapter(
                     adapter.connect().await.map_err(|e| e.to_string())?;
                     Ok(ActiveConnection::SQLite(Arc::new(Mutex::new(adapter))))
                 }
-                CoreDatabaseType::DuckDb => {
-                    let mut adapter = DuckDbAdapter::new(conn_config);
-                    adapter.connect().await.map_err(|e| e.to_string())?;
-                    Ok(ActiveConnection::DuckDb(Arc::new(Mutex::new(adapter))))
-                }
                 CoreDatabaseType::ClickHouse => {
                     let mut adapter = ClickHouseAdapter::new(conn_config);
                     adapter.connect().await.map_err(|e| e.to_string())?;
                     Ok(ActiveConnection::ClickHouse(Arc::new(Mutex::new(adapter))))
-                }
-                CoreDatabaseType::Oracle => {
-                    #[cfg(feature = "oracle")]
-                    {
-                        let mut adapter = crate::database::OracleAdapter::new(conn_config);
-                        adapter.connect().await.map_err(|e| e.to_string())?;
-                        return Ok(ActiveConnection::Oracle(Arc::new(Mutex::new(adapter))));
-                    }
-                    #[cfg(not(feature = "oracle"))]
-                Err("Oracle support requires the 'oracle' feature: cargo build --features oracle".to_string())
-                }
-                CoreDatabaseType::Firebird => {
-                    #[cfg(feature = "firebird")]
-                    {
-                        let mut adapter = FirebirdAdapter::new(conn_config);
-                        adapter.connect().await.map_err(|e| e.to_string())?;
-                        return Ok(ActiveConnection::Firebird(Arc::new(Mutex::new(adapter))));
-                    }
-                    #[cfg(not(feature = "firebird"))]
-                    Err("Firebird support requires the 'firebird' feature".into())
                 }
                 _ => Err(format!("Native adapter not yet implemented for {:?}", core)),
             }
@@ -138,35 +111,10 @@ pub async fn test_connection(
                 adapter.connect().await.map_err(|e| e.to_string())?;
                 adapter.test_connection().await.map_err(|e| e.to_string())
             }
-            CoreDatabaseType::DuckDb => {
-                let mut adapter = DuckDbAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                adapter.test_connection().await.map_err(|e| e.to_string())
-            }
             CoreDatabaseType::ClickHouse => {
                 let mut adapter = ClickHouseAdapter::new(conn_config);
                 adapter.connect().await.map_err(|e| e.to_string())?;
                 adapter.test_connection().await.map_err(|e| e.to_string())
-            }
-            CoreDatabaseType::Oracle => {
-                #[cfg(feature = "oracle")]
-                {
-                    let mut adapter = crate::database::OracleAdapter::new(conn_config);
-                    adapter.connect().await.map_err(|e| e.to_string())?;
-                    return adapter.test_connection().await.map_err(|e| e.to_string());
-                }
-                #[cfg(not(feature = "oracle"))]
-                Err("Oracle support requires the 'oracle' feature".to_string())
-            }
-            CoreDatabaseType::Firebird => {
-                #[cfg(feature = "firebird")]
-                {
-                    let mut adapter = FirebirdAdapter::new(conn_config);
-                    adapter.connect().await.map_err(|e| e.to_string())?;
-                    return adapter.test_connection().await.map_err(|e| e.to_string());
-                }
-                #[cfg(not(feature = "firebird"))]
-                Err("Firebird support requires the 'firebird' feature".into())
             }
             _ => Err("Native adapter not yet implemented".into()),
         },
@@ -241,6 +189,18 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
         "questdb" => Ok(DatabaseType::QuestDB),
         "vastbase" => Ok(DatabaseType::Vastbase),
         "yashandb" => Ok(DatabaseType::YashanDB),
+        "greenplum" | "cloudberry" | "greengage" => Ok(DatabaseType::Greenplum),
+        "edb" | "enterprisedb" => Ok(DatabaseType::EnterpriseDB),
+        "cratedb" | "crate" => Ok(DatabaseType::CrateDB),
+        "materialize" => Ok(DatabaseType::Materialize),
+        "risingwave" | "rising_wave" => Ok(DatabaseType::RisingWave),
+        "babelfish" => Ok(DatabaseType::Babelfish),
+        "alloydb" | "google_alloydb" => Ok(DatabaseType::AlloyDB),
+        "cloudsqlpg" | "cloud_sql_pg" => Ok(DatabaseType::CloudSQLPG),
+        "fujitsupg" | "fujitsu_pg" => Ok(DatabaseType::FujitsuPG),
+        "singlestore" | "memsql" | "single_store" => Ok(DatabaseType::SingleStoreMemSQL),
+        "cloudsqlmysql" | "cloud_sql_mysql" => Ok(DatabaseType::CloudSQLMySQL),
+        "ndbcluster" | "ndb_cluster" => Ok(DatabaseType::NDBCluster),
         "derby" => Ok(DatabaseType::Derby),
         "hive" => Ok(DatabaseType::Hive),
         "databricks" => Ok(DatabaseType::Databricks),

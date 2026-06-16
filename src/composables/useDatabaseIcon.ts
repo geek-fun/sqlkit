@@ -115,6 +115,18 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   RQLITE: { icon: sqliteLogo, color: 'bg-green-100 dark:bg-green-900/30' },
   TURSO: { icon: sqliteLogo, color: 'bg-cyan-100 dark:bg-cyan-900/30' },
   TDENGINE: { icon: clickhouseLogo, color: 'bg-amber-100 dark:bg-amber-900/30' },
+  GREENPLUM: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  ENTERPRISEDB: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  CRATEDB: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  MATERIALIZE: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  RISINGWAVE: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  BABELFISH: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  ALLOYDB: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  CLOUDSQLPG: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  FUJITSUPG: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  SINGLESTOREMEMSQL: { icon: mysqlLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
+  CLOUDSQLMYSQL: { icon: mysqlLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
+  NDB_CLUSTER: { icon: mysqlLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
 }
 
 export function useDatabaseIcon() {

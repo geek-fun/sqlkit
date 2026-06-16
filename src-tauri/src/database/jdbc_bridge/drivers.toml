@@ -47,6 +47,56 @@ jar_sha256 = ""
 maven_group_override = "com.oracle.database.jdbc"
 maven_artifact_override = "ojdbc6"
 
+# ── DuckDB ──
+
+[databases.duckdb]
+name = "DuckDB"
+class_name = "org.duckdb.DuckDBDriver"
+maven_group = "org.duckdb"
+maven_artifact = "duckdb_jdbc"
+jdbc_url_template = "jdbc:duckdb:{database}"
+default_port = 0
+min_jre_version = "11"
+version_error_signatures = [
+  "does not exist",
+  "catalog error",
+]
+
+[[databases.duckdb.versions]]
+version = "1.2.0"
+min_db_version = "1.x"
+label = "duckdb-jdbc"
+jar_sha256 = ""
+
+# ── Firebird ──
+
+[databases.firebird]
+name = "Firebird"
+class_name = "org.firebirdsql.jdbc.FBDriver"
+maven_group = "org.firebirdsql.jdbc"
+maven_artifact = "jaybird"
+jdbc_url_template = "jdbc:firebirdsql://{host}:{port}/{database}"
+default_port = 3050
+min_jre_version = "11"
+version_error_signatures = [
+  "connection rejected",
+  "malformed connection URL",
+  "Invalid parameter",
+  "ISC_ERROR",
+]
+
+[[databases.firebird.versions]]
+version = "5.0.2"
+min_db_version = "5.x"
+label = "jaybird"
+jar_sha256 = ""
+
+[[databases.firebird.versions]]
+version = "4.0.11"
+min_db_version = "4.x"
+label = "jaybird-legacy"
+jar_sha256 = ""
+
 # ── IBM DB2 ──
 
 [databases.db2]

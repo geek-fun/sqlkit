@@ -178,6 +178,8 @@ pub fn build_jdbc_url(
 fn db_type_to_registry_key(db: DatabaseType) -> Option<&'static str> {
     match db {
         DatabaseType::Oracle => Some("oracle"),
+        DatabaseType::DuckDb => Some("duckdb"),
+        DatabaseType::Firebird => Some("firebird"),
         DatabaseType::DB2 => Some("db2"),
         DatabaseType::H2 => Some("h2"),
         DatabaseType::Derby => Some("derby"),

@@ -61,6 +61,18 @@ export enum DatabaseType {
   RQLITE = 'RQLITE',
   TURSO = 'TURSO',
   TDENGINE = 'TDENGINE',
+  GREENPLUM = 'GREENPLUM',
+  ENTERPRISEDB = 'ENTERPRISEDB',
+  CRATEDB = 'CRATEDB',
+  MATERIALIZE = 'MATERIALIZE',
+  RISINGWAVE = 'RISINGWAVE',
+  BABELFISH = 'BABELFISH',
+  ALLOYDB = 'ALLOYDB',
+  CLOUDSQLPG = 'CLOUDSQLPG',
+  FUJITSUPG = 'FUJITSUPG',
+  SINGLESTOREMEMSQL = 'SINGLESTOREMEMSQL',
+  CLOUDSQLMYSQL = 'CLOUDSQLMYSQL',
+  NDB_CLUSTER = 'NDB_CLUSTER',
 }
 
 const PG_BACKEND = 'PostgreSQL'
@@ -124,6 +136,18 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.RQLITE]: 'rqlite',
   [DatabaseType.TURSO]: 'turso',
   [DatabaseType.TDENGINE]: 'tdengine',
+  [DatabaseType.GREENPLUM]: PG_BACKEND,
+  [DatabaseType.ENTERPRISEDB]: PG_BACKEND,
+  [DatabaseType.CRATEDB]: PG_BACKEND,
+  [DatabaseType.MATERIALIZE]: PG_BACKEND,
+  [DatabaseType.RISINGWAVE]: PG_BACKEND,
+  [DatabaseType.BABELFISH]: PG_BACKEND,
+  [DatabaseType.ALLOYDB]: PG_BACKEND,
+  [DatabaseType.CLOUDSQLPG]: PG_BACKEND,
+  [DatabaseType.FUJITSUPG]: PG_BACKEND,
+  [DatabaseType.SINGLESTOREMEMSQL]: MYSQL_BACKEND,
+  [DatabaseType.CLOUDSQLMYSQL]: MYSQL_BACKEND,
+  [DatabaseType.NDB_CLUSTER]: MYSQL_BACKEND,
 }
 
 const dbTypeFromBackend: Record<string, DatabaseType> = {
@@ -159,6 +183,18 @@ const dbTypeFromBackend: Record<string, DatabaseType> = {
   rqlite: DatabaseType.RQLITE,
   turso: DatabaseType.TURSO,
   tdengine: DatabaseType.TDENGINE,
+  greenplum: DatabaseType.GREENPLUM,
+  enterprisedb: DatabaseType.ENTERPRISEDB,
+  cratedb: DatabaseType.CRATEDB,
+  materialize: DatabaseType.MATERIALIZE,
+  risingwave: DatabaseType.RISINGWAVE,
+  babelfish: DatabaseType.BABELFISH,
+  alloydb: DatabaseType.ALLOYDB,
+  cloudsqlpg: DatabaseType.CLOUDSQLPG,
+  fujitsupg: DatabaseType.FUJITSUPG,
+  singlestore: DatabaseType.SINGLESTOREMEMSQL,
+  cloudsqlmysql: DatabaseType.CLOUDSQLMYSQL,
+  ndbcluster: DatabaseType.NDB_CLUSTER,
 }
 
 const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
@@ -198,6 +234,8 @@ export function isJdbcDatabase(type: DatabaseType): boolean {
     DatabaseType.IRIS,
     DatabaseType.ACCESS,
     DatabaseType.TDENGINE,
+    DatabaseType.DUCKDB,
+    DatabaseType.FIREBIRD,
   ].includes(type)
 }
 
@@ -223,6 +261,8 @@ export const jdbcDatabaseTypes: DatabaseType[] = [
   DatabaseType.IRIS,
   DatabaseType.ACCESS,
   DatabaseType.TDENGINE,
+  DatabaseType.DUCKDB,
+  DatabaseType.FIREBIRD,
 ]
 
 export enum ConnectionStatus {
