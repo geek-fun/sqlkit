@@ -751,13 +751,10 @@ export const zhCN = {
         cassandra: 'Apache Cassandra',
         iris: 'InterSystems IRIS',
         access: 'Microsoft Access',
-      },
-      databaseGroups: {
-        native: '原生',
-        jdbc: '☕ JDBC',
-      },
-      databaseBadges: {
-        jdbc: '(JDBC)',
+        firebird: 'Firebird',
+        rqlite: 'RQLite',
+        turso: 'Turso (libSQL)',
+        tdengine: 'TDengine',
       },
       sqlite: {
         modes: {

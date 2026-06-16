@@ -770,13 +770,10 @@ export const enUS = {
         cassandra: 'Apache Cassandra',
         iris: 'InterSystems IRIS',
         access: 'Microsoft Access',
-      },
-      databaseGroups: {
-        native: 'Native',
-        jdbc: '☕ JDBC',
-      },
-      databaseBadges: {
-        jdbc: '(JDBC)',
+        firebird: 'Firebird',
+        rqlite: 'RQLite',
+        turso: 'Turso (libSQL)',
+        tdengine: 'TDengine',
       },
       sqlite: {
         modes: {
