@@ -457,7 +457,6 @@ onBeforeUnmount(() => {
   flex: 1;
   display: flex;
   justify-content: flex-end;
-  gap: 4px;
 }
 
 .send-button {
