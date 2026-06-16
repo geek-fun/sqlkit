@@ -32,9 +32,54 @@ jobs:
             echo "is_new_version=true" >> $GITHUB_OUTPUT
           fi
 
+  prepare:
+    name: Prepare Release
+    needs: check-version
+    if: needs.check-version.outputs.is_new_version == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      release_body: ${{ steps.release_notes.outputs.release_body }}
+      release_id: ${{ steps.create-release.outputs.result }}
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Build Release Notes
+        id: release_notes
+        run: |
+          bash scripts/build-release-notes.sh
+          {
+            echo 'release_body<<EOF'
+            cat release-notes.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+      - name: Create draft release
+        id: create-release
+        uses: actions/github-script@v7
+        env:
+          VERSION: ${{ needs.check-version.outputs.version }}
+          RELEASE_BODY: ${{ steps.release_notes.outputs.release_body }}
+        with:
+          script: |
+            const { data } = await github.rest.repos.createRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              tag_name: `v${process.env.VERSION}`,
+              name: `SqlKit v${process.env.VERSION}`,
+              body: process.env.RELEASE_BODY || '',
+              draft: true,
+              prerelease: false
+            })
+            return data.id
+
   build:
     name: ${{ matrix.name }}
-    needs: check-version
+    needs: [check-version, prepare]
     if: needs.check-version.outputs.is_new_version == 'true'
     permissions:
       contents: write
@@ -125,7 +170,7 @@ jobs:
           echo "CERT_ID=$CERT_ID" >> $GITHUB_ENV
           echo "Signing identity: $CERT_ID"
 
-      - name: Build and Release
+      - name: Build and Upload Artifacts
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -140,23 +185,28 @@ jobs:
           DUCKDB_LIB_DIR: ${{ github.workspace }}/libduckdb
           DUCKDB_INCLUDE_DIR: ${{ github.workspace }}/libduckdb
         with:
-          tagName: v__VERSION__
-          releaseName: SqlKit v__VERSION__
-          releaseBody: See the assets to download this version and install.
-          releaseDraft: true
-          prerelease: false
-          args: ${{ matrix.args }}
+          releaseId: ${{ needs.prepare.outputs.release_id }}
           includeUpdaterJson: true
+          args: ${{ matrix.args }}
 
   publish:
     name: Publish Release
-    needs: [check-version, build]
+    needs: [check-version, prepare, build]
     if: needs.check-version.outputs.is_new_version == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - name: Publish draft release
+        uses: actions/github-script@v7
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release edit "v${{ needs.check-version.outputs.version }}" --draft=false --repo ${{ github.repository }}
+          release_id: ${{ needs.prepare.outputs.release_id }}
+        with:
+          script: |
+            github.rest.repos.updateRelease({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              release_id: Number(process.env.release_id),
+              draft: false,
+              prerelease: false
+            })
