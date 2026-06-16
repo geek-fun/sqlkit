@@ -118,6 +118,7 @@ export async function initAgentRuntime(): Promise<void> {
           store.setMessageStatus(messageId, 'streaming')
 
         store.updateStreamingContent(messageId, payload.content)
+        store.removePreparingPlaceholder()
       }),
     )
 
