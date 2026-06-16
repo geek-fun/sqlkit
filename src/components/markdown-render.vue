@@ -3,17 +3,24 @@ import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
 import MarkdownIt from 'markdown-it'
 import taskLists from 'markdown-it-task-lists'
-import { onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from '@/composables/useNotifications'
-
-import 'highlight.js/styles/atom-one-dark.css'
 
 const props = defineProps<{
   markdown: string
 }>()
 
 const { t } = useI18n()
+
+// Lazy-load highlight.js theme CSS after mount to avoid blocking initial render
+let _themeLoaded = false
+onMounted(() => {
+  if (!_themeLoaded) {
+    _themeLoaded = true
+    import('highlight.js/styles/atom-one-dark.css')
+  }
+})
 
 const parsedMarkdown = ref('')
 
