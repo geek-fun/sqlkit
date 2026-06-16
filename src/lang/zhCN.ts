@@ -731,6 +731,7 @@ export const zhCN = {
       update: '更新',
       delete: '删除',
       modeDefault: '询问',
+      modeFull: '自动',
       inheritTitle: '继承',
       inheritDescription: '遵循会话级权限',
       customTitle: '自定义',

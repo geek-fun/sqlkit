@@ -731,6 +731,7 @@ export const enUS = {
       update: 'Update',
       delete: 'Delete',
       modeDefault: 'Ask',
+      modeFull: 'Auto',
       inheritTitle: 'Inherit',
       inheritDescription: 'Follow session-level permissions',
       customTitle: 'Custom',
