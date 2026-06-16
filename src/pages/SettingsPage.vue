@@ -236,9 +236,7 @@ async function handleCheckUpdates() {
                       v-if="currentTheme === opt.value"
                       class="rounded-full bg-primary flex h-5 w-5 items-center right-2 top-2 justify-center absolute"
                     >
-                      <svg class="text-primary-foreground h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
+                      <span class="i-carbon-checkmark text-primary-foreground h-3 w-3" />
                     </div>
                     <p class="text-sm font-medium text-center">
                       {{ opt.label() }}

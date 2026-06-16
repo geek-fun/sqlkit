@@ -752,10 +752,7 @@ function closeResultPanel() {
             class="flex flex-1 items-center justify-center"
           >
             <div class="text-muted-foreground text-center">
-              <svg class="mx-auto mb-2 h-8 w-8 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
+              <span class="i-carbon-loading mx-auto mb-2 h-8 w-8 block animate-spin" />
               <p class="text-sm">
                 {{ t('pages.queries.status.executing') }}
               </p>
@@ -801,9 +798,7 @@ function closeResultPanel() {
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="executeQuery"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <polygon points="6 3 20 12 6 21 6 3" />
-                      </svg>
+                      <span class="i-carbon-play h-3.5 w-3.5" />
                       {{ t('pages.queries.editor.execute') }}
                     </Button>
                   </TooltipTrigger>
@@ -824,10 +819,7 @@ function closeResultPanel() {
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="handleExplainQuery(explainAnalyzeMode)"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M12 20h9" />
-                        <path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z" />
-                      </svg>
+                      <span class="i-carbon-wand h-3.5 w-3.5" />
                       {{ t('pages.queries.editor.explain') }}
                     </Button>
                   </TooltipTrigger>
@@ -866,11 +858,7 @@ function closeResultPanel() {
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="handleToolbarFormat"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M18.37 2.63 14 7l-1.59-1.59a2 2 0 0 0-2.82 0L8 7l9 9 1.59-1.59a2 2 0 0 0 0-2.82L17 10l4.37-4.37a2 2 0 0 0 0-2.82l-1.18-1.18a2 2 0 0 0-2.82 0z" />
-                        <line x1="9" y1="13" x2="15" y2="19" />
-                        <path d="M3 21h4l10.85-10.85" />
-                      </svg>
+                      <span class="i-carbon-wand h-3.5 w-3.5" />
                       {{ t('pages.queries.editor.format') }}
                     </Button>
                   </TooltipTrigger>
@@ -893,11 +881,7 @@ function closeResultPanel() {
                       :disabled="!activeTab || !activeTab.content.trim()"
                       @click="handleDownloadQuery"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                        <polyline points="7 10 12 15 17 10" />
-                        <line x1="12" x2="12" y1="15" y2="3" />
-                      </svg>
+                      <span class="i-carbon-download h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -955,10 +939,7 @@ function closeResultPanel() {
                   </div>
 
                   <!-- Welcome message -->
-                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground/50 mx-auto mb-4">
-                    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
-                    <polyline points="14 2 14 8 20 8" />
-                  </svg>
+                  <span class="i-carbon-document text-muted-foreground/50 mx-auto mb-4 h-12 w-12 block" />
                   <p class="text-muted-foreground mb-4">
                     {{ getConnectionId() ? t('pages.queries.landing.ready') : t('pages.queries.noTab') }}
                   </p>
