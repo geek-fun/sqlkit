@@ -57,7 +57,6 @@ const { llmSettings } = storeToRefs(appStore)
 
 const inputText = ref('')
 const scrollAreaRef = ref<{ viewportElement: HTMLElement | null } | null>(null)
-const inputRef = ref<HTMLTextAreaElement | null>(null)
 
 // ── Smart scroll ──────────────────────────────────────────────────────
 
@@ -331,70 +330,263 @@ onBeforeUnmount(() => {
     </div>
 
     <!-- Input area -->
-    <div class="px-4 py-3 border-t border-border shrink-0">
-      <div class="flex gap-2 items-center">
-        <!-- Toolbar left slot -->
-        <div v-if="$slots['toolbar-left']" class="flex gap-1 items-center">
-          <slot name="toolbar-left" />
+    <div class="chat-input-area">
+      <div v-if="stopReason && stopMessage" class="loop-stopped-banner" role="status">
+        <div class="loop-stopped-banner__body">
+          <span class="loop-stopped-banner__icon i-carbon-pause-filled" />
+          <div class="loop-stopped-banner__texts">
+            <span class="loop-stopped-banner__message">{{ stopMessage }}</span>
+            <span class="loop-stopped-banner__hint">{{ t('dataStudio.agent.continueHint') }}</span>
+          </div>
         </div>
-
-        <div class="flex-1 relative">
-          <textarea
-            ref="inputRef"
-            v-model="inputText"
-            :placeholder="inputPlaceholder || t('dataStudio.inputPlaceholder')"
-            class="text-sm px-3 py-2 outline-none border border-border rounded-lg bg-background max-h-[120px] min-h-[36px] w-full resize-none transition-colors focus:border-foreground/40"
-            rows="1"
-            :disabled="isLoading"
-            @keydown="handleKeydown"
-            @input="adjustTextareaHeight"
-          />
-        </div>
-
-        <!-- Toolbar center: ModelPicker + ContextIndicator -->
-        <div v-if="showModelPicker" class="flex gap-1 items-center">
-          <ContextIndicator
-            v-if="sessionId"
-            :session-id="sessionId"
-            :settings="contextSettings"
-          />
-          <ModelPicker
-            :groups="modelGroups"
-            :model-value="selectedModelId"
-            :recent-model-ids="recentModelIds"
-            :compact="compact"
-            @open="onModelPickerOpen"
-            @update:model-value="onModelChange"
-          />
-        </div>
-
-        <div class="flex gap-1 items-center">
-          <!-- Stop button -->
+        <div class="loop-stopped-banner__actions">
           <button
-            v-if="isLoading"
-            class="text-destructive-foreground rounded-lg bg-destructive inline-flex h-8 w-8 transition-opacity items-center justify-center hover:opacity-90"
+            class="loop-stopped-banner__action loop-stopped-banner__action--secondary"
+            type="button"
+            :disabled="isLoading"
+            @click="emit('stopLoop')"
+          >
+            {{ t('dataStudio.agent.stop') }}
+          </button>
+          <button
+            class="loop-stopped-banner__action loop-stopped-banner__action--primary"
+            type="button"
+            :disabled="isLoading"
+            @click="handleContinue"
+          >
+            {{ t('dataStudio.agent.continue') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="chat-input-wrapper">
+        <textarea
+          v-model="inputText"
+          class="chat-textarea"
+          rows="3"
+          :placeholder="inputPlaceholder || t('dataStudio.inputPlaceholder')"
+          autocomplete="off"
+          autocorrect="off"
+          autocapitalize="off"
+          spellcheck="false"
+          data-form-type="other"
+          :disabled="isLoading"
+          @keydown="handleKeydown"
+          @input="adjustTextareaHeight"
+        />
+
+        <div class="chat-toolbar">
+          <div class="toolbar-left">
+            <slot name="toolbar-left" />
+          </div>
+
+          <div class="toolbar-center">
+            <ContextIndicator
+              v-if="sessionId"
+              :session-id="sessionId"
+              :settings="contextSettings"
+            />
+            <ModelPicker
+              v-if="showModelPicker"
+              :groups="modelGroups"
+              :model-value="selectedModelId"
+              :recent-model-ids="recentModelIds"
+              :compact="compact"
+              @open="onModelPickerOpen"
+              @update:model-value="onModelChange"
+            />
+          </div>
+
+          <button
+            v-if="!isLoading"
+            class="send-button"
+            :disabled="!inputText.trim()"
+            @click="sendMessage"
+          >
+            <span class="i-carbon-arrow-up h-4 w-4" />
+          </button>
+          <button
+            v-else
+            class="send-button send-button--stop"
             :title="t('dataStudio.agent.stop')"
             @click="emit('stopLoop')"
           >
             <span class="i-carbon-stop-filled h-4 w-4" />
           </button>
-
-          <!-- Send button -->
-          <button
-            v-else
-            class="text-primary-foreground rounded-lg bg-primary inline-flex h-8 w-8 transition-opacity items-center justify-center disabled:opacity-40 hover:opacity-90"
-            :disabled="!inputText.trim()"
-            @click="sendMessage"
-          >
-            <span class="i-carbon-send h-4 w-4" />
-          </button>
-        </div>
-
-        <!-- Toolbar right slot -->
-        <div v-if="$slots['toolbar-right']" class="flex gap-1 items-center">
-          <slot name="toolbar-right" />
         </div>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.chat-input-area {
+  padding: 8px;
+  position: relative;
+}
+
+.chat-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--background));
+}
+
+.chat-textarea {
+  width: 100%;
+  min-height: 60px;
+  padding: 8px 10px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: hsl(var(--foreground));
+  font-size: 13px;
+  resize: none;
+  line-height: 1.5;
+}
+
+.chat-textarea:focus {
+  outline: none;
+}
+
+.chat-textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 10px;
+  height: 36px;
+  border-top: 1px solid hsl(var(--border));
+}
+
+.toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.toolbar-center {
+  flex: 1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.send-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: hsl(var(--foreground));
+  color: hsl(var(--background));
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  flex-shrink: 0;
+}
+
+.send-button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.send-button--stop {
+  background: hsl(var(--destructive));
+  color: hsl(var(--destructive-foreground));
+}
+
+.loop-stopped-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid hsl(38 92% 50% / 0.35);
+  background: hsl(38 92% 50% / 0.08);
+  color: hsl(var(--foreground));
+}
+
+.loop-stopped-banner__body {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 1 1 auto;
+}
+
+.loop-stopped-banner__texts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.loop-stopped-banner__icon {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  color: hsl(38 92% 50%);
+}
+
+.loop-stopped-banner__message {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.loop-stopped-banner__hint {
+  font-size: 12px;
+  color: hsl(var(--muted-foreground));
+  line-height: 1.4;
+}
+
+.loop-stopped-banner__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.loop-stopped-banner__action {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.loop-stopped-banner__action--primary {
+  border: 1px solid hsl(38 92% 50% / 0.5);
+  background: hsl(38 92% 50% / 0.15);
+  color: hsl(var(--foreground));
+}
+
+.loop-stopped-banner__action--primary:hover:not(:disabled) {
+  background: hsl(38 92% 50% / 0.25);
+}
+
+.loop-stopped-banner__action--secondary {
+  border: 1px solid transparent;
+  background: transparent;
+  color: hsl(var(--muted-foreground));
+}
+
+.loop-stopped-banner__action--secondary:hover:not(:disabled) {
+  background: hsl(var(--secondary));
+  color: hsl(var(--foreground));
+}
+
+.loop-stopped-banner__action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+</style>
