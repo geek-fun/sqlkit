@@ -256,8 +256,22 @@ async function executeQuery(details?: StatementToExecute) {
   await tabStore.executeQuery(activeTab.value.id, sqlToExecute)
 }
 
-async function handleExplainQuery() {
-  // TODO: Implement explain query
+const explainAnalyzeMode = ref(false)
+
+async function handleExplainQuery(analyze = false) {
+  if (!activeTab.value || activeTab.value.orphanFromConnectionId)
+    return
+  if (!activeTab.value.content.trim())
+    return
+  const connId = getConnectionId()
+  if (!connId)
+    return
+  showResultPanel.value = true
+  await tabStore.explainQuery(activeTab.value.id, analyze)
+}
+
+function toggleExplainMode() {
+  explainAnalyzeMode.value = !explainAnalyzeMode.value
 }
 
 function getActiveDialect(): string | null {
@@ -353,6 +367,17 @@ function handleGlobalKeydown(e: KeyboardEvent) {
       e.preventDefault()
       e.stopPropagation()
       queryTabsRef.value?.triggerClose(tab.id)
+    }
+  }
+  if (e.key === 'F6') {
+    // Don't fire F6 when user is typing in an input/textarea/contenteditable
+    const target = e.target as HTMLElement
+    const isInput = target.tagName === 'INPUT'
+      || target.tagName === 'TEXTAREA'
+      || target.isContentEditable
+    if (!isInput) {
+      e.preventDefault()
+      handleExplainQuery(explainAnalyzeMode.value)
     }
   }
 }
@@ -795,8 +820,9 @@ function closeResultPanel() {
                       variant="ghost"
                       size="sm"
                       class="gap-1 h-7"
-                      :disabled="!activeTab"
-                      @click="handleExplainQuery"
+                      :class="{ 'text-violet-600': !explainAnalyzeMode, 'text-green-600': explainAnalyzeMode }"
+                      :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
+                      @click="handleExplainQuery(explainAnalyzeMode)"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M12 20h9" />
@@ -808,6 +834,25 @@ function closeResultPanel() {
                   <TooltipContent>
                     <p>{{ t('pages.queries.shortcuts.explain', { key: modifierKey }) }}</p>
                   </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      class="p-0 h-7 w-7"
+                      :class="explainAnalyzeMode ? 'text-green-600 bg-green-100 dark:text-green-300 dark:bg-green-900/30' : 'text-muted-foreground/50'"
+                      :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
+                      @click="toggleExplainMode"
+                    >
+                      <span class="text-xs font-bold">A</span>
+                    </Button>
+                  </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{{ t('pages.queries.explain.analyzeToggle', { mode: explainAnalyzeMode ? 'ON' : 'OFF' }) }}</p>
+                    </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
 
@@ -946,6 +991,9 @@ function closeResultPanel() {
               :sql="activeTab?.content"
               :connection-id="getConnectionId() ?? undefined"
               :database="activeTab?.database"
+              :explain-plan="activeTab?.explainPlan ?? null"
+              :is-explaining="activeTab?.isExplaining ?? false"
+              :explain-error="activeTab?.explainError ?? null"
               @close="closeResultPanel"
               @refresh="handleNewTab"
             />

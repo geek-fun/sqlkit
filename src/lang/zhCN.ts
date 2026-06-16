@@ -565,6 +565,43 @@ export const zhCN = {
         acknowledge: '保持孤立',
         close: '关闭标签页',
       },
+      explain: {
+        title: '执行计划',
+        treeView: '树形',
+        summaryView: '概要',
+        rawView: '原始',
+        analyze: '分析执行',
+        running: '正在生成执行计划...',
+        empty: '暂无执行计划数据',
+        nodeCount: '{count} 个节点',
+        summary: {
+          totalCost: '预估总成本: {cost}',
+          mostExpensive: '最高成本: {node}',
+          noCostData: '无成本数据',
+        },
+        node: {
+          rowEstimate: '估:{rows}',
+          actualRows: '实:{rows}',
+          discrepancyWarning: '实际行数远超预估 ({actual} vs {estimated}, {ratio}倍)',
+        },
+        error: {
+          parseFailed: '执行计划解析失败',
+          noPlan: '数据库未返回执行计划',
+        },
+        tabLabels: {
+          results: '结果',
+          explain: '计划',
+        },
+        analyzeToggle: '切换 EXPLAIN ANALYZE 模式 (当前: {mode})',
+        columnHeaders: {
+          nodeType: '节点类型',
+          relation: '关系',
+          index: '索引',
+          cost: '成本',
+          rows: '行数',
+          details: '详情',
+        },
+      },
     },
     dataStudio: {
       title: '数据工作室',
