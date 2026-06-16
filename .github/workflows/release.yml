@@ -193,8 +193,6 @@ jobs:
     name: Build JRE (${{ matrix.name }})
     needs: [check-version, prepare]
     if: needs.check-version.outputs.is_new_version == 'true'
-    permissions:
-      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -246,15 +244,12 @@ jobs:
             tar czf ${{ matrix.archive }} ${{ matrix.output }}
           fi
 
-      - name: Upload JRE to release
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh release upload \
-            v${{ needs.check-version.outputs.version }} \
-            ${{ matrix.archive }} \
-            --name "jre/${{ matrix.archive }}" \
-            --clobber
+      - name: Upload JRE artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.archive }}
+          path: ${{ matrix.archive }}
+          if-no-files-found: error
 
   publish:
     name: Publish Release
@@ -264,6 +259,22 @@ jobs:
     permissions:
       contents: write
     steps:
+      - name: Download JRE artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: jre-*
+          path: jre-artifacts
+          merge-multiple: true
+
+      - name: Upload JRE assets to release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload \
+            v${{ needs.check-version.outputs.version }} \
+            jre-artifacts/* \
+            --clobber
+
       - name: Publish draft release
         uses: actions/github-script@v7
         env:

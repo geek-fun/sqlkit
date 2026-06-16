@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-06-17
+
+### Added
+
+- Port Dockit chat components — markdown-render, model-picker, context-indicator, agent-message-bubble (#96)
+- Add i18n translations for Firebird, RQLite, Turso, TDengine
+
+### Changed
+
+- Reduce frontend bundle size by 57%
+- Empty provider list by default with dropdown selector for provider type
+- Replace raw SVGs with Carbon icon classes across app UI and database browser
+- Sort database types by DB-Engines rank and remove Native/JDBC grouping
+
+### Fixed
+
+- Frontend bundle optimization and JRE auto-download for Oracle connections
+- Dockit alignment — permission trigger CSS, button component, toolbar-center, chat input layout, model-picker panel styling
+- Lazy-load highlight.js CSS to prevent FOUC at startup
+- i18n overhaul — add 67 missing zhCN keys, fix Dialog crash, resolve HMR stale references, add HMR handler
+- Resolve app freeze when navigating to Data Studio
+- Wire data pipeline — progress, stopReason, auto-scroll
+- Make i18n module safe for Jest by wrapping browser API access in try/catch
+- Auto-fill Display Name from preset provider name
+- Remove dead code causing Rust compiler startup warnings
+- Various fixes — lint issues, test mock issues, ModelPicker visibility, ContextIndicator display, CSS consistency
+
 ## [0.6.1] - 2026-06-16
 
 ### Added
