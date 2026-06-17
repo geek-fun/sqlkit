@@ -70,8 +70,8 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
     }
 
     let url = format!(
-        "https://github.com/geek-fun/sqlkit/releases/download/v{}/jdbc-bridge.jar",
-        APP_VERSION
+        "https://github.com/geek-fun/sqlkit/releases/download/v{}/jdbc-bridge-{}.jar",
+        APP_VERSION, APP_VERSION
     );
     download_to_path(&url, &jar_path).await?;
 
