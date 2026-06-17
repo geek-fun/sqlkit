@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-06-17
+
+### Added
+
+- Redesign JDBC management panel with bridge status display and database toggle
+- Update frontend API layer with new JDBC types and methods
+- Add JDBC management commands with automatic gate for non-JDBC connections
+- Add two-phase driver resolution with JRE auto-update on connect
+- Add ResolveDriver protocol, Adoptium JRE integration, and versioned bridge JAR
+- Add Java-side Maven driver resolver using okhttp3
+- Simplify drivers.toml and driver registry, remove fallback chains
+
+### Changed
+
+- Flatten bridge JAR storage, use versioned filenames instead of subdirectories
+
+### Fixed
+
+- Address review issues — fix classifier parsing, race condition, dead code, and code consolidation
+- Upgrade JRE from 21 to 25 LTS for bridge JAR and Adoptium
+- Use JDK 21 for bridge JAR, sync version with app
+
 ## [0.6.3] - 2026-06-17
 
 ### Added
