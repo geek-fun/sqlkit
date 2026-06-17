@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-06-17
+
+### Added
+
+- Export `dbTypeFromBackend` for database icon resolution in JRE/Drivers section
+- Redesign JRE/Drivers settings with icon buttons and compact layout
+
+### Changed
+
+- Remove JDBC toggle — JDBC support is now always enabled
+- Align UnoCSS and CSS theme config with dockit approach
+
+### Fixed
+
+- Remove duplicate jdbc-bridge.jar from CI releases
+- Fix lint issues
+- Add cursor-pointer to interactive UI elements (dropdown items, toggle buttons)
+
 ## [0.6.4] - 2026-06-17
 
 ### Added
