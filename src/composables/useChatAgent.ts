@@ -556,8 +556,10 @@ export function useChatAgent(config: UseChatAgentConfig) {
       }
 
       case 'cancel': {
-        // cancelSession is defined below, but the function is hoisted in runtime
-        cancelSessionHandler()
+        // Mark tool call as denied first, then cancel the loop
+        config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'denied', undefined, undefined, sessionId)
+        config.sessionStore.setSessionStatus(sessionId, 'idle')
+        await cancelSessionHandler()
         break
       }
     }

@@ -23,11 +23,54 @@ const { attachedSources, activeSession } = storeToRefs(dataStudioStore)
 
 const { getDatabaseIcon } = useDatabaseIcon()
 
-const AGENT_SUPPORTED_TYPES = new Set([
+// All PG-wire and MySQL-wire compatible databases + popular standalone engines
+// Knowledge blocks exist for PostgreSQL, MySQL, SQL Server, SQLite dialects;
+// wire-compatible types use the same SQL dialect through their respective bridge.
+const AGENT_SUPPORTED_TYPES = new Set<DatabaseType>([
+  // Native adapters (direct knowledge blocks)
   DatabaseType.POSTGRESQL,
   DatabaseType.MYSQL,
   DatabaseType.SQLITE,
   DatabaseType.SQLSERVER,
+  // PG-wire compatible
+  DatabaseType.MARIADB,
+  DatabaseType.COCKROACHDB,
+  DatabaseType.REDSHIFT,
+  DatabaseType.YUGABYTEDB,
+  DatabaseType.TIMESCALEDB,
+  DatabaseType.KINGBASEES,
+  DatabaseType.GAUSSDB,
+  DatabaseType.HIGHGO,
+  DatabaseType.UXDB,
+  DatabaseType.OPENGAUSS,
+  DatabaseType.GBASE8C,
+  DatabaseType.QUESTDB,
+  DatabaseType.VASTBASE,
+  DatabaseType.YASHANDB,
+  DatabaseType.GREENPLUM,
+  DatabaseType.ENTERPRISEDB,
+  DatabaseType.CRATEDB,
+  DatabaseType.MATERIALIZE,
+  DatabaseType.ALLOYDB,
+  DatabaseType.CLOUDSQLPG,
+  DatabaseType.FUJITSUPG,
+  // MySQL-wire compatible
+  DatabaseType.TIDB,
+  DatabaseType.OCEANBASE,
+  DatabaseType.TDSQL,
+  DatabaseType.POLARDB,
+  DatabaseType.DM8,
+  DatabaseType.DORIS,
+  DatabaseType.SELECTDB,
+  DatabaseType.STARROCKS,
+  DatabaseType.DATABEND,
+  DatabaseType.GOLDENDB,
+  DatabaseType.MANTICORESEARCH,
+  DatabaseType.SINGLESTOREMEMSQL,
+  DatabaseType.CLOUDSQLMYSQL,
+  // Popular standalone engines (well-known syntax, LLM understands them)
+  DatabaseType.DUCKDB,
+  DatabaseType.ORACLE,
 ])
 
 const {
@@ -104,6 +147,14 @@ const filteredAddConnections = computed(() => {
     : availableAddConnections.value
 })
 
+const addSourceEmptyMessage = computed(() => {
+  if (connections.value.length === 0)
+    return t('dataStudio.addSource.noConnections')
+  if (availableAddConnections.value.length === 0)
+    return t('dataStudio.addSource.allAttached')
+  return t('dataStudio.addSource.noConnections')
+})
+
 function getConnectionMeta(conn: ServerConnection): string {
   const label = conn.type
   if (conn.type === DatabaseType.SQLITE)
@@ -137,7 +188,7 @@ async function confirmAddSource() {
     if (!dataStudioStore.activeSession) {
       await dataStudioStore.getOrCreateSession()
     }
-    dataStudioStore.attachSourceToActiveSession(newSource.sourceId)
+    await dataStudioStore.attachSourceToActiveSession(newSource.sourceId)
     if (addSourceMode.value === 'Ask' && dataStudioStore.activeSession) {
       dataStudioStore.updateSessionSourceMode(
         newSource.sourceId,
@@ -151,9 +202,9 @@ async function confirmAddSource() {
   }
 }
 
-function setAutoMode(auto: boolean) {
+async function setAutoMode(auto: boolean) {
   permissionMenuOpen.value = false
-  dataStudioStore.setSessionPermissionsMode(auto ? 'Auto' : 'Ask')
+  await dataStudioStore.setSessionPermissionsMode(auto ? 'Auto' : 'Ask')
 }
 
 async function switchSession(sessionId: string) {
@@ -357,7 +408,7 @@ function syncAllProviderModels() {
                         />
                       </button>
                       <div v-if="filteredAddConnections.length === 0" class="add-source-empty">
-                        {{ t('dataStudio.addSource.noConnections') }}
+                        {{ addSourceEmptyMessage }}
                       </div>
                     </div>
 

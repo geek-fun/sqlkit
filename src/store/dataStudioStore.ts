@@ -360,7 +360,17 @@ export const useDataStudioStore = defineStore('dataStudio', {
       return source
     },
 
-    attachSourceToActiveSession(sourceId: string) {
+    async _persistSessionSources(sessionId: string) {
+      const session = this.sessions.find(s => s.id === sessionId)
+      if (!session)
+        return
+      const sourcesJson = JSON.stringify(session.sources)
+      await agentApi.updateSessionMeta(sessionId, sourcesJson).catch(e =>
+        console.warn('[persist] Failed to save session sources:', e),
+      )
+    },
+
+    async attachSourceToActiveSession(sourceId: string) {
       const session = this.activeSession
       if (!session)
         return
@@ -387,9 +397,11 @@ export const useDataStudioStore = defineStore('dataStudio', {
           ? { ...s, sources: [...s.sources, sessionSource], updated_at: Date.now() }
           : s,
       )
+
+      await this._persistSessionSources(session.id)
     },
 
-    detachSourceFromSession(sourceId: string) {
+    async detachSourceFromSession(sourceId: string) {
       const session = this.activeSession
       if (!session)
         return
@@ -407,9 +419,11 @@ export const useDataStudioStore = defineStore('dataStudio', {
             }
           : s,
       )
+
+      await this._persistSessionSources(session.id)
     },
 
-    setSessionPermissionsMode(mode: PermissionsMode) {
+    async setSessionPermissionsMode(mode: PermissionsMode) {
       const session = this.activeSession
       if (!session)
         return
@@ -418,6 +432,10 @@ export const useDataStudioStore = defineStore('dataStudio', {
         s.id === session.id
           ? { ...s, permissionsMode: mode, updated_at: Date.now() }
           : s,
+      )
+
+      await agentApi.updateSessionMeta(session.id, undefined, mode).catch(e =>
+        console.warn('[persist] Failed to save permissions mode:', e),
       )
     },
 
@@ -500,6 +518,13 @@ export const useDataStudioStore = defineStore('dataStudio', {
           this.activeSessionId = sessionId
           return existing
         }
+      }
+      // Return existing active session instead of creating new one
+      // Prevents resetting permissionsMode/sources to defaults on sendMessage
+      if (this.activeSessionId) {
+        const active = this.sessions.find(s => s.id === this.activeSessionId)
+        if (active)
+          return active
       }
       return await this.createSession()
     },
