@@ -2,41 +2,38 @@ import { createI18n, useI18n } from 'vue-i18n'
 import { enUS } from './enUS'
 import { zhCN } from './zhCN'
 
-function detectLocale(): string {
-  try {
-    const stored = localStorage.getItem('lang') || 'auto'
-    return stored === 'auto' ? (navigator.language === 'zh-CN' ? 'zhCN' : 'enUS') : stored
-  }
-  catch {
+type AppLocale = 'zhCN' | 'enUS'
+
+const getStoredLocale = (): AppLocale | 'auto' => {
+  if (typeof localStorage === 'undefined')
     return 'enUS'
-  }
+  return (localStorage.getItem('lang') as AppLocale | 'auto') || 'auto'
+}
+
+const AVAILABLE_LOCALES: AppLocale[] = ['enUS', 'zhCN']
+
+const resolveLocale = (): AppLocale => {
+  const stored = getStoredLocale()
+  if (stored === 'auto')
+    return typeof navigator !== 'undefined' && navigator.language === 'zh-CN' ? 'zhCN' : 'enUS'
+  // Validate stored locale against available locales; fall back to auto if invalid
+  if (AVAILABLE_LOCALES.includes(stored as AppLocale))
+    return stored
+  return typeof navigator !== 'undefined' && navigator.language === 'zh-CN' ? 'zhCN' : 'enUS'
 }
 
 const lang = createI18n({
   globalInjection: true,
-  locale: detectLocale(),
+  locale: resolveLocale(),
+  fallbackLocale: 'enUS',
   legacy: false,
+  missingWarn: false,
+  fallbackWarn: false,
   messages: {
     zhCN,
     enUS,
   },
 })
-
-// Re-register locale messages on Vite HMR to prevent stale references.
-// eval() prevents ts-jest from parsing import.meta as syntax in CJS.
-try {
-  // eslint-disable-next-line no-eval
-  const viteMeta: { hot?: { accept: (...args: any[]) => void } } = eval('import.meta')
-  if (viteMeta.hot) {
-    viteMeta.hot.accept(['./enUS', './zhCN'], ([newEnUS, newZhCN]: any) => {
-      if (newEnUS)
-        lang.global.setLocaleMessage('enUS', newEnUS.enUS)
-      if (newZhCN)
-        lang.global.setLocaleMessage('zhCN', newZhCN.zhCN)
-    })
-  }
-}
-catch {}
 
 const useLang = useI18n
 
