@@ -1,0 +1,272 @@
+//! Tauri command adapters for data-studio-agent-lib.
+//!
+//! Thin `#[tauri::command]` wrappers that extract Tauri state,
+//! create concrete EventEmitter + SessionStore impls, and delegate
+//! to the shared library.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use data_studio_agent_lib as lib;
+use data_studio_agent_lib::traits::{CancelMap, ConfirmMap, EventEmitter, SessionStore};
+use data_studio_agent_storage_sqlite as storage;
+use serde_json::Value;
+use tauri::{AppHandle, Emitter, Manager, State};
+
+// ---------------------------------------------------------------------------
+// TauriEventEmitter — bridges Tauri's Emitter into the lib's EventEmitter trait
+// ---------------------------------------------------------------------------
+
+struct TauriEmitter(AppHandle);
+
+impl EventEmitter for TauriEmitter {
+    fn emit(&self, event: &str, payload: Value) {
+        let _ = self.0.emit(event, payload);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Agent loop commands
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn run_agent_loop(
+    session_id: String,
+    user_message: String,
+    settings: Value,
+    app: AppHandle,
+) -> Result<(), String> {
+    let db_state: State<storage::db::AgentDb> = app.state::<storage::db::AgentDb>();
+    let store = storage::session_store::SqliteSessionStore::new(db_state.inner().clone());
+    let emitter = TauriEmitter(app.clone());
+
+    let confirm_state: State<ConfirmMap> = app.state::<ConfirmMap>();
+    let confirm_map: ConfirmMap = confirm_state.inner().clone();
+    let cancel_state: State<CancelMap> = app.state::<CancelMap>();
+    let cancel_map: CancelMap = cancel_state.inner().clone();
+    let executor_state: State<Arc<dyn lib::ToolExecutor>> = app.state::<Arc<dyn lib::ToolExecutor>>();
+    let executor: Arc<dyn lib::ToolExecutor> = executor_state.inner().clone();
+
+    let connections: HashMap<String, Value> = settings
+        .get("connections")
+        .and_then(|v| serde_json::from_value(v.clone()).ok())
+        .unwrap_or_default();
+    let fallback = settings
+        .get("connectionConfig")
+        .cloned()
+        .unwrap_or(Value::Null);
+
+    let result = lib::loop_runner::run_agent_loop(
+        &session_id,
+        &user_message,
+        &settings,
+        &store,
+        &emitter,
+        executor.as_ref(),
+        connections,
+        fallback,
+        &confirm_map,
+        &cancel_map,
+    )
+    .await;
+
+    let _ = store.update_session_status(&session_id, "idle").await;
+
+    if let Err(ref e) = result {
+        let _ = app.emit(
+            "agent-loop-error",
+            serde_json::json!({"session_id": session_id, "error": e}),
+        );
+    }
+    result
+}
+
+#[tauri::command]
+pub async fn cancel_agent_loop(
+    session_id: String,
+    cancel_map: State<'_, CancelMap>,
+) -> Result<(), String> {
+    let tx_opt = {
+        let mut cm = cancel_map.lock().map_err(|e| e.to_string())?;
+        cm.remove(&session_id)
+    };
+    if let Some(tx) = tx_opt {
+        let _ = tx.send(());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn confirm_tool_call(
+    tool_call_id: String,
+    allowed: bool,
+    confirm_map: State<'_, ConfirmMap>,
+) -> Result<(), String> {
+    let tx_opt = {
+        let mut cm = confirm_map.lock().map_err(|e| e.to_string())?;
+        cm.remove(&tool_call_id)
+    };
+    if let Some(tx) = tx_opt {
+        let _ = tx.send(allowed);
+        Ok(())
+    } else {
+        Err(format!("no pending confirmation for {}", tool_call_id))
+    }
+}
+
+#[tauri::command]
+pub async fn get_tool_full_result(
+    tool_call_id: String,
+    db: State<'_, storage::db::AgentDb>,
+) -> Result<String, String> {
+    let db = db.inner().clone();
+    tokio::task::spawn_blocking(move || -> Result<String, String> {
+        let conn = db.0.lock().map_err(|e| e.to_string())?;
+        let mut stmt = conn
+            .prepare(
+                "SELECT full_result FROM tool_result_store WHERE tool_call_id = ?1 ORDER BY created_at DESC LIMIT 1",
+            )
+            .map_err(|e| e.to_string())?;
+        let result: Result<String, rusqlite::Error> =
+            stmt.query_row(rusqlite::params![tool_call_id], |row| row.get(0));
+        result.map_err(|e| format!("Tool result not found: {}", e))
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub async fn compact_agent_session(
+    session_id: String,
+    settings: Value,
+    app: AppHandle,
+) -> Result<Value, String> {
+    let db_state: State<storage::db::AgentDb> = app.state::<storage::db::AgentDb>();
+    let store = storage::session_store::SqliteSessionStore::new(db_state.inner().clone());
+    let emitter = TauriEmitter(app.clone());
+
+    let lock = store.compact_lock(&session_id);
+    let _guard = lock.lock().await;
+
+    let outcome = lib::compact::run_compact_manual(&session_id, &settings, &store, &emitter).await?;
+    if let Some(info) = outcome {
+        let _ = app.emit(
+            "agent-loop-summary-injected",
+            serde_json::json!({
+                "session_id": session_id,
+                "trigger": info.trigger,
+                "pre_tokens": info.pre_tokens,
+                "post_tokens": info.post_tokens,
+                "removed_count": info.removed_count,
+                "fallback_keep_pairs": info.fallback_keep_pairs,
+            }),
+        );
+    }
+
+    let messages = store.load_messages_for_compact(&session_id).await?;
+    let spec = lib::compact::resolve_model_spec_for_session(&session_id, &settings);
+    let decision = lib::compact::evaluate(&messages, &spec);
+    let system_prompt = settings.get("systemPrompt").and_then(|v| v.as_str());
+    let tools = settings.get("tools");
+    let used_tokens = lib::compact::count_projected_tokens(&messages, system_prompt, tools, &spec);
+    let should_compact = used_tokens >= decision.trigger_at;
+    Ok(serde_json::json!({
+        "session_id": session_id,
+        "used_tokens": used_tokens,
+        "capacity": decision.capacity,
+        "context_window": spec.context_window,
+        "output_reserve": spec.output_reserve,
+        "trigger_at": decision.trigger_at,
+        "should_compact": should_compact,
+        "model": spec.model_id,
+    }))
+}
+
+#[tauri::command]
+pub async fn get_agent_context_usage(
+    session_id: String,
+    settings: Value,
+    app: AppHandle,
+) -> Result<Value, String> {
+    let db_state: State<storage::db::AgentDb> = app.state::<storage::db::AgentDb>();
+    let store = storage::session_store::SqliteSessionStore::new(db_state.inner().clone());
+
+    let messages = store.load_messages_for_compact(&session_id).await?;
+    let spec = lib::compact::resolve_model_spec_for_session(&session_id, &settings);
+    let decision = lib::compact::evaluate(&messages, &spec);
+    let system_prompt = settings.get("systemPrompt").and_then(|v| v.as_str());
+    let tools = settings.get("tools");
+    let used_tokens = lib::compact::count_projected_tokens(&messages, system_prompt, tools, &spec);
+    let should_compact = used_tokens >= decision.trigger_at;
+    Ok(serde_json::json!({
+        "session_id": session_id,
+        "used_tokens": used_tokens,
+        "capacity": decision.capacity,
+        "context_window": spec.context_window,
+        "output_reserve": spec.output_reserve,
+        "trigger_at": decision.trigger_at,
+        "should_compact": should_compact,
+        "model": spec.model_id,
+    }))
+}
+
+// ---------------------------------------------------------------------------
+// Harness commands (single-step LLM call + validation)
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub async fn run_agent_step(
+    window: tauri::Window,
+    request_id: String,
+    provider: String,
+    model: String,
+    messages: Vec<Value>,
+    tools: Vec<Value>,
+    http_proxy: Option<String>,
+    proxy_mode: Option<String>,
+    api_key: String,
+    base_url: Option<String>,
+) -> Result<String, String> {
+    let result = lib::harness::run_agent_step(
+        provider, model, messages, tools,
+        http_proxy, proxy_mode, api_key, base_url,
+    )
+    .await?;
+
+    let _ = window.emit("agent-step-done",
+        serde_json::json!({"requestId": request_id, "finishReason": result.get("finishReason").and_then(|v| v.as_str()).unwrap_or("stop")}).to_string()
+    );
+    Ok(result.to_string())
+}
+
+#[tauri::command]
+pub async fn validate_llm_config(
+    provider: String,
+    api_key: String,
+    model: String,
+    http_proxy: Option<String>,
+    proxy_mode: Option<String>,
+    base_url: Option<String>,
+) -> Result<bool, String> {
+    lib::harness::validate_llm_config(provider, api_key, model, http_proxy, proxy_mode, base_url).await
+}
+
+#[tauri::command]
+pub async fn list_llm_models(
+    provider: String,
+    api_key: String,
+    http_proxy: Option<String>,
+    proxy_mode: Option<String>,
+    base_url: Option<String>,
+) -> Result<Vec<String>, String> {
+    lib::harness::list_llm_models(provider, api_key, http_proxy, proxy_mode, base_url).await
+}
+
+// ---------------------------------------------------------------------------
+// Tools command
+// ---------------------------------------------------------------------------
+
+#[tauri::command]
+pub fn get_all_tools() -> Result<String, String> {
+    lib::tools::get_all_tools()
+}

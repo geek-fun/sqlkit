@@ -46,6 +46,10 @@ impl CapabilityRegistry {
                 if cap.source_kind == super::types::SourceKind::SqlKit {
                     return true;
                 }
+                // SQL database tools are always available for a SQL client
+                if cap.source_kind == super::types::SourceKind::SqlDatabase {
+                    return true;
+                }
                 db_types
                     .iter()
                     .any(|dt| cap.source_kind.matches_db_type(dt))
