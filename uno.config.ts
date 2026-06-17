@@ -1,5 +1,5 @@
-import { defineConfig, presetIcons, transformerDirectives, transformerVariantGroup } from 'unocss'
 import { presetWind4 } from '@unocss/preset-wind4'
+import { defineConfig, presetIcons, transformerDirectives, transformerVariantGroup } from 'unocss'
 import presetAnimations from 'unocss-preset-animations'
 
 export default defineConfig({
