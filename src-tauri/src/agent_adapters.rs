@@ -7,9 +7,9 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use data_studio_agent_lib as lib;
-use data_studio_agent_lib::traits::{CancelMap, ConfirmMap, EventEmitter};
-use data_studio_agent_storage_sqlite as storage;
+use data_studio_agent as lib;
+use data_studio_agent::traits::{CancelMap, ConfirmMap, EventEmitter};
+use data_studio_agent::storage as storage;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -56,6 +56,13 @@ pub async fn run_agent_loop(
         .cloned()
         .unwrap_or(Value::Null);
 
+    let is_parallel_ok = |name: &str| -> bool {
+        crate::capabilities::registry::registry()
+            .get(name)
+            .map(|c| c.parallel_ok)
+            .unwrap_or(false)
+    };
+
     lib::loop_runner::run_agent_loop(
         &session_id,
         &user_message,
@@ -67,6 +74,7 @@ pub async fn run_agent_loop(
         fallback,
         &confirm_map,
         &cancel_map,
+        &is_parallel_ok,
     )
     .await
 }

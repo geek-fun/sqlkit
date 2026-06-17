@@ -136,13 +136,13 @@ function validate(): boolean {
     const type = (props.columnTypes[col] ?? '').toLowerCase()
     if (isNumericType(type)) {
       if (!isValidNumber(value)) {
-        errors[col] = t('dataGrid.edit.validation.invalidNumber')
+        errors[col] = t('components.dataGrid.edit.validation.invalidNumber')
         continue
       }
     }
     if (type === 'bool' || type === 'boolean') {
       if (!isValidBoolean(value)) {
-        errors[col] = t('dataGrid.edit.validation.invalidBoolean')
+        errors[col] = t('components.dataGrid.edit.validation.invalidBoolean')
         continue
       }
     }
@@ -179,7 +179,7 @@ async function save() {
       pkValues: props.isNewRow ? {} : pkValues,
       updates,
     })
-    toast.success(`${t('dataGrid.edit.title')} → ${t('common.status.success')}`)
+    toast.success(`${t('components.dataGrid.edit.title')} → ${t('common.status.success')}`)
     emit('saved')
     emit('update:open', false)
   }
@@ -194,7 +194,7 @@ async function save() {
 function handleClose(open: boolean) {
   if (!open) {
     // eslint-disable-next-line no-alert
-    if (isDirty.value && !window.confirm(t('dataGrid.edit.confirmCancelMessage')))
+    if (isDirty.value && !window.confirm(t('components.dataGrid.edit.confirmCancelMessage')))
       return
     emit('update:open', false)
     emit('close')
@@ -207,7 +207,7 @@ function handleClose(open: boolean) {
     <DialogContent class="p-0 flex flex-col gap-0 max-h-[80vh] max-w-lg">
       <div class="px-6 pb-3 pt-5 border-b">
         <DialogTitle>
-          {{ isNewRow ? t('dataGrid.edit.duplicateTitle') : t('dataGrid.edit.title') }}
+          {{ isNewRow ? t('components.dataGrid.edit.duplicateTitle') : t('components.dataGrid.edit.title') }}
         </DialogTitle>
       </div>
 
@@ -231,9 +231,9 @@ function handleClose(open: boolean) {
                 :checked="editForm[col]?.setNull"
                 @change="editForm[col] = { ...editForm[col], setNull: !editForm[col]?.setNull, value: editForm[col]?.value ?? '' }"
               >
-              {{ t('dataGrid.edit.nullToggle') }}
+              {{ t('components.dataGrid.edit.nullToggle') }}
             </label>
-            <span v-else class="text-xs text-muted-foreground italic">{{ t('dataGrid.edit.pkReadonly') }}</span>
+            <span v-else class="text-xs text-muted-foreground italic">{{ t('components.dataGrid.edit.pkReadonly') }}</span>
           </div>
           <Input
             :model-value="editForm[col]?.setNull ? '' : (editForm[col]?.value ?? '')"
@@ -255,11 +255,11 @@ function handleClose(open: boolean) {
 
       <div class="px-6 py-3 border-t flex gap-2 justify-end">
         <Button variant="outline" size="sm" @click="handleClose(false)">
-          {{ t('dataGrid.edit.cancel') }}
+          {{ t('components.dataGrid.edit.cancel') }}
         </Button>
         <Button size="sm" :disabled="isSaving" @click="save">
           <Spinner v-if="isSaving" class="mr-1 h-3 w-3" />
-          {{ isSaving ? t('dataGrid.edit.saving') : t('dataGrid.edit.save') }}
+          {{ isSaving ? t('components.dataGrid.edit.saving') : t('components.dataGrid.edit.save') }}
         </Button>
       </div>
     </DialogContent>

@@ -2,6 +2,7 @@
 import type { BackgroundTask } from '@/types/transfer'
 
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -17,6 +18,8 @@ const emit = defineEmits<{
   dismiss: []
 }>()
 
+const { t } = useI18n()
+
 const statusColor = computed(() => {
   switch (props.task.status) {
     case 'running': return 'default'
@@ -26,14 +29,7 @@ const statusColor = computed(() => {
   }
 })
 
-const statusLabel = computed(() => {
-  switch (props.task.status) {
-    case 'running': return 'Running'
-    case 'completed': return 'Completed'
-    case 'failed': return 'Failed'
-    default: return 'Pending'
-  }
-})
+const statusLabel = computed(() => t(`transfer.tasks.status.${props.task.status}`))
 
 const progressPercent = computed(() =>
   props.task.progress.total > 0
@@ -55,12 +51,12 @@ const timeAgo = computed(() => {
   const diffMs = now.getTime() - start.getTime()
   const diffSec = Math.floor(diffMs / 1000)
   if (diffSec < 60)
-    return `${diffSec}s ago`
+    return t('transfer.tasks.startedAgo', { time: `${diffSec}s` })
   const diffMin = Math.floor(diffSec / 60)
   if (diffMin < 60)
-    return `${diffMin}m ago`
+    return t('transfer.tasks.startedAgo', { time: `${diffMin}m` })
   const diffHour = Math.floor(diffMin / 60)
-  return `${diffHour}h ago`
+  return t('transfer.tasks.startedAgo', { time: `${diffHour}h` })
 })
 </script>
 
@@ -110,7 +106,7 @@ const timeAgo = computed(() => {
           class="text-[11px] text-muted-foreground tracking-wide px-2.5 h-7 uppercase"
           @click="emit('dismiss')"
         >
-          Dismiss
+          {{ t('transfer.tasks.dismiss') }}
         </Button>
         <Button
           variant="outline"
@@ -119,7 +115,7 @@ const timeAgo = computed(() => {
           @click="emit('goToTask')"
         >
           <span class="i-carbon-arrow-right h-3 w-3" />
-          <span>View</span>
+          <span>{{ t('transfer.tasks.goToTask') }}</span>
         </Button>
       </div>
     </div>

@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use data_studio_agent_lib::tool_executor::{ToolEnvelope, ToolExecutor, ToolResultMetadata};
+use data_studio_agent::tool_executor::{ToolEnvelope, ToolExecutor, ToolResultMetadata};
 use serde_json::Value;
 
 const TOOL_ENVELOPE_MAX_CHARS: usize = 32768;

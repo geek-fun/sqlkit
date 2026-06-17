@@ -48,6 +48,7 @@ type Props = {
   database?: string
   schema?: string
   connectionId?: string
+  hideToolbar?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -60,6 +61,7 @@ const props = withDefaults(defineProps<Props>(), {
   database: undefined,
   schema: undefined,
   connectionId: undefined,
+  hideToolbar: false,
 })
 
 const emit = defineEmits<DataGridEmits>()
@@ -263,7 +265,7 @@ async function confirmDelete() {
       schema: props.schema ?? null,
       pkValues,
     })
-    toast.success(`${t('dataGrid.delete.title')} → ${t('common.status.success')}`)
+    toast.success(`${t('components.dataGrid.delete.title')} → ${t('common.status.success')}`)
     deleteDialogOpen.value = false
     deletingRowIndex.value = null
     emit('refresh')
@@ -342,7 +344,7 @@ function formatNumber(v: unknown, type?: string): string {
     return ''
   const num = Number(v)
   if (Number.isNaN(num))
-    return String(v)
+    return typeof v === 'object' ? JSON.stringify(v) : String(v)
   const t = (type ?? '').toUpperCase()
   if (/^(?:INT|BIGINT|SMALLINT|TINYINT|SERIAL|BIGSERIAL)/.test(t)) {
     return new Intl.NumberFormat().format(num)
@@ -355,7 +357,7 @@ function formatDateTime(v: unknown, type?: string): string {
     return ''
   const date = new Date(v as string | number)
   if (Number.isNaN(date.getTime()))
-    return String(v)
+    return typeof v === 'object' ? JSON.stringify(v) : String(v)
   const t = (type ?? '').toUpperCase()
   if (t === 'DATE') {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date)
@@ -373,7 +375,7 @@ function jsonPreview(v: unknown): string {
 function formatBlobSize(v: unknown): string {
   if (isNullValue(v))
     return ''
-  const s = typeof v === 'string' ? v.length / 2 : String(v).length
+  const s = typeof v === 'string' ? v.length / 2 : (typeof v === 'object' ? JSON.stringify(v) : String(v)).length
   if (s < 1024)
     return `[BLOB ${s.toFixed(0)} B]`
   return `[BLOB ${(s / 1024).toFixed(1)} KB]`
@@ -394,7 +396,7 @@ function getCellClass(type?: string): string {
 function getCellTooltip(v: unknown): string {
   if (isNullValue(v))
     return ''
-  return String(v)
+  return typeof v === 'object' ? JSON.stringify(v) : String(v)
 }
 
 function formatCellText(v: unknown): string {
@@ -420,7 +422,7 @@ const statusText = computed(() => {
     return ''
   const start = 1
   const end = props.rows.length
-  return t('dataGrid.status.showing', { start, end, total: props.rowCount.toLocaleString() })
+  return t('components.dataGrid.status.showing', { start, end, total: props.rowCount.toLocaleString() })
 })
 
 const formattedTime = computed(() => {
@@ -429,7 +431,7 @@ const formattedTime = computed(() => {
   const t2 = props.executionTimeMs < 1000
     ? `${props.executionTimeMs}ms`
     : `${(props.executionTimeMs / 1000).toFixed(2)}s`
-  return `${t('dataGrid.status.time', { time: t2 })}`
+  return `${t('components.dataGrid.status.time', { time: t2 })}`
 })
 
 // ── Load more handling for virtual scroll ──
@@ -445,24 +447,24 @@ watch(() => [props.rows, props.columns], () => {
   <div class="data-grid bg-background flex flex-col h-full">
     <!-- Toolbar -->
     <div
-      v-if="rows.length > 0"
+      v-if="rows.length > 0 && !hideToolbar"
       class="px-3 py-1 border-b bg-muted/20 flex flex-shrink-0 gap-1 items-center"
     >
       <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="copyAllAs('csv')">
-        {{ $t('dataGrid.export.copyAllCsv') }}
+        {{ $t('components.dataGrid.export.copyAllCsv') }}
       </Button>
       <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="copyAllAs('json')">
-        {{ $t('dataGrid.export.copyAllJson') }}
+        {{ $t('components.dataGrid.export.copyAllJson') }}
       </Button>
       <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="copyAllAs('insert')">
-        {{ $t('dataGrid.export.copyAllInsert') }}
+        {{ $t('components.dataGrid.export.copyAllInsert') }}
       </Button>
       <span class="text-xs text-muted-foreground mx-1">|</span>
       <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="exportAllAs('csv')">
-        {{ $t('dataGrid.export.exportCsv') }}
+        {{ $t('components.dataGrid.export.exportCsv') }}
       </Button>
       <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="exportAllAs('json')">
-        {{ $t('dataGrid.export.exportJson') }}
+        {{ $t('components.dataGrid.export.exportJson') }}
       </Button>
     </div>
 
@@ -501,7 +503,7 @@ watch(() => [props.rows, props.columns], () => {
           {{ error }}
         </p>
         <Button variant="outline" size="sm" @click="emit('refresh')">
-          {{ $t('dataGrid.error.retry') }}
+          {{ $t('components.dataGrid.error.retry') }}
         </Button>
       </div>
     </div>
@@ -514,7 +516,7 @@ watch(() => [props.rows, props.columns], () => {
       <div class="text-muted-foreground text-center">
         <span class="i-carbon-data-blank mx-auto mb-2 opacity-40 h-8 w-8 block" />
         <p class="text-sm">
-          {{ $t('dataGrid.empty') }}
+          {{ $t('components.dataGrid.empty') }}
         </p>
       </div>
     </div>
@@ -637,7 +639,7 @@ watch(() => [props.rows, props.columns], () => {
               <span
                 v-if="isNullValue(rows[virtualRow.index][col])"
                 class="text-xs text-muted-foreground italic"
-              >{{ $t('dataGrid.null') }}</span>
+              >{{ $t('components.dataGrid.null') }}</span>
 
               <!-- Boolean -->
               <span
@@ -675,7 +677,7 @@ watch(() => [props.rows, props.columns], () => {
                   size="sm"
                   class="text-[10px] text-primary px-1 flex-shrink-0 h-5"
                   @click.stop="openJsonDialog(rows[virtualRow.index][col], col)"
-                >{{ $t('dataGrid.json.expand') }}</Button>
+                >{{ $t('components.dataGrid.json.expand') }}</Button>
               </span>
 
               <!-- BLOB -->
@@ -700,31 +702,31 @@ watch(() => [props.rows, props.columns], () => {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" :side-offset="4">
                   <DropdownMenuItem @click="openEditDialog(virtualRow.index)">
-                    <span class="i-carbon-edit mr-2 h-3.5 w-3.5" />{{ $t('dataGrid.row.edit') }}
+                    <span class="i-carbon-edit mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.edit') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="openDuplicateDialog(virtualRow.index)">
-                    <span class="i-carbon-copy mr-2 h-3.5 w-3.5" />{{ $t('dataGrid.row.duplicate') }}
+                    <span class="i-carbon-copy mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.duplicate') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="openDetailsDialog(virtualRow.index)">
-                    <span class="i-carbon-information mr-2 h-3.5 w-3.5" />{{ $t('dataGrid.row.details') }}
+                    <span class="i-carbon-information mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.details') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="copyUtil.copyRowsAs([rows[virtualRow.index]], columns, 'csv', tableName)">
-                    <span class="i-carbon-table-split mr-2 h-3.5 w-3.5" />{{ $t('dataGrid.row.copyAsCsv') }}
+                    <span class="i-carbon-table-split mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.copyAsCsv') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="copyUtil.copyRowsAs([rows[virtualRow.index]], columns, 'json', tableName)">
-                    <span class="i-carbon-code mr-2 h-3.5 w-3.5" />{{ $t('dataGrid.row.copyAsJson') }}
+                    <span class="i-carbon-code mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.copyAsJson') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="copyUtil.copyRowsAs([rows[virtualRow.index]], columns, 'insert', tableName)">
-                    <span class="i-carbon-sql mr-2 h-3.5 w-3.5" />{{ $t('dataGrid.row.copyAsInsert') }}
+                    <span class="i-carbon-sql mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.copyAsInsert') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     class="text-destructive focus:text-destructive"
                     @click="openDeleteDialog(virtualRow.index)"
                   >
-                    <span class="i-carbon-trash-can mr-2 h-3.5 w-3.5" />{{ $t('dataGrid.row.delete') }}
+                    <span class="i-carbon-trash-can mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.delete') }}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -736,7 +738,7 @@ watch(() => [props.rows, props.columns], () => {
             v-if="!allRowsLoaded && rows.length > 0"
             class="text-xs text-muted-foreground py-2 flex items-center justify-center"
           >
-            {{ $t('dataGrid.status.showingLimited', { start: 1, end: rows.length, loaded: rows.length }) }}
+            {{ $t('components.dataGrid.status.showingLimited', { start: 1, end: rows.length, loaded: rows.length }) }}
           </div>
         </div>
       </div>
@@ -756,10 +758,10 @@ watch(() => [props.rows, props.columns], () => {
         <span v-if="formattedTime" class="text-muted-foreground/70">{{ formattedTime }}</span>
         <div class="flex-1" />
         <span v-if="sort.hasActiveSort.value" class="text-primary tabular-nums">
-          {{ $t('dataGrid.sort.asc') }}/{{ $t('dataGrid.sort.desc') }}
+          {{ $t('components.dataGrid.sort.asc') }}/{{ $t('components.dataGrid.sort.desc') }}
         </span>
         <span v-if="filter.hasActiveFilters.value" class="text-blue-500 tabular-nums">
-          {{ filter.filters.value.length }} {{ $t('dataGrid.filter.activeFilters') }}
+          {{ filter.filters.value.length }} {{ $t('components.dataGrid.filter.activeFilters') }}
         </span>
       </div>
     </div>
@@ -817,17 +819,17 @@ watch(() => [props.rows, props.columns], () => {
     <AlertDialog :open="deleteDialogOpen" @update:open="deleteDialogOpen = $event">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>{{ $t('dataGrid.delete.title') }}</AlertDialogTitle>
-          <AlertDialogDescription>{{ $t('dataGrid.delete.message') }}</AlertDialogDescription>
+          <AlertDialogTitle>{{ $t('components.dataGrid.delete.title') }}</AlertDialogTitle>
+          <AlertDialogDescription>{{ $t('components.dataGrid.delete.message') }}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>{{ $t('dataGrid.edit.cancel') }}</AlertDialogCancel>
+          <AlertDialogCancel>{{ $t('components.dataGrid.edit.cancel') }}</AlertDialogCancel>
           <AlertDialogAction
             class="text-destructive-foreground bg-destructive hover:bg-destructive/90"
             :disabled="isDeleting"
             @click="confirmDelete"
           >
-            {{ $t('dataGrid.delete.confirm') }}
+            {{ $t('components.dataGrid.delete.confirm') }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

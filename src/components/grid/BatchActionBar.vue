@@ -31,25 +31,25 @@ const { t } = useI18n()
       class="px-4 py-2 border-t border-primary/20 bg-primary/10 flex gap-3 items-center bottom-0 sticky z-30 backdrop-blur-sm"
     >
       <span class="text-sm font-medium tabular-nums">
-        {{ t('dataGrid.selection.selected', { count: selectedCount }) }}
+        {{ t('components.dataGrid.selection.selected', { count: selectedCount }) }}
       </span>
       <div class="ml-auto flex gap-2">
         <DropdownMenu>
           <DropdownMenuTrigger as-child>
             <Button variant="outline" size="sm">
-              {{ t('dataGrid.selection.exportSelected') }}
+              {{ t('components.dataGrid.selection.exportSelected') }}
               <span class="i-carbon-chevron-down ml-1 h-3 w-3" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem @click="emit('exportSelected', 'csv')">
-              <span class="i-carbon-table-split mr-2 h-3.5 w-3.5" /> CSV
+              <span class="i-carbon-table-split mr-2 h-3.5 w-3.5" />{{ t('components.dataGrid.export.formatLabels.csv') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="emit('exportSelected', 'json')">
-              <span class="i-carbon-code mr-2 h-3.5 w-3.5" /> JSON
+              <span class="i-carbon-code mr-2 h-3.5 w-3.5" />{{ t('components.dataGrid.export.formatLabels.json') }}
             </DropdownMenuItem>
             <DropdownMenuItem @click="emit('exportSelected', 'insert')">
-              <span class="i-carbon-sql mr-2 h-3.5 w-3.5" /> INSERT
+              <span class="i-carbon-sql mr-2 h-3.5 w-3.5" />{{ t('components.dataGrid.export.formatLabels.insert') }}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -59,7 +59,7 @@ const { t } = useI18n()
           @click="emit('deleteSelected')"
         >
           <span class="i-carbon-trash-can mr-1 h-3.5 w-3.5" />
-          {{ t('dataGrid.selection.deleteSelected') }}
+          {{ t('components.dataGrid.selection.deleteSelected') }}
         </Button>
       </div>
     </div>

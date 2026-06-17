@@ -50,4 +50,5 @@ pub struct Capability {
     pub required_permission: &'static str,
     pub source_kind: SourceKind,
     pub tags: &'static [&'static str],
+    pub parallel_ok: bool,
 }

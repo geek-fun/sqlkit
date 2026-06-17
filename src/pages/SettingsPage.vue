@@ -168,7 +168,7 @@ async function handleCheckUpdates() {
               {{ t('pages.settings.query.title') }}
             </TabsTrigger>
             <TabsTrigger value="ai">
-              LLMs
+              {{ t('pages.settings.ai.tabLabel') }}
             </TabsTrigger>
             <TabsTrigger value="jre">
               {{ t('pages.settings.jre.title') }}

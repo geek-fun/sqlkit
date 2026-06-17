@@ -105,18 +105,18 @@ onMounted(fetchColumns)
               </template>
             </td>
             <td class="px-3 py-1.5">
-              <span v-if="col.nullable" class="text-muted-foreground">YES</span>
-              <span v-else class="text-destructive font-medium">NO</span>
+              <span v-if="col.nullable" class="text-muted-foreground">{{ t('components.schemaTab.yes') }}</span>
+              <span v-else class="text-destructive font-medium">{{ t('components.schemaTab.no') }}</span>
             </td>
             <td class="text-muted-foreground font-mono px-3 py-1.5 max-w-[150px] truncate">
               {{ col.default_value ?? '—' }}
             </td>
             <td class="px-3 py-1.5">
-              <span v-if="col.is_primary_key" class="text-amber-500 font-medium">PK</span>
+              <span v-if="col.is_primary_key" class="text-amber-500 font-medium">{{ t('components.schemaTab.pk') }}</span>
               <span v-else class="text-muted-foreground">—</span>
             </td>
             <td class="px-3 py-1.5">
-              <span v-if="col.is_auto_increment" class="text-green-500 font-medium">YES</span>
+              <span v-if="col.is_auto_increment" class="text-green-500 font-medium">{{ t('components.schemaTab.yes') }}</span>
               <span v-else class="text-muted-foreground">—</span>
             </td>
           </tr>

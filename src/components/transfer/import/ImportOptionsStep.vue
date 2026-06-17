@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { ConflictStrategy } from '@/types/transfer'
 
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Card, CardContent } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -13,6 +14,7 @@ import { previewImport } from '@/datasources/transferApi'
 import { useTransferStore } from '@/store/transferStore'
 
 const transferStore = useTransferStore()
+const { t } = useI18n()
 
 const conflictStrategy = ref<ConflictStrategy>('skip')
 const batchSize = ref(5000)
@@ -23,12 +25,12 @@ const previewData = ref<string[][]>([])
 const previewColumns = ref<string[]>([])
 const isLoading = ref(false)
 
-const conflictOptions: { value: ConflictStrategy, label: string }[] = [
-  { value: 'skip', label: 'Skip duplicates' },
-  { value: 'replace', label: 'Replace existing' },
-  { value: 'upsert', label: 'Update existing (upsert)' },
-  { value: 'abort', label: 'Abort on error' },
-]
+const conflictOptions = computed<{ value: ConflictStrategy, label: string }[]>(() => [
+  { value: 'skip', label: t('transfer.import.conflict.skip') },
+  { value: 'replace', label: t('transfer.import.conflict.replace') },
+  { value: 'upsert', label: t('transfer.import.conflict.upsert') },
+  { value: 'abort', label: t('transfer.import.conflict.abort') },
+])
 
 async function loadPreview() {
   if (!transferStore.importRequest.filePath || !transferStore.importRequest.format) {
@@ -74,12 +76,12 @@ watch(() => transferStore.importRequest.filePath, () => {
       <CardContent class="p-3">
         <div class="text-xs tracking-wide font-semibold mb-3 flex gap-2 items-center">
           <div class="i-carbon-settings-adjust" />
-          IMPORT SETTINGS
+          {{ t('transfer.import.importSettings') }}
         </div>
 
         <div class="mb-3 gap-4 grid grid-cols-2">
           <div class="space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">On Conflict</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.conflict.label') }}</Label>
             <Select v-model="conflictStrategy">
               <SelectTrigger class="text-xs h-8">
                 <SelectValue />
@@ -98,7 +100,7 @@ watch(() => transferStore.importRequest.filePath, () => {
           </div>
 
           <div class="space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">Batch Size</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.batchSize') }}</Label>
             <Input
               v-model.number="batchSize"
               type="number"
@@ -112,12 +114,12 @@ watch(() => transferStore.importRequest.filePath, () => {
         <div class="pt-2 border-t border-border/40 space-y-0.5">
           <div class="px-2 py-1.5 rounded-sm flex transition-colors items-center space-x-2 hover:bg-muted/40">
             <Checkbox id="import-opt-truncate" v-model:checked="truncateBefore" class="h-3.5 w-3.5" />
-            <Label for="import-opt-truncate" class="text-xs cursor-pointer select-none">Truncate table before import</Label>
+            <Label for="import-opt-truncate" class="text-xs cursor-pointer select-none">{{ t('transfer.import.truncateBefore') }}</Label>
           </div>
 
           <div class="px-2 py-1.5 rounded-sm flex transition-colors items-center space-x-2 hover:bg-muted/40">
             <Checkbox id="import-opt-dry-run" v-model:checked="dryRun" class="h-3.5 w-3.5" />
-            <Label for="import-opt-dry-run" class="text-xs cursor-pointer select-none">Dry run (validate without inserting)</Label>
+            <Label for="import-opt-dry-run" class="text-xs cursor-pointer select-none">{{ t('transfer.import.dryRun') }}</Label>
           </div>
         </div>
       </CardContent>
@@ -128,9 +130,9 @@ watch(() => transferStore.importRequest.filePath, () => {
         <div class="mb-2 flex items-center justify-between">
           <div class="text-xs tracking-wide font-semibold flex gap-2 items-center">
             <div class="i-carbon-table" />
-            DATA PREVIEW
+            {{ t('transfer.import.dataPreview') }}
           </div>
-          <span class="text-[10px] text-muted-foreground tracking-wide font-mono uppercase">10 Rows</span>
+          <span class="text-[10px] text-muted-foreground tracking-wide font-mono uppercase">{{ t('transfer.import.previewRows') }}</span>
         </div>
 
         <div class="border border-border/40 rounded-sm overflow-hidden">
@@ -155,9 +157,9 @@ watch(() => transferStore.importRequest.filePath, () => {
           <div v-else class="text-[11px] text-muted-foreground py-6 text-center bg-muted/20">
             <div v-if="isLoading" class="flex flex-col gap-2 items-center justify-center">
               <div class="i-carbon-circle-dash opacity-50 animate-spin" />
-              Loading preview...
+              {{ t('transfer.import.loadingPreview') }}
             </div>
-            <span v-else>No preview data</span>
+            <span v-else>{{ t('transfer.import.noPreviewData') }}</span>
           </div>
         </div>
       </CardContent>

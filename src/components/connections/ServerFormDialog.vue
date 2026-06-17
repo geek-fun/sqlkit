@@ -914,28 +914,28 @@ function handleSave() {
                 :checked="formData.sshTunnel?.enabled ?? false"
                 @change="(e: Event) => toggleSsh((e.target as HTMLInputElement).checked)"
               >
-              <Label for="use-ssh">Use SSH Tunnel</Label>
+              <Label for="use-ssh">{{ t('components.serverForm.ssh.useSshTunnel') }}</Label>
             </div>
 
             <template v-if="formData.sshTunnel?.enabled">
               <div class="space-y-2">
-                <Label for="ssh-host">SSH Host</Label>
+                <Label for="ssh-host">{{ t('components.serverForm.ssh.sshHost') }}</Label>
                 <Input id="ssh-host" v-model="formData.sshTunnel.host" placeholder="ssh.example.com" />
               </div>
 
               <div class="gap-4 grid grid-cols-2">
                 <div class="space-y-2">
-                  <Label for="ssh-port">SSH Port</Label>
+                  <Label for="ssh-port">{{ t('components.serverForm.ssh.sshPort') }}</Label>
                   <Input id="ssh-port" v-model.number="formData.sshTunnel.port" type="number" placeholder="22" />
                 </div>
                 <div class="space-y-2">
-                  <Label for="ssh-user">Username</Label>
+                  <Label for="ssh-user">{{ t('components.serverForm.ssh.username') }}</Label>
                   <Input id="ssh-user" v-model="formData.sshTunnel.username" placeholder="username" autocomplete="off" />
                 </div>
               </div>
 
               <div class="space-y-2">
-                <Label for="ssh-auth">Auth Method</Label>
+                <Label for="ssh-auth">{{ t('components.serverForm.ssh.authMethod') }}</Label>
                 <Select v-model="formData.sshTunnel.authMethod">
                   <SelectTrigger id="ssh-auth">
                     <SelectValue />
@@ -943,13 +943,13 @@ function handleSave() {
                   <SelectContent>
                     <SelectGroup>
                       <SelectItem value="password">
-                        Password
+                        {{ t('components.serverForm.ssh.password') }}
                       </SelectItem>
                       <SelectItem value="privateKey">
-                        Private Key
+                        {{ t('components.serverForm.ssh.privateKey') }}
                       </SelectItem>
                       <SelectItem value="agent">
-                        SSH Agent
+                        {{ t('components.serverForm.ssh.sshAgent') }}
                       </SelectItem>
                     </SelectGroup>
                   </SelectContent>
@@ -958,25 +958,25 @@ function handleSave() {
 
               <template v-if="formData.sshTunnel.authMethod === 'password'">
                 <div class="space-y-2">
-                  <Label for="ssh-password">SSH Password</Label>
-                  <Input id="ssh-password" v-model="formData.sshTunnel.password" type="password" placeholder="SSH password" autocomplete="off" />
+                  <Label for="ssh-password">{{ t('components.serverForm.ssh.sshPassword') }}</Label>
+                  <Input id="ssh-password" v-model="formData.sshTunnel.password" type="password" :placeholder="t('components.serverForm.ssh.sshPasswordPlaceholder')" autocomplete="off" />
                 </div>
               </template>
 
               <template v-if="formData.sshTunnel.authMethod === 'privateKey'">
                 <div class="space-y-2">
-                  <Label for="ssh-key">Private Key Path</Label>
+                  <Label for="ssh-key">{{ t('components.serverForm.ssh.privateKeyPath') }}</Label>
                   <Input id="ssh-key" v-model="formData.sshTunnel.privateKey" placeholder="/path/to/id_rsa" />
                 </div>
                 <div class="space-y-2">
-                  <Label for="ssh-passphrase">Passphrase (optional)</Label>
-                  <Input id="ssh-passphrase" v-model="formData.sshTunnel.privateKeyPassphrase" type="password" placeholder="Key passphrase" autocomplete="off" />
+                  <Label for="ssh-passphrase">{{ t('components.serverForm.ssh.passphraseOptional') }}</Label>
+                  <Input id="ssh-passphrase" v-model="formData.sshTunnel.privateKeyPassphrase" type="password" :placeholder="t('components.serverForm.ssh.keyPassphrasePlaceholder')" autocomplete="off" />
                 </div>
               </template>
 
               <template v-if="formData.sshTunnel.authMethod === 'agent'">
                 <p class="text-sm text-muted-foreground">
-                  Using system SSH agent - no additional configuration needed.
+                  {{ t('components.serverForm.ssh.agentHelpText') }}
                 </p>
               </template>
             </template>

@@ -38,9 +38,11 @@ import TriggersTab from './TriggersTab.vue'
 
 type TableDataResult = {
   columns: string[]
+  columnTypes: string[]
   rows: Record<string, unknown>[]
-  rows_affected?: number
-  execution_time_ms?: number
+  rowsAffected?: number
+  executionTimeMs?: number
+  truncated?: boolean
 }
 
 type ColumnTypeInfo = {
@@ -241,7 +243,7 @@ async function fetchData() {
         },
       })
       data.value = result
-      executionTimeMs.value = result.execution_time_ms ?? null
+      executionTimeMs.value = result.executionTimeMs ?? null
     })
   }
   catch (err) {

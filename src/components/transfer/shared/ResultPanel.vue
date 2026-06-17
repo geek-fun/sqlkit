@@ -6,6 +6,7 @@
 import type { TransferResult } from '@/types/transfer'
 
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,6 +22,8 @@ const emit = defineEmits<{
   viewTable: []
   again: []
 }>()
+
+const { t } = useI18n()
 
 const isSuccess = computed(() => props.result?.success ?? false)
 
@@ -58,7 +61,7 @@ function formatDuration(seconds: number) {
       </div>
       <div class="flex flex-1 items-center justify-between">
         <h3 class="text-sm tracking-wide font-medium">
-          {{ isSuccess ? 'Transfer Completed' : 'Transfer Failed' }}
+          {{ isSuccess ? t('transfer.result.success') : t('transfer.result.failed') }}
         </h3>
         <p class="text-[11px] text-muted-foreground font-mono tabular-nums">
           {{ formatDuration(durationSeconds) }}
@@ -70,28 +73,28 @@ function formatDuration(seconds: number) {
     <div class="gap-3 grid grid-cols-2 sm:grid-cols-4">
       <Card class="border-border/40 rounded-md bg-muted/20 shadow-none">
         <CardContent class="p-3 flex flex-col justify-center">
-          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">Processed</span>
+          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">{{ t('transfer.result.processed') }}</span>
           <span class="text-lg font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.processedRows.toLocaleString() }}</span>
         </CardContent>
       </Card>
 
       <Card v-if="props.result.skippedRows > 0" class="border-border/40 rounded-md bg-muted/20 shadow-none">
         <CardContent class="p-3 flex flex-col justify-center">
-          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">Skipped</span>
+          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">{{ t('transfer.result.skipped') }}</span>
           <span class="text-lg font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.skippedRows.toLocaleString() }}</span>
         </CardContent>
       </Card>
 
       <Card v-if="props.result.outputSizeBytes" class="border-border/40 rounded-md bg-muted/20 shadow-none">
         <CardContent class="p-3 flex flex-col justify-center">
-          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">File Size</span>
+          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">{{ t('transfer.import.fileSize') }}</span>
           <span class="text-lg font-mono font-semibold mt-0.5 tabular-nums">{{ formatFileSize(props.result.outputSizeBytes) }}</span>
         </CardContent>
       </Card>
 
       <Card v-if="props.result.errorCount > 0" class="border-destructive/20 rounded-md bg-destructive/5 shadow-none">
         <CardContent class="p-3 flex flex-col justify-center">
-          <span class="text-[10px] text-destructive/80 tracking-widest font-medium uppercase">Errors</span>
+          <span class="text-[10px] text-destructive/80 tracking-widest font-medium uppercase">{{ t('transfer.result.errorCount') }}</span>
           <span class="text-lg text-destructive font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.errorCount.toLocaleString() }}</span>
         </CardContent>
       </Card>
@@ -127,16 +130,16 @@ function formatDuration(seconds: number) {
     <!-- Actions -->
     <div class="pt-3 border-t border-border/40 flex flex-wrap gap-2 items-center justify-end">
       <Button v-if="props.outputPath" variant="outline" size="sm" class="text-xs h-8" @click="emit('openFile')">
-        <span class="i-carbon-document mr-1.5" /> Open File
+        <span class="i-carbon-document mr-1.5" /> {{ t('transfer.result.openFile') }}
       </Button>
       <Button v-if="props.outputPath" variant="outline" size="sm" class="text-xs h-8" @click="emit('openFolder')">
-        <span class="i-carbon-folder mr-1.5" /> Open Folder
+        <span class="i-carbon-folder mr-1.5" /> {{ t('transfer.result.openFolder') }}
       </Button>
       <Button variant="outline" size="sm" class="text-xs h-8" @click="emit('viewTable')">
-        <span class="i-carbon-data-table mr-1.5" /> View Table
+        <span class="i-carbon-data-table mr-1.5" /> {{ t('transfer.result.viewTable') }}
       </Button>
       <Button size="sm" class="text-xs h-8" @click="emit('again')">
-        <span class="i-carbon-reset mr-1.5" /> {{ props.outputPath ? 'Export Again' : 'Import Again' }}
+        <span class="i-carbon-reset mr-1.5" /> {{ props.outputPath ? t('transfer.result.exportAgain') : t('transfer.result.importAgain') }}
       </Button>
     </div>
   </div>

@@ -108,7 +108,7 @@ function handleActionClick(e: MouseEvent) {
     const decoded = decodeURIComponent(atob(encoded))
     if (action === 'copy') {
       navigator.clipboard.writeText(decoded)
-      toast.success(t('notifications.codeCopied') || 'Copied')
+      toast.success(t('common.notifications.codeCopied') || 'Copied')
     }
   }
   catch {

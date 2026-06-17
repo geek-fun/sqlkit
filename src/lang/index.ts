@@ -4,7 +4,7 @@ import { zhCN } from './zhCN'
 
 type AppLocale = 'zhCN' | 'enUS'
 
-const getStoredLocale = (): AppLocale | 'auto' => {
+function getStoredLocale(): AppLocale | 'auto' {
   if (typeof localStorage === 'undefined')
     return 'enUS'
   return (localStorage.getItem('lang') as AppLocale | 'auto') || 'auto'
@@ -12,7 +12,7 @@ const getStoredLocale = (): AppLocale | 'auto' => {
 
 const AVAILABLE_LOCALES: AppLocale[] = ['enUS', 'zhCN']
 
-const resolveLocale = (): AppLocale => {
+function resolveLocale(): AppLocale {
   const stored = getStoredLocale()
   if (stored === 'auto')
     return typeof navigator !== 'undefined' && navigator.language === 'zh-CN' ? 'zhCN' : 'enUS'

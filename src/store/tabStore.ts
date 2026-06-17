@@ -10,10 +10,11 @@ import { useHistoryStore } from './historyStore'
 
 export type QueryResult = {
   columns: string[]
+  columnTypes: string[]
   rows: Record<string, unknown>[]
-  rowCount: number
   rowsAffected?: number
   executionTimeMs?: number
+  truncated?: boolean
 }
 
 export type ErDiagramMeta = {
