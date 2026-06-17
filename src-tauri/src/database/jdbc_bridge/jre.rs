@@ -1,6 +1,6 @@
 //! Managed JRE detection, download, and lifecycle.
 //!
-//! SQLKit downloads a JRE 21 from Adoptium (Eclipse Temurin) for each supported
+//! SQLKit downloads a JRE 25 (latest LTS) from Adoptium (Eclipse Temurin) for each supported
 //! platform. This module handles detecting Java (managed → `JAVA_HOME` → `PATH`),
 //! downloading/extracting the managed JRE, version checking via the built-in
 //! `release` file, and cleaning it up.
@@ -149,7 +149,7 @@ pub fn read_jre_version() -> Option<String> {
 pub async fn check_adoptium_update() -> Option<String> {
     let platform = adoptium_platform()?;
     let url = format!(
-        "https://api.adoptium.net/v3/binary/latest/21/ga/{platform}/jre/hotspot/normal/eclipse"
+        "https://api.adoptium.net/v3/binary/latest/25/ga/{platform}/jre/hotspot/normal/eclipse"
     );
 
     let client = reqwest::Client::builder()
@@ -202,7 +202,7 @@ pub async fn download_managed_jre() -> DbResult<()> {
         .map_err(|e| DbError::Connection(format!("Failed to create JRE parent dir: {}", e)))?;
 
     let url = format!(
-        "https://api.adoptium.net/v3/binary/latest/21/ga/{platform}/jre/hotspot/normal/eclipse"
+        "https://api.adoptium.net/v3/binary/latest/25/ga/{platform}/jre/hotspot/normal/eclipse"
     );
 
     let response = reqwest::get(&url)
