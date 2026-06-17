@@ -1,20 +1,24 @@
 //! JDBC bridge download management.
 //!
 //! Downloads the bridge fat JAR from GitHub Releases, version-pinned
-//! by the app version. JDBC driver JARs are resolved by the Java
-//! bridge process, not by Rust.
+//! by the app version. JARs are stored flat in `~/.sqlkit/jdbc-bridge/`
+//! with versioned filenames (`jdbc-bridge-{version}.jar`).
+//! JDBC driver JARs are resolved by the Java bridge process, not by Rust.
 
 use crate::database::error::{DbError, DbResult};
 use std::path::{Path, PathBuf};
-
-/// Bridge JAR filename.
-const BRIDGE_JAR: &str = "jdbc-bridge.jar";
 
 /// Current app version, used for bridge JAR version pinning.
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Subdirectory under user home for bridge data.
 const BRIDGE_DIR: &str = ".sqlkit/jdbc-bridge";
+
+/// Bridge JAR filename pattern prefix.
+const BRIDGE_JAR_PREFIX: &str = "jdbc-bridge-";
+
+/// Bridge JAR filename pattern suffix.
+const BRIDGE_JAR_SUFFIX: &str = ".jar";
 
 /// Get the bridge data directory (~/.sqlkit/jdbc-bridge).
 fn bridge_dir() -> PathBuf {
@@ -24,12 +28,12 @@ fn bridge_dir() -> PathBuf {
     PathBuf::from(home).join(BRIDGE_DIR)
 }
 
-/// Get the path to the bridge JAR (version-pinned).
+/// Get the path to the current version's bridge JAR (`~/.sqlkit/jdbc-bridge/jdbc-bridge-{ver}.jar`).
 pub fn bridge_jar_path() -> PathBuf {
-    bridge_dir().join(APP_VERSION).join(BRIDGE_JAR)
+    bridge_dir().join(format!("{}{}{}", BRIDGE_JAR_PREFIX, APP_VERSION, BRIDGE_JAR_SUFFIX))
 }
 
-/// Check if the bridge JAR is already installed.
+/// Check if the current version's bridge JAR is installed.
 pub fn is_bridge_installed() -> bool {
     bridge_jar_path().exists()
 }
@@ -44,7 +48,6 @@ pub async fn download_to_path(url: &str, dest: &Path) -> DbResult<()> {
         .bytes()
         .await
         .map_err(|e| DbError::Connection(format!("Failed to read download: {}", e)))?;
-    // Ensure parent dir exists
     if let Some(parent) = dest.parent() {
         tokio::fs::create_dir_all(parent)
             .await
@@ -63,7 +66,6 @@ pub async fn download_to_path(url: &str, dest: &Path) -> DbResult<()> {
 pub async fn download_bridge_plugin() -> DbResult<()> {
     let jar_path = bridge_jar_path();
 
-    // Ensure parent dir exists
     if let Some(parent) = jar_path.parent() {
         tokio::fs::create_dir_all(parent)
             .await
@@ -76,13 +78,14 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
     );
     download_to_path(&url, &jar_path).await?;
 
-    // Clean up old bridge versions after successful download
     cleanup_old_bridge_versions().await?;
 
     Ok(())
 }
 
-/// Clean up bridge JAR directories for versions other than the current one.
+/// Clean up old bridge JARs and stale version directories.
+/// Removes `jdbc-bridge-*.jar` files for versions other than current,
+/// and any leftover `{version}/` directories from the old folder layout.
 async fn cleanup_old_bridge_versions() -> DbResult<()> {
     let dir = bridge_dir();
     if !dir.exists() {
@@ -91,24 +94,37 @@ async fn cleanup_old_bridge_versions() -> DbResult<()> {
     let mut entries = tokio::fs::read_dir(&dir)
         .await
         .map_err(|e| DbError::Connection(format!("Failed to list bridge dir: {}", e)))?;
-    let mut remove_tasks = Vec::new();
     while let Some(entry) = entries
         .next_entry()
         .await
         .map_err(|e| DbError::Connection(format!("Failed to read bridge entry: {}", e)))?
     {
         let path = entry.path();
-        if path.is_dir() {
-            if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
-                if dir_name != APP_VERSION && dir_name != "drivers" {
-                    remove_tasks.push(tokio::fs::remove_dir_all(path));
-                }
+        let fname = match path.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n.to_string(),
+            None => continue,
+        };
+
+        // Remove stale version subdirectories from old folder layout
+        if path.is_dir() && fname != "drivers" {
+            let old_jar = path.join("jdbc-bridge.jar");
+            if old_jar.exists() {
+                tokio::fs::remove_dir_all(&path)
+                    .await
+                    .map_err(|e| DbError::Connection(format!("Failed to remove old bridge dir: {}", e)))?;
+            }
+            continue;
+        }
+
+        // Remove old flat jdbc-bridge-*.jar files (not current version)
+        if fname.starts_with(BRIDGE_JAR_PREFIX) && fname.ends_with(BRIDGE_JAR_SUFFIX) {
+            let ver = &fname[BRIDGE_JAR_PREFIX.len()..fname.len() - BRIDGE_JAR_SUFFIX.len()];
+            if ver != APP_VERSION {
+                tokio::fs::remove_file(&path)
+                    .await
+                    .map_err(|e| DbError::Connection(format!("Failed to remove old bridge JAR: {}", e)))?;
             }
         }
-    }
-    for task in remove_tasks {
-        task.await
-            .map_err(|e| DbError::Connection(format!("Failed to remove old bridge version: {}", e)))?;
     }
     Ok(())
 }
@@ -122,15 +138,13 @@ pub fn list_bridge_versions() -> Vec<String> {
     let mut versions = Vec::new();
     if let Ok(entries) = std::fs::read_dir(&dir) {
         for entry in entries.flatten() {
-            if entry.path().is_dir() {
-                if let Some(name) = entry.file_name().to_str() {
-                    if name != "drivers" {
-                        let jar = entry.path().join(BRIDGE_JAR);
-                        if jar.exists() {
-                            versions.push(name.to_string());
-                        }
-                    }
-                }
+            let fname = match entry.file_name().to_str() {
+                Some(n) => n.to_string(),
+                None => continue,
+            };
+            if fname.starts_with(BRIDGE_JAR_PREFIX) && fname.ends_with(BRIDGE_JAR_SUFFIX) {
+                let ver = &fname[BRIDGE_JAR_PREFIX.len()..fname.len() - BRIDGE_JAR_SUFFIX.len()];
+                versions.push(ver.to_string());
             }
         }
     }

@@ -241,10 +241,8 @@ pub async fn download_bridge_jar() -> Result<(), String> {
 pub async fn remove_bridge_jar() -> Result<(), String> {
     let jar_path = download::bridge_jar_path();
     if jar_path.exists() {
-        if let Some(parent) = jar_path.parent() {
-            std::fs::remove_dir_all(parent)
-                .map_err(|e| format!("Failed to remove bridge JAR: {}", e))?;
-        }
+        std::fs::remove_file(&jar_path)
+            .map_err(|e| format!("Failed to remove bridge JAR: {}", e))?;
     }
     Ok(())
 }
