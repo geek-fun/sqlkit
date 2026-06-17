@@ -69,6 +69,10 @@ public class ProtocolHandler {
                     handleListColumns(params, response);
                     break;
 
+                case "resolve_driver":
+                    handleResolveDriver(params, response);
+                    break;
+
                 case "test_connection":
                     handleTestConnection(params, response);
                     break;
@@ -184,6 +188,22 @@ public class ProtocolHandler {
         Map<String, Object> status = connectionManager.testConnection(connId);
         JsonNode json = MAPPER.valueToTree(status);
         response.set("result", json);
+    }
+
+    private void handleResolveDriver(JsonNode params, ObjectNode response) throws Exception {
+        String mavenGroup = requiredString(params, "maven_group", null);
+        String mavenArtifact = requiredString(params, "maven_artifact", null);
+        String versionCap = params.has("version_cap") && !params.get("version_cap").isNull()
+                ? params.get("version_cap").asText() : null;
+        String classifier = params.has("maven_classifier") && !params.get("maven_classifier").isNull()
+                ? params.get("maven_classifier").asText() : null;
+        
+        DriverResolver.DriverResult result = DriverResolver.resolve(mavenGroup, mavenArtifact, versionCap, classifier);
+        
+        ObjectNode resultNode = MAPPER.createObjectNode();
+        resultNode.put("jar_path", result.getJarPath());
+        resultNode.put("resolved_version", result.getResolvedVersion());
+        response.set("result", resultNode);
     }
 
     private String requiredString(JsonNode params, String key, String defaultValue) throws Exception {
