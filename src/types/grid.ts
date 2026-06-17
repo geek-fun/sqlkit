@@ -30,6 +30,11 @@ export type ColumnFilter = {
 
 export type FilterState = ColumnFilter[]
 
+// ── Cell Value ──
+// Standardized cell value type after JSON deserialization from the backend.
+// All database types are normalized to these primitives on the Rust side.
+export type CellValue = string | number | boolean | null
+
 // ── Copy/Export ──
 
 export type CopyFormat = 'csv' | 'json' | 'insert'

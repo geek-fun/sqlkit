@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ConnectionStatus, useConnectionStore, useDatabaseStore } from '@/store'
 import DbTypeIcon from './DbTypeIcon.vue'
 
@@ -10,6 +11,8 @@ const props = defineProps<{
 
 const connectionStore = useConnectionStore()
 const databaseStore = useDatabaseStore()
+
+const { t } = useI18n()
 
 const activeConnection = computed(() =>
   props.connectionId ? connectionStore.getConnectionById(props.connectionId) : connectionStore.activeConnection,
@@ -62,11 +65,11 @@ const currentDatabase = computed(() =>
 
     <div v-if="isConnected" class="pt-1 border-t space-y-0.5">
       <div class="text-xs flex items-center justify-between">
-        <span class="text-muted-foreground">Databases</span>
+        <span class="text-muted-foreground">{{ t('components.databaseBrowser.databases') }}</span>
         <span class="font-medium">{{ databaseCount }}</span>
       </div>
       <div v-if="currentDatabase" class="text-xs flex items-center justify-between">
-        <span class="text-muted-foreground">Current</span>
+        <span class="text-muted-foreground">{{ t('components.databaseBrowser.current') }}</span>
         <span class="font-medium ml-2 truncate">{{ currentDatabase }}</span>
       </div>
     </div>

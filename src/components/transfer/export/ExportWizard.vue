@@ -238,16 +238,16 @@ async function startExport() {
 
           <!-- Step 2: Scope selector -->
           <div class="space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Scope</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.export.scope') }}</Label>
             <ScopeSelector :scope="scope" @update:scope="scope = $event" />
           </div>
 
           <!-- Step 3: Database selector (only when scope is 'database' or 'tables') -->
           <div v-if="scope === 'database' || scope === 'tables'" class="space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Database</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.databaseLabel') }}</Label>
             <Select v-model="database" :disabled="!connectionId">
               <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
-                <SelectValue placeholder="Select database" />
+                <SelectValue :placeholder="t('transfer.connection.databasePlaceholder')" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem
@@ -328,44 +328,44 @@ async function startExport() {
               <!-- CSV Options -->
               <div v-if="selectedFormat === 'csv'" class="flex gap-3 items-center">
                 <div class="space-y-1.5">
-                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Delimiter</Label>
+                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.delimiter') }}</Label>
                   <Select v-model="csvDelimiter">
                     <SelectTrigger class="text-xs font-mono h-8 w-24">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value=",">
-                        Comma (,)
+                        {{ t('transfer.export.delimiterOptions.comma') }}
                       </SelectItem>
                       <SelectItem value=";">
-                        Semicolon (;)
+                        {{ t('transfer.export.delimiterOptions.semicolon') }}
                       </SelectItem>
                       <SelectItem value="\t">
-                        Tab
+                        {{ t('transfer.export.delimiterOptions.tab') }}
                       </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
                 <div class="flex items-center space-x-2 sm:mt-5">
                   <Checkbox id="csv-header" v-model:checked="csvIncludeHeader" class="h-3.5 w-3.5" />
-                  <Label for="csv-header" class="text-xs cursor-pointer">Include header</Label>
+                  <Label for="csv-header" class="text-xs cursor-pointer">{{ t('transfer.export.includeHeader') }}</Label>
                 </div>
               </div>
 
               <!-- JSONL Options -->
               <div v-if="selectedFormat === 'jsonl'" class="flex gap-3 items-center">
                 <div class="space-y-1.5">
-                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Date Format</Label>
+                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.dateFormat') }}</Label>
                   <Select v-model="jsonlDateFormat">
                     <SelectTrigger class="text-xs h-8 w-28">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ISO8601">
-                        ISO 8601
+                        {{ t('transfer.export.dateFormatOptions.iso8601') }}
                       </SelectItem>
                       <SelectItem value="Unix">
-                        Unix
+                        {{ t('transfer.export.dateFormatOptions.unix') }}
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -375,35 +375,35 @@ async function startExport() {
               <!-- SQL Options -->
               <div v-if="selectedFormat === 'sql'" class="flex flex-wrap gap-3 items-center">
                 <div class="space-y-1.5">
-                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Rows/Batch</Label>
+                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.rowsPerBatch') }}</Label>
                   <Input v-model.number="sqlBatchSize" type="number" min="1" max="10000" class="text-xs font-mono h-8 w-24" />
                 </div>
                 <div class="flex items-center space-x-2 sm:mt-5">
                   <Checkbox id="sql-create" v-model:checked="sqlIncludeCreateTable" class="h-3.5 w-3.5" />
-                  <Label for="sql-create" class="text-xs cursor-pointer">CREATE TABLE</Label>
+                  <Label for="sql-create" class="text-xs cursor-pointer">{{ t('transfer.export.createTable') }}</Label>
                 </div>
                 <div class="flex items-center space-x-2 sm:mt-5">
                   <Checkbox id="sql-drop" v-model:checked="sqlIncludeDropTable" class="h-3.5 w-3.5" />
-                  <Label for="sql-drop" class="text-xs cursor-pointer">DROP TABLE</Label>
+                  <Label for="sql-drop" class="text-xs cursor-pointer">{{ t('transfer.export.dropTable') }}</Label>
                 </div>
               </div>
 
               <!-- Excel Options -->
               <div v-if="selectedFormat === 'excel'" class="flex gap-3 items-center">
                 <div class="space-y-1.5">
-                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Worksheet</Label>
+                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.worksheet') }}</Label>
                   <div class="flex gap-3 items-center">
                     <div class="flex items-center space-x-2">
                       <Checkbox id="excel-header" v-model:checked="excelIncludeHeader" class="h-3.5 w-3.5" />
-                      <Label for="excel-header" class="text-xs cursor-pointer">Header</Label>
+                      <Label for="excel-header" class="text-xs cursor-pointer">{{ t('transfer.export.includeHeader') }}</Label>
                     </div>
                     <div class="flex items-center space-x-2">
                       <Checkbox id="excel-freeze" v-model:checked="excelFreezeHeader" class="h-3.5 w-3.5" />
-                      <Label for="excel-freeze" class="text-xs cursor-pointer">Freeze</Label>
+                      <Label for="excel-freeze" class="text-xs cursor-pointer">{{ t('transfer.export.freeze') }}</Label>
                     </div>
                     <div class="flex items-center space-x-2">
                       <Checkbox id="excel-autofit" v-model:checked="excelAutoFit" class="h-3.5 w-3.5" />
-                      <Label for="excel-autofit" class="text-xs cursor-pointer">Auto-fit</Label>
+                      <Label for="excel-autofit" class="text-xs cursor-pointer">{{ t('transfer.export.autoFit') }}</Label>
                     </div>
                   </div>
                 </div>
@@ -413,7 +413,7 @@ async function startExport() {
 
           <!-- Right: Output Path -->
           <div class="pl-4 border-l border-border/40 flex-1 min-w-0 space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Output Path</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.outputPath') }}</Label>
             <div class="flex gap-2 items-center">
               <Button variant="outline" size="sm" class="text-xs px-3 h-8" @click="handleBrowse">
                 <span class="i-carbon-folder mr-1.5" /> {{ t('common.buttons.browse') }}

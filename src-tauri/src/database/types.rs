@@ -94,25 +94,49 @@ pub type QueryRow = HashMap<String, QueryValue>;
 
 /// Represents the result of a query execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct QueryResult {
     /// Column names in order.
     pub columns: Vec<String>,
+    /// Column type names in order (database-specific, e.g. "int4", "varchar", "numeric").
+    /// May be empty for non-SELECT statements. Parallel to `columns`.
+    #[serde(default)]
+    pub column_types: Vec<String>,
     /// Rows of data.
     pub rows: Vec<QueryRow>,
     /// Number of rows affected (for INSERT, UPDATE, DELETE).
+    #[serde(default)]
     pub rows_affected: Option<u64>,
     /// Execution time in milliseconds.
+    #[serde(default)]
     pub execution_time_ms: Option<u64>,
+    /// Whether the result was truncated (e.g., due to row limit).
+    #[serde(default)]
+    pub truncated: bool,
 }
 
 impl QueryResult {
     /// Create a new empty query result.
     pub fn new(columns: Vec<String>) -> Self {
         Self {
+            column_types: Vec::new(),
             columns,
             rows: Vec::new(),
             rows_affected: None,
             execution_time_ms: None,
+            truncated: false,
+        }
+    }
+
+    /// Create a query result with column types.
+    pub fn with_columns(columns: Vec<String>, column_types: Vec<String>) -> Self {
+        Self {
+            columns,
+            column_types,
+            rows: Vec::new(),
+            rows_affected: None,
+            execution_time_ms: None,
+            truncated: false,
         }
     }
 
@@ -120,9 +144,11 @@ impl QueryResult {
     pub fn affected(rows_affected: u64) -> Self {
         Self {
             columns: Vec::new(),
+            column_types: Vec::new(),
             rows: Vec::new(),
             rows_affected: Some(rows_affected),
             execution_time_ms: None,
+            truncated: false,
         }
     }
 

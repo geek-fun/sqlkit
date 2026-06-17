@@ -10,6 +10,8 @@ import { ExplainPlanPanel } from '@/components/explain-plan'
 import DataGrid from '@/components/grid/DataGrid.vue'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { useDataGridCopy } from '@/composables/useDataGridCopy'
 import { formatApiError } from '@/types/api'
 
 type Props = {
@@ -63,6 +65,7 @@ watch(() => props.results, (res) => {
 })
 
 const { t } = useI18n()
+const copyUtil = useDataGridCopy()
 
 const panelHeight = ref(300)
 const isResizing = ref(false)
@@ -221,7 +224,19 @@ function close() {
 
 // Determine what to show
 const displayResults = computed(() => gridResults.value ?? props.results)
+const displayColumnTypes = computed(() => {
+  const result = displayResults.value
+  if (!result || !result.columnTypes || result.columnTypes.length === 0)
+    return {}
+  return Object.fromEntries(result.columns.map((col, i) => [col, result.columnTypes[i] ?? '']))
+})
 const displayError = computed(() => gridError.value ?? props.error)
+const displayErrorMessage = computed(() => {
+  const err = displayError.value
+  if (!err) return null
+  if (typeof err === 'string') return err
+  return formatApiError(err, t)
+})
 const displayExecuting = computed(() => props.isExecuting || gridLoading.value)
 const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.executionTime)
 </script>
@@ -260,9 +275,65 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
       >
         {{ t('pages.queries.explain.tabLabels.explain') }}
       </Button>
+
+      <!-- Export actions -->
+      <span class="text-muted-foreground/30 mx-1">|</span>
+      <template v-if="displayResults && displayResults.rows.length > 0 && activeOutputView === 'results'">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'csv')">
+                <span class="i-carbon-table-split h-4.5 w-4.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ t('components.dataGrid.export.copyAllCsv') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'json')">
+                <span class="i-carbon-code h-4.5 w-4.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ t('components.dataGrid.export.copyAllJson') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'insert')">
+                <span class="i-carbon-sql h-4.5 w-4.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ t('components.dataGrid.export.copyAllInsert') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <span class="text-xs text-muted-foreground mx-1">|</span>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'csv')">
+                <span class="i-carbon-document-export h-4.5 w-4.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ t('components.dataGrid.export.exportCsv') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'json')">
+                <span class="i-carbon-document-export h-4.5 w-4.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ t('components.dataGrid.export.exportJson') }}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </template>
       <div class="flex-1" />
       <div v-if="displayResults && activeOutputView === 'results'" class="text-xs text-muted-foreground flex gap-2 items-center">
-        <span v-if="displayResults.columns.length > 0">{{ t('components.queryResult.rows', { count: displayResults.rowCount }) }}</span>
+        <span v-if="displayResults.columns.length > 0">{{ t('components.queryResult.rows', { count: displayResults.rows.length }) }}</span>
         <span v-else-if="displayResults.rowsAffected !== undefined">{{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}</span>
         <span v-if="formattedTime">• {{ t('components.queryResult.time', { time: formattedTime }) }}</span>
       </div>
@@ -313,14 +384,16 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <DataGrid
           v-else-if="displayResults && displayResults.columns.length > 0"
           :columns="displayResults.columns"
+          :column-types="displayColumnTypes"
           :rows="displayResults.rows"
-          :row-count="displayResults.rowCount"
+          :row-count="displayResults.rows.length"
           :execution-time-ms="displayExecutionTime"
           :connection-id="connectionId"
           :database="database"
           :schema="schema"
           :loading="displayExecuting"
-          :error="displayError ? String(displayError) : null"
+          :hide-toolbar="true"
+          :error="displayErrorMessage"
           @sort-change="handleSortChange"
           @filter-change="handleFilterChange"
           @refresh="handleRefresh"

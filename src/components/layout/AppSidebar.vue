@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
@@ -13,6 +14,7 @@ const menuItems = [
 ]
 
 const isActive = (path: string) => route.path === path
+const { t } = useI18n()
 </script>
 
 <template>
@@ -184,7 +186,7 @@ const isActive = (path: string) => route.path === path
               </button>
             </TooltipTrigger>
             <TooltipContent side="right">
-              <p>Settings</p>
+              <p>{{ t('common.settings') }}</p>
             </TooltipContent>
           </Tooltip>
         </RouterLink>

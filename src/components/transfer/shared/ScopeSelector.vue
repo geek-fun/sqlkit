@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { TransferScope } from '@/types/transfer'
+import { useI18n } from 'vue-i18n'
 
 const props = defineProps<{
   scope: TransferScope
@@ -10,12 +11,14 @@ const emit = defineEmits<{
   'update:scope': [value: TransferScope]
 }>()
 
+const { t } = useI18n()
+
 const scopeOptions: TransferScope[] = ['server', 'database', 'tables']
 
 const scopeLabels: Record<TransferScope, string> = {
-  server: 'Server',
-  database: 'Database',
-  tables: 'Tables',
+  server: t('transfer.common.scopeServer'),
+  database: t('transfer.common.scopeDatabase'),
+  tables: t('transfer.common.scopeTables'),
 }
 
 function getChipClasses(option: TransferScope) {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { BackgroundTask } from '@/types/transfer'
 import { onUnmounted, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import TaskCard from '@/components/transfer/tasks/TaskCard.vue'
 import { useTransferStore } from '@/store/transferStore'
@@ -9,6 +10,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
+const { t } = useI18n()
 const router = useRouter()
 const transferStore = useTransferStore()
 
@@ -100,8 +102,8 @@ onUnmounted(() => {
             <span class="i-carbon-task-complete opacity-40 h-6 w-6 block" />
           </div>
           <div class="flex flex-col gap-1 items-center">
-            <span class="text-xs text-foreground/60 font-medium">No active tasks</span>
-            <span class="text-[11px] text-muted-foreground/60">Export, import, and migration jobs will appear here</span>
+            <span class="text-xs text-foreground/60 font-medium">{{ t('transfer.tasks.noTasks') }}</span>
+            <span class="text-[11px] text-muted-foreground/60">{{ t('transfer.tasks.emptyDescription') }}</span>
           </div>
         </div>
 

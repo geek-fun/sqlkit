@@ -3,6 +3,7 @@ import type { ColumnMapping, ImportTarget } from '@/types/transfer'
 
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -19,6 +20,7 @@ export type ColumnInfo = {
 }
 
 const transferStore = useTransferStore()
+const { t } = useI18n()
 
 const connectionId = ref('')
 const database = ref('')
@@ -187,11 +189,11 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
                     class="text-xs font-mono h-7 w-full"
                     :aria-label="`Target column for ${mapping.sourceColumn}`"
                   >
-                    <SelectValue placeholder="Skip" />
+                    <SelectValue :placeholder="t('transfer.import.skipPlaceholder')" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="" class="text-xs text-muted-foreground italic">
-                      (Skip)
+                      {{ t('transfer.import.skip') }}
                     </SelectItem>
                     <SelectItem
                       v-for="col in targetColumns"

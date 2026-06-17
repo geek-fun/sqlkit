@@ -85,7 +85,7 @@ export function useDataGridCopy() {
         break
     }
     await navigator.clipboard.writeText(content)
-    toast.success(t('dataGrid.export.copied'))
+    toast.success(t('components.dataGrid.export.copied'))
   }
 
   const exportToFile = async (
@@ -121,7 +121,7 @@ export function useDataGridCopy() {
       })
       if (selectedPath) {
         await invoke('write_text_file', { path: selectedPath, content })
-        toast.success(t('dataGrid.export.exported'))
+        toast.success(t('components.dataGrid.export.exported'))
         return
       }
     }
@@ -139,7 +139,7 @@ export function useDataGridCopy() {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    toast.success(t('dataGrid.export.exported'))
+    toast.success(t('components.dataGrid.export.exported'))
   }
 
   return {

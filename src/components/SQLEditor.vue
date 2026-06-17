@@ -2,6 +2,7 @@
 import type { MonacoEditorOptions, SQLDialect } from '@/composables/useMonacoEditor'
 import type { StatementToExecute } from '@/composables/useSqlStatements'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ProgressBar } from '@/components/ui/progress'
 import { useMonacoEditor } from '@/composables/useMonacoEditor'
 import { usePlatform } from '@/composables/usePlatform'
@@ -47,6 +48,7 @@ const emit = defineEmits<{
 const editorContainer = ref<HTMLElement | null>(null)
 const { isDark } = useTheme()
 const { modifierKey, altKey } = usePlatform()
+const { t } = useI18n()
 
 const cmdKey = modifierKey
 const formatKey = computed(() => `Shift+${altKey.value}F`)
@@ -239,15 +241,15 @@ defineExpose({ getValue, setValue, handleFormat })
     >
       <ul>
         <li @click="handleContextMenuExecute">
-          <span>Execute</span>
+          <span>{{ t('components.sqlEditor.execute') }}</span>
           <span class="shortcut">{{ cmdKey }}Enter</span>
         </li>
         <li @click="handleContextMenuFormat">
-          <span>Format</span>
+          <span>{{ t('components.sqlEditor.format') }}</span>
           <span class="shortcut">{{ formatKey }}</span>
         </li>
         <li @click="handleContextMenuCopy">
-          <span>Copy</span>
+          <span>{{ t('components.sqlEditor.copy') }}</span>
         </li>
       </ul>
     </div>

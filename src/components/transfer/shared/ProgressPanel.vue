@@ -6,6 +6,7 @@
 import type { TransferProgress } from '@/types/transfer'
 
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 
 import { ProgressBar } from '@/components/ui/progress'
@@ -19,6 +20,8 @@ const emit = defineEmits<{
   cancel: []
   runInBackground: []
 }>()
+
+const { t } = useI18n()
 
 const percent = computed(() => props.progress?.percent ?? 0)
 
@@ -48,7 +51,7 @@ function formatTime(seconds: number) {
     <div class="flex items-center justify-between">
       <div role="status" aria-live="polite" class="text-xs text-foreground font-medium flex gap-1.5 items-center">
         <span class="i-carbon-circle-dash text-primary h-3.5 w-3.5" :class="{ 'animate-spin': props.isRunning }" />
-        <span>{{ props.progress?.phase || 'Preparing' }}</span>
+        <span>{{ props.progress?.phase || t('transfer.progress.preparing') }}</span>
       </div>
       <div class="text-[11px] text-muted-foreground font-mono tabular-nums" aria-live="off">
         {{ formatTime(elapsedSeconds) }} elapsed
@@ -99,7 +102,7 @@ function formatTime(seconds: number) {
         :disabled="!props.isRunning"
         @click="emit('runInBackground')"
       >
-        Run in Background
+        {{ t('transfer.progress.runInBackground') }}
       </Button>
       <Button
         variant="outline"
@@ -108,7 +111,7 @@ function formatTime(seconds: number) {
         :disabled="!props.isRunning"
         @click="emit('cancel')"
       >
-        Cancel
+        {{ t('transfer.progress.cancel') }}
       </Button>
     </div>
   </div>

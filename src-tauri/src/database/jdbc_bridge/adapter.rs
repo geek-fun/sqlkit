@@ -110,9 +110,11 @@ impl JdbcBridgeAdapter {
 
         Ok(QueryResult {
             columns: qr.columns,
+            column_types: Vec::new(),
             rows,
             rows_affected: qr.rows_affected,
             execution_time_ms: None,
+            truncated: false,
         })
     }
 

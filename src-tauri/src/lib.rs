@@ -41,8 +41,8 @@ use agent_adapters::{
     validate_llm_config,
 };
 use capabilities::commands::{get_available_tools, invoke_capability};
-use data_studio_agent_lib as lib;
-use data_studio_agent_storage_sqlite as storage;
+use data_studio_agent as lib;
+use data_studio_agent::storage as storage;
 
 #[derive(Clone, serde::Serialize)]
 struct AuthPayload {

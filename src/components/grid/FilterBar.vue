@@ -44,7 +44,7 @@ function chipColor(op: FilterOperator): string {
     v-if="filters.length > 0"
     class="px-3 py-1.5 border-b bg-muted/30 flex flex-wrap gap-1.5 min-h-[32px] items-center"
   >
-    <span class="text-xs text-muted-foreground mr-1 whitespace-nowrap">{{ t('dataGrid.filter.activeFilters') }}:</span>
+    <span class="text-xs text-muted-foreground mr-1 whitespace-nowrap">{{ t('components.dataGrid.filter.activeFilters') }}:</span>
     <span
       v-for="f in filters"
       :key="f.column"
@@ -56,7 +56,7 @@ function chipColor(op: FilterOperator): string {
       <span class="max-w-[200px] truncate">{{ f.value }}<template v-if="f.value2"> – {{ f.value2 }}</template></span>
       <button
         class="text-sm leading-none ml-0.5 hover:opacity-70"
-        :title="t('dataGrid.filter.clearFilter')"
+        :title="t('components.dataGrid.filter.clearFilter')"
         @click="emit('removeFilter', f.column)"
       >×</button>
     </span>
@@ -64,7 +64,7 @@ function chipColor(op: FilterOperator): string {
       class="text-xs text-muted-foreground ml-2 underline underline-offset-2 hover:text-foreground"
       @click="emit('clearAll')"
     >
-      {{ t('dataGrid.filter.clearAll') }}
+      {{ t('components.dataGrid.filter.clearAll') }}
     </button>
   </div>
 </template>

@@ -7,6 +7,7 @@ import type { TableInfo } from '@/store/databaseStore'
 
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Label } from '@/components/ui/label'
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -24,6 +25,7 @@ const emit = defineEmits<{
   'update:table': [value: string]
 }>()
 
+const { t } = useI18n()
 const connectionStore = useConnectionStore()
 
 const selectedTable = computed({
@@ -90,10 +92,10 @@ const selectedTableInfo = computed(() =>
 <template>
   <div class="space-y-3">
     <div class="space-y-1.5">
-      <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Table</Label>
+      <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.tableLabel') }}</Label>
       <Select v-model="selectedTable" :disabled="!tables.length || loading">
         <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
-          <SelectValue placeholder="Select table" />
+          <SelectValue :placeholder="t('transfer.connection.tablePlaceholder')" />
         </SelectTrigger>
         <SelectContent>
           <SelectItem

@@ -39,16 +39,16 @@ function promptFilterValue(label: string): string | null {
 
 function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
   if (operator === 'between') {
-    const v1 = promptFilterValue(t('dataGrid.filter.between'))
+    const v1 = promptFilterValue(t('components.dataGrid.filter.between'))
     if (v1 === null)
       return
-    const v2 = promptFilterValue(t('dataGrid.filter.between'))
+    const v2 = promptFilterValue(t('components.dataGrid.filter.between'))
     if (v2 === null)
       return
     emit('filter', { column: props.column, operator, value: v1, value2: v2 })
   }
   else {
-    const v = promptFilterValue(t('dataGrid.filter.byValue'))
+    const v = promptFilterValue(t('components.dataGrid.filter.byValue'))
     if (v === null)
       return
     emit('filter', { column: props.column, operator, value: v })
@@ -71,18 +71,18 @@ function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
           <!-- Sort options -->
           <DropdownMenuItem @click="emit('sort', column, 'ASC'); emit('close')">
             <span class="i-carbon-arrow-up mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.sort.asc') }}
+            {{ t('components.dataGrid.sort.asc') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="emit('sort', column, 'DESC'); emit('close')">
             <span class="i-carbon-arrow-down mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.sort.desc') }}
+            {{ t('components.dataGrid.sort.desc') }}
           </DropdownMenuItem>
           <DropdownMenuItem
             v-if="currentSortDirection"
             @click="emit('clearSort'); emit('close')"
           >
             <span class="i-carbon-close mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.sort.clear') }}
+            {{ t('components.dataGrid.sort.clear') }}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator />
@@ -90,27 +90,27 @@ function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
           <!-- Filter options -->
           <DropdownMenuItem @click="handleFilterWithPrompt('eq')">
             <span class="i-carbon-filter mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.filter.byValue') }}
+            {{ t('components.dataGrid.filter.byValue') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleFilterWithPrompt('like')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.filter.byLike') }}
+            {{ t('components.dataGrid.filter.byLike') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleFilterWithPrompt('gte')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.filter.greaterThan') }}
+            {{ t('components.dataGrid.filter.greaterThan') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleFilterWithPrompt('lte')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.filter.lessThan') }}
+            {{ t('components.dataGrid.filter.lessThan') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleFilterWithPrompt('between')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.filter.between') }}
+            {{ t('components.dataGrid.filter.between') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="handleFilterWithPrompt('neq')">
             <span class="i-carbon-filter-remove mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.filter.excludeValue') }}
+            {{ t('components.dataGrid.filter.excludeValue') }}
           </DropdownMenuItem>
 
           <DropdownMenuSeparator v-if="hasActiveFilter" />
@@ -120,7 +120,7 @@ function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
             @click="emit('clearFilter', column); emit('close')"
           >
             <span class="i-carbon-clean mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.filter.clearFilter') }}
+            {{ t('components.dataGrid.filter.clearFilter') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

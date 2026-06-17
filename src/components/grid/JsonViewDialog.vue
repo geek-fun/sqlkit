@@ -35,7 +35,7 @@ const formattedJson = computed(() => {
 
 async function copyJson() {
   await navigator.clipboard.writeText(formattedJson.value)
-  toast.success(t('dataGrid.json.copy'))
+  toast.success(t('components.dataGrid.json.copy'))
 }
 </script>
 
@@ -50,7 +50,7 @@ async function copyJson() {
           class="right-2 top-2 absolute z-10"
           @click="copyJson"
         >
-          <span class="i-carbon-copy mr-1 h-3.5 w-3.5" />{{ t('dataGrid.json.copy') }}
+          <span class="i-carbon-copy mr-1 h-3.5 w-3.5" />{{ t('components.dataGrid.json.copy') }}
         </Button>
         <pre class="text-sm font-mono p-4 rounded-md bg-muted/50 max-h-[60vh] whitespace-pre-wrap break-all overflow-auto">{{ formattedJson }}</pre>
       </div>
