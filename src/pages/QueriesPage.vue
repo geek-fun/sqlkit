@@ -798,7 +798,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="p-0 h-9 w-9 text-foreground hover:bg-muted"
+                      class="text-foreground p-0 h-9 w-9 hover:bg-muted"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="executeQuery"
                     >
@@ -817,7 +817,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="p-0 h-9 w-9 text-foreground hover:bg-muted"
+                      class="text-foreground p-0 h-9 w-9 hover:bg-muted"
                       :class="{ '!text-violet-600': !explainAnalyzeMode, '!text-green-600': explainAnalyzeMode }"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="handleExplainQuery(explainAnalyzeMode)"
@@ -836,7 +836,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="p-0 h-9 w-9 text-foreground hover:bg-muted"
+                      class="text-foreground p-0 h-9 w-9 hover:bg-muted"
                       :class="explainAnalyzeMode ? '!text-green-600 bg-green-100 dark:text-green-300 dark:bg-green-900/30' : ''"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="toggleExplainMode"
@@ -856,7 +856,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="p-0 h-9 w-9 text-foreground hover:bg-muted"
+                      class="text-foreground p-0 h-9 w-9 hover:bg-muted"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="handleToolbarFormat"
                     >

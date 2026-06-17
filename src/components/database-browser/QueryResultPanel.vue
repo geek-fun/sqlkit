@@ -233,8 +233,10 @@ const displayColumnTypes = computed(() => {
 const displayError = computed(() => gridError.value ?? props.error)
 const displayErrorMessage = computed(() => {
   const err = displayError.value
-  if (!err) return null
-  if (typeof err === 'string') return err
+  if (!err)
+    return null
+  if (typeof err === 'string')
+    return err
   return formatApiError(err, t)
 })
 const displayExecuting = computed(() => props.isExecuting || gridLoading.value)
@@ -282,7 +284,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'csv')">
+              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'csv')">
                 <span class="i-carbon-table-split h-4.5 w-4.5" />
               </Button>
             </TooltipTrigger>
@@ -292,7 +294,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'json')">
+              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'json')">
                 <span class="i-carbon-code h-4.5 w-4.5" />
               </Button>
             </TooltipTrigger>
@@ -302,7 +304,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'insert')">
+              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'insert')">
                 <span class="i-carbon-sql h-4.5 w-4.5" />
               </Button>
             </TooltipTrigger>
@@ -313,7 +315,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'csv')">
+              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'csv')">
                 <span class="i-carbon-document-export h-4.5 w-4.5" />
               </Button>
             </TooltipTrigger>
@@ -323,7 +325,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="p-0 h-8 w-8 text-foreground hover:bg-muted" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'json')">
+              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'json')">
                 <span class="i-carbon-document-export h-4.5 w-4.5" />
               </Button>
             </TooltipTrigger>

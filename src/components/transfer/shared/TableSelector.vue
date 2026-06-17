@@ -99,15 +99,15 @@ const selectedTableInfo = computed(() =>
         </SelectTrigger>
         <SelectContent>
           <SelectItem
-            v-for="t in tables"
-            :key="t.name"
-            :value="t.name"
+            v-for="tbl in tables"
+            :key="tbl.name"
+            :value="tbl.name"
             class="text-xs"
           >
             <div class="flex gap-4 w-full items-center justify-between">
-              <span>{{ t.name }}</span>
-              <span v-if="t.rowCount" class="text-[10px] text-muted-foreground font-mono px-1 rounded-sm bg-muted/60 tabular-nums">
-                {{ t.rowCount.toLocaleString() }} rows
+              <span>{{ tbl.name }}</span>
+              <span v-if="tbl.rowCount" class="text-[10px] text-muted-foreground font-mono px-1 rounded-sm bg-muted/60 tabular-nums">
+                {{ tbl.rowCount.toLocaleString() }} rows
               </span>
             </div>
           </SelectItem>
