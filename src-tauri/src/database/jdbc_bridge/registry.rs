@@ -43,32 +43,10 @@ pub struct DatabaseDriverConfig {
     /// Error-message substrings that signal a version mismatch.
     #[serde(default)]
     pub version_error_signatures: Vec<String>,
-    /// Ordered fallback chain of driver versions (tried from first to last).
-    pub versions: Vec<DriverVersion>,
-}
-
-/// A single driver version entry in the fallback chain.
-#[derive(Debug, Clone, Deserialize)]
-pub struct DriverVersion {
-    /// Driver version string (e.g. `"21.15.0.0"`).
-    pub version: String,
-    /// Minimum database version this driver supports.
+    /// Optional legacy version cap — pins the driver to a known-good version
+    /// when LATEST from Maven Central may be incompatible.
     #[serde(default)]
-    pub min_db_version: Option<String>,
-    /// User-facing label for UI selection.
-    pub label: String,
-    /// SHA-256 checksum of the JAR (empty string = not verified).
-    #[serde(default)]
-    pub jar_sha256: String,
-    /// Per-version override of the Maven group (if different from parent).
-    #[serde(default)]
-    pub maven_group_override: Option<String>,
-    /// Per-version override of the Maven artifact (if different from parent).
-    #[serde(default)]
-    pub maven_artifact_override: Option<String>,
-    /// Additional error signatures specific to this version.
-    #[serde(default)]
-    pub version_error_signatures: Vec<String>,
+    pub version_cap: Option<String>,
     /// Maven classifier (e.g. `"standalone"` for hive-jdbc-{version}-standalone.jar).
     /// When set, the download URL becomes: {artifact}-{version}-{classifier}.jar
     #[serde(default)]
@@ -98,16 +76,18 @@ impl DriverRegistry {
         db_type_to_registry_key(db_type)
     }
 
-    /// Get the full driver-version fallback chain for a given database type.
-    pub fn get_driver_chain(&self, db_type: DatabaseType) -> Option<&[DriverVersion]> {
-        let key = Self::registry_key(db_type)?;
-        self.databases.get(key).map(|cfg| cfg.versions.as_slice())
-    }
-
     /// Get the full driver configuration for a given database type.
     pub fn get_config(&self, db_type: DatabaseType) -> Option<&DatabaseDriverConfig> {
         let key = Self::registry_key(db_type)?;
         self.databases.get(key)
+    }
+
+    /// Return all database entries as (registry_key, config) pairs,
+    /// sorted by registry key for deterministic iteration.
+    pub fn get_all_databases(&self) -> Vec<(String, &DatabaseDriverConfig)> {
+        let mut entries: Vec<_> = self.databases.iter().map(|(k, v)| (k.clone(), v)).collect();
+        entries.sort_by(|a, b| a.0.cmp(&b.0));
+        entries
     }
 }
 
@@ -115,21 +95,13 @@ impl DriverRegistry {
 // Public helper functions
 // ---------------------------------------------------------------------------
 
-/// Construct a Maven Central download URL for a driver version.
+/// Construct a Maven Central download URL from plain coordinates.
 ///
-/// Respects per-version `maven_group_override` and `maven_artifact_override`;
-/// falls back to the base group/artifact when those are `None`.
-pub fn resolve_maven_url(entry: &DriverVersion, base_group: &str, base_artifact: &str) -> String {
-    let group = entry.maven_group_override.as_deref().unwrap_or(base_group);
-    let artifact = entry
-        .maven_artifact_override
-        .as_deref()
-        .unwrap_or(base_artifact);
-    let version = &entry.version;
+/// When `classifier` is `Some`, the JAR filename becomes
+/// `{artifact}-{version}-{classifier}.jar` (e.g. `hive-jdbc-3.1.3-standalone.jar`).
+pub fn resolve_maven_url(group: &str, artifact: &str, version: &str, classifier: Option<&str>) -> String {
     let group_path = group.replace('.', "/");
-    let classifier_suffix = entry
-        .maven_classifier
-        .as_ref()
+    let classifier_suffix = classifier
         .map(|c| format!("-{c}"))
         .unwrap_or_default();
     format!(
@@ -253,64 +225,17 @@ mod tests {
     }
 
     #[test]
-    fn test_get_driver_chain_oracle_has_three_versions() {
-        let registry = DriverRegistry::load();
-        let chain = registry.get_driver_chain(DatabaseType::Oracle);
-        assert!(chain.is_some(), "Oracle should have a driver chain");
-        assert_eq!(chain.unwrap().len(), 3);
-    }
-
-    #[test]
-    fn test_get_driver_chain_h2_has_two_versions() {
-        let registry = DriverRegistry::load();
-        let chain = registry.get_driver_chain(DatabaseType::H2);
-        assert!(chain.is_some(), "H2 should have a driver chain");
-        assert_eq!(chain.unwrap().len(), 2);
-    }
-
-    #[test]
-    fn test_get_driver_chain_unknown_returns_none() {
-        let registry = DriverRegistry::load();
-        let chain = registry.get_driver_chain(DatabaseType::PostgreSQL);
-        assert!(chain.is_none(), "PostgreSQL is not a JDBC-bridge database");
-        let chain = registry.get_driver_chain(DatabaseType::MySQL);
-        assert!(chain.is_none(), "MySQL is not a JDBC-bridge database");
-        let chain = registry.get_driver_chain(DatabaseType::SqlServer);
-        assert!(chain.is_none(), "SQL Server is not a JDBC-bridge database");
-    }
-
-    #[test]
-    fn test_resolve_maven_url_with_overrides() {
-        let entry = DriverVersion {
-            version: "21.15.0.0".into(),
-            min_db_version: Some("19c".into()),
-            label: "ojdbc11".into(),
-            jar_sha256: "".into(),
-            maven_group_override: None,
-            maven_artifact_override: Some("ojdbc11".into()),
-            version_error_signatures: vec![],
-            maven_classifier: None,
-        };
-        let url = resolve_maven_url(&entry, "com.oracle.database.jdbc", "ojdbc11");
+    fn test_resolve_maven_url_with_classifier() {
+        let url = resolve_maven_url("org.apache.hive", "hive-jdbc", "3.1.3", Some("standalone"));
         assert_eq!(
             url,
-            "https://repo1.maven.org/maven2/com/oracle/database/jdbc/ojdbc11/21.15.0.0/ojdbc11-21.15.0.0.jar"
+            "https://repo1.maven.org/maven2/org/apache/hive/hive-jdbc/3.1.3/hive-jdbc-3.1.3-standalone.jar"
         );
     }
 
     #[test]
-    fn test_resolve_maven_url_without_overrides() {
-        let entry = DriverVersion {
-            version: "2.2.224".into(),
-            min_db_version: Some("2.x".into()),
-            label: "h2".into(),
-            jar_sha256: "".into(),
-            maven_group_override: None,
-            maven_artifact_override: None,
-            version_error_signatures: vec![],
-            maven_classifier: None,
-        };
-        let url = resolve_maven_url(&entry, "com.h2database", "h2");
+    fn test_resolve_maven_url_without_classifier() {
+        let url = resolve_maven_url("com.h2database", "h2", "2.2.224", None);
         assert_eq!(
             url,
             "https://repo1.maven.org/maven2/com/h2database/h2/2.2.224/h2-2.2.224.jar"
@@ -328,7 +253,8 @@ mod tests {
             default_port: Some(9092),
             min_jre_version: Some("11".into()),
             version_error_signatures: vec![],
-            versions: vec![],
+            version_cap: None,
+            maven_classifier: None,
         };
         let url = build_jdbc_url(&config, "localhost", 9092, Some("testdb"));
         assert_eq!(url, "jdbc:h2:tcp://localhost:9092/testdb");
@@ -345,7 +271,8 @@ mod tests {
             default_port: Some(1521),
             min_jre_version: Some("11".into()),
             version_error_signatures: vec![],
-            versions: vec![],
+            version_cap: None,
+            maven_classifier: None,
         };
         let url = build_jdbc_url(&config, "localhost", 1521, Some("XEPDB1"));
         assert_eq!(url, "jdbc:oracle:thin:@localhost:1521:XEPDB1");
@@ -363,7 +290,8 @@ mod tests {
             default_port: Some(9092),
             min_jre_version: Some("11".into()),
             version_error_signatures: vec![],
-            versions: vec![],
+            version_cap: None,
+            maven_classifier: None,
         };
         let url = build_jdbc_url(&config, "localhost", 9092, None);
         assert_eq!(url, "jdbc:h2:tcp://localhost:9092/");
@@ -381,7 +309,8 @@ mod tests {
             default_port: Some(5236),
             min_jre_version: Some("11".into()),
             version_error_signatures: vec![],
-            versions: vec![],
+            version_cap: None,
+            maven_classifier: None,
         };
         let url = build_jdbc_url(&config, "10.0.0.1", 5236, None);
         assert_eq!(url, "jdbc:dm://10.0.0.1:5236");
@@ -442,7 +371,8 @@ mod tests {
                 default_port: None,
                 min_jre_version: None,
                 version_error_signatures: vec![],
-                versions: vec![],
+                version_cap: None,
+                maven_classifier: None,
             };
             let url = build_jdbc_url(&config, "localhost", port, None);
             assert_eq!(
@@ -518,6 +448,83 @@ mod tests {
         assert_eq!(
             DriverRegistry::registry_key(DatabaseType::Access),
             Some("access")
+        );
+    }
+
+    #[test]
+    fn test_get_all_databases_returns_all_entries() {
+        let registry = DriverRegistry::load();
+        let all = registry.get_all_databases();
+        assert!(!all.is_empty(), "should have at least one database entry");
+        // Verify structure: (key, config) pairs
+        for (key, config) in &all {
+            assert!(!key.is_empty(), "key should not be empty");
+            assert!(!config.name.is_empty(), "name should not be empty");
+        }
+        // Verify known entries are present
+        let keys: Vec<_> = all.iter().map(|(k, _)| k.as_str()).collect();
+        assert!(keys.contains(&"oracle"), "oracle should be in the list");
+        assert!(keys.contains(&"db2"), "db2 should be in the list");
+        assert!(keys.contains(&"h2"), "h2 should be in the list");
+    }
+
+    #[test]
+    fn test_version_cap_present_for_known_dbs() {
+        let registry = DriverRegistry::load();
+
+        // Oracle has a version cap
+        let oracle = registry.databases.get("oracle").unwrap();
+        assert_eq!(
+            oracle.version_cap.as_deref(),
+            Some("21.15.0.0"),
+            "Oracle should have version_cap = 21.15.0.0"
+        );
+
+        // DB2 has a version cap
+        let db2 = registry.databases.get("db2").unwrap();
+        assert_eq!(
+            db2.version_cap.as_deref(),
+            Some("11.5.9.0"),
+            "DB2 should have version_cap = 11.5.9.0"
+        );
+
+        // H2 has a version cap
+        let h2 = registry.databases.get("h2").unwrap();
+        assert_eq!(
+            h2.version_cap.as_deref(),
+            Some("2.2.224"),
+            "H2 should have version_cap = 2.2.224"
+        );
+
+        // Derby has a version cap
+        let derby = registry.databases.get("derby").unwrap();
+        assert_eq!(
+            derby.version_cap.as_deref(),
+            Some("10.16.1.1"),
+            "Derby should have version_cap = 10.16.1.1"
+        );
+
+        // Firebird has a version cap
+        let firebird = registry.databases.get("firebird").unwrap();
+        assert_eq!(
+            firebird.version_cap.as_deref(),
+            Some("5.0.2"),
+            "Firebird should have version_cap = 5.0.2"
+        );
+
+        // DuckDB does NOT have a version cap
+        let duckdb = registry.databases.get("duckdb").unwrap();
+        assert!(
+            duckdb.version_cap.is_none(),
+            "DuckDB should not have a version cap"
+        );
+
+        // Hive has a classifier
+        let hive = registry.databases.get("hive").unwrap();
+        assert_eq!(
+            hive.maven_classifier.as_deref(),
+            Some("standalone"),
+            "Hive should have maven_classifier = standalone"
         );
     }
 }
