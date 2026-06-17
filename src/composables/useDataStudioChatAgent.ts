@@ -87,7 +87,7 @@ export function useDataStudioChatAgent() {
           return acc
 
         const connection = connectionStore.connections.find(
-          c => Number(c.id) === Number(attachedSource.connectionId),
+          c => String(c.id) === String(attachedSource.connectionId),
         )
         if (!connection || connection.id == null)
           return acc

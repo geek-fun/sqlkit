@@ -19,7 +19,7 @@ export type SourcePermissionsMode = 'inherit' | 'custom'
 export type DatabaseSource = {
   kind: 'database'
   sourceId: string
-  connectionId: number
+  connectionId: string
   name: string
   databaseType: 'POSTGRESQL' | 'MYSQL' | 'SQLSERVER' | 'SQLITE' | 'DUCKDB' | 'CLICKHOUSE' | 'ORACLE' | 'DB2' | 'H2' | 'SNOWFLAKE' | 'TRINO' | 'PRESTO' | 'COCKROACHDB' | 'REDSHIFT' | 'MARIADB' | 'TIDB' | 'OCEANBASE' | 'TDSQL'
   permissions: DataSourcePermissions
@@ -128,7 +128,7 @@ function fromAttachedSourceRow(row: AttachedSourceRow): AttachedSource {
   return {
     kind: 'database',
     sourceId: row.id,
-    connectionId: row.connection_id ? Number(row.connection_id) : 0,
+    connectionId: row.connection_id ?? '',
     name: row.alias || row.name,
     databaseType: (row.database_type as DatabaseSource['databaseType']) ?? 'POSTGRESQL',
     permissions: { read: true, create: false, update: false, delete: false },
@@ -335,7 +335,7 @@ export const useDataStudioStore = defineStore('dataStudio', {
     },
 
     async addDatabaseSourceFromConnection(params: {
-      connectionId: number
+      connectionId: string
       name: string
       databaseType: DatabaseSource['databaseType']
       permissions: DataSourcePermissions

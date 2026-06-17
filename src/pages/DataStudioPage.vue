@@ -128,13 +128,13 @@ const availableAddConnections = computed(() => {
     activeSessionSources.value.flatMap((s) => {
       const attached = attachedSources.value.find(a => a.sourceId === s.sourceId)
       return attached?.kind === 'database'
-        ? [(attached as { connectionId: number }).connectionId]
+        ? [(attached as { connectionId: string }).connectionId]
         : []
     }),
   )
   return connections.value.filter(
     conn =>
-      !sessionConnIds.has(Number(conn.id))
+      !sessionConnIds.has(String(conn.id ?? ''))
       && AGENT_SUPPORTED_TYPES.has(conn.type as DatabaseType),
   )
 })
@@ -180,7 +180,7 @@ async function confirmAddSource() {
 
   try {
     const newSource = await dataStudioStore.addDatabaseSourceFromConnection({
-      connectionId: Number(conn.id),
+      connectionId: String(conn.id),
       name: conn.name,
       databaseType: conn.type as 'POSTGRESQL' | 'MYSQL' | 'SQLSERVER' | 'SQLITE',
       permissions: { read: true, create: false, update: false, delete: false },

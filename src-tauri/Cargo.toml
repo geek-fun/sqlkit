@@ -77,6 +77,8 @@ http = "1"
 log = "0.4"
 futures = "0.3"
 rand = "0.8"
+data-studio-agent-lib = { path = "../../data-studio-agent/crates/agent-lib" }
+data-studio-agent-storage-sqlite = { path = "../../data-studio-agent/crates/storage-sqlite" }
 
 # Archive extraction (JRE downloads)
 flate2 = "1.0"

@@ -315,13 +315,14 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const runtime = getSessionRuntime(sessionId)
 
       // Build settings payload for the agent loop
-      // Include connectionConfig so the Rust loop_runner can resolve DB connections
+      // Include connectionConfig so the Rust loop_runner can resolve DB connections.
+      // Key by connectionId (UUID) so the LLM can use IDs from sqlkit__list_connections.
       const connectionConfig = contextSnapshot?.connections
         ? Object.fromEntries(
-            Object.entries(contextSnapshot.connections).map(([alias, conn]) => [
-              alias,
-              { connectionId: String(conn.connectionId), dbType: conn.dbType, permissions: conn.permissions },
-            ]),
+            Object.entries(contextSnapshot.connections).flatMap(([alias, conn]) => {
+              const entry = { connectionId: String(conn.connectionId), dbType: conn.dbType, permissions: conn.permissions }
+              return [[String(conn.connectionId), entry], [alias, entry]]
+            }),
           )
         : {}
 
@@ -339,6 +340,10 @@ export function useChatAgent(config: UseChatAgentConfig) {
         attachedSources: sources,
         connectionConfig,
         apiCompatibility: modelConfig.provider.apiCompatibility,
+      }
+      // Pass connections for loop_runner to resolve tool connection_ids
+      if (connectionConfig && Object.keys(connectionConfig).length > 0) {
+        settings.connections = connectionConfig
       }
 
       lastSettings.value = settings
@@ -409,15 +414,11 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const context = options.context ?? config.contextProvider?.()
       const connections = context?.connections ?? {}
 
-      const dbTypes = [...new Set(
-        Object.values(connections).map(c => c.dbType),
-      )].filter(Boolean)
+      const dbTypes = Object.values(connections).map(c => c.dbType)
 
       let toolsResponse
       try {
-        toolsResponse = await agentApi.getAvailableTools(
-          dbTypes.length > 0 ? dbTypes : undefined,
-        )
+        toolsResponse = await agentApi.getAvailableTools(dbTypes)
       }
       catch (err) {
         console.warn('[useChatAgent] Failed to get available tools, continuing without:', err)

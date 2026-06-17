@@ -215,7 +215,7 @@ export const agentApi = {
     databaseType?: string,
     fileType?: string,
     filePath?: string,
-    connectionId?: number | null,
+    connectionId?: string | null,
   ): Promise<AttachedSourceRow> =>
     invoke<AttachedSourceRow>('save_attached_source', {
       id,
