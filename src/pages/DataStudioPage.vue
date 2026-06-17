@@ -776,7 +776,6 @@ function syncAllProviderModels() {
   background: hsl(var(--muted) / 0.2);
 }
 
-
 .add-source-connect-btn {
   display: inline-flex;
   align-items: center;

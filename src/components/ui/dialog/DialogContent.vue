@@ -12,10 +12,10 @@ import {
 import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 
-interface Props extends DialogContentProps {
+type Props = {
   class?: HTMLAttributes['class']
   showClose?: boolean
-}
+} & DialogContentProps
 
 const props = withDefaults(defineProps<Props>(), {
   class: undefined,
@@ -35,7 +35,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
 <template>
   <DialogPortal>
     <DialogOverlay
-      class="fixed inset-0 z-50 bg-background/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+      class="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 bg-background/80 inset-0 fixed z-50"
     />
     <DialogContent
       v-bind="forwarded"
