@@ -21,6 +21,32 @@ let runtimeInitialized = false
 let runtimeDisposed = false
 let runtimeUnlisteners: Array<() => void> = []
 
+// Tool execution timeout: mark tool as error if no result arrives within 60s
+const TOOL_TIMEOUT_MS = 60_000
+const toolTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+
+function setToolTimeout(toolCallId: string, sessionId: string, assistantMsgId: string) {
+  clearToolTimeout(toolCallId)
+  const timer = setTimeout(() => {
+    toolTimeouts.delete(toolCallId)
+    const store = useDataStudioStore()
+    const session = getSessionById(store.sessions, sessionId)
+    if (!session)
+      return
+    store.updateToolCallStatus(assistantMsgId, toolCallId, 'error', 'Tool execution timed out', undefined, sessionId)
+    store.removeOrphanedStreamingMessages(sessionId)
+  }, TOOL_TIMEOUT_MS)
+  toolTimeouts.set(toolCallId, timer)
+}
+
+function clearToolTimeout(toolCallId: string) {
+  const timer = toolTimeouts.get(toolCallId)
+  if (timer) {
+    clearTimeout(timer)
+    toolTimeouts.delete(toolCallId)
+  }
+}
+
 function getSessionRuntime(sessionId: string): SessionRuntime {
   if (!sessionRuntimes.has(sessionId))
     sessionRuntimes.set(sessionId, {})
@@ -173,6 +199,10 @@ async function initAgentRuntime(): Promise<void> {
       }
 
       if (!needsConfirmation) {
+        // Tool about to execute — set timeout in case it never returns
+        const aid = lastAssistant?.id
+        if (aid)
+          setToolTimeout(tool_call_id, session_id, aid)
         agentApi.confirmToolCall(tool_call_id, true).catch(() => undefined)
       }
       else {
@@ -183,6 +213,7 @@ async function initAgentRuntime(): Promise<void> {
 
   unlisteners.push(
     await agentApi.onAgentLoopToolResult(({ session_id, tool_call_id, envelope, error }) => {
+      clearToolTimeout(tool_call_id)
       const store = useDataStudioStore()
       const session = getSessionById(store.sessions, session_id)
       if (!session)
@@ -383,6 +414,10 @@ function disposeAgentRuntime() {
   runtimeUnlisteners = []
   runtimeInitPromise = null
   sessionRuntimes.clear()
+  // Clear any pending tool timeouts
+  for (const timer of toolTimeouts.values())
+    clearTimeout(timer)
+  toolTimeouts.clear()
   runtimeInitialized = false
 }
 

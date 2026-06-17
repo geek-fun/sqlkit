@@ -192,6 +192,7 @@ export function useDataStudioChatAgent() {
     handleConfirmation: agent.handleConfirmation,
     cancelSession: agent.cancelSession,
     clearChat: agent.clearChat,
+    dismissError: agent.dismissError,
     attachedSources,
     confirmationRules,
     stopReason,

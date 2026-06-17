@@ -50,6 +50,7 @@ const emit = defineEmits<{
   confirmToolCall: [msgId: string, event: { toolCallId: string, action: 'allow_once' | 'allow_always' | 'deny' | 'deny_always' | 'cancel' }]
   modelChange: [modelId: string]
   modelPickerOpen: []
+  dismissError: []
 }>()
 
 const { t } = useI18n()
@@ -267,9 +268,15 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Error banner -->
-        <div v-if="error" class="text-sm text-destructive mx-4 mb-2 p-3 border border-destructive/20 rounded-lg bg-destructive/10 flex gap-2 items-center">
-          <span class="i-carbon-warning shrink-0 h-4 w-4" />
-          <span>{{ error }}</span>
+        <div v-if="error" class="text-sm text-destructive mx-4 mb-2 p-3 border border-destructive/20 rounded-lg bg-destructive/10 flex gap-2 items-start">
+          <span class="i-carbon-warning mt-0.5 shrink-0 h-4 w-4" />
+          <span class="flex-1 min-w-0">{{ error }}</span>
+          <button
+            class="text-destructive/60 p-0.5 rounded shrink-0 transition-colors hover:text-destructive"
+            @click="emit('dismissError')"
+          >
+            <span class="i-carbon-close h-3.5 w-3.5" />
+          </button>
         </div>
 
         <!-- Progress indicator -->

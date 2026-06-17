@@ -129,10 +129,13 @@ function formatTokens(n: number): string {
 }
 
 function formatToolArgs(tc: AgentToolCall): string {
-  if (!tc.args || !Object.keys(tc.args).length)
+  if (!tc.args || tc.args === '{}')
     return tc.toolName
   try {
-    return JSON.stringify(tc.args, null, 2)
+    const parsed = JSON.parse(tc.args)
+    if (!Object.keys(parsed).length)
+      return tc.toolName
+    return JSON.stringify(parsed, null, 2)
   }
   catch {
     return String(tc.args)
