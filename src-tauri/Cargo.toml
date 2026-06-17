@@ -90,5 +90,8 @@ russh = "0.60"
 portpicker = "0.1.1"
 pageant = "0.2"
 
+[dev-dependencies]
+mockall = "0.13"
+
 [features]
 default = []

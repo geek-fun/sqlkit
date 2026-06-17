@@ -385,12 +385,22 @@ impl CapabilityHandler for ExplainQueryHandler {
 
 /// Register all SQL agent tools. These tools work across all SQL database types.
 /// They use `SourceKind::SqlDatabase` so they match any SQL database type.
+fn connection_id_schema() -> Value {
+    json!({
+        "type": "string",
+        "description": "The connection alias to use (e.g. 'mac-postgresql'). Use sqlkit__list_connections to see available connections."
+    })
+}
+
 pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
     reg.register(Capability {
         name: "sqlkit__execute_query",
         description: "Execute an arbitrary SQL query and return the result set. Supports SELECT, INSERT, UPDATE, DELETE, DDL, and any other SQL statement.",
         handler: Arc::new(ExecuteQueryHandler),
-        input_schema: json!({"type": "object", "properties": {"sql": {"type": "string", "description": "The SQL query to execute"}}, "required": ["sql"]}),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "sql": {"type": "string", "description": "The SQL query to execute"}
+        }, "required": ["connection_id", "sql"]}),
         risk_level: RiskLevel::Elevated,
         required_permission: "read",
         source_kind: SourceKind::SqlDatabase,
@@ -401,7 +411,9 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         name: "sqlkit__list_databases",
         description: "List all databases on the connected server.",
         handler: Arc::new(ListDatabasesHandler),
-        input_schema: json!({"type": "object", "properties": {}, "required": []}),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema()
+        }, "required": ["connection_id"]}),
         risk_level: RiskLevel::Safe,
         required_permission: "read",
         source_kind: SourceKind::SqlDatabase,
@@ -410,16 +422,25 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
 
     reg.register(Capability {
         name: "sqlkit__list_schemas",
-        description: "List all schemas in a database.", handler: Arc::new(ListSchemasHandler),
-        input_schema: json!({"type": "object", "properties": {"database": {"type": "string", "description": "Database name (optional)"}}, "required": []}),
+        description: "List all schemas in a database.",
+        handler: Arc::new(ListSchemasHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name (optional)"}
+        }, "required": ["connection_id"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
     });
 
     reg.register(Capability {
         name: "sqlkit__list_tables",
-        description: "List all tables in a database schema.", handler: Arc::new(ListTablesHandler),
-        input_schema: json!({"type": "object", "properties": {"database": {"type": "string", "description": "Database name"}, "schema": {"type": "string", "description": "Schema name (optional)"}}, "required": []}),
+        description: "List all tables in a database schema.",
+        handler: Arc::new(ListTablesHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name"},
+            "schema": {"type": "string", "description": "Schema name (optional)"}
+        }, "required": ["connection_id"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
     });
@@ -428,7 +449,11 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         name: "sqlkit__get_schema",
         description: "Get the full database schema (all tables and columns) as DDL-like text. Use this before writing queries to understand the structure.",
         handler: Arc::new(GetSchemaHandler),
-        input_schema: json!({"type": "object", "properties": {"database": {"type": "string", "description": "Database name (optional)"}, "schema": {"type": "string", "description": "Schema name (optional)"}}, "required": []}),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name (optional)"},
+            "schema": {"type": "string", "description": "Schema name (optional)"}
+        }, "required": ["connection_id"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
     });
@@ -437,7 +462,12 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         name: "sqlkit__describe_table",
         description: "Get detailed column info for a table including types, nullability, defaults, and keys.",
         handler: Arc::new(DescribeTableHandler),
-        input_schema: json!({"type": "object", "properties": {"table": {"type": "string", "description": "Table name"}, "database": {"type": "string"}, "schema": {"type": "string"}}, "required": ["table"]}),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "table": {"type": "string", "description": "Table name"},
+            "database": {"type": "string"},
+            "schema": {"type": "string"}
+        }, "required": ["connection_id", "table"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
     });
@@ -446,7 +476,10 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         name: "sqlkit__explain_query",
         description: "Get the query execution plan for a SQL statement. Useful for optimizing slow queries.",
         handler: Arc::new(ExplainQueryHandler),
-        input_schema: json!({"type": "object", "properties": {"sql": {"type": "string", "description": "The SQL query to explain"}}, "required": ["sql"]}),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "sql": {"type": "string", "description": "The SQL query to explain"}
+        }, "required": ["connection_id", "sql"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
     });

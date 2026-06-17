@@ -164,6 +164,7 @@ export function useSidebarChatAgent() {
     handleConfirmation: agent.handleConfirmation,
     cancelSession: agent.cancelSession,
     clearChat: agent.clearChat,
+    dismissError: agent.dismissError,
     stopReason: computed(() => activeSession.value?.stopReason ?? null),
     stopMessage: computed(() => activeSession.value?.stopMessage ?? null),
     progress: computed(() =>

@@ -255,21 +255,19 @@ async fn run_openai(
 
     while let Some(item) = stream.next().await {
         let chunk = item.map_err(|e| format!("Chunk error: {}", e))?;
-        let cv = serde_json::to_value(&chunk).map_err(|e| format!("Ser error: {}", e))?;
+        let chunk_str = serde_json::to_string(&chunk).map_err(|e| format!("Ser error: {}", e))?;
         let cr = formatter
-            .parse_chunk(&cv)
+            .parse_chunk(&chunk_str)
             .map_err(|e| format!("Parse error: {}", e))?;
-        if let Some(ref c) = cr.content_delta {
-            if !c.is_empty() {
-                let _ = window.emit(
-                    "agent-delta",
-                    json!({"requestId": request_id, "content": c}),
-                );
-                full.push_str(c);
-            }
+        if !cr.content_delta.is_empty() {
+            let _ = window.emit(
+                "agent-delta",
+                json!({"requestId": request_id, "content": cr.content_delta}),
+            );
+            full.push_str(&cr.content_delta);
         }
-        for tc in &cr.tool_calls {
-            let p = json!({"index": calls.len(), "id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": tc.arguments.to_string()}});
+        for tc in &cr.tool_call_deltas {
+            let p = json!({"index": calls.len(), "id": tc.id, "type": "function", "function": {"name": tc.name, "arguments": tc.arguments_delta}});
             let _ = window.emit(
                 "agent-tool-call",
                 json!({"requestId": request_id, "toolCall": p}),

@@ -278,14 +278,18 @@ export function useChatAgent(config: UseChatAgentConfig) {
 
   // ── Core Methods ──────────────────────────────────────────────────────────
 
-  const runAgentLoop = async (sessionId: string, userMessageContent: string, schemaContext?: string) => {
+  const runAgentLoop = async (
+    sessionId: string,
+    userMessageContent: string,
+    schemaContext: string,
+    contextSnapshot: ChatContextConfig,
+  ) => {
     config.sessionStore.setSessionStatus(sessionId, 'running')
 
     try {
       // Build system prompt from context
-      const context = config.contextProvider?.()
-      const sources = context?.connections
-        ? Object.entries(context.connections).map(([alias, conn]) => ({
+      const sources = contextSnapshot?.connections
+        ? Object.entries(contextSnapshot.connections).map(([alias, conn]) => ({
             connectionId: alias,
             databaseType: conn.dbType,
             permissions: conn.permissions,
@@ -297,7 +301,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const permissionsMode = autoMode ? 'AUTO' : 'ASK'
 
       const systemPrompt = buildSystemPrompt({
-        schema: schemaContext || context?.schema,
+        schema: schemaContext || contextSnapshot?.schema,
         sources,
         permissionsMode,
       })
@@ -312,9 +316,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
 
       // Build settings payload for the agent loop
       // Include connectionConfig so the Rust loop_runner can resolve DB connections
-      const connectionConfig = context?.connections
+      const connectionConfig = contextSnapshot?.connections
         ? Object.fromEntries(
-            Object.entries(context.connections).map(([alias, conn]) => [
+            Object.entries(contextSnapshot.connections).map(([alias, conn]) => [
               alias,
               { connectionId: String(conn.connectionId), dbType: conn.dbType, permissions: conn.permissions },
             ]),
@@ -376,15 +380,6 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const message = err instanceof Error ? err.message : String(err)
       localError.value = message
       config.sessionStore.setSessionStatus(sessionId, 'error')
-
-      const errorMsg: ChatMessage = {
-        id: ulid(),
-        role: 'system',
-        content: `Error: ${message}`,
-        status: 'error',
-        timestamp: Date.now(),
-      }
-      config.sessionStore.addMessage(sessionId, errorMsg)
     }
   }
 
@@ -467,7 +462,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
         }
       }
 
-      await runAgentLoop(sessionId, options.content, schemaContext)
+      await runAgentLoop(sessionId, options.content, schemaContext, context ?? { connections: {} })
     }
     catch (err) {
       localError.value = err instanceof Error ? err.message : String(err)
@@ -565,6 +560,13 @@ export function useChatAgent(config: UseChatAgentConfig) {
     }
   }
 
+  const dismissError = () => {
+    localError.value = undefined
+    const sessionId = config.sessionStore.activeSessionId.value
+    if (sessionId)
+      dataStudioStore.clearSessionError(sessionId)
+  }
+
   const clearChat = async () => {
     const sessionId = config.sessionStore.activeSessionId.value
     if (!sessionId)
@@ -609,6 +611,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
     handleConfirmation,
     cancelSession,
     clearChat,
+    dismissError,
   }
 }
 

@@ -81,6 +81,7 @@ const {
   handleConfirmation: rawHandleConfirmation,
   cancelSession,
   clearChat,
+  dismissError,
   activeSessionSources,
   lastSettings,
   initContextSettings,
@@ -337,6 +338,7 @@ function syncAllProviderModels() {
             @confirm-tool-call="handleConfirmation"
             @model-change="onModelChange"
             @model-picker-open="syncAllProviderModels"
+            @dismiss-error="dismissError"
           >
             <template #toolbar-left>
               <!-- Connected source chips -->
