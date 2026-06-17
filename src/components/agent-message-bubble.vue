@@ -1053,3 +1053,11 @@ details[open] .activity-chevron {
   border-color: hsl(var(--primary) / 0.3);
 }
 </style>
+
+<style>
+/* Make markdown table borders visible in dark mode */
+.dark .markdown-body th,
+.dark .markdown-body td {
+  border-color: hsl(217.2 32.6% 30%) !important;
+}
+</style>
