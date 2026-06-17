@@ -687,7 +687,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
       <!-- TABLES Section -->
       <div class="border-b">
         <button
-          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center cursor-pointer hover:bg-accent/50"
           @click="showTables = !showTables"
         >
           <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showTables }" />
@@ -715,7 +715,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
       <!-- VIEWS Section (opens listing tab) -->
       <div class="border-b">
         <button
-          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center cursor-pointer hover:bg-accent/50"
           @click="toggleViews"
         >
           <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showViews }" />
@@ -745,7 +745,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
       <!-- PROCEDURES Section -->
       <div class="border-b">
         <button
-          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center cursor-pointer hover:bg-accent/50"
           @click="toggleProcedures"
         >
           <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showProcedures }" />
@@ -775,7 +775,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
       <!-- FUNCTIONS Section -->
       <div class="border-b">
         <button
-          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center cursor-pointer hover:bg-accent/50"
           @click="toggleFunctions"
         >
           <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showFunctions }" />
@@ -805,7 +805,7 @@ defineExpose({ fetchSavedQueryFiles, refreshTree })
       <!-- SAVED QUERIES Section -->
       <div class="border-b">
         <button
-          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center hover:bg-accent/50"
+          class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full uppercase items-center cursor-pointer hover:bg-accent/50"
           @click="showSavedQueries = !showSavedQueries"
         >
           <span class="i-carbon-chevron-right h-3 w-3 transition-transform" :class="{ 'rotate-90': showSavedQueries }" />

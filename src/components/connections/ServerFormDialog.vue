@@ -895,6 +895,7 @@ function handleSave() {
         <!-- Advanced Configuration: SSH Tunnel -->
         <div v-if="!isFileBased" class="pt-2">
           <Button
+            type="button"
             variant="ghost"
             size="sm"
             class="text-muted-foreground w-full justify-between"
