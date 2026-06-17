@@ -203,7 +203,7 @@ jobs:
             output: jre-macos-aarch64
             pack: tar
           - name: macOS x64
-            os: macos-13
+            os: macos-15-intel
             archive: jre-macos-x64.tar.gz
             output: jre-macos-x64
             pack: tar
@@ -259,6 +259,8 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
+
       - name: Download JRE artifacts
         uses: actions/download-artifact@v4
         with:
@@ -274,7 +276,6 @@ jobs:
             v${{ needs.check-version.outputs.version }} \
             jre-artifacts/* \
             --clobber
-
       - name: Publish draft release
         uses: actions/github-script@v7
         env:
