@@ -341,7 +341,29 @@ export const enUS = {
             download: 'Download JRE',
             remove: 'Remove JRE',
             redownload: 'Re-download',
+            checkUpdates: 'Check for Updates',
           },
+        },
+        bridgeCard: {
+          title: 'Bridge JAR',
+          description: 'JDBC bridge component for database connections',
+          status: {
+            installed: 'Installed',
+            notInstalled: 'Not Installed',
+            checking: 'Checking...',
+          },
+          actions: {
+            download: 'Download Bridge',
+            remove: 'Remove Bridge',
+          },
+        },
+        jdbcToggle: {
+          title: 'JDBC Connections',
+          description: 'Enable JDBC database support (JRE + bridge + drivers)',
+          label: 'JDBC Not Needed',
+        },
+        actions: {
+          refresh: 'Refresh',
         },
         driversCard: {
           title: 'JDBC Drivers',

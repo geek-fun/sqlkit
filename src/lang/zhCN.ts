@@ -341,7 +341,29 @@ export const zhCN = {
             download: '下载 JRE',
             remove: '移除 JRE',
             redownload: '重新下载',
+            checkUpdates: '检查更新',
           },
+        },
+        bridgeCard: {
+          title: '桥接 JAR',
+          description: '用于数据库连接的 JDBC 桥接组件',
+          status: {
+            installed: '已安装',
+            notInstalled: '未安装',
+            checking: '检查中...',
+          },
+          actions: {
+            download: '下载桥接',
+            remove: '移除桥接',
+          },
+        },
+        jdbcToggle: {
+          title: 'JDBC 连接',
+          description: '启用 JDBC 数据库支持（JRE + 桥接 + 驱动）',
+          label: '不需要 JDBC',
+        },
+        actions: {
+          refresh: '刷新',
         },
         driversCard: {
           title: 'JDBC 驱动',
