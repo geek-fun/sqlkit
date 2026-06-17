@@ -746,6 +746,7 @@ export const zhCN = {
       selectConnection: '选择连接',
       searchPlaceholder: '搜索连接...',
       noConnections: '没有兼容的连接',
+      allAttached: '所有兼容的连接已添加',
       connectionsFound: '找到 {count} 个连接',
       connectSource: '连接',
     },

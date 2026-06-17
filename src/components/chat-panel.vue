@@ -278,9 +278,7 @@ onBeforeUnmount(() => {
           <span v-if="progress.phase === 'iterating'">
             {{ t('dataStudio.agent.iteration') }} {{ progress.iter }}/{{ progress.maxIter }}
           </span>
-          <span v-else-if="progress.phase === 'waiting_llm'">
-            {{ t('dataStudio.agent.waitingModel') }}
-          </span>
+          <!-- waiting_llm phase hidden — message bubble activity timeline already shows "Waiting for model" -->
           <span v-else-if="progress.phase === 'compacting'">
             {{ t('dataStudio.agent.compacting') }}
           </span>

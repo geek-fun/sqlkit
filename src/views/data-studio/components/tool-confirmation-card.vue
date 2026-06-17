@@ -46,28 +46,32 @@ function riskColor(risk: string): string {
     <div class="flex flex-wrap gap-1.5">
       <Button
         size="sm"
-        variant="default"
+        variant="outline"
+        class="text-foreground"
         @click="emit('confirm', { toolCallId: props.toolCall.id, action: 'allow_once' })"
       >
         {{ t('dataStudio.agent.allowOnce') }}
       </Button>
       <Button
         size="sm"
-        variant="outline"
+        variant="ghost"
+        class="text-foreground"
         @click="emit('confirm', { toolCallId: props.toolCall.id, action: 'allow_always' })"
       >
         {{ t('dataStudio.agent.allowAlways') }}
       </Button>
       <Button
         size="sm"
-        variant="secondary"
+        variant="ghost"
+        class="text-muted-foreground"
         @click="emit('confirm', { toolCallId: props.toolCall.id, action: 'deny' })"
       >
         {{ t('dataStudio.agent.deny') }}
       </Button>
       <Button
         size="sm"
-        variant="destructive"
+        variant="ghost"
+        class="text-muted-foreground hover:text-destructive"
         @click="emit('confirm', { toolCallId: props.toolCall.id, action: 'deny_always' })"
       >
         {{ t('dataStudio.agent.denyAlways') }}
@@ -75,6 +79,7 @@ function riskColor(risk: string): string {
       <Button
         size="sm"
         variant="ghost"
+        class="text-muted-foreground"
         @click="emit('confirm', { toolCallId: props.toolCall.id, action: 'cancel' })"
       >
         {{ t('dataStudio.agent.cancelRun') }}

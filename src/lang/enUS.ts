@@ -746,6 +746,7 @@ export const enUS = {
       selectConnection: 'Select Connection',
       searchPlaceholder: 'Search connections...',
       noConnections: 'No compatible connections found',
+      allAttached: 'All compatible connections are already attached',
       connectionsFound: '{count} connections found',
       connectSource: 'Connect',
     },
