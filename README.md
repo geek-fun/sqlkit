@@ -4,7 +4,7 @@
 
 # SqlKit
 
-**Agentic cross-platform SQL database GUI client — your database agent for 66 databases.**
+**Agentic cross-platform SQL database GUI client — your database agent for 70+ databases.**
 
 **Privacy-first. Your data, your keys. Open source.**
 
@@ -101,7 +101,7 @@ Built with Rust + Tauri v2 — no Electron, no JRE, no bundled Chromium. Ships a
 
 ### All Your Databases, One App
 
-SqlKit supports **66 databases** across four adapter strategies:
+SqlKit supports **70+ databases** across four adapter strategies:
 
 | Strategy | Databases |
 |----------|-----------|
@@ -217,7 +217,7 @@ Yes. The desktop app works fully offline. AI features require network access to 
 
 <details>
 <summary><strong>How is SqlKit different from DBeaver / TablePlus / DataGrip?</strong></summary>
-SqlKit is a native Tauri app (Rust) — no Java JRE, no Electron overhead. It includes AI natively (not as a plugin), supports 66 databases, and runs on macOS, Windows, and Linux from a single binary. Privacy-first with encrypted local credential storage.
+SqlKit is a native Tauri app (Rust) — no Java JRE, no Electron overhead. It includes AI natively (not as a plugin), supports 70+ databases, and runs on macOS, Windows, and Linux from a single binary. Privacy-first with encrypted local credential storage.
 </details>
 
 <details>

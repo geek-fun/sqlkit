@@ -4,7 +4,7 @@
 
 # SqlKit
 
-**Agentic 跨平台 SQL 数据库 GUI 客户端 —— 你的数据库代理，支持 40+ 种数据库。**
+**Agentic 跨平台 SQL 数据库 GUI 客户端 —— 你的数据库代理，支持 70+ 种数据库。**
 
 **隐私优先。你的数据，你的密钥。开源。**
 
@@ -101,15 +101,15 @@ SqlKit 是一个 **Agentic 数据库客户端** —— 它不仅执行 SQL，还
 
 ### 所有数据库，一个应用
 
-SqlKit 支持 **40+ 种数据库**，通过四种适配策略覆盖：
+SqlKit 支持 **70+ 种数据库**，通过四种适配策略覆盖：
 
 | 策略 | 数据库 |
 |------|--------|
-| **原生** (Rust) | PostgreSQL、MySQL、SQL Server、SQLite、DuckDB、ClickHouse、Firebird、Oracle、RQLite、Turso |
-| **PG 协议兼容** | CockroachDB、Redshift、YugabyteDB、TimescaleDB、QuestDB、Vastbase 等 |
-| **MySQL 协议兼容** | MariaDB、TiDB、OceanBase、StarRocks、Databend、ManticoreSearch 等 |
-| **JDBC 桥接** | DB2、H2、Snowflake、TDengine、Hive、Databricks、Hana、Teradata、Vertica、Exasol、BigQuery、Informix、Cassandra 等 |
-| **HTTP 桥接** | Trino、Presto、RQLite、Turso |
+| **原生** (Rust) | PostgreSQL、MySQL、SQL Server、SQLite |
+| **PG 协议兼容** | CockroachDB、Redshift、YugabyteDB、TimescaleDB、QuestDB、Vastbase、YashanDB、KingbaseES、GaussDB、HighGo、UXDB、OpenGauss、GBase8c、Greenplum、EnterpriseDB、CrateDB、Materialize、AlloyDB、CloudSQLPG、FujitsuPG |
+| **MySQL 协议兼容** | MariaDB、TiDB、OceanBase、TDSQL、PolarDB、DM8、Doris、SelectDB、StarRocks、Databend、GoldenDB、ManticoreSearch、SingleStore、CloudSQLMySQL |
+| **JDBC 桥接** | Oracle、DuckDB、Firebird、DB2、H2、Snowflake、TDengine、Derby、Hive、Databricks、Hana、Teradata、Vertica、Exasol、BigQuery、Informix、Kylin、Cassandra、Iris、Access、DM8Oracle、XuguDB、GBase8a |
+| **HTTP 桥接** | ClickHouse、Trino、Presto、RQLite、Turso |
 
 ### 专业级编辑器
 
@@ -217,7 +217,7 @@ npm run tauri dev
 
 <details>
 <summary><strong>SqlKit 和 DBeaver、TablePlus、DataGrip 有什么不同？</strong></summary>
-SqlKit 是基于 Tauri（Rust）的原生应用 —— 无需 Java 运行时，没有 Electron 的开销。AI 功能内建而非插件形式，支持 40+ 数据库，一套二进制文件即可在 macOS、Windows 和 Linux 上运行。隐私优先，凭据经本地加密存储。
+SqlKit 是基于 Tauri（Rust）的原生应用 —— 无需 Java 运行时，没有 Electron 的开销。AI 功能内建而非插件形式，支持 70+ 数据库，一套二进制文件即可在 macOS、Windows 和 Linux 上运行。隐私优先，凭据经本地加密存储。
 </details>
 
 <details>
