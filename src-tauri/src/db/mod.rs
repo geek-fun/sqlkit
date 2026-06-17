@@ -82,7 +82,7 @@ pub fn migrate(db: &AgentDb) -> Result<(), String> {
             database_type TEXT,
             file_type TEXT,
             file_path TEXT,
-            connection_id INTEGER,
+            connection_id TEXT,
             created_at INTEGER NOT NULL,
             updated_at INTEGER NOT NULL
         );

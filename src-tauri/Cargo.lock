@@ -204,15 +204,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-convert"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d416feee97712e43152cd42874de162b8f9b77295b1c85e5d92725cc8310bae"
-dependencies = [
- "async-trait",
-]
-
-[[package]]
 name = "async-executor"
 version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -257,32 +248,6 @@ dependencies = [
 
 [[package]]
 name = "async-openai"
-version = "0.25.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b17e44510f88a904cb3102a020d7ea11929dcddadfaff756e71112cb2cb7bd0"
-dependencies = [
- "async-convert",
- "backoff",
- "base64 0.22.1",
- "bytes",
- "derive_builder",
- "eventsource-stream",
- "futures",
- "rand 0.8.6",
- "reqwest 0.12.28",
- "reqwest-eventsource",
- "secrecy 0.8.0",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
-]
-
-[[package]]
-name = "async-openai"
 version = "0.32.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f4d91c2005832450ad9ac92411b9d4cec39e30be21adc76553efc47f812d59c7"
@@ -298,7 +263,7 @@ dependencies = [
  "rand 0.9.4",
  "reqwest 0.12.28",
  "reqwest-eventsource",
- "secrecy 0.10.3",
+ "secrecy",
  "serde",
  "serde_json",
  "serde_urlencoded",
@@ -1519,14 +1484,14 @@ checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
 name = "data-studio-agent-lib"
 version = "0.1.0"
 dependencies = [
- "async-openai 0.32.4",
+ "async-openai",
  "async-trait",
  "futures",
  "rand 0.8.6",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
- "tiktoken-rs 0.7.0",
+ "tiktoken-rs",
  "tokio",
  "uuid",
 ]
@@ -2076,16 +2041,6 @@ name = "fallible-streaming-iterator"
 version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
-
-[[package]]
-name = "fancy-regex"
-version = "0.12.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7493d4c459da9f84325ad297371a6b2b8a162800873a22e3b6b6512e61d18c05"
-dependencies = [
- "bit-set 0.5.3",
- "regex",
-]
 
 [[package]]
 name = "fancy-regex"
@@ -6009,16 +5964,6 @@ dependencies = [
 
 [[package]]
 name = "secrecy"
-version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bd1c54ea06cfd2f6b63219704de0b9b4f72dcc2b8fdef820be6cd799780e91e"
-dependencies = [
- "serde",
- "zeroize",
-]
-
-[[package]]
-name = "secrecy"
 version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e891af845473308773346dc847b2c23ee78fe442e0472ac50e22a18a93d3ae5a"
@@ -6486,7 +6431,6 @@ dependencies = [
 name = "sqlkit"
 version = "0.6.3"
 dependencies = [
- "async-openai 0.25.0",
  "async-trait",
  "base64 0.22.1",
  "calamine",
@@ -6525,7 +6469,6 @@ dependencies = [
  "tauri-plugin-updater",
  "thiserror 1.0.69",
  "tiberius",
- "tiktoken-rs 0.5.9",
  "tokio",
  "tokio-native-tls",
  "tokio-postgres",
@@ -7295,21 +7238,6 @@ dependencies = [
 
 [[package]]
 name = "tiktoken-rs"
-version = "0.5.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c314e7ce51440f9e8f5a497394682a57b7c323d0f4d0a6b1b13c429056e0e234"
-dependencies = [
- "anyhow",
- "base64 0.21.7",
- "bstr",
- "fancy-regex 0.12.0",
- "lazy_static",
- "parking_lot",
- "rustc-hash 1.1.0",
-]
-
-[[package]]
-name = "tiktoken-rs"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "25563eeba904d770acf527e8b370fe9a5547bacd20ff84a0b6c3bc41288e5625"
@@ -7317,7 +7245,7 @@ dependencies = [
  "anyhow",
  "base64 0.22.1",
  "bstr",
- "fancy-regex 0.13.0",
+ "fancy-regex",
  "lazy_static",
  "regex",
  "rustc-hash 1.1.0",

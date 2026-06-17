@@ -42,7 +42,7 @@ pub struct AttachedSourceRow {
     pub database_type: Option<String>,
     pub file_type: Option<String>,
     pub file_path: Option<String>,
-    pub connection_id: Option<i64>,
+    pub connection_id: Option<String>,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -376,7 +376,7 @@ pub fn save_attached_source(
     database_type: Option<String>,
     file_type: Option<String>,
     file_path: Option<String>,
-    connection_id: Option<i64>,
+    connection_id: Option<String>,
 ) -> Result<AttachedSourceRow, String> {
     let now = now_ms();
     let conn = agent_db

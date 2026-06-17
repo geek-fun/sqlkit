@@ -56,7 +56,7 @@ pub async fn run_agent_loop(
         .cloned()
         .unwrap_or(Value::Null);
 
-    let result = lib::loop_runner::run_agent_loop(
+    lib::loop_runner::run_agent_loop(
         &session_id,
         &user_message,
         &settings,
@@ -68,17 +68,7 @@ pub async fn run_agent_loop(
         &confirm_map,
         &cancel_map,
     )
-    .await;
-
-    let _ = store.update_session_status(&session_id, "idle").await;
-
-    if let Err(ref e) = result {
-        let _ = app.emit(
-            "agent-loop-error",
-            serde_json::json!({"session_id": session_id, "error": e}),
-        );
-    }
-    result
+    .await
 }
 
 #[tauri::command]
@@ -86,14 +76,7 @@ pub async fn cancel_agent_loop(
     session_id: String,
     cancel_map: State<'_, CancelMap>,
 ) -> Result<(), String> {
-    let tx_opt = {
-        let mut cm = cancel_map.lock().map_err(|e| e.to_string())?;
-        cm.remove(&session_id)
-    };
-    if let Some(tx) = tx_opt {
-        let _ = tx.send(());
-    }
-    Ok(())
+    lib::loop_runner::cancel_agent_loop(&session_id, &cancel_map)
 }
 
 #[tauri::command]
@@ -102,16 +85,7 @@ pub async fn confirm_tool_call(
     allowed: bool,
     confirm_map: State<'_, ConfirmMap>,
 ) -> Result<(), String> {
-    let tx_opt = {
-        let mut cm = confirm_map.lock().map_err(|e| e.to_string())?;
-        cm.remove(&tool_call_id)
-    };
-    if let Some(tx) = tx_opt {
-        let _ = tx.send(allowed);
-        Ok(())
-    } else {
-        Err(format!("no pending confirmation for {}", tool_call_id))
-    }
+    lib::loop_runner::confirm_tool_call(&tool_call_id, allowed, &confirm_map)
 }
 
 #[tauri::command]
