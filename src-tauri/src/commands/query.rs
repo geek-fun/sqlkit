@@ -755,7 +755,6 @@ pub async fn explain_query(
 // Integration tests should be added in src-tauri/tests/ directory.
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_sql_validation() {

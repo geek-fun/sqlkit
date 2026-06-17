@@ -289,6 +289,7 @@ mod tests {
             maven_group_override: None,
             maven_artifact_override: Some("ojdbc11".into()),
             version_error_signatures: vec![],
+            maven_classifier: None,
         };
         let url = resolve_maven_url(&entry, "com.oracle.database.jdbc", "ojdbc11");
         assert_eq!(
@@ -307,6 +308,7 @@ mod tests {
             maven_group_override: None,
             maven_artifact_override: None,
             version_error_signatures: vec![],
+            maven_classifier: None,
         };
         let url = resolve_maven_url(&entry, "com.h2database", "h2");
         assert_eq!(

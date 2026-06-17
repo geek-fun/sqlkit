@@ -2411,6 +2411,18 @@ mod tests {
         assert_eq!(config, json!({}));
     }
 
+    fn get_settings_string_array(settings: &serde_json::Value, key: &str) -> Vec<String> {
+        settings
+            .get(key)
+            .and_then(|v| v.as_array())
+            .map(|arr| {
+                arr.iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
     #[test]
     fn test_get_settings_string_array() {
         let settings = json!({

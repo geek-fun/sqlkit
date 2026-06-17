@@ -251,7 +251,6 @@ pub fn remove_managed_jre() -> DbResult<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
 
     #[test]
     fn test_jre_base_dir() {

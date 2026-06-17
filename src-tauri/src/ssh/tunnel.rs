@@ -676,7 +676,6 @@ async fn spawn_tunnel_task(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ssh::config::SshAuthMethod;
 
     #[test]
     fn test_sanitize_openssh_key_strips_trailing_content() {
@@ -694,7 +693,8 @@ mod tests {
         push_string(&mut container, &private_blob);
         pad_to_block(&mut container, 8);
 
-        let b64 = BASE64.encode(&container);
+        use base64::engine::general_purpose;
+        let b64 = general_purpose::STANDARD.encode(&container);
         let pem = format!(
             "-----BEGIN OPENSSH PRIVATE KEY-----\n{}\n-----END OPENSSH PRIVATE KEY-----",
             b64
