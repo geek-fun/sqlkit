@@ -66,6 +66,8 @@ pub fn load_messages_for_compact(
     Ok(out)
 }
 
+/// Load all messages for a session without respecting compaction boundaries.
+/// Used by manual compaction to compact the full conversation.
 pub fn load_all_messages(db: &AgentDb, session_id: &str) -> Result<Vec<StoredMessage>, String> {
     let conn = db.0.lock().map_err(|e| e.to_string())?;
     let mut stmt = conn
@@ -151,13 +153,4 @@ pub async fn post_chat_completions_compact(
         jittered_sleep_ms(RETRY_DELAYS_MS[attempt]).await;
     }
     Err(last_err)
-}
-
-pub fn format_user_message(session_id: &str, content: &str) -> Value {
-    serde_json::json!({
-        "id": uuid::Uuid::new_v4().to_string(),
-        "session_id": session_id,
-        "role": "user",
-        "content": content,
-    })
 }

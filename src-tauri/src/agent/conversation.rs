@@ -5,15 +5,20 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter};
 use tokio::sync::Mutex as AsyncMutex;
 
-use crate::agent::compact::{
-    count_projected_tokens, evaluate, resolve_model_spec_for_session, run_compact_with_events,
-};
+use crate::agent::compact::{count_projected_tokens, evaluate, resolve_model_spec_for_session, run_compact_with_events};
 use crate::agent::loop_runner_support::{load_messages_for_compact, new_id, now_ms, StoredMessage};
 use crate::db::AgentDb;
 
+/// Per-session async mutex registry. Ensures only one compaction runs per
+/// session at a time, regardless of which append path triggered it.
 static SESSION_COMPACT_LOCKS: OnceLock<Mutex<HashMap<String, Arc<AsyncMutex<()>>>>> =
     OnceLock::new();
 
+/// Sessions that already have a background compaction queued or running.
+/// Used by `append()` to avoid stacking N redundant background tasks while
+/// one is already in flight — the mutex would serialize them anyway, but
+/// every queued task would re-acquire the lock, re-check `needs_compact`,
+/// and (when the summary alone is large) emit another boundary row.
 static SESSION_COMPACT_INFLIGHT: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
 
 fn inflight_set() -> &'static Mutex<HashSet<String>> {
@@ -21,16 +26,12 @@ fn inflight_set() -> &'static Mutex<HashSet<String>> {
 }
 
 fn try_acquire_inflight(session_id: &str) -> bool {
-    let mut set = inflight_set()
-        .lock()
-        .expect("compact inflight set poisoned");
+    let mut set = inflight_set().lock().expect("compact inflight set poisoned");
     set.insert(session_id.to_string())
 }
 
 fn release_inflight(session_id: &str) {
-    let mut set = inflight_set()
-        .lock()
-        .expect("compact inflight set poisoned");
+    let mut set = inflight_set().lock().expect("compact inflight set poisoned");
     set.remove(session_id);
 }
 
@@ -145,6 +146,11 @@ pub fn needs_compact(db: &AgentDb, session_id: &str, settings: &Value) -> bool {
     evaluate(&messages, &spec).should_compact
 }
 
+/// Inline append: write the message synchronously, emit the usage snapshot,
+/// and if the context now exceeds threshold AND autoCompact is on, spawn a
+/// background compaction task. Returns immediately; does NOT wait for the LLM
+/// summarize call. Callers that need the next LLM payload to be post-compacted
+/// must call `prepare_for_llm` before building the request body.
 pub fn append(
     db: &AgentDb,
     app: &AppHandle,
@@ -157,23 +163,19 @@ pub fn append(
     write_message(db, id, session_id, role, content)?;
     emit_usage(app, session_id, settings, db);
 
+    // Do not trigger background compaction immediately after an assistant message that
+    // contains tool_calls: the tool results have not been written yet, so compaction
+    // would see a dangling assistant+tool_calls with no following tool messages and
+    // produce a payload that OpenAI rejects with HTTP 400. The prepare_for_llm gate
+    // runs before every LLM call and is the correct place to compact.
     let has_pending_tool_calls = role == "assistant"
         && serde_json::from_str::<serde_json::Value>(content)
             .ok()
-            .and_then(|v| {
-                v.get("tool_calls")
-                    .and_then(|tc| tc.as_array())
-                    .map(|a| !a.is_empty())
-            })
+            .and_then(|v| v.get("tool_calls").and_then(|tc| tc.as_array()).map(|a| !a.is_empty()))
             .unwrap_or(false);
     if !has_pending_tool_calls && auto_compact_enabled(settings) {
         if try_acquire_inflight(session_id) {
-            spawn_background_compact(
-                db.clone(),
-                app.clone(),
-                settings.clone(),
-                session_id.to_string(),
-            );
+            spawn_background_compact(db.clone(), app.clone(), settings.clone(), session_id.to_string());
         }
     }
     Ok(())
@@ -193,6 +195,13 @@ pub fn append_with_new_id(
     Ok(id)
 }
 
+/// Blocking gate called by the loop right before sending a request to the LLM.
+/// If a background compaction is in flight (or queued via the mutex), this
+/// awaits it so the next LLM payload reflects the post-compact state. Then
+/// runs one final compaction synchronously if `should_compact` is still true
+/// (e.g., because the background spawn hasn't started yet, or fresh appends
+/// landed during it). When compaction runs, compact.rs emits
+/// `agent-loop-compacting` phase start/end around the summarize LLM call.
 pub async fn prepare_for_llm(
     db: &AgentDb,
     app: &AppHandle,
@@ -220,7 +229,10 @@ pub async fn prepare_for_llm(
                 if let Some(fallback_keep_pairs) = info.fallback_keep_pairs {
                     summary_payload["fallback_keep_pairs"] = json!(fallback_keep_pairs);
                 }
-                let _ = app.emit("agent-loop-summary-injected", summary_payload);
+                let _ = app.emit(
+                    "agent-loop-summary-injected",
+                    summary_payload,
+                );
             }
             Ok(None) => {}
             Err(compact_err) => {
@@ -240,6 +252,10 @@ pub async fn prepare_for_llm(
     Ok(())
 }
 
+/// Fire-and-forget background compaction. Acquires the per-session mutex so
+/// it serializes with `prepare_for_llm`. Errors are swallowed (emitted as
+/// warnings) because the caller already returned. Progress for long summarize
+/// calls is emitted via `agent-loop-compacting` start/end from compact.rs.
 fn spawn_background_compact(db: AgentDb, app: AppHandle, settings: Value, session_id: String) {
     tokio::spawn(async move {
         let _inflight = InflightGuard::new(session_id.clone());
@@ -265,7 +281,10 @@ fn spawn_background_compact(db: AgentDb, app: AppHandle, settings: Value, sessio
                 if let Some(fallback_keep_pairs) = info.fallback_keep_pairs {
                     summary_payload["fallback_keep_pairs"] = json!(fallback_keep_pairs);
                 }
-                let _ = app.emit("agent-loop-summary-injected", summary_payload);
+                let _ = app.emit(
+                    "agent-loop-summary-injected",
+                    summary_payload,
+                );
                 emit_usage(&app, &session_id, &settings, &db);
             }
             Ok(None) => {}

@@ -24,6 +24,7 @@ const {
   sendMessage,
   handleConfirmation: rawHandleConfirmation,
   clearChat,
+  dismissError,
   activeSession,
   lastSettings,
   initContextSettings,
@@ -134,6 +135,7 @@ onUnmounted(() => {
       @stop-loop="cancelSession"
       @confirm-tool-call="handleConfirmation"
       @model-change="onModelChange"
+      @dismiss-error="dismissError"
     >
       <template #header>
         <div class="header-row">

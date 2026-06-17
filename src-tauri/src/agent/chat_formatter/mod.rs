@@ -1,45 +1,57 @@
-use serde_json::Value;
+pub mod openai;
+pub mod anthropic;
 
-#[derive(Debug, Clone)]
+pub use self::openai::OpenAIChatFormatter;
+pub use self::anthropic::AnthropicChatFormatter;
+
+/// Provider-agnostic message representation.
 pub struct LlmMessage {
     pub role: String,
-    pub content: String,
+    pub text_content: String,
+    pub tool_calls: Option<Vec<LlmToolCall>>,
+    pub tool_call_id: Option<String>,
+    pub thinking: Option<String>,
 }
 
-#[derive(Debug, Clone)]
 pub struct LlmToolCall {
     pub id: String,
     pub name: String,
-    pub arguments: Value,
+    pub arguments: String,
 }
 
-pub trait ChatFormatter: Send + Sync {
-    fn format_messages(
-        &self,
-        messages: &[LlmMessage],
-        system_prompt: &str,
-    ) -> Result<Value, String>;
-
-    fn format_tools(&self, tools: &[Value]) -> Result<Value, String>;
-
-    fn parse_response(&self, response: &Value) -> Result<ParseResult, String>;
-
-    fn parse_chunk(&self, chunk: &Value) -> Result<ChunkResult, String>;
-}
-
-pub enum ParseResult {
-    Content(String),
-    ToolCalls(Vec<LlmToolCall>),
-}
-
-pub struct ChunkResult {
-    pub content_delta: Option<String>,
-    pub thinking_delta: Option<String>,
-    pub tool_calls: Vec<LlmToolCall>,
+/// A single SSE event parsed by a ChatFormatter.
+/// Not all fields are populated on every event — the accumulator merges them.
+#[derive(Default, Debug)]
+pub struct StreamDelta {
+    pub content_delta: String,
+    pub thinking_delta: String,
+    pub tool_call_deltas: Vec<StreamToolCallDelta>,
     pub finish_reason: Option<String>,
 }
 
-pub mod anthropic;
-pub mod openai;
-pub use anthropic::AnthropicChatFormatter;
-pub use openai::OpenAIChatFormatter;
+#[derive(Default, Debug)]
+pub struct StreamToolCallDelta {
+    pub index: usize,
+    pub id: String,
+    pub name: String,
+    pub arguments_delta: String,
+}
+
+/// Provider-agnostic formatter trait.
+pub trait ChatFormatter: Send + Sync {
+    /// The URL path for chat completions (e.g. "/v1/chat/completions", "/v1/messages")
+    fn chat_path(&self) -> &str;
+
+    /// Build the HTTP request body from the internal message representation.
+    fn build_request(
+        &self,
+        model: &str,
+        system_prompt: Option<&str>,
+        messages: &[LlmMessage],
+        tools: Option<&serde_json::Value>,
+        stream: bool,
+    ) -> serde_json::Value;
+
+    /// Parse a single SSE "data:" line into a StreamDelta.
+    fn parse_chunk(&self, data: &str) -> Result<StreamDelta, String>;
+}
