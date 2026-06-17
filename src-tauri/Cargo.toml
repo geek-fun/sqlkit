@@ -65,14 +65,12 @@ hex = "0.4"
 rust_xlsxwriter = "0.64"
 calamine = "0.22"
 
-# Agent / LLM dependencies
-async-openai = "0.25"
+# Agent / LLM dependencies (now in data-studio-agent-lib)
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "native-tls",
   "socks"
 ] }
-tiktoken-rs = "0.5"
 http = "1"
 log = "0.4"
 futures = "0.3"

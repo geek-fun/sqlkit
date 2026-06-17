@@ -162,8 +162,8 @@ mod tests {
         mock.expect_get_connections()
             .return_once(|| {
                 Ok(json!([
-                    {"id": 1, "name": "My PG", "type": "POSTGRESQL", "password": "secret"},
-                    {"id": 2, "name": "My MySQL", "type": "MYSQL", "password": "s3cret"},
+                    {"id": 1, "name": "My PG", "db_type": "POSTGRESQL", "password": "secret"},
+                    {"id": 2, "name": "My MySQL", "db_type": "MYSQL", "password": "s3cret"},
                 ]))
             });
 
@@ -214,8 +214,8 @@ mod tests {
         mock.expect_get_connections()
             .return_once(|| {
                 Ok(json!([
-                    {"id": null, "name": null, "type": null},
-                    {"id": 1, "name": "valid", "type": "PG"},
+                    {"id": null, "name": null, "db_type": null},
+                    {"id": 1, "name": "valid", "db_type": "PG"},
                 ]))
             });
 
