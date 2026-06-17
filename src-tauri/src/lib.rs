@@ -14,6 +14,7 @@ pub mod menu;
 
 // Agent / AI modules
 pub mod agent;
+pub mod agent_adapters;
 pub mod capabilities;
 pub mod common;
 pub mod db;
@@ -26,10 +27,6 @@ use tauri::AppHandle;
 pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 use agent::executor::SqlKitToolExecutor;
-use agent::loop_runner::{
-    cancel_agent_loop, compact_agent_session, confirm_tool_call, get_agent_context_usage,
-    get_tool_full_result, run_agent_loop, CancelMap, ConfirmMap,
-};
 use agent::query_history::{add_query_history_entry, load_query_history};
 use agent::session_store::{
     clear_agent_session_messages, clear_session_confirmation_rules, create_agent_session,
@@ -38,9 +35,14 @@ use agent::session_store::{
     migrate_session_metadata, save_attached_source, save_confirmation_rule, update_session_meta,
     update_session_status,
 };
-use agent::tool_executor::ToolExecutor;
-use agent::{get_all_tools, list_llm_models, run_agent_step, validate_llm_config};
+use agent_adapters::{
+    cancel_agent_loop, compact_agent_session, confirm_tool_call, get_agent_context_usage,
+    get_all_tools, get_tool_full_result, list_llm_models, run_agent_loop, run_agent_step,
+    validate_llm_config,
+};
 use capabilities::commands::{get_available_tools, invoke_capability};
+use data_studio_agent_lib as lib;
+use data_studio_agent_storage_sqlite as storage;
 
 #[derive(Clone, serde::Serialize)]
 struct AuthPayload {
@@ -102,8 +104,8 @@ pub fn run() {
                 .app_data_dir()
                 .map_err(|e| format!("Failed to resolve app data dir: {}", e))?;
             let db_path = app_data_dir.join("agent.sqlite");
-            let agent_db = db::open(&db_path)?;
-            db::migrate(&agent_db)?;
+            let agent_db = storage::db::open(&db_path)?;
+            storage::db::migrate(&agent_db)?;
             {
                 let conn = agent_db.0.lock().map_err(|e| e.to_string())?;
                 recover_stuck_sessions_inner(&conn)?;
@@ -112,11 +114,11 @@ pub fn run() {
 
             use std::collections::HashMap;
             use std::sync::{Arc, Mutex};
-            let confirm_map: ConfirmMap = Arc::new(Mutex::new(HashMap::new()));
-            let cancel_map: CancelMap = Arc::new(Mutex::new(HashMap::new()));
+            let confirm_map: lib::traits::ConfirmMap = Arc::new(Mutex::new(HashMap::new()));
+            let cancel_map: lib::traits::CancelMap = Arc::new(Mutex::new(HashMap::new()));
             app.manage(confirm_map);
             app.manage(cancel_map);
-            let executor: Arc<dyn ToolExecutor> = Arc::new(SqlKitToolExecutor);
+            let executor: Arc<dyn lib::ToolExecutor> = Arc::new(SqlKitToolExecutor);
             app.manage(executor);
 
             use tauri::{Emitter, Listener};
