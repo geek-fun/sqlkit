@@ -49,8 +49,4 @@ export const jdbcApi = {
   downloadDriver: (dbType: string) => invoke<void>('download_driver', { dbType }),
 
   removeDriver: (dbType: string) => invoke<void>('remove_driver', { dbType }),
-
-  getJdbcNeeded: () => invoke<boolean>('get_jdbc_needed'),
-
-  setJdbcNeeded: (needed: boolean) => invoke<void>('set_jdbc_needed', { needed }),
 }

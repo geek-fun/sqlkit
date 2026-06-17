@@ -191,22 +191,6 @@ fn parse_jar_version(artifact: &str, classifier: Option<&str>, filename: &str) -
     Some(version_str.to_string())
 }
 
-/// Check whether a driver JAR is already cached on disk for the given artifact name.
-/// Looks in `~/.sqlkit/jdbc-bridge/drivers/{artifact}/` for any `.jar` file.
-fn is_driver_cached(artifact: &str) -> bool {
-    let dir = drivers_cache_dir().join(artifact);
-    if !dir.exists() {
-        return false;
-    }
-    std::fs::read_dir(&dir)
-        .map(|entries| {
-            entries.flatten().any(|e| {
-                e.path().extension() == Some(std::ffi::OsStr::new("jar"))
-            })
-        })
-        .unwrap_or(false)
-}
-
 /// Get the path to the JDBC driver cache directory (`~/.sqlkit/jdbc-bridge/drivers/`).
 fn drivers_cache_dir() -> PathBuf {
     jre::home_dir()
@@ -283,29 +267,4 @@ pub async fn check_jre_update() -> Result<JreUpdateStatus, String> {
         latest_version: latest,
         update_available,
     })
-}
-
-#[tauri::command]
-pub async fn get_jdbc_needed() -> Result<bool, String> {
-    Ok(!jdbc_not_needed_path().exists())
-}
-
-#[tauri::command]
-pub async fn set_jdbc_needed(needed: bool) -> Result<(), String> {
-    let path = jdbc_not_needed_path();
-    if needed {
-        let _ = std::fs::remove_file(&path);
-    } else {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| format!("Failed to create config dir: {}", e))?;
-        }
-        std::fs::write(&path, "")
-            .map_err(|e| format!("Failed to write JDBC preference: {}", e))?;
-    }
-    Ok(())
-}
-
-fn jdbc_not_needed_path() -> PathBuf {
-    jre::home_dir().join(".sqlkit").join(".jdbc_not_needed")
 }

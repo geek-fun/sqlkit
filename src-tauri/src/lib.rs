@@ -198,8 +198,6 @@ pub fn run() {
             commands::list_drivers,
             commands::download_driver,
             commands::remove_driver,
-            commands::get_jdbc_needed,
-            commands::set_jdbc_needed,
             // Connection management
             commands::save_connection,
             commands::list_connections,
