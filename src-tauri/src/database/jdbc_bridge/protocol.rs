@@ -16,8 +16,9 @@ pub enum JdbcMethod {
     ListSchemas,
     ListTables,
     ListColumns,
-    TestConnection,
     Ping,
+    ResolveDriver,
+    TestConnection,
 }
 
 /// A JSON-RPC request sent from Rust to Java.
@@ -98,6 +99,22 @@ pub struct ListParams {
     pub schema: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub table: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResolveDriverParams {
+    pub maven_group: String,
+    pub maven_artifact: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version_cap: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub maven_classifier: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResolveDriverResult {
+    pub jar_path: String,
+    pub resolved_version: String,
 }
 
 // ── Response result types ──

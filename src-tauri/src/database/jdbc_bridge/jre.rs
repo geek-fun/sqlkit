@@ -1,8 +1,9 @@
 //! Managed JRE detection, download, and lifecycle.
 //!
-//! SQLKit bundles a minimal JRE 21 built with `jlink` for each supported
+//! SQLKit downloads a JRE 21 from Adoptium (Eclipse Temurin) for each supported
 //! platform. This module handles detecting Java (managed → `JAVA_HOME` → `PATH`),
-//! downloading/extracting the managed JRE, and cleaning it up.
+//! downloading/extracting the managed JRE, version checking via the built-in
+//! `release` file, and cleaning it up.
 
 use crate::database::error::{DbError, DbResult};
 use std::path::PathBuf;
@@ -10,18 +11,12 @@ use std::path::PathBuf;
 /// Subdirectory under user home for the managed JRE.
 const JRE_BASE_DIR: &str = ".sqlkit/jre";
 
-/// Version of the bundled JRE.
-pub const MANAGED_JRE_VERSION: &str = "21";
-
 /// Java executable path relative to JRE root (platform-aware).
 const JAVA_EXE: &str = if cfg!(target_os = "windows") {
     "bin/java.exe"
 } else {
     "bin/java"
 };
-
-/// Download URL base for releases.
-const BRIDGE_RELEASE_URL: &str = "https://github.com/geek-fun/sqlkit/releases/latest/download";
 
 // ── helpers ────────────────────────────────────────────────
 
@@ -50,38 +45,22 @@ pub fn is_managed_jre_installed() -> bool {
     managed_jre_java_path().exists()
 }
 
-/// Platform-specific JRE archive filename.
-pub fn jre_archive_name() -> &'static str {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-    {
-        "jre-macos-aarch64.tar.gz"
-    }
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
-    {
-        "jre-macos-x64.tar.gz"
-    }
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
-    {
-        "jre-linux-x64.tar.gz"
-    }
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
-    {
-        "jre-linux-aarch64.tar.gz"
-    }
-    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
-    {
-        "jre-windows-x64.zip"
-    }
+// ── Adoptium platform ─────────────────────────────────────
+
+/// Determine the Adoptium platform string for the current architecture.
+fn adoptium_platform() -> Option<&'static str> {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))] { Some("macos-aarch64") }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))] { Some("macos-x64") }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))] { Some("linux-x64") }
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))] { Some("linux-aarch64") }
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))] { Some("windows-x64") }
     #[cfg(not(any(
         all(target_os = "macos", target_arch = "aarch64"),
         all(target_os = "macos", target_arch = "x86_64"),
         all(target_os = "linux", target_arch = "x86_64"),
         all(target_os = "linux", target_arch = "aarch64"),
         all(target_os = "windows", target_arch = "x86_64"),
-    )))]
-    {
-        ""
-    }
+    )))] { None }
 }
 
 // ── detection ─────────────────────────────────────────────
@@ -133,19 +112,86 @@ impl JreDetector {
     }
 }
 
+// ── version reading ───────────────────────────────────────
+
+/// Read the JRE version from the built-in `release` file.
+///
+/// The release file is a Java properties file that ships with every OpenJDK build
+/// at `~/.sqlkit/jre/release`. It contains lines like:
+///   JAVA_VERSION="21.0.11"
+///   JAVA_BUILD="21.0.11+10"
+pub fn read_jre_version() -> Option<String> {
+    let release_path = jre_base_dir().join("release");
+    if !release_path.exists() {
+        return None;
+    }
+    let content = std::fs::read_to_string(release_path).ok()?;
+    for line in content.lines() {
+        let line = line.trim();
+        if line.starts_with("JAVA_VERSION=") {
+            let version = line
+                .trim_start_matches("JAVA_VERSION=")
+                .trim_matches('"')
+                .trim()
+                .to_string();
+            return Some(version);
+        }
+    }
+    None
+}
+
+// ── Adoptium update check ─────────────────────────────────
+
+/// Check if a newer JRE build is available from Adoptium.
+///
+/// Returns `Some(redirect_url)` with the redirect target containing the build
+/// version, or `None` if not available / on error.
+pub async fn check_adoptium_update() -> Option<String> {
+    let platform = adoptium_platform()?;
+    let url = format!(
+        "https://api.adoptium.net/v3/binary/latest/21/ga/{platform}/jre/hotspot/normal/eclipse"
+    );
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()
+        .ok()?;
+    let response = client.head(&url).send().await.ok()?;
+    let final_url = response.url().to_string();
+    Some(final_url)
+}
+
+/// Extract the build version from an Adoptium redirect URL.
+///
+/// e.g. ".../OpenJDK21U-jre_aarch64_mac_hotspot_21.0.10.8_1.tar.gz" -> "21.0.10.8"
+pub fn parse_adoptium_build_version(url: &str) -> Option<String> {
+    // Find "hotspot_" or "hotspot-" in URL
+    let marker = if let Some(idx) = url.find("hotspot_") {
+        idx + 8
+    } else if let Some(idx) = url.find("hotspot-") {
+        idx + 8
+    } else {
+        return None;
+    };
+    // Take the version part until the next non-version char
+    let rest = &url[marker..];
+    let version: String = rest
+        .chars()
+        .take_while(|c| c.is_ascii_digit() || *c == '.')
+        .collect();
+    if version.is_empty() { None } else { Some(version) }
+}
+
 // ── download / remove ─────────────────────────────────────
 
-/// Download and extract the managed JRE for the current platform.
+/// Download and extract the managed JRE for the current platform from Adoptium.
 ///
-/// The JRE is a minimal image built with `jlink` (only `java.base` + `java.sql`),
-/// compressed as `.tar.gz` (macOS / Linux) or `.zip` (Windows).
+/// Downloads the latest JRE 21 (Eclipse Temurin) build from the Adoptium API,
+/// extracts the archive, and renames the extracted directory to `jre`.
 pub async fn download_managed_jre() -> DbResult<()> {
-    let archive_name = jre_archive_name();
-    if archive_name.is_empty() {
-        return Err(DbError::Connection(
-            "No bundled JRE available for this platform".to_string(),
-        ));
-    }
+    let platform = adoptium_platform().ok_or_else(|| {
+        DbError::Connection("No JRE available for this platform".to_string())
+    })?;
 
     let parent = jre_base_dir()
         .parent()
@@ -155,7 +201,10 @@ pub async fn download_managed_jre() -> DbResult<()> {
         .await
         .map_err(|e| DbError::Connection(format!("Failed to create JRE parent dir: {}", e)))?;
 
-    let url = format!("{}/jre/{}", BRIDGE_RELEASE_URL, archive_name);
+    let url = format!(
+        "https://api.adoptium.net/v3/binary/latest/21/ga/{platform}/jre/hotspot/normal/eclipse"
+    );
+
     let response = reqwest::get(&url)
         .await
         .map_err(|e| DbError::Connection(format!("Failed to download JRE: {}", e)))?;
@@ -168,12 +217,15 @@ pub async fn download_managed_jre() -> DbResult<()> {
         )));
     }
 
+    let is_zip = platform.starts_with("windows");
+
     let bytes = response
         .bytes()
         .await
         .map_err(|e| DbError::Connection(format!("Failed to read JRE download: {}", e)))?;
 
-    let tmp_path = parent.join(format!("{}.tmp", archive_name));
+    let ext = if is_zip { "zip" } else { "tar.gz" };
+    let tmp_path = parent.join(format!("jre_download.{}", ext));
     tokio::fs::write(&tmp_path, &bytes)
         .await
         .map_err(|e| DbError::Connection(format!("Failed to write JRE archive: {}", e)))?;
@@ -189,33 +241,31 @@ pub async fn download_managed_jre() -> DbResult<()> {
         let file =
             std::fs::File::open(&tmp_path).map_err(|e| format!("Failed to open archive: {}", e))?;
 
-        if archive_name.ends_with(".tar.gz") {
-            let decoder = flate2::read::GzDecoder::new(file);
-            let mut archive = tar::Archive::new(decoder);
-            archive
-                .unpack(&parent)
-                .map_err(|e| format!("Failed to extract JRE: {}", e))?;
-        } else if archive_name.ends_with(".zip") {
+        if is_zip {
             let mut archive = zip::ZipArchive::new(file)
                 .map_err(|e| format!("Failed to open zip archive: {}", e))?;
             archive
                 .extract(&parent)
                 .map_err(|e| format!("Failed to extract JRE zip: {}", e))?;
+        } else {
+            let decoder = flate2::read::GzDecoder::new(file);
+            let mut archive = tar::Archive::new(decoder);
+            archive
+                .unpack(&parent)
+                .map_err(|e| format!("Failed to extract JRE: {}", e))?;
         }
 
+        // Find the extracted directory that contains bin/java
         for entry in std::fs::read_dir(&parent)
             .map_err(|e| format!("Failed to list extracted files: {}", e))?
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
         {
-            let bin_java = entry
-                .path()
-                .join("bin")
-                .join(if cfg!(target_os = "windows") {
-                    "java.exe"
-                } else {
-                    "java"
-                });
+            let bin_java = entry.path().join("bin").join(if cfg!(target_os = "windows") {
+                "java.exe"
+            } else {
+                "java"
+            });
             if bin_java.exists() {
                 let extracted_path = entry.path();
                 let target_path = parent.join("jre");
@@ -268,30 +318,6 @@ mod tests {
     }
 
     #[test]
-    fn test_jre_archive_name_macos_aarch64() {
-        #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
-        assert_eq!(jre_archive_name(), "jre-macos-aarch64.tar.gz");
-
-        #[cfg(not(all(target_os = "macos", target_arch = "aarch64")))]
-        let _ = jre_archive_name(); // no-op: test only applies on macOS ARM
-    }
-
-    #[test]
-    fn test_jre_archive_name_non_empty_for_known_platform() {
-        let name = jre_archive_name();
-        // On known platforms the name is non-empty; on unknown platforms
-        // it's empty by design. Both are valid — we just verify format when set.
-        if !name.is_empty() {
-            assert!(name.starts_with("jre-"));
-            assert!(
-                name.ends_with(".tar.gz") || name.ends_with(".zip"),
-                "Expected .tar.gz or .zip, got: {}",
-                name
-            );
-        }
-    }
-
-    #[test]
     fn test_is_valid_java() {
         // Non-existent path is invalid
         assert!(!JreDetector::is_valid_java(&PathBuf::from(
@@ -304,6 +330,64 @@ mod tests {
                 &std::env::current_exe().unwrap_or_else(|_| PathBuf::from("/"))
             ),
             "current_exe() should be valid"
+        );
+    }
+
+    #[test]
+    fn test_read_jre_version_from_release_file() {
+        let content = "JAVA_VERSION=\"21.0.11\"\nJAVA_BUILD=\"21.0.11+10\"\n";
+        let parsed = content
+            .lines()
+            .filter_map(|line| {
+                let line = line.trim();
+                if line.starts_with("JAVA_VERSION=") {
+                    Some(
+                        line.trim_start_matches("JAVA_VERSION=")
+                            .trim_matches('"')
+                            .trim()
+                            .to_string(),
+                    )
+                } else {
+                    None
+                }
+            })
+            .next();
+        assert_eq!(parsed, Some("21.0.11".to_string()));
+    }
+
+    #[test]
+    fn test_parse_adoptium_build_version() {
+        // macOS aarch64
+        let url = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.10.8%2B1/OpenJDK21U-jre_aarch64_mac_hotspot_21.0.10.8_1.tar.gz";
+        assert_eq!(
+            parse_adoptium_build_version(url),
+            Some("21.0.10.8".to_string())
+        );
+
+        // Linux x64
+        let url2 = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.11.9%2B1/OpenJDK21U-jre_x64_linux_hotspot_21.0.11.9_1.tar.gz";
+        assert_eq!(
+            parse_adoptium_build_version(url2),
+            Some("21.0.11.9".to_string())
+        );
+
+        // Windows x64 (zip)
+        let url3 = "https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.9.2%2B1/OpenJDK21U-jre_x64_windows_hotspot_21.0.9.2_1.zip";
+        assert_eq!(
+            parse_adoptium_build_version(url3),
+            Some("21.0.9.2".to_string())
+        );
+
+        // Invalid - no hotspot marker
+        assert_eq!(
+            parse_adoptium_build_version("https://example.com/no-match"),
+            None
+        );
+
+        // Empty version part after hotspot_
+        assert_eq!(
+            parse_adoptium_build_version("https://example.com/hotspot_"),
+            None
         );
     }
 }

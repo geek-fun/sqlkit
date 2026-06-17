@@ -1,18 +1,17 @@
-//! JDBC bridge and driver download management.
+//! JDBC bridge download management.
 //!
-//! Downloads the bridge fat JAR and per-database JDBC driver JARs from
-//! GitHub Releases and Maven Central on demand.
+//! Downloads the bridge fat JAR from GitHub Releases, version-pinned
+//! by the app version. JDBC driver JARs are resolved by the Java
+//! bridge process, not by Rust.
 
-use crate::database::config::DatabaseType;
 use crate::database::error::{DbError, DbResult};
-use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
 /// Bridge JAR filename.
 const BRIDGE_JAR: &str = "jdbc-bridge.jar";
 
-/// Download URL base for bridge releases.
-const BRIDGE_RELEASE_URL: &str = "https://github.com/geek-fun/sqlkit/releases/latest/download";
+/// Current app version, used for bridge JAR version pinning.
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Subdirectory under user home for bridge data.
 const BRIDGE_DIR: &str = ".sqlkit/jdbc-bridge";
@@ -25,48 +24,14 @@ fn bridge_dir() -> PathBuf {
     PathBuf::from(home).join(BRIDGE_DIR)
 }
 
-/// Get the drivers directory.
-fn drivers_dir() -> PathBuf {
-    bridge_dir().join("drivers")
+/// Get the path to the bridge JAR (version-pinned).
+pub fn bridge_jar_path() -> PathBuf {
+    bridge_dir().join(APP_VERSION).join(BRIDGE_JAR)
 }
 
-/// Get the path to the bridge JAR.
-pub fn bridge_jar_path() -> PathBuf {
-    bridge_dir().join(BRIDGE_JAR)
-}
 /// Check if the bridge JAR is already installed.
 pub fn is_bridge_installed() -> bool {
     bridge_jar_path().exists()
-}
-
-/// Check if a JDBC driver is available for the given database type.
-pub fn is_driver_available(db_type: DatabaseType) -> bool {
-    let name = driver_jar_name(db_type);
-    drivers_dir().join(name).exists()
-}
-
-/// Check if a specific driver version JAR is installed.
-pub fn is_driver_version_installed(db_type: DatabaseType, version: &str) -> bool {
-    let jar_name = driver_jar_name_for_version(db_type, version);
-    drivers_dir().join(&jar_name).exists()
-}
-
-/// Verify SHA-256 checksum of a file against expected hex string.
-pub fn verify_sha256(path: &Path, expected_hex: &str) -> DbResult<()> {
-    let bytes = std::fs::read(path)
-        .map_err(|e| DbError::Connection(format!("Failed to read file for checksum: {}", e)))?;
-    let mut hasher = Sha256::new();
-    hasher.update(&bytes);
-    let actual = hex::encode(hasher.finalize());
-    if !actual.eq_ignore_ascii_case(expected_hex) {
-        return Err(DbError::Connection(format!(
-            "SHA-256 mismatch for {}: expected {}, got {}",
-            path.display(),
-            expected_hex,
-            actual
-        )));
-    }
-    Ok(())
 }
 
 /// Download a file from URL to a temporary path, then atomically rename to final.
@@ -94,177 +59,81 @@ pub async fn download_to_path(url: &str, dest: &Path) -> DbResult<()> {
     Ok(())
 }
 
-/// Ensure the bridge JAR and required driver are installed.
-pub fn ensure_bridge_setup(db_type: DatabaseType) -> DbResult<()> {
-    let bridge = bridge_jar_path();
-    if !bridge.exists() {
-        return Err(DbError::Connection(format!(
-            "JDBC bridge not installed. Run download_bridge_plugin() first. \
-             Expected JAR at: {}",
-            bridge.display()
-        )));
-    }
-    if !is_driver_available(db_type) {
-        return Err(DbError::Connection(format!(
-            "JDBC driver for {:?} not available. Run download_driver({:?}) first.",
-            db_type, db_type
-        )));
-    }
-    Ok(())
-}
-
-/// Download the bridge fat JAR from GitHub Releases.
+/// Download the bridge fat JAR from GitHub Releases (version-pinned).
 pub async fn download_bridge_plugin() -> DbResult<()> {
+    let jar_path = bridge_jar_path();
+
+    // Ensure parent dir exists
+    if let Some(parent) = jar_path.parent() {
+        tokio::fs::create_dir_all(parent)
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to create bridge dir: {}", e)))?;
+    }
+
+    let url = format!(
+        "https://github.com/geek-fun/sqlkit/releases/download/v{}/jdbc-bridge.jar",
+        APP_VERSION
+    );
+    download_to_path(&url, &jar_path).await?;
+
+    // Clean up old bridge versions after successful download
+    cleanup_old_bridge_versions().await?;
+
+    Ok(())
+}
+
+/// Clean up bridge JAR directories for versions other than the current one.
+async fn cleanup_old_bridge_versions() -> DbResult<()> {
     let dir = bridge_dir();
-    tokio::fs::create_dir_all(&dir)
+    if !dir.exists() {
+        return Ok(());
+    }
+    let mut entries = tokio::fs::read_dir(&dir)
         .await
-        .map_err(|e| DbError::Connection(format!("Failed to create bridge dir: {}", e)))?;
-
-    let url = format!("{}/{}", BRIDGE_RELEASE_URL, BRIDGE_JAR);
-    let response = reqwest::get(&url)
+        .map_err(|e| DbError::Connection(format!("Failed to list bridge dir: {}", e)))?;
+    let mut remove_tasks = Vec::new();
+    while let Some(entry) = entries
+        .next_entry()
         .await
-        .map_err(|e| DbError::Connection(format!("Failed to download bridge: {}", e)))?;
-
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to read bridge download: {}", e)))?;
-
-    let path = bridge_jar_path();
-    tokio::fs::write(&path, &bytes)
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to write bridge JAR: {}", e)))?;
-
-    Ok(())
-}
-
-/// Download a JDBC driver JAR for the given database type (from GitHub Releases).
-pub async fn download_driver(db_type: DatabaseType) -> DbResult<()> {
-    let dir = drivers_dir();
-    tokio::fs::create_dir_all(&dir)
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to create drivers dir: {}", e)))?;
-
-    let jar_name = driver_jar_name(db_type);
-    let url = format!("{}/drivers/{}", BRIDGE_RELEASE_URL, jar_name);
-
-    let response = reqwest::get(&url)
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to download driver: {}", e)))?;
-
-    let bytes = response
-        .bytes()
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to read driver download: {}", e)))?;
-
-    let path = drivers_dir().join(&jar_name);
-    tokio::fs::write(&path, &bytes)
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to write driver JAR: {}", e)))?;
-
-    Ok(())
-}
-
-/// Download a specific driver version from Maven Central.
-///
-/// Constructs the Maven Central URL from group/artifact/version coordinates
-/// and optionally verifies the SHA-256 checksum.
-/// When `maven_classifier` is `Some`, the JAR filename becomes
-/// `{artifact}-{version}-{classifier}.jar` (e.g. `hive-jdbc-3.1.3-standalone.jar`).
-pub async fn download_driver_from_maven(
-    maven_group: &str,
-    maven_artifact: &str,
-    version: &str,
-    dest_path: &Path,
-    expected_sha256: &str,
-    maven_classifier: Option<&str>,
-) -> DbResult<()> {
-    if dest_path.exists() && !expected_sha256.is_empty() {
-        if verify_sha256(dest_path, expected_sha256).is_ok() {
-            return Ok(()); // Already downloaded and valid
+        .map_err(|e| DbError::Connection(format!("Failed to read bridge entry: {}", e)))?
+    {
+        let path = entry.path();
+        if path.is_dir() {
+            if let Some(dir_name) = path.file_name().and_then(|n| n.to_str()) {
+                if dir_name != APP_VERSION && dir_name != "drivers" {
+                    remove_tasks.push(tokio::fs::remove_dir_all(path));
+                }
+            }
         }
     }
-
-    let group_path = maven_group.replace('.', "/");
-    let classifier_suffix = maven_classifier
-        .map(|c| format!("-{c}"))
-        .unwrap_or_default();
-    let url = format!(
-        "https://repo1.maven.org/maven2/{}/{}/{}/{}-{}{}.jar",
-        group_path, maven_artifact, version, maven_artifact, version, classifier_suffix
-    );
-
-    download_to_path(&url, dest_path).await?;
-
-    if !expected_sha256.is_empty() {
-        verify_sha256(dest_path, expected_sha256)?;
+    for task in remove_tasks {
+        task.await
+            .map_err(|e| DbError::Connection(format!("Failed to remove old bridge version: {}", e)))?;
     }
-
     Ok(())
 }
 
-/// Map a DatabaseType to a JDBC driver JAR filename.
-fn driver_jar_name(db_type: DatabaseType) -> &'static str {
-    use DatabaseType::*;
-    match db_type {
-        DB2 => "db2-jdbc.jar",
-        H2 => "h2-2.4.240.jar",
-        Snowflake => "snowflake-jdbc.jar",
-        Oracle => "ojdbc11.jar",
-        Derby => "derbyclient.jar",
-        DM8Oracle => "dm-jdbc.jar",
-        XuguDB => "xugudb-jdbc.jar",
-        GBase8a => "gbase8a-jdbc.jar",
-        Hive => "hive-jdbc.jar",
-        Databricks => "databricks-jdbc.jar",
-        Hana => "ngdbc.jar",
-        Teradata => "terajdbc.jar",
-        Vertica => "vertica-jdbc.jar",
-        Exasol => "exasol-jdbc.jar",
-        BigQuery => "bigquery-jdbc.jar",
-        Informix => "informix-jdbc.jar",
-        Kylin => "kylin-jdbc.jar",
-        Cassandra => "cassandra-jdbc.jar",
-        Iris => "iris-jdbc.jar",
-        Access => "ucanaccess.jar",
-        _ => "unknown.jar",
+/// List all installed bridge JAR versions on disk.
+pub fn list_bridge_versions() -> Vec<String> {
+    let dir = bridge_dir();
+    if !dir.exists() {
+        return Vec::new();
     }
-}
-
-/// Get driver JAR filename for a specific version (for fallback chain).
-pub fn driver_jar_name_for_version(db_type: DatabaseType, version: &str) -> String {
-    use DatabaseType::*;
-    match db_type {
-        DB2 => format!("db2jcc-{}.jar", version),
-        H2 => format!("h2-{}.jar", version),
-        Snowflake => format!("snowflake-jdbc-{}.jar", version),
-        Oracle => format!("ojdbc-{}.jar", version),
-        Derby => format!("derbyclient-{}.jar", version),
-        DM8Oracle => format!("dm-jdbc-{}.jar", version),
-        XuguDB => format!("xugudb-jdbc-{}.jar", version),
-        GBase8a => format!("gbase8a-jdbc-{}.jar", version),
-        Hive => format!("hive-jdbc-{}.jar", version),
-        Databricks => format!("databricks-jdbc-{}.jar", version),
-        Hana => format!("ngdbc-{}.jar", version),
-        Teradata => format!("terajdbc-{}.jar", version),
-        Vertica => format!("vertica-jdbc-{}.jar", version),
-        Exasol => format!("exasol-jdbc-{}.jar", version),
-        BigQuery => format!("bigquery-jdbc-{}.jar", version),
-        Informix => format!("informix-jdbc-{}.jar", version),
-        Kylin => format!("kylin-jdbc-{}.jar", version),
-        Cassandra => format!("cassandra-jdbc-{}.jar", version),
-        Iris => format!("iris-jdbc-{}.jar", version),
-        Access => format!("ucanaccess-{}.jar", version),
-        _ => format!("unknown-{}.jar", version),
+    let mut versions = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(&dir) {
+        for entry in entries.flatten() {
+            if entry.path().is_dir() {
+                if let Some(name) = entry.file_name().to_str() {
+                    if name != "drivers" {
+                        let jar = entry.path().join(BRIDGE_JAR);
+                        if jar.exists() {
+                            versions.push(name.to_string());
+                        }
+                    }
+                }
+            }
+        }
     }
-}
-
-/// Get the full path to a driver JAR for the given database type.
-pub fn driver_jar_path(db_type: DatabaseType) -> PathBuf {
-    drivers_dir().join(driver_jar_name(db_type))
-}
-
-/// Get the full path to a version-specific driver JAR.
-pub fn driver_jar_path_for_version(db_type: DatabaseType, version: &str) -> PathBuf {
-    drivers_dir().join(driver_jar_name_for_version(db_type, version))
+    versions.sort();
+    versions
 }
