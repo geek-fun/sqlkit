@@ -144,7 +144,7 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.CLOUDSQLMYSQL]: MYSQL_BACKEND,
 }
 
-const dbTypeFromBackend: Record<string, DatabaseType> = {
+export const dbTypeFromBackend: Record<string, DatabaseType> = {
   PostgreSQL: DatabaseType.POSTGRESQL,
   MySQL: DatabaseType.MYSQL,
   SqlServer: DatabaseType.SQLSERVER,
