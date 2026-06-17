@@ -60,7 +60,7 @@ function formatTime(session: AgentSession): string {
 
 <template>
   <div class="history-panel">
-    <div class="history-header">
+    <div class="history-header border-b border-border">
       <span class="history-title">{{ t('dataStudio.history.title') }}</span>
       <div class="history-header-actions">
         <button
@@ -68,14 +68,14 @@ function formatTime(session: AgentSession): string {
           :title="t('dataStudio.history.newSession')"
           @click="emit('newSession')"
         >
-          <span class="i-carbon-add h-4 w-4" />
+          <span class="i-carbon-add h-3.5 w-3.5" />
         </button>
         <button
           class="icon-btn"
           :title="t('common.buttons.close')"
           @click="emit('close')"
         >
-          <span class="i-carbon-close h-4 w-4" />
+          <span class="i-carbon-close h-3.5 w-3.5" />
         </button>
       </div>
     </div>

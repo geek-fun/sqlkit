@@ -225,43 +225,43 @@ function syncAllProviderModels() {
       <!-- Main Conversation Area -->
       <div class="flex flex-1 flex-col min-w-0">
         <!-- Header -->
-        <div class="px-5 py-3 border-b border-border flex shrink-0 items-center justify-between">
+        <div class="px-4 py-2 border-b border-border flex shrink-0 items-center justify-between">
           <div class="flex gap-2 items-center">
             <button
-              class="text-muted-foreground rounded inline-flex h-8 w-8 transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
+              class="text-muted-foreground rounded inline-flex h-8 w-8 cursor-pointer transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
               :class="{ 'bg-muted text-foreground': historyPanelOpen }"
               :title="t('dataStudio.history.title')"
               @click="historyPanelOpen = !historyPanelOpen"
             >
-              <span class="i-carbon-time h-5 w-5" />
+              <span class="i-carbon-time h-3.5 w-3.5" />
             </button>
-            <span class="text-xs tracking-wider font-bold px-3 py-1 border border-border rounded-full">
+            <span class="text-[11px] tracking-wider font-bold px-3 py-0.5 border border-border rounded-full">
               {{ t('dataStudio.title') }}
             </span>
           </div>
           <div class="flex gap-2 items-center">
             <button
               v-if="isLoading"
-              class="text-destructive rounded inline-flex h-8 w-8 transition-colors items-center justify-center hover:bg-destructive/10"
+              class="text-destructive rounded inline-flex h-8 w-8 cursor-pointer transition-colors items-center justify-center hover:bg-destructive/10"
               :title="t('dataStudio.agent.stop')"
               @click="cancelSession"
             >
-              <span class="i-carbon-stop-filled h-5 w-5" />
+              <span class="i-carbon-stop-filled h-3.5 w-3.5" />
             </button>
             <button
-              class="text-muted-foreground rounded inline-flex h-8 w-8 transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
+              class="text-muted-foreground rounded inline-flex h-8 w-8 cursor-pointer transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
               :title="t('dataStudio.history.newSession')"
               @click="startNewSession"
             >
-              <span class="i-carbon-add h-5 w-5" />
+              <span class="i-carbon-add h-3.5 w-3.5" />
             </button>
             <button
               v-if="hasMessages"
-              class="text-muted-foreground rounded inline-flex h-8 w-8 transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
+              class="text-muted-foreground rounded inline-flex h-8 w-8 cursor-pointer transition-colors items-center justify-center hover:text-foreground hover:bg-muted"
               :title="t('dataStudio.agent.clearChat')"
               @click="clearChat"
             >
-              <span class="i-carbon-trash-can h-5 w-5" />
+              <span class="i-carbon-trash-can h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -302,7 +302,7 @@ function syncAllProviderModels() {
                   :alt="source.databaseType"
                 >
                 <span class="source-chip-name">{{ source.alias }}</span>
-                <span class="source-chip-edit i-carbon-settings h-3 w-3" />
+                <span class="source-chip-edit i-carbon-settings h-3.5 w-3.5" />
               </button>
 
               <!-- Add source dropdown -->
@@ -313,7 +313,7 @@ function syncAllProviderModels() {
                   :title="t('dataStudio.addSource.title')"
                   @click.stop="addSourceOpen = !addSourceOpen"
                 >
-                  <span class="i-carbon-add-alt h-4 w-4" />
+                  <span class="i-carbon-add-alt h-3.5 w-3.5" />
                 </button>
 
                 <Transition name="menu-rise">
@@ -387,9 +387,6 @@ function syncAllProviderModels() {
                     </div>
 
                     <div class="add-source-footer">
-                      <span class="add-source-count">
-                        {{ t('dataStudio.addSource.connectionsFound', { count: filteredAddConnections.length }) }}
-                      </span>
                       <button
                         class="add-source-connect-btn"
                         :disabled="!addSourceSelectedId"
@@ -419,7 +416,7 @@ function syncAllProviderModels() {
                   <span class="permission-trigger-label">
                     {{ sessionPermissionsMode === 'Auto' ? t('dataStudio.modifySource.modeFull') : t('dataStudio.modifySource.modeDefault') }}
                   </span>
-                  <span class="permission-trigger-chevron i-carbon-chevron-down h-3 w-3" />
+                  <span class="permission-trigger-chevron i-carbon-chevron-down h-3.5 w-3.5" />
                 </button>
                 <div v-if="permissionMenuOpen" class="permission-menu">
                   <div class="permission-menu-title">
@@ -430,7 +427,7 @@ function syncAllProviderModels() {
                     :class="{ 'permission-menu-item--active': sessionPermissionsMode === 'Ask' }"
                     @click="setAutoMode(false)"
                   >
-                    <span class="permission-menu-icon i-carbon-locked h-4 w-4" />
+                    <span class="permission-menu-icon i-carbon-locked h-3.5 w-3.5" />
                     <span class="permission-menu-label">
                       {{ t('dataStudio.modifySource.modeDefault') }}
                     </span>
@@ -444,7 +441,7 @@ function syncAllProviderModels() {
                     :class="{ 'permission-menu-item--active': sessionPermissionsMode === 'Auto' }"
                     @click="setAutoMode(true)"
                   >
-                    <span class="permission-menu-icon i-carbon-unlocked h-4 w-4" />
+                    <span class="permission-menu-icon i-carbon-unlocked h-3.5 w-3.5" />
                     <span class="permission-menu-label">
                       {{ t('dataStudio.modifySource.modeFull') }}
                     </span>
@@ -575,16 +572,16 @@ function syncAllProviderModels() {
 }
 
 .source-chip-edit {
-  opacity: 0;
+  opacity: 0.5;
   flex-shrink: 0;
   transition: opacity 0.15s;
 }
 
 .source-chip:hover .source-chip-edit {
-  opacity: 0.6;
+  opacity: 0.8;
 }
 
-.source-chip:hover .source-chip-edit:hover {
+.source-chip .source-chip-edit:hover {
   opacity: 1;
 }
 
@@ -662,6 +659,7 @@ function syncAllProviderModels() {
   padding: 8px 12px;
   text-align: left;
   border-bottom: 1px solid hsl(var(--border) / 0.5);
+  cursor: pointer;
   transition: background-color 0.12s;
 }
 
@@ -772,19 +770,12 @@ function syncAllProviderModels() {
 .add-source-footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   padding: 8px 12px;
   border-top: 1px solid hsl(var(--border));
   background: hsl(var(--muted) / 0.2);
 }
 
-.add-source-count {
-  font-size: 11px;
-  font-weight: 600;
-  color: hsl(var(--muted-foreground));
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
 
 .add-source-connect-btn {
   display: inline-flex;

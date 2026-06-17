@@ -146,7 +146,7 @@ onUnmounted(() => {
               :title="t('dataStudio.history.newSession')"
               @click="handleNewSession"
             >
-              <span class="i-carbon-add h-4 w-4" />
+              <span class="i-carbon-add h-3.5 w-3.5" />
             </button>
             <button
               class="header-icon-btn"
@@ -154,21 +154,21 @@ onUnmounted(() => {
               :title="t('dataStudio.history.title')"
               @click="historyPanelOpen = !historyPanelOpen"
             >
-              <span class="i-carbon-time h-4 w-4" />
+              <span class="i-carbon-time h-3.5 w-3.5" />
             </button>
             <button
               class="header-icon-btn"
               :title="t('dataStudio.agent.clearChat')"
               @click="handleClearChat"
             >
-              <span class="i-carbon-trash-can h-4 w-4" />
+              <span class="i-carbon-trash-can h-3.5 w-3.5" />
             </button>
             <button
               class="header-icon-btn header-icon-btn--close"
               :title="t('common.buttons.close')"
               @click="handleClose"
             >
-              <span class="i-carbon-close h-4 w-4" />
+              <span class="i-carbon-close h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -230,6 +230,7 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   padding: 12px 12px 12px 16px;
+  border-bottom: 1px solid hsl(var(--border));
 }
 
 .header-title {
