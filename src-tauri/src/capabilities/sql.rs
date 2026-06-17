@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use tauri::AppHandle;
-use tauri::Manager;
+use tauri::{AppHandle, Manager};
+use tauri_plugin_store::StoreExt;
 
 use crate::database::{DatabaseAdapter, QueryResult};
-use crate::state::ActiveConnection;
+use crate::state::{ActiveConnection, ServerConfig};
 
 use super::registry::CapabilityRegistry;
 use super::types::{Capability, CapabilityHandler, RiskLevel, SourceKind};
@@ -20,12 +20,54 @@ fn app_handle() -> AppHandle {
 
 async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String> {
     let app = app_handle();
-    let state: tauri::State<'_, crate::state::AppState> = app.state();
-    let conns = state.connections.lock().await;
-    conns
-        .get(connection_id)
-        .cloned()
-        .ok_or_else(|| format!("Connection not found: {}", connection_id))
+
+    // Check if already connected
+    {
+        let state: tauri::State<'_, crate::state::AppState> = app.state();
+        let conns = state.connections.lock().await;
+        if let Some(adapter) = conns.get(connection_id) {
+            return Ok(adapter.clone());
+        }
+    }
+
+    // Auto-connect: look up credentials from the store
+    let store = app
+        .store(".store.dat")
+        .map_err(|e| format!("Failed to open store: {}", e))?;
+    let all_connections = store
+        .get("connections")
+        .and_then(|v| v.as_array().cloned())
+        .ok_or_else(|| "No connections found in store".to_string())?;
+
+    let conn_value = all_connections
+        .into_iter()
+        .find(|c| {
+            c.get("id")
+                .and_then(|v| v.as_str())
+                == Some(connection_id)
+        })
+        .ok_or_else(|| {
+            format!("Connection '{}' not found in store. Connect manually first.", connection_id)
+        })?;
+
+    let server_config: ServerConfig =
+        serde_json::from_value(conn_value)
+            .map_err(|e| format!("Failed to parse connection config: {}", e))?;
+
+    let adapter = crate::commands::helpers::create_and_connect_adapter(
+        &server_config.db_type,
+        server_config.to_connection_config().map_err(|e| format!("Invalid connection config: {}", e))?,
+    )
+    .await?;
+
+    // Store the adapter for future use
+    {
+        let state: tauri::State<'_, crate::state::AppState> = app.state();
+        let mut conns = state.connections.lock().await;
+        conns.insert(connection_id.to_string(), adapter.clone());
+    }
+
+    Ok(adapter)
 }
 
 async fn execute_on_adapter(adapter: &ActiveConnection, sql: &str) -> Result<QueryResult, String> {
