@@ -4,6 +4,7 @@
 -->
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -14,6 +15,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   fileSelected: [file: File]
 }>()
+
+const { t } = useI18n()
 
 const isDragging = ref(false)
 
@@ -80,10 +83,10 @@ function handleFileInput(e: Event) {
         <span class="i-carbon-document-upload h-4.5 w-4.5" />
       </div>
       <h3 class="text-sm text-foreground tracking-tight font-medium">
-        Drag & drop a file here
+        {{ t('transfer.import.dropzone.title') }}
       </h3>
       <p class="text-[11px] text-muted-foreground mt-0.5">
-        or click to browse from your computer
+        {{ t('transfer.import.dropzone.instruction') }}
       </p>
       <div class="mt-3 flex flex-wrap gap-1.5 justify-center">
         <span

@@ -358,6 +358,9 @@ impl SQLiteAdapter {
             let columns: Vec<String> = (0..column_count)
                 .map(|i| stmt.column_name(i).unwrap_or("unknown").to_string())
                 .collect();
+            let column_types: Vec<String> = (0..column_count)
+                .map(|_| String::new())
+                .collect();
 
             let rows_iter = stmt
                 .query_map([], |row| Ok(Self::row_to_query_row(row)))
@@ -379,9 +382,11 @@ impl SQLiteAdapter {
 
             Ok(QueryResult {
                 columns,
+                column_types,
                 rows,
                 rows_affected: None,
                 execution_time_ms: None,
+                truncated: false,
             })
         } else {
             // For non-SELECT queries (INSERT, UPDATE, DELETE, etc.)
@@ -394,9 +399,11 @@ impl SQLiteAdapter {
 
             Ok(QueryResult {
                 columns: Vec::new(),
+                column_types: Vec::new(),
                 rows: Vec::new(),
                 rows_affected: Some(rows_affected as u64),
                 execution_time_ms: None,
+                truncated: false,
             })
         }
     }

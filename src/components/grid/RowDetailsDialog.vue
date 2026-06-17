@@ -30,10 +30,10 @@ function formatValue(v: unknown, type?: string): string {
       return JSON.stringify(typeof v === 'string' ? JSON.parse(v) : v, null, 2)
     }
     catch {
-      return String(v)
+      return typeof v === 'object' ? JSON.stringify(v) : String(v)
     }
   }
-  return String(v)
+  return typeof v === 'object' ? JSON.stringify(v) : String(v)
 }
 
 const isNull = (v: unknown): boolean => v === null || v === undefined
@@ -42,7 +42,7 @@ const isNull = (v: unknown): boolean => v === null || v === undefined
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent class="flex flex-col max-h-[80vh] max-w-2xl overflow-hidden">
-      <DialogTitle>{{ t('dataGrid.details.title') }}</DialogTitle>
+      <DialogTitle>{{ t('components.dataGrid.details.title') }}</DialogTitle>
       <div class="mt-4 flex-1 overflow-y-auto space-y-0 divide-border/30 divide-y">
         <div
           v-for="col in columns"

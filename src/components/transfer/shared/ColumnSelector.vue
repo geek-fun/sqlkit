@@ -5,6 +5,7 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 
@@ -33,6 +34,7 @@ const emit = defineEmits<{
 }>()
 
 const connectionStore = useConnectionStore()
+const { t } = useI18n()
 
 const selectedColumns = computed({
   get: () => props.columns || [],
@@ -118,13 +120,13 @@ const isColumnSelected = (colName: string) => selectedColumns.value.includes(col
 <template>
   <div class="space-y-3">
     <div class="flex items-center justify-between">
-      <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Columns</Label>
+      <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.common.columns') }}</Label>
       <div class="flex gap-1.5">
         <Button variant="ghost" size="sm" class="text-[11px] text-muted-foreground px-2 h-6 hover:text-foreground" @click="selectAll">
-          Select All
+          {{ t('transfer.migration.selectAll') }}
         </Button>
         <Button variant="ghost" size="sm" class="text-[11px] text-muted-foreground px-2 h-6 hover:text-foreground" @click="deselectAll">
-          Deselect All
+          {{ t('transfer.common.deselectAll') }}
         </Button>
       </div>
     </div>

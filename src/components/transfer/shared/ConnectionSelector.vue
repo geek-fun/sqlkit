@@ -195,20 +195,20 @@ const shouldShowSchema = computed(() => {
     <div v-if="allConnections.length === 0" class="p-6 text-center border rounded-md border-dashed bg-muted/20 flex flex-col items-center justify-center">
       <span class="i-carbon-api-1 text-muted-foreground mb-2 opacity-50 h-6 w-6" />
       <p class="text-xs text-muted-foreground font-medium">
-        No connections available. Please add a connection first.
+        {{ t('transfer.connection.noConnections') }}
       </p>
     </div>
 
     <div v-else class="space-y-3">
       <div class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Connection</Label>
+        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.label') }}</Label>
         <Select
           :model-value="selectedConnectionId"
           :disabled="isConnecting"
           @update:model-value="handleConnectionSelect"
         >
           <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
-            <SelectValue placeholder="Select connection">
+            <SelectValue :placeholder="t('transfer.connection.placeholder')">
               <template v-if="selectedConnection">
                 <span class="font-mono">{{ selectedConnection.name }}</span>
                 <span
@@ -235,13 +235,13 @@ const shouldShowSchema = computed(() => {
                   v-if="connectionStore.getConnectionStatus(conn.id!) === ConnectionStatus.CONNECTED"
                   class="text-[10px] text-green-600 tracking-wide font-mono px-1 rounded-sm bg-green-500/10 uppercase"
                 >
-                  Connected
+                  {{ t('transfer.connection.connected') }}
                 </span>
                 <span
                   v-else
                   class="text-[10px] text-muted-foreground tracking-wide font-mono px-1 rounded-sm bg-muted/60 uppercase"
                 >
-                  Offline
+                  {{ t('transfer.connection.offline') }}
                 </span>
                 <span class="text-[10px] text-muted-foreground font-mono ml-auto">{{ conn.type }}</span>
               </div>
@@ -251,13 +251,13 @@ const shouldShowSchema = computed(() => {
       </div>
 
       <div v-if="props.showDatabase" class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Database</Label>
+        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.databaseLabel') }}</Label>
         <Select
           v-model="selectedDatabase"
           :disabled="!isConnected || loadingDatabases || databases.length === 0"
         >
           <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
-            <SelectValue placeholder="Select database" />
+            <SelectValue :placeholder="t('transfer.connection.databasePlaceholder')" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem
@@ -272,25 +272,25 @@ const shouldShowSchema = computed(() => {
                   v-if="db.is_system"
                   class="text-[10px] text-muted-foreground tracking-wide font-mono ml-auto px-1 rounded-sm bg-muted/60 uppercase"
                 >
-                  System
+                  {{ t('transfer.connection.system') }}
                 </span>
               </div>
             </SelectItem>
           </SelectContent>
         </Select>
         <div v-if="loadingDatabases" class="text-[10px] text-muted-foreground flex items-center">
-          <span class="i-carbon-circle-dash mr-1 animate-spin" /> Loading databases...
+          <span class="i-carbon-circle-dash mr-1 animate-spin" /> {{ t('transfer.connection.loadingDatabases') }}
         </div>
       </div>
 
       <div v-if="shouldShowSchema" class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">Schema</Label>
+        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.schemaLabel') }}</Label>
         <Select
           v-model="selectedSchema"
           :disabled="!selectedDatabase || loadingSchemas || schemas.length === 0"
         >
           <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
-            <SelectValue placeholder="Select schema" />
+            <SelectValue :placeholder="t('transfer.connection.schemaPlaceholder')" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem
@@ -304,7 +304,7 @@ const shouldShowSchema = computed(() => {
           </SelectContent>
         </Select>
         <div v-if="loadingSchemas" class="text-[10px] text-muted-foreground flex items-center">
-          <span class="i-carbon-circle-dash mr-1 animate-spin" /> Loading schemas...
+          <span class="i-carbon-circle-dash mr-1 animate-spin" /> {{ t('transfer.connection.loadingSchemas') }}
         </div>
       </div>
     </div>

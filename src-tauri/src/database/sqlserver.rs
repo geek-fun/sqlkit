@@ -460,8 +460,13 @@ impl DatabaseAdapter for SqlServerAdapter {
                     .iter()
                     .map(|col| col.name().to_string())
                     .collect();
+                let column_types: Vec<String> = result_set[0]
+                    .columns()
+                    .iter()
+                    .map(|col| format!("{:?}", col.column_type()))
+                    .collect();
 
-                let mut query_result = QueryResult::new(columns);
+                let mut query_result = QueryResult::with_columns(columns, column_types);
                 for row in result_set {
                     let query_row = Self::row_to_query_row(row)?;
                     query_result.add_row(query_row);

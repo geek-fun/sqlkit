@@ -1481,7 +1481,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4ae5f15dda3c708c0ade84bfee31ccab44a3da4f88015ed22f63732abe300c8"
 
 [[package]]
-name = "data-studio-agent-lib"
+name = "data-studio-agent"
 version = "0.1.0"
 dependencies = [
  "async-openai",
@@ -1489,22 +1489,10 @@ dependencies = [
  "futures",
  "rand 0.8.6",
  "reqwest 0.12.28",
- "serde",
- "serde_json",
- "tiktoken-rs",
- "tokio",
- "uuid",
-]
-
-[[package]]
-name = "data-studio-agent-storage-sqlite"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "data-studio-agent-lib",
  "rusqlite",
  "serde",
  "serde_json",
+ "tiktoken-rs",
  "tokio",
  "uuid",
 ]
@@ -6435,8 +6423,7 @@ dependencies = [
  "base64 0.22.1",
  "calamine",
  "chrono",
- "data-studio-agent-lib",
- "data-studio-agent-storage-sqlite",
+ "data-studio-agent",
  "deadpool-postgres",
  "flate2",
  "futures",

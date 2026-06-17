@@ -76,7 +76,7 @@ export class ApiErrorException extends Error {
     }
 
     if (this.apiError.hint) {
-      parts.push(`💡 ${this.apiError.hint}`)
+      parts.push(this.apiError.hint)
     }
 
     return parts.join('\n\n')
@@ -118,7 +118,7 @@ export function formatApiError(error: ApiError, t: (key: string) => string): str
   if (error.hint) {
     const hintKey = `errors.hints.${error.code}`
     const hint = t(hintKey) !== hintKey ? t(hintKey) : error.hint
-    parts.push(`💡 ${hint}`)
+    parts.push(hint)
   }
 
   return parts.join('\n\n')

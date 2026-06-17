@@ -142,20 +142,20 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
                 <Checkbox :checked="false" class="h-3.5 w-3.5" disabled />
               </th>
               <th scope="col" class="font-medium px-2 py-1.5 text-left">
-                Table Name
+                {{ t('transfer.common.tableName') }}
               </th>
               <th scope="col" class="font-medium px-2 py-1.5 text-right">
-                Rows
+                {{ t('transfer.common.rows') }}
               </th>
               <th scope="col" class="font-medium px-2 py-1.5 text-right">
-                Type
+                {{ t('transfer.common.type') }}
               </th>
             </tr>
           </thead>
           <tbody>
             <tr>
               <td colspan="4" class="text-[11px] text-muted-foreground px-2 py-6 text-center italic">
-                <span class="i-carbon-data-base mr-1.5 opacity-50" /> No tables found
+                <span class="i-carbon-data-base mr-1.5 opacity-50" /> {{ t('transfer.common.noTablesFound') }}
               </td>
             </tr>
           </tbody>
@@ -178,15 +178,15 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
                 />
               </th>
               <th scope="col" class="font-medium px-2 py-1.5 text-left">
-                Table Name
+                {{ t('transfer.common.tableName') }}
               </th>
               <th scope="col" class="font-medium px-2 py-1.5 text-right">
-                Rows
+                {{ t('transfer.common.rows') }}
               </th>
               <th scope="col" class="font-medium px-2 py-1.5 text-right w-20">
                 <span class="flex gap-1 items-center justify-end">
                   <span v-if="selectionCount > 0" class="text-primary font-semibold">{{ selectionCount }}</span>
-                  <span v-else>Type</span>
+                  <span v-else>{{ t('transfer.common.type') }}</span>
                 </span>
               </th>
             </tr>

@@ -55,9 +55,11 @@ pub fn convert_query_row_to_json(row: &QueryRow) -> Value {
 pub fn convert_query_result_to_json(result: &QueryResult) -> Value {
     json!({
         "columns": result.columns,
+        "columnTypes": result.column_types,
         "rows": result.rows.iter().map(convert_query_row_to_json).collect::<Vec<_>>(),
-        "rows_affected": result.rows_affected,
-        "execution_time_ms": result.execution_time_ms,
+        "rowsAffected": result.rows_affected,
+        "executionTimeMs": result.execution_time_ms,
+        "truncated": result.truncated,
     })
 }
 

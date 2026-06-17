@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { Button } from '@/components/ui/button'
 
@@ -17,6 +17,7 @@ const emit = defineEmits<{
   'update:open': [value: boolean]
 }>()
 
+const { t } = useI18n()
 const transferStore = useTransferStore()
 const router = useRouter()
 
@@ -49,7 +50,7 @@ function handleDismiss(taskId: string) {
       <DialogTitle class="flex items-center justify-between">
         <div class="flex gap-2 items-center">
           <span class="i-carbon-task text-muted-foreground h-4 w-4" />
-          <span class="text-sm tracking-wide font-semibold uppercase">Tasks</span>
+          <span class="text-sm tracking-wide font-semibold uppercase">{{ t('transfer.tasks.title') }}</span>
         </div>
         <Button
           v-if="transferStore.runningTasks.some(t => t.status !== 'running')"
@@ -58,7 +59,7 @@ function handleDismiss(taskId: string) {
           class="text-[11px] tracking-wide h-8 uppercase"
           @click="handleClearCompleted"
         >
-          Clear Completed
+          {{ t('transfer.tasks.clearCompleted') }}
         </Button>
       </DialogTitle>
 
@@ -68,8 +69,8 @@ function handleDismiss(taskId: string) {
             <span class="i-carbon-task-complete opacity-40 h-6 w-6 block" />
           </div>
           <div class="flex flex-col gap-1 items-center">
-            <span class="text-xs text-foreground/60 font-medium">No active tasks</span>
-            <span class="text-[11px] text-muted-foreground/60">Export, import, and migration jobs will appear here</span>
+            <span class="text-xs text-foreground/60 font-medium">{{ t('transfer.tasks.noTasks') }}</span>
+            <span class="text-[11px] text-muted-foreground/60">{{ t('transfer.tasks.emptyDescription') }}</span>
           </div>
         </div>
 

@@ -89,12 +89,12 @@ onMounted(fetchIndexes)
               {{ idx.index_type }}
             </td>
             <td class="px-3 py-1.5">
-              <span v-if="idx.is_unique" class="text-green-500 font-medium">YES</span>
-              <span v-else class="text-muted-foreground">NO</span>
+              <span v-if="idx.is_unique" class="text-green-500 font-medium">{{ t('components.indexesTab.yes') }}</span>
+              <span v-else class="text-muted-foreground">{{ t('components.indexesTab.no') }}</span>
             </td>
             <td class="px-3 py-1.5">
-              <span v-if="idx.is_primary" class="text-amber-500 font-medium">YES</span>
-              <span v-else class="text-muted-foreground">NO</span>
+              <span v-if="idx.is_primary" class="text-amber-500 font-medium">{{ t('components.indexesTab.yes') }}</span>
+              <span v-else class="text-muted-foreground">{{ t('components.indexesTab.no') }}</span>
             </td>
           </tr>
         </tbody>

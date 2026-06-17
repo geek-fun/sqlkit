@@ -462,7 +462,7 @@ async function handleDestructiveConfirm() {
   isDestructiveActionExecuting.value = true
   const connId = getActiveConnectionId()
   if (!connId) {
-    toast.error('No active connection')
+    toast.error(t('pages.queries.notifications.noActiveConnection'))
     isDestructiveActionExecuting.value = false
     return
   }
@@ -479,13 +479,13 @@ async function handleDestructiveConfirm() {
       sql,
     })
     const actionLabel = action.type === 'drop' ? 'dropped' : 'truncated'
-    toast.success(`Table ${actionLabel} successfully`)
+    toast.success(t('pages.queries.notifications.tableActionSuccess', { action: actionLabel }))
     destructiveDialogOpen.value = false
     destructiveAction.value = null
     databaseBrowserRef.value?.refreshTree()
   }
   catch (err) {
-    toast.error(`Failed to ${action.type} table: ${err instanceof Error ? err.message : String(err)}`)
+    toast.error(t('pages.queries.notifications.tableActionFailed', { action: action.type, error: err instanceof Error ? err.message : String(err) }))
   }
   finally {
     isDestructiveActionExecuting.value = false
@@ -798,16 +798,15 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="gap-1 h-7"
+                      class="p-0 h-9 w-9 text-foreground hover:bg-muted"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="executeQuery"
                     >
-                      <span class="i-carbon-play h-3.5 w-3.5" />
-                      {{ t('pages.queries.editor.execute') }}
+                      <span class="i-carbon-play h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{{ t('pages.queries.shortcuts.execute', { key: modifierKey }) }}</p>
+                    <p>{{ t('pages.queries.editor.execute') }} ({{ t('pages.queries.shortcuts.execute', { key: modifierKey }) }})</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -818,17 +817,16 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="gap-1 h-7"
-                      :class="{ 'text-violet-600': !explainAnalyzeMode, 'text-green-600': explainAnalyzeMode }"
+                      class="p-0 h-9 w-9 text-foreground hover:bg-muted"
+                      :class="{ '!text-violet-600': !explainAnalyzeMode, '!text-green-600': explainAnalyzeMode }"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="handleExplainQuery(explainAnalyzeMode)"
                     >
-                      <span class="i-carbon-wand h-3.5 w-3.5" />
-                      {{ t('pages.queries.editor.explain') }}
+                      <span class="i-carbon-wand h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{{ t('pages.queries.shortcuts.explain', { key: modifierKey }) }}</p>
+                    <p>{{ t('pages.queries.editor.explain') }} ({{ t('pages.queries.shortcuts.explain', { key: modifierKey }) }})</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -838,12 +836,12 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="p-0 h-7 w-7"
-                      :class="explainAnalyzeMode ? 'text-green-600 bg-green-100 dark:text-green-300 dark:bg-green-900/30' : 'text-muted-foreground/50'"
+                      class="p-0 h-9 w-9 text-foreground hover:bg-muted"
+                      :class="explainAnalyzeMode ? '!text-green-600 bg-green-100 dark:text-green-300 dark:bg-green-900/30' : ''"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="toggleExplainMode"
                     >
-                      <span class="text-xs font-bold">A</span>
+                      <span class="i-carbon-analytics h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -858,16 +856,15 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="gap-1 h-7"
+                      class="p-0 h-9 w-9 text-foreground hover:bg-muted"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="handleToolbarFormat"
                     >
-                      <span class="i-carbon-wand h-3.5 w-3.5" />
-                      {{ t('pages.queries.editor.format') }}
+                      <span class="i-carbon-text-align-left h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{{ t('pages.queries.shortcuts.format') }}</p>
+                    <p>{{ t('pages.queries.editor.format') }} ({{ t('pages.queries.shortcuts.format') }})</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -995,7 +992,7 @@ function closeResultPanel() {
         </div>
         <div class="flex gap-4 items-center">
           <span v-if="activeTab?.results">
-            {{ t('pages.queries.status.rows') }}: {{ activeTab.results.rowCount }}
+            {{ t('pages.queries.status.rows') }}: {{ activeTab.results.rows.length }}
           </span>
           <span v-if="activeTab?.executionTime">
             {{ t('pages.queries.status.time') }}: {{ activeTab.executionTime }}ms

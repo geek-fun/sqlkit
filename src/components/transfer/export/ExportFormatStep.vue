@@ -2,6 +2,7 @@
 import type { ExportFormat } from '@/types/transfer'
 
 import { ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
@@ -11,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useTransferStore } from '@/store/transferStore'
 
 const transferStore = useTransferStore()
+const { t } = useI18n()
 
 const formats: { value: ExportFormat, label: string, defaults: string }[] = [
   { value: 'csv', label: 'CSV (.csv)', defaults: 'Comma delimiter, double-quote, UTF-8, include header' },
@@ -42,7 +44,7 @@ watch([selectedFormat, csvDelimiter, csvEncoding, csvIncludeHeader], () => {
 <template>
   <div class="space-y-4">
     <div class="space-y-2">
-      <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Select Format</Label>
+      <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.selectFormat') }}</Label>
       <RadioGroup v-model="selectedFormat" class="gap-2.5 grid grid-cols-1 md:grid-cols-2">
         <label
           v-for="format in formats"
@@ -63,31 +65,31 @@ watch([selectedFormat, csvDelimiter, csvEncoding, csvIncludeHeader], () => {
 
     <Button variant="ghost" size="sm" class="text-[11px] text-muted-foreground h-8 w-full" @click="showAdvanced = !showAdvanced">
       <span :class="showAdvanced ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="mr-1.5" />
-      {{ showAdvanced ? 'Hide Advanced Options' : 'Show Advanced Options' }}
+      {{ showAdvanced ? t('transfer.export.hideAdvanced') : t('transfer.export.showAdvanced') }}
     </Button>
 
     <div v-if="showAdvanced && selectedFormat === 'csv'" class="p-3 border border-border/40 rounded-md bg-muted/20 gap-2.5 grid grid-cols-1 md:grid-cols-3">
       <div class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Delimiter</Label>
+        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.delimiter') }}</Label>
         <Select v-model="csvDelimiter">
           <SelectTrigger class="text-xs font-mono h-8">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value=",">
-              Comma (,)
+              {{ t('transfer.export.delimiterOptions.comma') }}
             </SelectItem>
             <SelectItem value=";">
-              Semicolon (;)
+              {{ t('transfer.export.delimiterOptions.semicolon') }}
             </SelectItem>
             <SelectItem value="\t">
-              Tab
+              {{ t('transfer.export.delimiterOptions.tab') }}
             </SelectItem>
           </SelectContent>
         </Select>
       </div>
       <div class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">Encoding</Label>
+        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.encoding') }}</Label>
         <Select v-model="csvEncoding">
           <SelectTrigger class="text-xs font-mono h-8">
             <SelectValue />
@@ -104,7 +106,7 @@ watch([selectedFormat, csvDelimiter, csvEncoding, csvIncludeHeader], () => {
       </div>
       <div class="flex items-center space-x-2 sm:mt-5">
         <Checkbox id="export-csv-header" v-model:checked="csvIncludeHeader" />
-        <Label for="export-csv-header" class="text-xs leading-none font-medium cursor-pointer">Include header row</Label>
+        <Label for="export-csv-header" class="text-xs leading-none font-medium cursor-pointer">{{ t('transfer.export.includeHeader') }}</Label>
       </div>
     </div>
   </div>

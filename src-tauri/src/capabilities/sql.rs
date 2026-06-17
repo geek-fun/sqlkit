@@ -447,6 +447,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         required_permission: "read",
         source_kind: SourceKind::SqlDatabase,
         tags: &["agent"],
+        parallel_ok: false,
     });
 
     reg.register(Capability {
@@ -460,6 +461,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         required_permission: "read",
         source_kind: SourceKind::SqlDatabase,
         tags: &["agent"],
+        parallel_ok: true,
     });
 
     reg.register(Capability {
@@ -472,6 +474,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         }, "required": ["connection_id"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
+        parallel_ok: true,
     });
 
     reg.register(Capability {
@@ -485,6 +488,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         }, "required": ["connection_id"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
+        parallel_ok: true,
     });
 
     reg.register(Capability {
@@ -498,6 +502,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         }, "required": ["connection_id"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
+        parallel_ok: true,
     });
 
     reg.register(Capability {
@@ -512,6 +517,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         }, "required": ["connection_id", "table"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
+        parallel_ok: true,
     });
 
     reg.register(Capability {
@@ -524,5 +530,6 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         }, "required": ["connection_id", "sql"]}),
         risk_level: RiskLevel::Safe, required_permission: "read",
         source_kind: SourceKind::SqlDatabase, tags: &["agent"],
+        parallel_ok: true,
     });
 }

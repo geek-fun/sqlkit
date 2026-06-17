@@ -228,12 +228,12 @@ const previewData = ref<string[][]>([])
 const previewColumns = ref<string[]>([])
 const isLoadingPreview = ref(false)
 
-const conflictOptions: { value: ConflictStrategy, label: string }[] = [
-  { value: 'skip', label: 'Skip duplicates' },
-  { value: 'replace', label: 'Replace existing' },
-  { value: 'upsert', label: 'Update existing (upsert)' },
-  { value: 'abort', label: 'Abort on error' },
-]
+const conflictOptions = computed<{ value: ConflictStrategy, label: string }[]>(() => [
+  { value: 'skip', label: t('transfer.import.conflict.skip') },
+  { value: 'replace', label: t('transfer.import.conflict.replace') },
+  { value: 'upsert', label: t('transfer.import.conflict.upsert') },
+  { value: 'abort', label: t('transfer.import.conflict.abort') },
+])
 
 async function loadPreview() {
   if (!transferStore.importRequest.filePath || !transferStore.importRequest.format) {
@@ -388,32 +388,32 @@ onUnmounted(() => {
         <div class="flex justify-end">
           <Button variant="outline" size="sm" @click="handleFileBrowse">
             <div class="i-carbon-folder-open mr-2" />
-            Browse Files
+            {{ t('transfer.import.browseFiles') }}
           </Button>
         </div>
 
         <div v-if="detectionResult" class="mt-4 pt-3 border-t border-border/40 space-y-3">
           <div class="gap-2.5 grid grid-cols-2">
             <div>
-              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">Detected Format</Label>
+              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.format') }}</Label>
               <Badge class="text-[10px] font-mono px-1 py-0.5 w-fit block uppercase" variant="secondary">
                 {{ formatLabel }}
               </Badge>
             </div>
             <div>
-              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">Encoding</Label>
+              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.encoding') }}</Label>
               <Badge class="text-[10px] font-mono px-1 py-0.5 w-fit block uppercase" variant="outline">
                 {{ detectionResult.encoding }}
               </Badge>
             </div>
             <div>
-              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">Estimated Rows</Label>
+              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.rows') }}</Label>
               <div class="text-xs font-mono tabular-nums">
                 {{ detectionResult.estimatedRows?.toLocaleString() || 'Unknown' }}
               </div>
             </div>
             <div>
-              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">File Size</Label>
+              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.fileSize') }}</Label>
               <div class="text-xs font-mono tabular-nums">
                 {{ (detectionResult.fileSizeBytes / 1024).toFixed(1) }} KB
               </div>
@@ -421,7 +421,7 @@ onUnmounted(() => {
           </div>
 
           <div class="pt-2 border-t border-border/40">
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-2 block uppercase">Detected Columns</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide mb-2 block uppercase">{{ t('transfer.import.detectedColumns') }}</Label>
             <div class="flex flex-wrap gap-1.5">
               <Badge
                 v-for="col in detectionResult.columns.slice(0, 10)"
@@ -473,11 +473,11 @@ onUnmounted(() => {
 
         <div class="px-2 py-1.5 rounded-sm flex transition-colors items-center space-x-2 hover:bg-muted/40">
           <Checkbox id="import-create-db" v-model:checked="createDatabaseIfNotExists" class="h-3.5 w-3.5" />
-          <Label for="import-create-db" class="text-xs cursor-pointer select-none">Create database if not exists</Label>
+          <Label for="import-create-db" class="text-xs cursor-pointer select-none">{{ t('transfer.import.createDbIfNotExists') }}</Label>
         </div>
 
         <Badge v-if="database" variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
-          Tables will be auto-created
+          {{ t('transfer.import.tablesAutoCreated') }}
         </Badge>
       </div>
 
@@ -559,11 +559,11 @@ onUnmounted(() => {
                         class="text-xs font-mono h-7 w-full"
                         :aria-label="`Target column for ${mapping.sourceColumn}`"
                       >
-                        <SelectValue placeholder="Skip" />
+                        <SelectValue :placeholder="t('transfer.import.skipPlaceholder')" />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="" class="text-xs text-muted-foreground italic">
-                          (Skip)
+                          {{ t('transfer.import.skip') }}
                         </SelectItem>
                         <SelectItem
                           v-for="col in targetColumns"
@@ -631,7 +631,7 @@ onUnmounted(() => {
         <template v-else>
           <div class="gap-4 grid grid-cols-2">
             <div class="space-y-1.5">
-              <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">On Conflict</Label>
+              <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.conflict.label') }}</Label>
               <Select v-model="conflictStrategy">
                 <SelectTrigger class="text-xs h-8">
                   <SelectValue />
@@ -650,7 +650,7 @@ onUnmounted(() => {
             </div>
 
             <div class="space-y-1.5">
-              <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">Batch Size</Label>
+              <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.batchSize') }}</Label>
               <Input
                 v-model.number="batchSize"
                 type="number"
@@ -664,12 +664,12 @@ onUnmounted(() => {
           <div class="mt-2 space-y-0.5">
             <div class="px-2 py-1.5 rounded-sm flex transition-colors items-center space-x-2 hover:bg-muted/40">
               <Checkbox id="import-opt-truncate" v-model:checked="truncateBefore" class="h-3.5 w-3.5" />
-              <Label for="import-opt-truncate" class="text-xs cursor-pointer select-none">Truncate table before import</Label>
+              <Label for="import-opt-truncate" class="text-xs cursor-pointer select-none">{{ t('transfer.import.truncateBefore') }}</Label>
             </div>
 
             <div class="px-2 py-1.5 rounded-sm flex transition-colors items-center space-x-2 hover:bg-muted/40">
               <Checkbox id="import-opt-dry-run" v-model:checked="dryRun" class="h-3.5 w-3.5" />
-              <Label for="import-opt-dry-run" class="text-xs cursor-pointer select-none">Dry run (validate without inserting)</Label>
+              <Label for="import-opt-dry-run" class="text-xs cursor-pointer select-none">{{ t('transfer.import.dryRun') }}</Label>
             </div>
           </div>
 
@@ -690,9 +690,9 @@ onUnmounted(() => {
             <div class="mb-2 flex items-center justify-between">
               <div class="text-xs tracking-wide font-semibold flex gap-2 items-center">
                 <div class="i-carbon-table" />
-                DATA PREVIEW
+                {{ t('transfer.import.dataPreview') }}
               </div>
-              <span class="text-[10px] text-muted-foreground tracking-wide font-mono uppercase">10 Rows</span>
+              <span class="text-[10px] text-muted-foreground tracking-wide font-mono uppercase">{{ t('transfer.import.previewRows') }}</span>
             </div>
             <div class="border border-border/40 rounded-sm overflow-hidden">
               <div v-if="previewData.length > 0" class="max-h-[240px] overflow-auto">
@@ -716,9 +716,9 @@ onUnmounted(() => {
               <div v-else class="text-[11px] text-muted-foreground py-6 text-center bg-muted/20">
                 <div v-if="isLoadingPreview" class="flex flex-col gap-2 items-center justify-center">
                   <div class="i-carbon-circle-dash opacity-50 animate-spin" />
-                  Loading preview...
+                  {{ t('transfer.import.loadingPreview') }}
                 </div>
-                <span v-else>Select a file to preview data</span>
+                <span v-else>{{ t('transfer.import.selectFileToPreview') }}</span>
               </div>
             </div>
           </div>
@@ -726,7 +726,7 @@ onUnmounted(() => {
           <!-- Execute Button -->
           <div class="mt-4 pt-3 border-t border-border/40 flex justify-end">
             <Button :disabled="!canImport" size="sm" class="min-w-[120px]" @click="startImport">
-              <div class="i-carbon-document-import mr-2" /> Import Data
+              <div class="i-carbon-document-import mr-2" /> {{ t('transfer.import.importData') }}
             </Button>
           </div>
         </template>

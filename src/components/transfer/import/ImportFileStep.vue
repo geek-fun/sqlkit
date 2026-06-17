@@ -3,7 +3,9 @@ import type { FileDetectionResult } from '@/types/transfer'
 
 import { open } from '@tauri-apps/plugin-dialog'
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 
 import { Card, CardContent } from '@/components/ui/card'
 
@@ -15,6 +17,7 @@ import { useTransferStore } from '@/store/transferStore'
 import FileDropZone from '../shared/FileDropZone.vue'
 
 const transferStore = useTransferStore()
+const { t } = useI18n()
 
 const filePath = ref('')
 const detectionResult = ref<FileDetectionResult | null>(null)
@@ -85,7 +88,7 @@ watch(filePath, () => {
     <div class="flex justify-end">
       <Button variant="outline" size="sm" @click="handleBrowse">
         <div class="i-carbon-folder-open mr-2" />
-        Browse Files
+        {{ t('transfer.import.browseFiles') }}
       </Button>
     </div>
 
@@ -93,30 +96,30 @@ watch(filePath, () => {
       <CardContent class="p-3 space-y-3">
         <div class="text-xs tracking-wide font-semibold mb-2 flex gap-2 items-center">
           <div class="i-carbon-document" />
-          FILE DETAILS
+          {{ t('transfer.import.fileDetails') }}
         </div>
 
         <div class="gap-2.5 grid grid-cols-2">
           <div>
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">Detected Format</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.format') }}</Label>
             <Badge class="text-[10px] font-mono px-1 py-0.5 uppercase" variant="secondary">
               {{ formatLabel }}
             </Badge>
           </div>
           <div>
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">Encoding</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.encoding') }}</Label>
             <Badge class="text-[10px] font-mono px-1 py-0.5 uppercase" variant="outline">
               {{ detectionResult.encoding }}
             </Badge>
           </div>
           <div>
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">Estimated Rows</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.rows') }}</Label>
             <div class="text-xs font-mono tabular-nums">
               {{ detectionResult.estimatedRows?.toLocaleString() || 'Unknown' }}
             </div>
           </div>
           <div>
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">File Size</Label>
+            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.fileSize') }}</Label>
             <div class="text-xs font-mono tabular-nums">
               {{ (detectionResult.fileSizeBytes / 1024).toFixed(1) }} KB
             </div>
@@ -124,7 +127,7 @@ watch(filePath, () => {
         </div>
 
         <div class="pt-2 border-t border-border/40">
-          <Label class="text-[11px] text-muted-foreground tracking-wide mb-2 block uppercase">Detected Columns</Label>
+          <Label class="text-[11px] text-muted-foreground tracking-wide mb-2 block uppercase">{{ t('transfer.import.detectedColumns') }}</Label>
           <div class="flex flex-wrap gap-1.5">
             <Badge
               v-for="col in detectionResult.columns.slice(0, 10)"

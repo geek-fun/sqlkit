@@ -64,33 +64,33 @@ function closeAnd(fn: () => void) {
         <DropdownMenuContent align="start" class="min-w-44" @keydown.escape="emit('close')">
           <DropdownMenuItem @click="closeAnd(() => copyCellValue(value))">
             <span class="i-carbon-copy mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.cell.copyValue') }}
+            {{ t('components.dataGrid.cell.copyValue') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem @click="closeAnd(() => { if (row) copyRowsAs([row], columns, 'csv', tableName) })">
             <span class="i-carbon-table-split mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.row.copyAsCsv') }}
+            {{ t('components.dataGrid.row.copyAsCsv') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="closeAnd(() => { if (row) copyRowsAs([row], columns, 'json', tableName) })">
             <span class="i-carbon-code mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.row.copyAsJson') }}
+            {{ t('components.dataGrid.row.copyAsJson') }}
           </DropdownMenuItem>
           <DropdownMenuItem @click="closeAnd(() => { if (row) copyRowsAs([row], columns, 'insert', tableName) })">
             <span class="i-carbon-sql mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.row.copyAsInsert') }}
+            {{ t('components.dataGrid.row.copyAsInsert') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
             @click="closeAnd(() => emit('filter', { column, operator: 'eq', value: String(value) }))"
           >
             <span class="i-carbon-filter mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.cell.filterByValue') }}
+            {{ t('components.dataGrid.cell.filterByValue') }}
           </DropdownMenuItem>
           <DropdownMenuItem
             @click="closeAnd(() => emit('filter', { column, operator: 'neq', value: String(value) }))"
           >
             <span class="i-carbon-filter-remove mr-2 h-3.5 w-3.5" />
-            {{ t('dataGrid.cell.excludeValue') }}
+            {{ t('components.dataGrid.cell.excludeValue') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

@@ -124,6 +124,7 @@ pub(crate) fn register_all(reg: &mut CapabilityRegistry) {
         required_permission: "read",
         source_kind: SourceKind::SqlKit,
         tags: &["agent"],
+        parallel_ok: true,
     });
 
     reg.register(Capability {
@@ -144,6 +145,7 @@ pub(crate) fn register_all(reg: &mut CapabilityRegistry) {
         required_permission: "read",
         source_kind: SourceKind::SqlKit,
         tags: &["agent"],
+        parallel_ok: true,
     });
 }
 
