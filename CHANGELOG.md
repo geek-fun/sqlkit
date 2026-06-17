@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-06-18
+
+### Added
+
+- Migrate TLS from OpenSSL (native-tls) to rustls for pure Rust TLS across all platforms (#105)
+- Standardize result panel data contract and improve toolbar UX
+
+### Fixed
+
+- Render object cell values as JSON in DataGrid instead of `[object Object]`
+- Fix i18n scope issues across DataGrid and agent UI — use `$t` instead of `t()`, add locale validation and fallback
+- Make markdown table borders visible in dark mode
+- Fix agent auto-connect so it connects to databases automatically on adapter resolve
+- Resolve connection_id type mismatch — agents now use UUID strings instead of i64
+- Resolve Unknown connection_id errors with UUID string comparison and dual-key connections map
+- Align agent architecture with Dockit pattern — ChatFormatter trait, message loading, tool schemas, capabilities
+- Resolve Data Studio UI bugs — duplicate status text, permission buttons, cancel action, source persistence, connection filtering (#103)
+- Align Dockit UI across DataStudio, dialogs, and sidebar (#99)
+- Use data-studio-agent from GitHub release instead of local path
+
 ## [0.6.5] - 2026-06-17
 
 ### Added
