@@ -64,7 +64,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<DataGridEmits>()
 
-const { t } = useI18n()
+const { t } = useI18n({ useScope: 'global' })
 const sort = useDataGridSort()
 const filter = useDataGridFilter()
 const selection = useDataGridSelection()
