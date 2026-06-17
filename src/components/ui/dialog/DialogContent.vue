@@ -4,7 +4,7 @@ import type { HTMLAttributes } from 'vue'
 import {
   DialogClose,
   DialogContent,
-
+  DialogDescription,
   DialogOverlay,
   DialogPortal,
   useForwardPropsEmits,
@@ -12,12 +12,20 @@ import {
 import { computed } from 'vue'
 import { cn } from '@/lib/utils'
 
-const props = defineProps<DialogContentProps & { class?: HTMLAttributes['class'] }>()
+type Props = {
+  class?: HTMLAttributes['class']
+  showClose?: boolean
+} & DialogContentProps
+
+const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
+  showClose: true,
+})
 
 const emits = defineEmits<DialogContentEmits>()
 
 const delegatedProps = computed(() => {
-  const { class: _, ...delegated } = props
+  const { class: _, showClose: __, ...delegated } = props
   return delegated
 })
 
@@ -31,13 +39,21 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     />
     <DialogContent
       v-bind="forwarded"
-      :class="cn('fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border bg-card text-card-foreground p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg', props.class)"
+      :class="
+        cn(
+          'fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-3 border border-border bg-background p-4 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] rounded-lg',
+          props.class,
+        )
+      "
     >
       <slot />
 
-      <DialogClose
-        class="rounded-sm opacity-70 cursor-pointer ring-offset-background transition-opacity right-4 top-4 absolute data-[state=open]:text-muted-foreground focus:outline-none data-[state=open]:bg-accent hover:opacity-100 disabled:pointer-events-none focus:ring-1 focus:ring-ring focus:ring-offset-1"
-      >
+      <!-- Visually hidden description for accessibility (radix-vue requirement) -->
+      <DialogDescription class="sr-only">
+        Dialog content
+      </DialogDescription>
+
+      <DialogClose v-if="showClose" class="dialog-close-button">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="24"
@@ -58,3 +74,37 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
     </DialogContent>
   </DialogPortal>
 </template>
+
+<style scoped>
+.dialog-close-button {
+  position: absolute;
+  right: 1rem;
+  top: 1rem;
+  border-radius: 0.125rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+  background: transparent;
+  border: none;
+  padding: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.dialog-close-button:hover {
+  opacity: 1;
+  background: transparent;
+}
+
+.dialog-close-button:focus {
+  outline: none;
+}
+
+.dialog-close-button:focus-visible {
+  outline: 1px solid hsl(var(--ring));
+  outline-offset: 0;
+}
+
+.dialog-close-button:disabled {
+  pointer-events: none;
+}
+</style>
