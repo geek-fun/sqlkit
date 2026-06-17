@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use data_studio_agent_lib as lib;
-use data_studio_agent_lib::traits::{CancelMap, ConfirmMap, EventEmitter, SessionStore};
+use data_studio_agent_lib::traits::{CancelMap, ConfirmMap, EventEmitter};
 use data_studio_agent_storage_sqlite as storage;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -118,42 +118,7 @@ pub async fn compact_agent_session(
     let db_state: State<storage::db::AgentDb> = app.state::<storage::db::AgentDb>();
     let store = storage::session_store::SqliteSessionStore::new(db_state.inner().clone());
     let emitter = TauriEmitter(app.clone());
-
-    let lock = store.compact_lock(&session_id);
-    let _guard = lock.lock().await;
-
-    let outcome = lib::compact::run_compact_manual(&session_id, &settings, &store, &emitter).await?;
-    if let Some(info) = outcome {
-        let _ = app.emit(
-            "agent-loop-summary-injected",
-            serde_json::json!({
-                "session_id": session_id,
-                "trigger": info.trigger,
-                "pre_tokens": info.pre_tokens,
-                "post_tokens": info.post_tokens,
-                "removed_count": info.removed_count,
-                "fallback_keep_pairs": info.fallback_keep_pairs,
-            }),
-        );
-    }
-
-    let messages = store.load_messages_for_compact(&session_id).await?;
-    let spec = lib::compact::resolve_model_spec_for_session(&session_id, &settings);
-    let decision = lib::compact::evaluate(&messages, &spec);
-    let system_prompt = settings.get("systemPrompt").and_then(|v| v.as_str());
-    let tools = settings.get("tools");
-    let used_tokens = lib::compact::count_projected_tokens(&messages, system_prompt, tools, &spec);
-    let should_compact = used_tokens >= decision.trigger_at;
-    Ok(serde_json::json!({
-        "session_id": session_id,
-        "used_tokens": used_tokens,
-        "capacity": decision.capacity,
-        "context_window": spec.context_window,
-        "output_reserve": spec.output_reserve,
-        "trigger_at": decision.trigger_at,
-        "should_compact": should_compact,
-        "model": spec.model_id,
-    }))
+    lib::loop_runner::compact_agent_session(&session_id, &settings, &store, &emitter).await
 }
 
 #[tauri::command]
@@ -164,24 +129,7 @@ pub async fn get_agent_context_usage(
 ) -> Result<Value, String> {
     let db_state: State<storage::db::AgentDb> = app.state::<storage::db::AgentDb>();
     let store = storage::session_store::SqliteSessionStore::new(db_state.inner().clone());
-
-    let messages = store.load_messages_for_compact(&session_id).await?;
-    let spec = lib::compact::resolve_model_spec_for_session(&session_id, &settings);
-    let decision = lib::compact::evaluate(&messages, &spec);
-    let system_prompt = settings.get("systemPrompt").and_then(|v| v.as_str());
-    let tools = settings.get("tools");
-    let used_tokens = lib::compact::count_projected_tokens(&messages, system_prompt, tools, &spec);
-    let should_compact = used_tokens >= decision.trigger_at;
-    Ok(serde_json::json!({
-        "session_id": session_id,
-        "used_tokens": used_tokens,
-        "capacity": decision.capacity,
-        "context_window": spec.context_window,
-        "output_reserve": spec.output_reserve,
-        "trigger_at": decision.trigger_at,
-        "should_compact": should_compact,
-        "model": spec.model_id,
-    }))
+    lib::loop_runner::get_agent_context_usage(&session_id, &settings, &store).await
 }
 
 // ---------------------------------------------------------------------------
