@@ -5,6 +5,7 @@ export {
   buildTransportLayers,
   ConnectionStatus,
   DatabaseType,
+  dbTypeFromBackend,
   dbTypeToBackend,
   isJdbcDatabase,
   jdbcDatabaseTypes,
