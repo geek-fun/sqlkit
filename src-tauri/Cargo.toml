@@ -74,7 +74,7 @@ hex = "0.4"
 rust_xlsxwriter = "0.64"
 calamine = "0.22"
 
-# Agent / LLM dependencies (now in data-studio-agent-lib)
+# Agent / LLM dependencies (data-studio-agent release)
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
@@ -84,7 +84,7 @@ http = "1"
 log = "0.4"
 futures = "0.3"
 rand = "0.8"
-data-studio-agent = { path = "../../data-studio-agent" }
+data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", tag = "v0.1.1" }
 
 # Archive extraction (JRE downloads)
 flate2 = "1.0"
