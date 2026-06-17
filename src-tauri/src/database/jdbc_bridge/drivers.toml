@@ -1,8 +1,8 @@
 # SQLKit JDBC Driver Registry
 #
 # This registry defines known JDBC drivers for databases without native Rust SDKs.
-# Each database type has a fallback chain of driver versions, tried in order.
-# On version incompatibility, the next driver in the chain is attempted.
+# Drivers resolve LATEST from Maven Central. The TOML provides Maven coordinates,
+# JDBC URL templates, error signatures, and optional legacy version caps.
 #
 # Embedded at compile time via include_str!() in registry.rs.
 # Format: TOML v0.8+ (parsed with `toml` crate using serde).
@@ -15,6 +15,7 @@ maven_artifact = "ojdbc11"
 jdbc_url_template = "jdbc:oracle:thin:@{host}:{port}:{database}"
 default_port = 1521
 min_jre_version = "11"
+version_cap = "21.15.0.0"
 version_error_signatures = [
   "ORA-28040",
   "ORA-03134",
@@ -24,28 +25,6 @@ version_error_signatures = [
   "unsupported protocol version",
   "AbstractMethodError",
 ]
-
-[[databases.oracle.versions]]
-version = "21.15.0.0"
-min_db_version = "19c"
-label = "ojdbc11"
-jar_sha256 = ""
-maven_artifact_override = "ojdbc11"
-
-[[databases.oracle.versions]]
-version = "19.25.0.0"
-min_db_version = "12c"
-label = "ojdbc8"
-jar_sha256 = ""
-maven_artifact_override = "ojdbc8"
-
-[[databases.oracle.versions]]
-version = "11.2.0.4"
-min_db_version = "11g"
-label = "ojdbc6"
-jar_sha256 = ""
-maven_group_override = "com.oracle.database.jdbc"
-maven_artifact_override = "ojdbc6"
 
 # ── DuckDB ──
 
@@ -62,12 +41,6 @@ version_error_signatures = [
   "catalog error",
 ]
 
-[[databases.duckdb.versions]]
-version = "1.2.0"
-min_db_version = "1.x"
-label = "duckdb-jdbc"
-jar_sha256 = ""
-
 # ── Firebird ──
 
 [databases.firebird]
@@ -78,24 +51,13 @@ maven_artifact = "jaybird"
 jdbc_url_template = "jdbc:firebirdsql://{host}:{port}/{database}"
 default_port = 3050
 min_jre_version = "11"
+version_cap = "5.0.2"
 version_error_signatures = [
   "connection rejected",
   "malformed connection URL",
   "Invalid parameter",
   "ISC_ERROR",
 ]
-
-[[databases.firebird.versions]]
-version = "5.0.2"
-min_db_version = "5.x"
-label = "jaybird"
-jar_sha256 = ""
-
-[[databases.firebird.versions]]
-version = "4.0.11"
-min_db_version = "4.x"
-label = "jaybird-legacy"
-jar_sha256 = ""
 
 # ── IBM DB2 ──
 
@@ -107,24 +69,13 @@ maven_artifact = "jcc"
 jdbc_url_template = "jdbc:db2://{host}:{port}/{database}"
 default_port = 50000
 min_jre_version = "11"
+version_cap = "11.5.9.0"
 version_error_signatures = [
   "The driver does not support this version",
   "SQL1402N",
   "The driver version is not compatible",
   "not supported by this driver version",
 ]
-
-[[databases.db2.versions]]
-version = "11.5.9.0"
-min_db_version = "11.5"
-label = "db2jcc4"
-jar_sha256 = ""
-
-[[databases.db2.versions]]
-version = "11.5.0.0"
-min_db_version = "10.5"
-label = "db2jcc4-legacy"
-jar_sha256 = ""
 
 # ── H2 Database ──
 
@@ -136,24 +87,13 @@ maven_artifact = "h2"
 jdbc_url_template = "jdbc:h2:tcp://{host}:{port}/{database}"
 default_port = 9092
 min_jre_version = "11"
+version_cap = "2.2.224"
 version_error_signatures = [
   "unsupported SQL grammar",
   "Feature not supported",
   "Wrong user or password",
   "IO Exception",
 ]
-
-[[databases.h2.versions]]
-version = "2.2.224"
-min_db_version = "2.x"
-label = "h2"
-jar_sha256 = ""
-
-[[databases.h2.versions]]
-version = "1.4.200"
-min_db_version = "1.x"
-label = "h2-legacy"
-jar_sha256 = ""
 
 # ── Apache Derby ──
 
@@ -165,23 +105,12 @@ maven_artifact = "derbyclient"
 jdbc_url_template = "jdbc:derby://{host}:{port}/{database}"
 default_port = 1527
 min_jre_version = "11"
+version_cap = "10.16.1.1"
 version_error_signatures = [
   "unsupported SQL grammar",
   "Driver requires a newer version",
   "protocol version mismatch",
 ]
-
-[[databases.derby.versions]]
-version = "10.16.1.1"
-min_db_version = "10.16"
-label = "derbyclient"
-jar_sha256 = ""
-
-[[databases.derby.versions]]
-version = "10.14.2.0"
-min_db_version = "10.14"
-label = "derbyclient-legacy"
-jar_sha256 = ""
 
 # ── Snowflake ──
 
@@ -198,12 +127,6 @@ version_error_signatures = [
   "Incompatible driver version",
 ]
 
-[[databases.snowflake.versions]]
-version = "3.14.3"
-min_db_version = "any"
-label = "snowflake-jdbc"
-jar_sha256 = ""
-
 # ── 达梦 DM8 (Oracle mode) ──
 
 [databases.dm8_oracle]
@@ -219,12 +142,6 @@ version_error_signatures = [
   "not support",
 ]
 
-[[databases.dm8_oracle.versions]]
-version = "18.1.7.6"
-min_db_version = "DM8"
-label = "dm-jdbc"
-jar_sha256 = ""
-
 # ── 虚谷 XuguDB ──
 
 [databases.xugudb]
@@ -236,12 +153,6 @@ jdbc_url_template = "jdbc:xugudb://{host}:{port}/{database}"
 default_port = 5138
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
-
-[[databases.xugudb.versions]]
-version = "1.0.0"
-min_db_version = "any"
-label = "xugudb-jdbc"
-jar_sha256 = ""
 
 # ── 南大通用 GBase 8a ──
 
@@ -255,12 +166,6 @@ default_port = 5258
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
 
-[[databases.gbase8a.versions]]
-version = "8.5.1"
-min_db_version = "8a"
-label = "gbase8a-jdbc"
-jar_sha256 = ""
-
 # ── Apache Hive ──
 #
 # Hive JDBC uses the "standalone" classifier on Maven Central, which
@@ -268,7 +173,6 @@ jar_sha256 = ""
 #
 #   https://repo1.maven.org/maven2/org/apache/hive/hive-jdbc/{version}/
 #   → hive-jdbc-{version}-standalone.jar  (with classifier)
-#
 
 [databases.hive]
 name = "Apache Hive"
@@ -278,14 +182,8 @@ maven_artifact = "hive-jdbc"
 jdbc_url_template = "jdbc:hive2://{host}:{port}/{database}"
 default_port = 10000
 min_jre_version = "11"
-version_error_signatures = [ "driver version not compatible", ]
-
-[[databases.hive.versions]]
-version = "3.1.3"
-min_db_version = "3.x"
-label = "hive-jdbc"
-jar_sha256 = ""
 maven_classifier = "standalone"
+version_error_signatures = [ "driver version not compatible", ]
 
 # ── Databricks SQL ──
 
@@ -299,12 +197,6 @@ default_port = 443
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
 
-[[databases.databricks.versions]]
-version = "2.6.40"
-min_db_version = "any"
-label = "databricks-jdbc"
-jar_sha256 = ""
-
 # ── SAP HANA ──
 
 [databases.hana]
@@ -316,12 +208,6 @@ jdbc_url_template = "jdbc:sap://{host}:{port}/{database}"
 default_port = 30015
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
-
-[[databases.hana.versions]]
-version = "2.21.42"
-min_db_version = "any"
-label = "ngdbc"
-jar_sha256 = ""
 
 # ── Teradata ──
 
@@ -335,12 +221,6 @@ default_port = 1025
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
 
-[[databases.teradata.versions]]
-version = "17.20.00.12"
-min_db_version = "any"
-label = "terajdbc"
-jar_sha256 = ""
-
 # ── Vertica ──
 
 [databases.vertica]
@@ -352,12 +232,6 @@ jdbc_url_template = "jdbc:vertica://{host}:{port}/{database}"
 default_port = 5433
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
-
-[[databases.vertica.versions]]
-version = "12.0.3-0"
-min_db_version = "any"
-label = "vertica-jdbc"
-jar_sha256 = ""
 
 # ── Exasol ──
 
@@ -371,12 +245,6 @@ default_port = 8563
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
 
-[[databases.exasol.versions]]
-version = "7.1.20"
-min_db_version = "any"
-label = "exasol-jdbc"
-jar_sha256 = ""
-
 # ── Google BigQuery ──
 
 [databases.bigquery]
@@ -388,12 +256,6 @@ jdbc_url_template = "jdbc:bigquery://{host}:{port};ProjectId={database}"
 default_port = 443
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
-
-[[databases.bigquery.versions]]
-version = "2.1.4"
-min_db_version = "any"
-label = "bigquery-jdbc"
-jar_sha256 = ""
 
 # ── IBM Informix ──
 
@@ -407,12 +269,6 @@ default_port = 9088
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
 
-[[databases.informix.versions]]
-version = "4.50.11"
-min_db_version = "any"
-label = "informix-jdbc"
-jar_sha256 = ""
-
 # ── Apache Kylin ──
 
 [databases.kylin]
@@ -424,12 +280,6 @@ jdbc_url_template = "jdbc:kylin://{host}:{port}/{database}"
 default_port = 7070
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
-
-[[databases.kylin.versions]]
-version = "4.0.3"
-min_db_version = "any"
-label = "kylin-jdbc"
-jar_sha256 = ""
 
 # ── Apache Cassandra ──
 
@@ -443,12 +293,6 @@ default_port = 9042
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
 
-[[databases.cassandra.versions]]
-version = "1.0.0"
-min_db_version = "any"
-label = "cassandra-jdbc"
-jar_sha256 = ""
-
 # ── InterSystems IRIS ──
 
 [databases.iris]
@@ -461,12 +305,6 @@ default_port = 1972
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
 
-[[databases.iris.versions]]
-version = "3.2.0"
-min_db_version = "any"
-label = "iris-jdbc"
-jar_sha256 = ""
-
 # ── Microsoft Access ──
 
 [databases.access]
@@ -478,9 +316,3 @@ jdbc_url_template = "jdbc:ucanaccess://{host}/{database}"
 default_port = 0
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
-
-[[databases.access.versions]]
-version = "5.1.0"
-min_db_version = "any"
-label = "ucanaccess"
-jar_sha256 = ""
