@@ -7,6 +7,8 @@
 
 use crate::database::error::{DbError, DbResult};
 use std::path::PathBuf;
+use std::sync::OnceLock;
+use tokio::sync::Mutex;
 
 /// Subdirectory under user home for the managed JRE.
 const JRE_BASE_DIR: &str = ".sqlkit/jre";
@@ -21,11 +23,31 @@ const JAVA_EXE: &str = if cfg!(target_os = "windows") {
 // ── helpers ────────────────────────────────────────────────
 
 /// User home directory.
-fn home_dir() -> PathBuf {
+pub(crate) fn home_dir() -> PathBuf {
     std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_else(|_| ".".to_string())
         .into()
+}
+
+/// Serialize JRE installations to prevent concurrent downloads from
+/// racing on `remove_dir_all` / extract / rename.
+static JRE_INSTALL_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+
+/// Compare two dotted version strings numerically (e.g. "21.0.11" > "9.0.0").
+/// Returns negative if a < b, positive if a > b, 0 if equal.
+pub(crate) fn compare_versions(a: &str, b: &str) -> i32 {
+    let parts_a: Vec<&str> = a.split('.').collect();
+    let parts_b: Vec<&str> = b.split('.').collect();
+    let max_len = parts_a.len().max(parts_b.len());
+    for i in 0..max_len {
+        let na: u32 = parts_a.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
+        let nb: u32 = parts_b.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
+        if na != nb {
+            return if na > nb { 1 } else { -1 };
+        }
+    }
+    0
 }
 
 // ── path helpers ──────────────────────────────────────────
@@ -189,6 +211,11 @@ pub fn parse_adoptium_build_version(url: &str) -> Option<String> {
 /// Downloads the latest JRE 21 (Eclipse Temurin) build from the Adoptium API,
 /// extracts the archive, and renames the extracted directory to `jre`.
 pub async fn download_managed_jre() -> DbResult<()> {
+    let _guard = JRE_INSTALL_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .await;
+
     let platform = adoptium_platform().ok_or_else(|| {
         DbError::Connection("No JRE available for this platform".to_string())
     })?;

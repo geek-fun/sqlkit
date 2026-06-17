@@ -72,7 +72,9 @@ pub async fn list_drivers() -> Result<Vec<DriverInfo>, String> {
             version_cap: config.version_cap.clone(),
             filename: cached.as_ref().map(|c| c.0.clone()),
             file_size: cached.as_ref().map(|c| c.1),
-            resolved_version: cached.as_ref().and_then(|c| parse_jar_version(&c.0)),
+            resolved_version: cached
+                .as_ref()
+                .and_then(|c| parse_jar_version(&config.maven_artifact, config.maven_classifier.as_deref(), &c.0)),
         });
     }
     Ok(result)
@@ -174,16 +176,19 @@ fn driver_cache_info(artifact: &str) -> Option<(String, u64)> {
 }
 
 /// Parse a version from a JAR filename.
-/// e.g. "h2-2.2.224.jar" -> "2.2.224", "ojdbc11-21.15.0.0.jar" -> "21.15.0.0"
-fn parse_jar_version(filename: &str) -> Option<String> {
+/// Handles Maven classifiers: e.g. "hive-jdbc-3.1.3-standalone.jar" -> "3.1.3"
+fn parse_jar_version(artifact: &str, classifier: Option<&str>, filename: &str) -> Option<String> {
     let stem = filename.strip_suffix(".jar")?;
-    // Find the first digit-segment after a hyphen
-    let dash_idx = stem.rfind('-')?;
-    let version_part = &stem[dash_idx + 1..];
-    if version_part.is_empty() || !version_part.chars().next()?.is_ascii_digit() {
+    let after_artifact = stem.strip_prefix(&format!("{}-", artifact))?;
+    let version_str = if let Some(cls) = classifier {
+        after_artifact.strip_suffix(&format!("-{}", cls))?
+    } else {
+        after_artifact
+    };
+    if version_str.is_empty() || !version_str.chars().next()?.is_ascii_digit() {
         return None;
     }
-    Some(version_part.to_string())
+    Some(version_str.to_string())
 }
 
 /// Check whether a driver JAR is already cached on disk for the given artifact name.
@@ -204,10 +209,7 @@ fn is_driver_cached(artifact: &str) -> bool {
 
 /// Get the path to the JDBC driver cache directory (`~/.sqlkit/jdbc-bridge/drivers/`).
 fn drivers_cache_dir() -> PathBuf {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home)
+    jre::home_dir()
         .join(".sqlkit")
         .join("jdbc-bridge")
         .join("drivers")
@@ -223,9 +225,19 @@ pub struct BridgeStatus {
 #[tauri::command]
 pub async fn check_bridge_status() -> Result<BridgeStatus, String> {
     let jar_path = download::bridge_jar_path();
+    let current_version = if jar_path.exists() {
+        jar_path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .and_then(|s| s.strip_prefix("jdbc-bridge-"))
+            .unwrap_or(env!("CARGO_PKG_VERSION"))
+            .to_string()
+    } else {
+        env!("CARGO_PKG_VERSION").to_string()
+    };
     Ok(BridgeStatus {
         installed: jar_path.exists(),
-        current_version: env!("CARGO_PKG_VERSION").to_string(),
+        current_version,
         path: Some(jar_path.to_string_lossy().to_string()),
     })
 }
@@ -262,7 +274,7 @@ pub async fn check_jre_update() -> Result<JreUpdateStatus, String> {
         .as_ref()
         .and_then(|url| jre::parse_adoptium_build_version(url));
     let update_available = match (&current, &latest) {
-        (Some(c), Some(l)) => compare_versions(l, c) > 0,
+        (Some(c), Some(l)) => jre::compare_versions(l, c) > 0,
         (None, Some(_)) => true,
         _ => false,
     };
@@ -294,25 +306,6 @@ pub async fn set_jdbc_needed(needed: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// Compare two dotted version strings numerically (e.g. "21.0.11" > "9.0.0").
-/// Returns negative if a < b, positive if a > b, 0 if equal.
-fn compare_versions(a: &str, b: &str) -> i32 {
-    let parts_a: Vec<&str> = a.split('.').collect();
-    let parts_b: Vec<&str> = b.split('.').collect();
-    let max_len = parts_a.len().max(parts_b.len());
-    for i in 0..max_len {
-        let na: u32 = parts_a.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
-        let nb: u32 = parts_b.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
-        if na != nb {
-            return if na > nb { 1 } else { -1 };
-        }
-    }
-    0
-}
-
 fn jdbc_not_needed_path() -> PathBuf {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(".sqlkit").join(".jdbc_not_needed")
+    jre::home_dir().join(".sqlkit").join(".jdbc_not_needed")
 }

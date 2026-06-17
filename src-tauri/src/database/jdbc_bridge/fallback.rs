@@ -198,7 +198,7 @@ pub async fn run_fallback_chain(
             if let Some(redirect_url) = super::jre::check_adoptium_update().await {
                 if let Some(latest) = super::jre::parse_adoptium_build_version(&redirect_url) {
                     if let Some(current) = super::jre::read_jre_version() {
-                        if compare_jre_versions(&latest, &current) > 0 {
+                        if super::jre::compare_versions(&latest, &current) > 0 {
                             super::jre::download_managed_jre().await?;
                         }
                     }
@@ -240,22 +240,6 @@ pub async fn run_fallback_chain(
         }
         DriverAttempt::Fatal(e) => Err(e),
     }
-}
-
-/// Compare two dotted JRE version strings numerically.
-/// Returns positive if a > b, negative if a < b, 0 if equal.
-fn compare_jre_versions(a: &str, b: &str) -> i32 {
-    let parts_a: Vec<&str> = a.split('.').collect();
-    let parts_b: Vec<&str> = b.split('.').collect();
-    let max_len = parts_a.len().max(parts_b.len());
-    for i in 0..max_len {
-        let na: u32 = parts_a.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
-        let nb: u32 = parts_b.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
-        if na != nb {
-            return if na > nb { 1 } else { -1 };
-        }
-    }
-    0
 }
 
 fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
