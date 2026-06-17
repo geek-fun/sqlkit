@@ -400,6 +400,8 @@ function getCellTooltip(v: unknown): string {
 function formatCellText(v: unknown): string {
   if (isNullValue(v))
     return ''
+  if (typeof v === 'object')
+    return JSON.stringify(v)
   return String(v)
 }
 
