@@ -66,10 +66,6 @@ pub enum DatabaseType {
     CrateDB,
     /// Materialize — streaming materialized SQL, PG wire protocol.
     Materialize,
-    /// RisingWave — streaming SQL, PG wire protocol.
-    RisingWave,
-    /// Babelfish — PG with SQL Server protocol, PG wire protocol.
-    Babelfish,
     /// Google AlloyDB — cloud PostgreSQL fork, PG wire protocol.
     AlloyDB,
     /// Cloud SQL for PostgreSQL — Google managed PG, PG wire protocol.
@@ -106,9 +102,6 @@ pub enum DatabaseType {
     SingleStoreMemSQL,
     /// Cloud SQL for MySQL — Google managed MySQL, MySQL wire protocol.
     CloudSQLMySQL,
-    /// NDB Cluster — MySQL in-memory cluster, MySQL wire protocol.
-    NDBCluster,
-
     // ── JDBC bridge (Java subprocess, lazy download) ──
     /// Oracle Database — JDBC bridge.
     Oracle,

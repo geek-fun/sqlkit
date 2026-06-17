@@ -46,7 +46,7 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         // PG wire protocol compat
         CockroachDB | Redshift | YugabyteDB | TimescaleDB | KingbaseES | GaussDB | HighGo
         | UXDB | OpenGauss | GBase8c | QuestDB | Vastbase | YashanDB
-        | Greenplum | EnterpriseDB | CrateDB | Materialize | RisingWave | Babelfish
+        | Greenplum | EnterpriseDB | CrateDB | Materialize
         | AlloyDB | CloudSQLPG | FujitsuPG => {
             ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL)
         }
@@ -56,7 +56,7 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         // MySQL wire protocol compat
         MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 | Doris | SelectDB | StarRocks
         | Databend | GoldenDB | ManticoreSearch
-        | SingleStoreMemSQL | CloudSQLMySQL | NDBCluster => {
+        | SingleStoreMemSQL | CloudSQLMySQL => {
             ConnectionStrategy::Native(CoreDatabaseType::MySQL)
         }
 
@@ -120,12 +120,12 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
     match db {
         PostgreSQL | CockroachDB | Redshift | YugabyteDB | TimescaleDB | KingbaseES | GaussDB
         | HighGo | UXDB | OpenGauss | GBase8c | Vastbase
-        | Greenplum | EnterpriseDB | CrateDB | Materialize | RisingWave | Babelfish
+        | Greenplum | EnterpriseDB | CrateDB | Materialize
         | AlloyDB | CloudSQLPG | FujitsuPG => Some(5432),
         QuestDB => Some(8812),
         YashanDB => Some(1688),
         MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 | GoldenDB
-        | SingleStoreMemSQL | CloudSQLMySQL | NDBCluster => Some(3306),
+        | SingleStoreMemSQL | CloudSQLMySQL => Some(3306),
         Doris | SelectDB | StarRocks => Some(9030),
         Databend => Some(3307),
         ManticoreSearch => Some(9306),
@@ -182,8 +182,6 @@ mod tests {
             DatabaseType::EnterpriseDB,
             DatabaseType::CrateDB,
             DatabaseType::Materialize,
-            DatabaseType::RisingWave,
-            DatabaseType::Babelfish,
             DatabaseType::AlloyDB,
             DatabaseType::CloudSQLPG,
             DatabaseType::FujitsuPG,
@@ -213,7 +211,6 @@ mod tests {
             DatabaseType::ManticoreSearch,
             DatabaseType::SingleStoreMemSQL,
             DatabaseType::CloudSQLMySQL,
-            DatabaseType::NDBCluster,
         ] {
             assert!(
                 is_mysql_family(db),
