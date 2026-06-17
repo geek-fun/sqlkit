@@ -2,6 +2,7 @@ use crate::database::config::DatabaseType;
 use crate::database::rqlite::RqliteAdapter;
 use crate::database::strategy::{resolve_effective_type, ConnectionStrategy, CoreDatabaseType};
 use crate::database::turso::TursoAdapter;
+use crate::database::jdbc_bridge;
 use crate::database::{
     clickhouse::ClickHouseAdapter, config::ConnectionConfig, http_sql::HttpSqlAdapter,
     jdbc_bridge::JdbcBridgeAdapter, ConnectionStatus, DatabaseAdapter,
@@ -13,7 +14,6 @@ use crate::database::{
 use crate::ssh::TunnelManager;
 use crate::ssh::start_transport_layers;
 use crate::state::ActiveConnection;
-use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -272,9 +272,6 @@ pub async fn connection_host_port(
 /// Check whether JDBC connections are allowed.
 /// Returns false when the `~/.sqlkit/.jdbc_not_needed` marker file exists.
 fn is_jdbc_needed() -> bool {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_string());
-    let marker = PathBuf::from(home).join(".sqlkit").join(".jdbc_not_needed");
+    let marker = jdbc_bridge::jre::home_dir().join(".sqlkit").join(".jdbc_not_needed");
     !marker.exists()
 }

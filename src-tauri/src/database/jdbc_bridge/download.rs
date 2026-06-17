@@ -22,10 +22,7 @@ const BRIDGE_JAR_SUFFIX: &str = ".jar";
 
 /// Get the bridge data directory (~/.sqlkit/jdbc-bridge).
 fn bridge_dir() -> PathBuf {
-    let home = std::env::var("HOME")
-        .or_else(|_| std::env::var("USERPROFILE"))
-        .unwrap_or_else(|_| ".".to_string());
-    PathBuf::from(home).join(BRIDGE_DIR)
+    super::jre::home_dir().join(BRIDGE_DIR)
 }
 
 /// Get the path to the current version's bridge JAR (`~/.sqlkit/jdbc-bridge/jdbc-bridge-{ver}.jar`).
@@ -129,25 +126,4 @@ async fn cleanup_old_bridge_versions() -> DbResult<()> {
     Ok(())
 }
 
-/// List all installed bridge JAR versions on disk.
-pub fn list_bridge_versions() -> Vec<String> {
-    let dir = bridge_dir();
-    if !dir.exists() {
-        return Vec::new();
-    }
-    let mut versions = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(&dir) {
-        for entry in entries.flatten() {
-            let fname = match entry.file_name().to_str() {
-                Some(n) => n.to_string(),
-                None => continue,
-            };
-            if fname.starts_with(BRIDGE_JAR_PREFIX) && fname.ends_with(BRIDGE_JAR_SUFFIX) {
-                let ver = &fname[BRIDGE_JAR_PREFIX.len()..fname.len() - BRIDGE_JAR_SUFFIX.len()];
-                versions.push(ver.to_string());
-            }
-        }
-    }
-    versions.sort();
-    versions
-}
+
