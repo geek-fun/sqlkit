@@ -219,7 +219,7 @@ jobs:
       - name: Prepare bridge JAR for upload
         run: |
           VERSION=${{ needs.check-version.outputs.version }}
-          cp bridge-artifact/jdbc-bridge-${VERSION}.jar bridge-artifact/jdbc-bridge.jar
+          ls -la bridge-artifact/
 
       - name: Upload bridge JAR to release
         env:
@@ -228,7 +228,6 @@ jobs:
           VERSION=${{ needs.check-version.outputs.version }}
           gh release upload \
             v${{ needs.check-version.outputs.version }} \
-            bridge-artifact/jdbc-bridge.jar \
             bridge-artifact/jdbc-bridge-${VERSION}.jar \
             --clobber
       - name: Publish draft release
