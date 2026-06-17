@@ -35,11 +35,20 @@ tokio-postgres = { version = "0.7", features = [
   "with-chrono-0_4",
   "with-uuid-1"
 ] }
-postgres-native-tls = "0.5"
-native-tls = "0.2"
 deadpool-postgres = "0.14"
-mysql_async = { version = "0.34", features = [ "native-tls-tls" ] }
-tokio-native-tls = "0.3"
+mysql_async = { version = "0.34", default-features = false, features = [
+  "minimal-rust",
+  "rustls-tls",
+  "bigdecimal",
+  "rust_decimal",
+  "time",
+  "frunk",
+  "binlog"
+] }
+tokio-postgres-rustls = "0.13"
+rustls = "0.23"
+rustls-pemfile = "2"
+rustls-native-certs = "0.8"
 tiberius = { version = "0.12", default-features = false, features = [
   "sql-browser-tokio",
   "tds73",
@@ -68,7 +77,7 @@ calamine = "0.22"
 # Agent / LLM dependencies (data-studio-agent release)
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
-  "native-tls",
+  "rustls-tls",
   "socks"
 ] }
 http = "1"
@@ -94,3 +103,4 @@ mockall = "0.13"
 
 [features]
 default = []
+ohos = []
