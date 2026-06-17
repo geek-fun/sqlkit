@@ -2,7 +2,6 @@ use crate::database::config::DatabaseType;
 use crate::database::rqlite::RqliteAdapter;
 use crate::database::strategy::{resolve_effective_type, ConnectionStrategy, CoreDatabaseType};
 use crate::database::turso::TursoAdapter;
-use crate::database::jdbc_bridge;
 use crate::database::{
     clickhouse::ClickHouseAdapter, config::ConnectionConfig, http_sql::HttpSqlAdapter,
     jdbc_bridge::JdbcBridgeAdapter, ConnectionStatus, DatabaseAdapter,
@@ -58,12 +57,6 @@ pub async fn create_and_connect_adapter(
             }
         }
         ConnectionStrategy::JdbcBridge => {
-            if !is_jdbc_needed() {
-                return Err(
-                    "JDBC connections are disabled. Enable them in Settings → JRE & Drivers."
-                        .to_string(),
-                );
-            }
             let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;
             Ok(ActiveConnection::JdbcBridge(Arc::new(Mutex::new(adapter))))
@@ -126,12 +119,6 @@ pub async fn test_connection(
             _ => Err("Native adapter not yet implemented".into()),
         },
         ConnectionStrategy::JdbcBridge => {
-            if !is_jdbc_needed() {
-                return Err(
-                    "JDBC connections are disabled. Enable them in Settings → JRE & Drivers."
-                        .to_string(),
-                );
-            }
             let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;
             adapter.test_connection().await.map_err(|e| e.to_string())
@@ -267,11 +254,4 @@ pub async fn connection_host_port(
         Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),
         None => Ok((config.host.clone(), config.port)),
     }
-}
-
-/// Check whether JDBC connections are allowed.
-/// Returns false when the `~/.sqlkit/.jdbc_not_needed` marker file exists.
-fn is_jdbc_needed() -> bool {
-    let marker = jdbc_bridge::jre::home_dir().join(".sqlkit").join(".jdbc_not_needed");
-    !marker.exists()
 }
