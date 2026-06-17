@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-06-17
+
+### Added
+
+- Support 70+ databases (up from 55) with 12 new wire-protocol compat databases: Greenplum, EnterpriseDB, CrateDB, Materialize, AlloyDB, CloudSQLPG, FujitsuPG, SingleStore/MemSQL, CloudSQLMySQL (#98)
+- Dedicated SVG icons for Firebird, Derby, RQLite, Turso, TDengine and 7 new databases
+
+### Changed
+
+- Migrate DuckDB, Firebird, Oracle from native Rust adapters to JDBC bridge — reduces binary size by removing bundled C libraries (#98)
+- Native pure Rust adapters now limited to PostgreSQL, MySQL, SQL Server, SQLite
+- ClickHouse, RQLite, Turso consolidated under HTTP bridge
+- README updated with current adapter strategy and 70+ database support
+
+### Fixed
+
+- CI: Replace deprecated `macos-13` runner with `macos-15-intel` for JRE builds
+- CI: Add missing `actions/checkout` to publish job to fix JRE asset upload
+- Fix pre-existing test compilation errors in JDBC registry, SSH transport, and agent loop
+
+### Removed
+
+- Babelfish (PG feature, not standalone database)
+- RisingWave (dropped from scope)
+- NDB Cluster (MySQL storage engine, not a separate product)
+
 ## [0.6.2] - 2026-06-17
 
 ### Added
