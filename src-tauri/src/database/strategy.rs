@@ -6,16 +6,14 @@
 use crate::database::config::DatabaseType;
 
 /// Core database types that have native adapter implementations.
+/// Non-core databases route through JDBC bridge or HTTP bridge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CoreDatabaseType {
     PostgreSQL,
     MySQL,
     SqlServer,
     SQLite,
-    DuckDb,
     ClickHouse,
-    Firebird,
-    Oracle,
     DB2,
     H2,
     Snowflake,
@@ -43,11 +41,13 @@ pub enum ConnectionStrategy {
 pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
     use DatabaseType::*;
     match db {
-        // Native PG adapter
+        //         Native PG adapter
         PostgreSQL => ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL),
         // PG wire protocol compat
         CockroachDB | Redshift | YugabyteDB | TimescaleDB | KingbaseES | GaussDB | HighGo
-        | UXDB | OpenGauss | GBase8c | QuestDB | Vastbase | YashanDB => {
+        | UXDB | OpenGauss | GBase8c | QuestDB | Vastbase | YashanDB
+        | Greenplum | EnterpriseDB | CrateDB | Materialize
+        | AlloyDB | CloudSQLPG | FujitsuPG => {
             ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL)
         }
 
@@ -55,28 +55,20 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         MySQL => ConnectionStrategy::Native(CoreDatabaseType::MySQL),
         // MySQL wire protocol compat
         MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 | Doris | SelectDB | StarRocks
-        | Databend | GoldenDB | ManticoreSearch => {
+        | Databend | GoldenDB | ManticoreSearch
+        | SingleStoreMemSQL | CloudSQLMySQL => {
             ConnectionStrategy::Native(CoreDatabaseType::MySQL)
         }
 
         // Other native adapters
         SqlServer => ConnectionStrategy::Native(CoreDatabaseType::SqlServer),
         SQLite => ConnectionStrategy::Native(CoreDatabaseType::SQLite),
-        DuckDb => ConnectionStrategy::Native(CoreDatabaseType::DuckDb),
         ClickHouse => ConnectionStrategy::Native(CoreDatabaseType::ClickHouse),
-        Firebird => ConnectionStrategy::Native(CoreDatabaseType::Firebird),
 
         // JDBC bridge (Java subprocess)
-        Oracle => {
-            #[cfg(feature = "oracle")]
-            {
-                ConnectionStrategy::Native(CoreDatabaseType::Oracle)
-            }
-            #[cfg(not(feature = "oracle"))]
-            {
-                ConnectionStrategy::JdbcBridge
-            }
-        }
+        // DuckDB, Oracle, Firebird moved from native to JDBC bridge
+        // for binary size reduction (DuckDB) and simplified maintenance (Oracle, Firebird)
+        DuckDb | Oracle | Firebird => ConnectionStrategy::JdbcBridge,
         DB2 => ConnectionStrategy::JdbcBridge,
         H2 => ConnectionStrategy::JdbcBridge,
         Snowflake => ConnectionStrategy::JdbcBridge,
@@ -127,10 +119,13 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
     use DatabaseType::*;
     match db {
         PostgreSQL | CockroachDB | Redshift | YugabyteDB | TimescaleDB | KingbaseES | GaussDB
-        | HighGo | UXDB | OpenGauss | GBase8c | Vastbase => Some(5432),
+        | HighGo | UXDB | OpenGauss | GBase8c | Vastbase
+        | Greenplum | EnterpriseDB | CrateDB | Materialize
+        | AlloyDB | CloudSQLPG | FujitsuPG => Some(5432),
         QuestDB => Some(8812),
         YashanDB => Some(1688),
-        MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 | GoldenDB => Some(3306),
+        MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 | GoldenDB
+        | SingleStoreMemSQL | CloudSQLMySQL => Some(3306),
         Doris | SelectDB | StarRocks => Some(9030),
         Databend => Some(3307),
         ManticoreSearch => Some(9306),
@@ -183,6 +178,13 @@ mod tests {
             DatabaseType::QuestDB,
             DatabaseType::Vastbase,
             DatabaseType::YashanDB,
+            DatabaseType::Greenplum,
+            DatabaseType::EnterpriseDB,
+            DatabaseType::CrateDB,
+            DatabaseType::Materialize,
+            DatabaseType::AlloyDB,
+            DatabaseType::CloudSQLPG,
+            DatabaseType::FujitsuPG,
         ] {
             assert!(
                 is_pg_family(db),
@@ -207,6 +209,8 @@ mod tests {
             DatabaseType::Databend,
             DatabaseType::GoldenDB,
             DatabaseType::ManticoreSearch,
+            DatabaseType::SingleStoreMemSQL,
+            DatabaseType::CloudSQLMySQL,
         ] {
             assert!(
                 is_mysql_family(db),
@@ -217,26 +221,38 @@ mod tests {
     }
 
     #[test]
-    fn test_firebird_routes_to_native() {
+    fn test_duckdb_routes_to_jdbc() {
         assert_eq!(
-            resolve_effective_type(DatabaseType::Firebird),
-            ConnectionStrategy::Native(CoreDatabaseType::Firebird),
-            "Firebird should route to native Firebird adapter"
+            resolve_effective_type(DatabaseType::DuckDb),
+            ConnectionStrategy::JdbcBridge,
+            "DuckDB should route to JDBC bridge"
         );
     }
 
     #[test]
-    fn test_oracle_routes_to_native() {
+    fn test_firebird_routes_to_jdbc() {
+        assert_eq!(
+            resolve_effective_type(DatabaseType::Firebird),
+            ConnectionStrategy::JdbcBridge,
+            "Firebird should route to JDBC bridge"
+        );
+    }
+
+    #[test]
+    fn test_oracle_routes_to_jdbc() {
         assert_eq!(
             resolve_effective_type(DatabaseType::Oracle),
-            ConnectionStrategy::Native(CoreDatabaseType::Oracle),
-            "Oracle should route to native Oracle adapter"
+            ConnectionStrategy::JdbcBridge,
+            "Oracle should route to JDBC bridge"
         );
     }
 
     #[test]
     fn test_jdbc_bridge_types() {
         for db in [
+            DatabaseType::DuckDb,
+            DatabaseType::Firebird,
+            DatabaseType::Oracle,
             DatabaseType::DB2,
             DatabaseType::H2,
             DatabaseType::Snowflake,
@@ -312,7 +328,12 @@ mod tests {
         assert_eq!(default_port(DatabaseType::Cassandra), Some(9042));
         assert_eq!(default_port(DatabaseType::Iris), Some(1972));
         assert_eq!(default_port(DatabaseType::Access), Some(0));
-        assert_eq!(default_port(DatabaseType::Firebird), Some(3050));
+        assert_eq!(default_port(DatabaseType::DuckDb), None);
+        assert_eq!(default_port(DatabaseType::Greenplum), Some(5432));
+        assert_eq!(default_port(DatabaseType::EnterpriseDB), Some(5432));
+        assert_eq!(default_port(DatabaseType::CrateDB), Some(5432));
+        assert_eq!(default_port(DatabaseType::SingleStoreMemSQL), Some(3306));
+        assert_eq!(default_port(DatabaseType::CloudSQLMySQL), Some(3306));
         assert_eq!(default_port(DatabaseType::RQLite), Some(4001));
         assert_eq!(default_port(DatabaseType::Turso), Some(443));
         assert_eq!(default_port(DatabaseType::TDengine), Some(6030));

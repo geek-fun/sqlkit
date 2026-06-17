@@ -276,7 +276,6 @@ jobs:
             v${{ needs.check-version.outputs.version }} \
             jre-artifacts/* \
             --clobber
-
       - name: Publish draft release
         uses: actions/github-script@v7
         env:

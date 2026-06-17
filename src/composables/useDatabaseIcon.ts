@@ -1,21 +1,28 @@
 import type { DatabaseType } from '@/store'
 
 import accessLogo from '@/assets/images/database-icons/access-logo.svg'
+import alloydbLogo from '@/assets/images/database-icons/alloydb-logo.svg'
 import bigqueryLogo from '@/assets/images/database-icons/bigquery-logo.svg'
 import cassandraLogo from '@/assets/images/database-icons/cassandra-logo.svg'
 import clickhouseLogo from '@/assets/images/database-icons/clickhouse-logo.svg'
+import cloudsqlpgLogo from '@/assets/images/database-icons/cloudsqlpg-logo.svg'
 import cockroachdbLogo from '@/assets/images/database-icons/cockroachdb-logo.svg'
+import cratedbLogo from '@/assets/images/database-icons/cratedb-logo.svg'
 import databendLogo from '@/assets/images/database-icons/databend-logo.svg'
 import databricksLogo from '@/assets/images/database-icons/databricks-logo.svg'
 import db2Logo from '@/assets/images/database-icons/db2-logo.svg'
+import derbyLogo from '@/assets/images/database-icons/derby-logo.svg'
 import dm8Logo from '@/assets/images/database-icons/dm8-logo.svg'
 import dm8oracleLogo from '@/assets/images/database-icons/dm8oracle-logo.svg'
 import dorisLogo from '@/assets/images/database-icons/doris-logo.svg'
 import duckdbLogo from '@/assets/images/database-icons/duckdb-logo.svg'
+import enterprisedbLogo from '@/assets/images/database-icons/enterprisedb-logo.svg'
 import exasolLogo from '@/assets/images/database-icons/exasol-logo.svg'
+import firebirdLogo from '@/assets/images/database-icons/firebird-logo.svg'
 import gaussdbLogo from '@/assets/images/database-icons/gaussdb-logo.svg'
 import gbaseLogo from '@/assets/images/database-icons/gbase-logo.svg'
 import goldendbLogo from '@/assets/images/database-icons/goldendb-logo.svg'
+import greenplumLogo from '@/assets/images/database-icons/greenplum-logo.svg'
 import h2Logo from '@/assets/images/database-icons/h2-logo.svg'
 import hanaLogo from '@/assets/images/database-icons/hana-logo.svg'
 import highgoLogo from '@/assets/images/database-icons/highgo-logo.svg'
@@ -26,6 +33,7 @@ import kingbaseesLogo from '@/assets/images/database-icons/kingbasees-logo.svg'
 import kylinLogo from '@/assets/images/database-icons/kylin-logo.svg'
 import manticoreLogo from '@/assets/images/database-icons/manticore-logo.svg'
 import mariadbLogo from '@/assets/images/database-icons/mariadb-logo.svg'
+import materializeLogo from '@/assets/images/database-icons/materialize-logo.svg'
 import mysqlLogo from '@/assets/images/database-icons/mysql-logo.svg'
 import oceanbaseLogo from '@/assets/images/database-icons/oceanbase-logo.svg'
 import opengaussLogo from '@/assets/images/database-icons/opengauss-logo.svg'
@@ -35,16 +43,20 @@ import postgresqlLogo from '@/assets/images/database-icons/postgresql-logo.svg'
 import prestoLogo from '@/assets/images/database-icons/presto-logo.svg'
 import questdbLogo from '@/assets/images/database-icons/questdb-logo.svg'
 import redshiftLogo from '@/assets/images/database-icons/redshift-logo.svg'
+import rqliteLogo from '@/assets/images/database-icons/rqlite-logo.svg'
 import selectdbLogo from '@/assets/images/database-icons/selectdb-logo.svg'
+import singlestoreLogo from '@/assets/images/database-icons/singlestorememsql-logo.svg'
 import snowflakeLogo from '@/assets/images/database-icons/snowflake-logo.svg'
 import sqliteLogo from '@/assets/images/database-icons/sqlite-logo.svg'
 import sqlserverLogo from '@/assets/images/database-icons/sqlserver-logo.svg'
 import starrocksLogo from '@/assets/images/database-icons/starrocks-logo.svg'
+import tdengineLogo from '@/assets/images/database-icons/tdengine-logo.svg'
 import tdsqlLogo from '@/assets/images/database-icons/tdsql-logo.svg'
 import teradataLogo from '@/assets/images/database-icons/teradata-logo.svg'
 import tidbLogo from '@/assets/images/database-icons/tidb-logo.svg'
 import timescaledbLogo from '@/assets/images/database-icons/timescaledb-logo.svg'
 import trinoLogo from '@/assets/images/database-icons/trino-logo.svg'
+import tursoLogo from '@/assets/images/database-icons/turso-logo.svg'
 import uxdbLogo from '@/assets/images/database-icons/uxdb-logo.svg'
 import vastbaseLogo from '@/assets/images/database-icons/vastbase-logo.svg'
 import verticaLogo from '@/assets/images/database-icons/vertica-logo.svg'
@@ -98,7 +110,7 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   GBASE8A: { icon: gbaseLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   TRINO: { icon: trinoLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   PRESTO: { icon: prestoLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
-  DERBY: { icon: sqliteLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  DERBY: { icon: derbyLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   HIVE: { icon: hiveLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
   DATABRICKS: { icon: databricksLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   HANA: { icon: hanaLogo, color: 'bg-teal-100 dark:bg-teal-900/30' },
@@ -111,10 +123,19 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   CASSANDRA: { icon: cassandraLogo, color: 'bg-gray-100 dark:bg-gray-800/30' },
   IRIS: { icon: irisLogo, color: 'bg-teal-100 dark:bg-teal-900/30' },
   ACCESS: { icon: accessLogo, color: 'bg-red-100 dark:bg-red-900/30' },
-  FIREBIRD: { icon: clickhouseLogo, color: 'bg-purple-100 dark:bg-purple-900/30' },
-  RQLITE: { icon: sqliteLogo, color: 'bg-green-100 dark:bg-green-900/30' },
-  TURSO: { icon: sqliteLogo, color: 'bg-cyan-100 dark:bg-cyan-900/30' },
-  TDENGINE: { icon: clickhouseLogo, color: 'bg-amber-100 dark:bg-amber-900/30' },
+  FIREBIRD: { icon: firebirdLogo, color: 'bg-purple-100 dark:bg-purple-900/30' },
+  RQLITE: { icon: rqliteLogo, color: 'bg-green-100 dark:bg-green-900/30' },
+  TURSO: { icon: tursoLogo, color: 'bg-cyan-100 dark:bg-cyan-900/30' },
+  TDENGINE: { icon: tdengineLogo, color: 'bg-amber-100 dark:bg-amber-900/30' },
+  ALLOYDB: { icon: alloydbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  CRATEDB: { icon: cratedbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  CLOUDSQLPG: { icon: cloudsqlpgLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  ENTERPRISEDB: { icon: enterprisedbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  GREENPLUM: { icon: greenplumLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  MATERIALIZE: { icon: materializeLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  FUJITSUPG: { icon: postgresqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  SINGLESTOREMEMSQL: { icon: singlestoreLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
+  CLOUDSQLMYSQL: { icon: mysqlLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
 }
 
 export function useDatabaseIcon() {

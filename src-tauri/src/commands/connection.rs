@@ -38,16 +38,7 @@ pub async fn connect_server(
             let a = adapter.lock().await;
             a.test_connection().await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
         ActiveConnection::ClickHouse(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let a = adapter.lock().await;
             a.test_connection().await
         }
@@ -88,10 +79,7 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
         ActiveConnection::MySQL(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::SQLServer(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::SQLite(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::DuckDb(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::ClickHouse(adapter) => adapter.lock().await.disconnect().await,
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::HttpSql(adapter) => adapter.lock().await.disconnect().await,
         ActiveConnection::Rqlite(adapter) => adapter.lock().await.disconnect().await,

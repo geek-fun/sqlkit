@@ -178,6 +178,8 @@ pub fn build_jdbc_url(
 fn db_type_to_registry_key(db: DatabaseType) -> Option<&'static str> {
     match db {
         DatabaseType::Oracle => Some("oracle"),
+        DatabaseType::DuckDb => Some("duckdb"),
+        DatabaseType::Firebird => Some("firebird"),
         DatabaseType::DB2 => Some("db2"),
         DatabaseType::H2 => Some("h2"),
         DatabaseType::Derby => Some("derby"),
@@ -287,6 +289,7 @@ mod tests {
             maven_group_override: None,
             maven_artifact_override: Some("ojdbc11".into()),
             version_error_signatures: vec![],
+            maven_classifier: None,
         };
         let url = resolve_maven_url(&entry, "com.oracle.database.jdbc", "ojdbc11");
         assert_eq!(
@@ -305,6 +308,7 @@ mod tests {
             maven_group_override: None,
             maven_artifact_override: None,
             version_error_signatures: vec![],
+            maven_classifier: None,
         };
         let url = resolve_maven_url(&entry, "com.h2database", "h2");
         assert_eq!(

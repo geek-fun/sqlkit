@@ -61,6 +61,15 @@ export enum DatabaseType {
   RQLITE = 'RQLITE',
   TURSO = 'TURSO',
   TDENGINE = 'TDENGINE',
+  GREENPLUM = 'GREENPLUM',
+  ENTERPRISEDB = 'ENTERPRISEDB',
+  CRATEDB = 'CRATEDB',
+  MATERIALIZE = 'MATERIALIZE',
+  ALLOYDB = 'ALLOYDB',
+  CLOUDSQLPG = 'CLOUDSQLPG',
+  FUJITSUPG = 'FUJITSUPG',
+  SINGLESTOREMEMSQL = 'SINGLESTOREMEMSQL',
+  CLOUDSQLMYSQL = 'CLOUDSQLMYSQL',
 }
 
 const PG_BACKEND = 'PostgreSQL'
@@ -124,6 +133,15 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.RQLITE]: 'rqlite',
   [DatabaseType.TURSO]: 'turso',
   [DatabaseType.TDENGINE]: 'tdengine',
+  [DatabaseType.GREENPLUM]: PG_BACKEND,
+  [DatabaseType.ENTERPRISEDB]: PG_BACKEND,
+  [DatabaseType.CRATEDB]: PG_BACKEND,
+  [DatabaseType.MATERIALIZE]: PG_BACKEND,
+  [DatabaseType.ALLOYDB]: PG_BACKEND,
+  [DatabaseType.CLOUDSQLPG]: PG_BACKEND,
+  [DatabaseType.FUJITSUPG]: PG_BACKEND,
+  [DatabaseType.SINGLESTOREMEMSQL]: MYSQL_BACKEND,
+  [DatabaseType.CLOUDSQLMYSQL]: MYSQL_BACKEND,
 }
 
 const dbTypeFromBackend: Record<string, DatabaseType> = {
@@ -159,6 +177,15 @@ const dbTypeFromBackend: Record<string, DatabaseType> = {
   rqlite: DatabaseType.RQLITE,
   turso: DatabaseType.TURSO,
   tdengine: DatabaseType.TDENGINE,
+  greenplum: DatabaseType.GREENPLUM,
+  enterprisedb: DatabaseType.ENTERPRISEDB,
+  cratedb: DatabaseType.CRATEDB,
+  materialize: DatabaseType.MATERIALIZE,
+  alloydb: DatabaseType.ALLOYDB,
+  cloudsqlpg: DatabaseType.CLOUDSQLPG,
+  fujitsupg: DatabaseType.FUJITSUPG,
+  singlestore: DatabaseType.SINGLESTOREMEMSQL,
+  cloudsqlmysql: DatabaseType.CLOUDSQLMYSQL,
 }
 
 const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
@@ -198,6 +225,8 @@ export function isJdbcDatabase(type: DatabaseType): boolean {
     DatabaseType.IRIS,
     DatabaseType.ACCESS,
     DatabaseType.TDENGINE,
+    DatabaseType.DUCKDB,
+    DatabaseType.FIREBIRD,
   ].includes(type)
 }
 
@@ -223,6 +252,8 @@ export const jdbcDatabaseTypes: DatabaseType[] = [
   DatabaseType.IRIS,
   DatabaseType.ACCESS,
   DatabaseType.TDENGINE,
+  DatabaseType.DUCKDB,
+  DatabaseType.FIREBIRD,
 ]
 
 export enum ConnectionStatus {

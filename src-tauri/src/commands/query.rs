@@ -4,10 +4,8 @@
 //! and getting query execution plans.
 
 use crate::api_response::{db_error_to_api_error, ApiResponse};
-#[cfg(feature = "firebird")]
-use crate::database::FirebirdAdapter;
 use crate::database::{
-    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DuckDbAdapter, ExplainResult,
+    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, ExplainResult,
     HttpSqlAdapter, JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter,
     SqlServerAdapter, TursoAdapter,
 };
@@ -118,12 +116,9 @@ pub async fn execute_query(
             Postgres(ConnectionConfig),
             MySQL(ConnectionConfig),
             SQLServer(ConnectionConfig),
-            DuckDb(ConnectionConfig),
             ClickHouse(ConnectionConfig),
             JdbcBridge(ConnectionConfig),
             HttpSql(ConnectionConfig),
-            #[cfg(feature = "firebird")]
-            Firebird(ConnectionConfig),
             Rqlite(ConnectionConfig),
             Turso(ConnectionConfig),
         }
@@ -165,33 +160,12 @@ pub async fn execute_query(
                         None
                     }
                 }
-                ActiveConnection::DuckDb(adapter) => {
-                    let adapter = adapter.lock().await;
-                    if Some(db.as_str()) != adapter.config.database.as_deref() {
-                        let mut cfg = adapter.config.clone();
-                        cfg.database = Some(db.clone());
-                        Some(TempKind::DuckDb(cfg))
-                    } else {
-                        None
-                    }
-                }
                 ActiveConnection::ClickHouse(adapter) => {
                     let adapter = adapter.lock().await;
                     if Some(db.as_str()) != adapter.config.database.as_deref() {
                         let mut cfg = adapter.config.clone();
                         cfg.database = Some(db.clone());
                         Some(TempKind::ClickHouse(cfg))
-                    } else {
-                        None
-                    }
-                }
-                #[cfg(feature = "firebird")]
-                ActiveConnection::Firebird(adapter) => {
-                    let adapter = adapter.lock().await;
-                    if Some(db.as_str()) != adapter.config.database.as_deref() {
-                        let mut cfg = adapter.config.clone();
-                        cfg.database = Some(db.clone());
-                        Some(TempKind::Firebird(cfg))
                     } else {
                         None
                     }
@@ -252,9 +226,6 @@ pub async fn execute_query(
                 TempKind::SQLServer(cfg) => {
                     execute_with_temp_adapter(SqlServerAdapter::new(cfg), &sql).await
                 }
-                TempKind::DuckDb(cfg) => {
-                    execute_with_temp_adapter(DuckDbAdapter::new(cfg), &sql).await
-                }
                 TempKind::ClickHouse(cfg) => {
                     execute_with_temp_adapter(ClickHouseAdapter::new(cfg), &sql).await
                 }
@@ -263,10 +234,6 @@ pub async fn execute_query(
                 }
                 TempKind::HttpSql(cfg) => {
                     execute_with_temp_adapter(HttpSqlAdapter::new(cfg), &sql).await
-                }
-                #[cfg(feature = "firebird")]
-                TempKind::Firebird(cfg) => {
-                    execute_with_temp_adapter(FirebirdAdapter::new(cfg), &sql).await
                 }
                 TempKind::Rqlite(cfg) => {
                     execute_with_temp_adapter(RqliteAdapter::new(cfg), &sql).await
@@ -301,16 +268,7 @@ pub async fn execute_query(
             let adapter = adapter.lock().await;
             adapter.execute_query(&sql).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter.execute_query(&sql).await
         }
@@ -405,12 +363,9 @@ pub async fn explain_query(
             Postgres(ConnectionConfig),
             MySQL(ConnectionConfig),
             SQLServer(ConnectionConfig),
-            DuckDb(ConnectionConfig),
             ClickHouse(ConnectionConfig),
             JdbcBridge(ConnectionConfig),
             HttpSql(ConnectionConfig),
-            #[cfg(feature = "firebird")]
-            Firebird(ConnectionConfig),
             Rqlite(ConnectionConfig),
             Turso(ConnectionConfig),
         }
@@ -453,33 +408,12 @@ pub async fn explain_query(
                     }
                 }
                 ActiveConnection::SQLite(_) => None,
-                ActiveConnection::DuckDb(adapter) => {
-                    let adapter = adapter.lock().await;
-                    if Some(db.as_str()) != adapter.config.database.as_deref() {
-                        let mut cfg = adapter.config.clone();
-                        cfg.database = Some(db.clone());
-                        Some(TempExplainKind::DuckDb(cfg))
-                    } else {
-                        None
-                    }
-                }
                 ActiveConnection::ClickHouse(adapter) => {
                     let adapter = adapter.lock().await;
                     if Some(db.as_str()) != adapter.config.database.as_deref() {
                         let mut cfg = adapter.config.clone();
                         cfg.database = Some(db.clone());
                         Some(TempExplainKind::ClickHouse(cfg))
-                    } else {
-                        None
-                    }
-                }
-                #[cfg(feature = "firebird")]
-                ActiveConnection::Firebird(adapter) => {
-                    let adapter = adapter.lock().await;
-                    if Some(db.as_str()) != adapter.config.database.as_deref() {
-                        let mut cfg = adapter.config.clone();
-                        cfg.database = Some(db.clone());
-                        Some(TempExplainKind::Firebird(cfg))
                     } else {
                         None
                     }
@@ -608,54 +542,9 @@ pub async fn explain_query(
                         analyze,
                     })
                 }
-                TempExplainKind::DuckDb(cfg) => {
-                    let database_type = "duckdb";
-                    let mut temp = DuckDbAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
-                    let explain_sql = if analyze {
-                        format!("EXPLAIN ANALYZE {}", sql)
-                    } else {
-                        format!("EXPLAIN {}", sql)
-                    };
-                    let result = temp
-                        .execute_query(&explain_sql)
-                        .await
-                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
-                    let raw = extract_plan_text(&result);
-                    let _ = temp.disconnect().await;
-                    Ok(ExplainResult {
-                        database_type: database_type.to_string(),
-                        raw,
-                        format: "text".to_string(),
-                        analyze,
-                    })
-                }
                 TempExplainKind::ClickHouse(cfg) => {
                     let database_type = "clickhouse";
                     let mut temp = ClickHouseAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
-                    let explain_sql = format!("EXPLAIN {}", sql);
-                    let result = temp
-                        .execute_query(&explain_sql)
-                        .await
-                        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
-                    let raw = extract_plan_text(&result);
-                    let _ = temp.disconnect().await;
-                    Ok(ExplainResult {
-                        database_type: database_type.to_string(),
-                        raw,
-                        format: "text".to_string(),
-                        analyze,
-                    })
-                }
-                #[cfg(feature = "firebird")]
-                TempExplainKind::Firebird(cfg) => {
-                    let database_type = "firebird";
-                    let mut temp = FirebirdAdapter::new(cfg);
                     temp.connect().await.map_err(|e| {
                         format!("Failed to connect to database for EXPLAIN: {}", e)
                     })?;
@@ -769,10 +658,7 @@ pub async fn explain_query(
         ActiveConnection::MySQL(_) => "mysql",
         ActiveConnection::SQLite(_) => "sqlite",
         ActiveConnection::SQLServer(_) => "sqlserver",
-        ActiveConnection::DuckDb(_) => "duckdb",
         ActiveConnection::ClickHouse(_) => "clickhouse",
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(_) => "firebird",
         ActiveConnection::JdbcBridge(_) => "generic",
         ActiveConnection::HttpSql(_) => "generic",
         ActiveConnection::Rqlite(_) => "rqlite",
@@ -818,22 +704,7 @@ pub async fn explain_query(
             let explain_sql = format!("EXPLAIN QUERY PLAN {}", sql);
             (adapter.execute_query(&explain_sql).await, "text")
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            let explain_sql = if analyze {
-                format!("EXPLAIN ANALYZE {}", sql)
-            } else {
-                format!("EXPLAIN {}", sql)
-            };
-            (adapter.execute_query(&explain_sql).await, "text")
-        }
         ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            (adapter.execute_query(&explain_sql).await, "text")
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             let explain_sql = format!("EXPLAIN {}", sql);
             (adapter.execute_query(&explain_sql).await, "text")
@@ -884,7 +755,6 @@ pub async fn explain_query(
 // Integration tests should be added in src-tauri/tests/ directory.
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
     fn test_sql_validation() {

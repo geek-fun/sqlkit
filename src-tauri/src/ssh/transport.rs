@@ -57,6 +57,7 @@ mod tests {
             auth_method: SshAuthMethod::Agent,
             connect_timeout_secs: 5,
             keepalive_interval_secs: 30,
+            verify_host_key: false,
         }
     }
 

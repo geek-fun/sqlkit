@@ -139,10 +139,6 @@ pub async fn list_databases(
             let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
-        ActiveConnection::DuckDb(_) => {
-            // DuckDB is file-based and has no separate databases
-            return Ok(vec![]);
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_databases().await
@@ -152,11 +148,6 @@ pub async fn list_databases(
             adapter.list_databases().await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_databases().await
         }
@@ -215,13 +206,6 @@ pub async fn list_schemas(
             // SQLite doesn't have schemas
             return Ok(vec!["main".to_string()]);
         }
-        ActiveConnection::DuckDb(_) => {
-            return Ok(vec![
-                "main".to_string(),
-                "information_schema".to_string(),
-                "pg_catalog".to_string(),
-            ]);
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_schemas(Some(&database)).await
@@ -231,11 +215,6 @@ pub async fn list_schemas(
             adapter.list_schemas(Some(&database)).await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_schemas(Some(&database)).await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_schemas(Some(&database)).await
         }
@@ -302,10 +281,6 @@ pub async fn list_tables(
             let adapter = adapter.lock().await;
             adapter.list_tables(None, None).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_tables(None, schema.as_deref()).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -319,13 +294,6 @@ pub async fn list_tables(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_tables(Some(&database), schema.as_deref())
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_tables(Some(&database), schema.as_deref())
@@ -400,12 +368,6 @@ pub async fn get_table_info(
             let adapter = adapter.lock().await;
             adapter.get_table_info(None, None, &table_name).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(None, schema.as_deref(), &table_name)
-                .await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -419,13 +381,6 @@ pub async fn get_table_info(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(Some(&database), schema.as_deref(), &table_name)
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .get_table_info(Some(&database), schema.as_deref(), &table_name)
@@ -510,12 +465,6 @@ pub async fn list_columns(
             let adapter = adapter.lock().await;
             adapter.list_columns(None, None, &table_name).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(None, schema.as_deref(), &table_name)
-                .await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -529,13 +478,6 @@ pub async fn list_columns(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(None, schema.as_deref(), &table_name)
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_columns(None, schema.as_deref(), &table_name)
@@ -598,10 +540,6 @@ pub async fn get_foreign_keys(
             let adapter = adapter.lock().await;
             adapter.get_foreign_keys(None, None).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.get_foreign_keys(None, schema.as_deref()).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter.get_foreign_keys(Some(&database), None).await
@@ -613,13 +551,6 @@ pub async fn get_foreign_keys(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_foreign_keys(Some(&database), schema.as_deref())
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .get_foreign_keys(Some(&database), schema.as_deref())
@@ -734,13 +665,6 @@ pub async fn get_table_data(
                 build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
             adapter.execute_query(&sql).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "duckdb");
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "duckdb");
-            adapter.execute_query(&sql).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             let qualified =
@@ -760,14 +684,6 @@ pub async fn get_table_data(
             let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "trino");
             let sql =
                 build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "trino");
-            adapter.execute_query(&sql).await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "sqlite");
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
             adapter.execute_query(&sql).await
         }
         ActiveConnection::Rqlite(adapter) => {
@@ -877,12 +793,6 @@ pub async fn get_table_count(
             let query = build_count_query(&qualified, filter_ref);
             adapter.execute_query(&query).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "duckdb");
-            let query = build_count_query(&qualified, filter_ref);
-            adapter.execute_query(&query).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             let qualified = build_qualified_table(schema.as_deref(), &table, "clickhouse");
@@ -898,13 +808,6 @@ pub async fn get_table_count(
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
             let qualified = build_qualified_table(schema.as_deref(), &table, "trino");
-            let query = build_count_query(&qualified, filter_ref);
-            adapter.execute_query(&query).await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlite");
             let query = build_count_query(&qualified, filter_ref);
             adapter.execute_query(&query).await
         }
@@ -1102,14 +1005,6 @@ pub async fn update_table_row(
                 .await
                 .map_err(|e| format!("Failed to update row: {}", e))?;
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("duckdb")?;
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to update row: {}", e))?;
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_update_sql("clickhouse")?;
@@ -1129,15 +1024,6 @@ pub async fn update_table_row(
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_update_sql("trino")?;
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to update row: {}", e))?;
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("sqlite")?;
             adapter
                 .execute_query(&sql)
                 .await
@@ -1278,14 +1164,6 @@ pub async fn delete_table_row(
                 .await
                 .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("duckdb");
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to delete row: {}", e))?;
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_delete_sql("clickhouse");
@@ -1305,15 +1183,6 @@ pub async fn delete_table_row(
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
             let sql = build_delete_sql("trino");
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to delete row: {}", e))?;
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("sqlite");
             adapter
                 .execute_query(&sql)
                 .await
@@ -1370,10 +1239,6 @@ pub async fn list_views(
             let adapter = adapter.lock().await;
             adapter.list_views(None, None).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(None, schema.as_deref()).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_views(Some(&database), schema.as_deref()).await
@@ -1383,11 +1248,6 @@ pub async fn list_views(
             adapter.list_views(Some(&database), schema.as_deref()).await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(Some(&database), schema.as_deref()).await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter.list_views(Some(&database), schema.as_deref()).await
         }
@@ -1439,10 +1299,6 @@ pub async fn list_procedures(
             let adapter = adapter.lock().await;
             adapter.list_procedures(None, None).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_procedures(None, schema.as_deref()).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -1456,13 +1312,6 @@ pub async fn list_procedures(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_procedures(Some(&database), schema.as_deref())
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_procedures(Some(&database), schema.as_deref())
@@ -1520,10 +1369,6 @@ pub async fn list_functions(
             let adapter = adapter.lock().await;
             adapter.list_functions(None, None).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_functions(None, schema.as_deref()).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -1537,13 +1382,6 @@ pub async fn list_functions(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_functions(Some(&database), schema.as_deref())
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_functions(Some(&database), schema.as_deref())
@@ -1602,10 +1440,6 @@ pub async fn list_triggers(
             let adapter = adapter.lock().await;
             adapter.list_triggers(None, None, &table).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_triggers(None, schema.as_deref(), &table).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -1619,13 +1453,6 @@ pub async fn list_triggers(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_triggers(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_triggers(Some(&database), schema.as_deref(), &table)
@@ -1684,10 +1511,6 @@ pub async fn list_indexes(
             let adapter = adapter.lock().await;
             adapter.list_indexes(None, None, &table).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_indexes(None, schema.as_deref(), &table).await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -1701,13 +1524,6 @@ pub async fn list_indexes(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_indexes(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_indexes(Some(&database), schema.as_deref(), &table)
@@ -1766,12 +1582,6 @@ pub async fn list_foreign_keys(
             let adapter = adapter.lock().await;
             adapter.list_foreign_keys(None, None, &table).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(None, schema.as_deref(), &table)
-                .await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -1785,13 +1595,6 @@ pub async fn list_foreign_keys(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_foreign_keys(Some(&database), schema.as_deref(), &table)
@@ -1868,12 +1671,6 @@ pub async fn get_object_ddl(
                 .get_object_ddl(None, None, &object_name, &object_type)
                 .await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(None, schema.as_deref(), &object_name, &object_type)
-                .await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -1897,18 +1694,6 @@ pub async fn get_object_ddl(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .get_object_ddl(
@@ -2000,12 +1785,6 @@ pub async fn drop_object(
                 .drop_object(None, None, &object_name, &object_type)
                 .await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(None, schema.as_deref(), &object_name, &object_type)
-                .await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -2029,18 +1808,6 @@ pub async fn drop_object(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .drop_object(
@@ -2136,18 +1903,6 @@ pub async fn rename_object(
                 .rename_object(None, None, &object_name, &object_type, &new_name)
                 .await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    None,
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -2173,19 +1928,6 @@ pub async fn rename_object(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .rename_object(
@@ -2247,10 +1989,7 @@ fn get_db_type_string(connection: &ActiveConnection) -> &'static str {
         ActiveConnection::MySQL(_) => "mysql",
         ActiveConnection::SQLServer(_) => "sqlserver",
         ActiveConnection::SQLite(_) => "sqlite",
-        ActiveConnection::DuckDb(_) => "duckdb",
         ActiveConnection::ClickHouse(_) => "clickhouse",
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(_) => "sqlite",
         ActiveConnection::JdbcBridge(_) => "jdbc",
         ActiveConnection::HttpSql(_) => "trino",
         ActiveConnection::Rqlite(_) => "sqlite",
@@ -2341,12 +2080,6 @@ pub async fn build_table_search_filter(
             let adapter = adapter.lock().await;
             adapter.list_columns(None, None, &table_name).await
         }
-        ActiveConnection::DuckDb(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(None, schema.as_deref(), &table_name)
-                .await
-        }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
             adapter
@@ -2360,13 +2093,6 @@ pub async fn build_table_search_filter(
                 .await
         }
         ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(None, schema.as_deref(), &table_name)
-                .await
-        }
-        #[cfg(feature = "firebird")]
-        ActiveConnection::Firebird(adapter) => {
             let adapter = adapter.lock().await;
             adapter
                 .list_columns(None, schema.as_deref(), &table_name)
