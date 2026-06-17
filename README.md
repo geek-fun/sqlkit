@@ -4,7 +4,7 @@
 
 # SqlKit
 
-**Agentic cross-platform SQL database GUI client — your database agent for 40+ databases.**
+**Agentic cross-platform SQL database GUI client — your database agent for 66 databases.**
 
 **Privacy-first. Your data, your keys. Open source.**
 
@@ -101,15 +101,15 @@ Built with Rust + Tauri v2 — no Electron, no JRE, no bundled Chromium. Ships a
 
 ### All Your Databases, One App
 
-SqlKit supports **40+ databases** across four adapter strategies:
+SqlKit supports **66 databases** across four adapter strategies:
 
 | Strategy | Databases |
 |----------|-----------|
-| **Native** (Rust) | PostgreSQL, MySQL, SQL Server, SQLite, DuckDB, ClickHouse, Firebird, Oracle, RQLite, Turso |
-| **PG-wire compat** | CockroachDB, Redshift, YugabyteDB, TimescaleDB, QuestDB, Vastbase, and more |
-| **MySQL-wire compat** | MariaDB, TiDB, OceanBase, StarRocks, Databend, ManticoreSearch, and more |
-| **JDBC bridge** | DB2, H2, Snowflake, TDengine, Hive, Databricks, Hana, Teradata, Vertica, Exasol, BigQuery, Informix, Cassandra, and more |
-| **HTTP bridge** | Trino, Presto, RQLite, Turso |
+| **Native** (Rust) | PostgreSQL, MySQL, SQL Server, SQLite |
+| **PG-wire compat** | CockroachDB, Redshift, YugabyteDB, TimescaleDB, QuestDB, Vastbase, YashanDB, KingbaseES, GaussDB, HighGo, UXDB, OpenGauss, GBase8c, Greenplum, EnterpriseDB, CrateDB, Materialize, AlloyDB, CloudSQLPG, FujitsuPG |
+| **MySQL-wire compat** | MariaDB, TiDB, OceanBase, TDSQL, PolarDB, DM8, Doris, SelectDB, StarRocks, Databend, GoldenDB, ManticoreSearch, SingleStore, CloudSQLMySQL |
+| **JDBC bridge** | Oracle, DuckDB, Firebird, DB2, H2, Snowflake, TDengine, Derby, Hive, Databricks, Hana, Teradata, Vertica, Exasol, BigQuery, Informix, Kylin, Cassandra, Iris, Access, DM8Oracle, XuguDB, GBase8a |
+| **HTTP bridge** | ClickHouse, Trino, Presto, RQLite, Turso |
 
 ### Product-Grade Editor
 
@@ -217,12 +217,12 @@ Yes. The desktop app works fully offline. AI features require network access to 
 
 <details>
 <summary><strong>How is SqlKit different from DBeaver / TablePlus / DataGrip?</strong></summary>
-SqlKit is a native Tauri app (Rust) — no Java JRE, no Electron overhead. It includes AI natively (not as a plugin), supports 40+ databases, and runs on macOS, Windows, and Linux from a single binary. Privacy-first with encrypted local credential storage.
+SqlKit is a native Tauri app (Rust) — no Java JRE, no Electron overhead. It includes AI natively (not as a plugin), supports 66 databases, and runs on macOS, Windows, and Linux from a single binary. Privacy-first with encrypted local credential storage.
 </details>
 
 <details>
 <summary><strong>What databases are supported?</strong></summary>
-PostgreSQL, MySQL, Oracle, SQL Server, SQLite, DuckDB, ClickHouse, Firebird, MariaDB, CockroachDB, Redis, TiDB, OceanBase, Snowflake, DB2, H2, Trino, and 20+ more. See the <a href="#multi-database-support">Multi-Database Support</a> section for the full list.
+PostgreSQL, MySQL, Oracle, SQL Server, SQLite, DuckDB, ClickHouse, Firebird, MariaDB, CockroachDB, TiDB, OceanBase, Snowflake, DB2, H2, Trino, Greenplum, CrateDB, SingleStore, and 60+ more. See the <a href="#multi-database-support">Multi-Database Support</a> section for the full list.
 </details>
 
 <details>
