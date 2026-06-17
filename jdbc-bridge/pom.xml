@@ -6,15 +6,16 @@
 
     <groupId>com.sqlkit</groupId>
     <artifactId>jdbc-bridge</artifactId>
-    <version>1.0.0</version>
+    <version>${revision}</version>
     <packaging>jar</packaging>
 
     <name>SQLKit JDBC Bridge</name>
     <description>Lightweight JDBC proxy for SQLKit — connects to databases via JDBC and exposes JSON-RPC over stdin/stdout</description>
 
     <properties>
-        <maven.compiler.source>17</maven.compiler.source>
-        <maven.compiler.target>17</maven.compiler.target>
+        <revision>1.0.0</revision>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <hikaricp.version>5.1.0</hikaricp.version>
         <jackson.version>2.17.2</jackson.version>
