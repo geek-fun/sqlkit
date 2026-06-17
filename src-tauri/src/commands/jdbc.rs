@@ -1,6 +1,7 @@
 use crate::database::config::DatabaseType;
-use crate::database::jdbc_bridge::{download, jre, registry::DriverRegistry};
+use crate::database::jdbc_bridge::{download, jre, launcher::JdbcBridgeLauncher, protocol::{JdbcMethod, JdbcRequest}, registry::DriverRegistry};
 use serde::Serialize;
+use std::path::PathBuf;
 
 #[derive(Serialize)]
 pub struct JreStatus {
@@ -14,8 +15,11 @@ pub struct JreStatus {
 pub struct DriverInfo {
     pub db_type: String,
     pub name: String,
-    pub driver_count: usize,
     pub installed: bool,
+    pub version_cap: Option<String>,
+    pub filename: Option<String>,
+    pub file_size: Option<u64>,
+    pub resolved_version: Option<String>,
 }
 
 #[tauri::command]
@@ -24,7 +28,7 @@ pub async fn check_jre_status() -> Result<JreStatus, String> {
     if managed_path.exists() {
         Ok(JreStatus {
             installed: true,
-            version: Some(jre::MANAGED_JRE_VERSION.to_string()),
+            version: jre::read_jre_version().or_else(|| Some("21".to_string())),
             path: Some(managed_path.to_string_lossy().to_string()),
             source: "managed".to_string(),
         })
@@ -60,17 +64,15 @@ pub async fn list_drivers() -> Result<Vec<DriverInfo>, String> {
     let registry = DriverRegistry::load();
     let mut result = Vec::new();
     for (key, config) in &registry.databases {
-        let installed = config.versions.iter().any(|v| {
-            let db_type = db_type_from_registry_key(key);
-            db_type
-                .map(|dt| download::is_driver_version_installed(dt, &v.version))
-                .unwrap_or(false)
-        });
+        let cached = driver_cache_info(&config.maven_artifact);
         result.push(DriverInfo {
             db_type: key.clone(),
             name: config.name.clone(),
-            driver_count: config.versions.len(),
-            installed,
+            installed: cached.is_some(),
+            version_cap: config.version_cap.clone(),
+            filename: cached.as_ref().map(|c| c.0.clone()),
+            file_size: cached.as_ref().map(|c| c.1),
+            resolved_version: cached.as_ref().and_then(|c| parse_jar_version(&c.0)),
         });
     }
     Ok(result)
@@ -83,27 +85,29 @@ pub async fn download_driver(db_type: String) -> Result<(), String> {
     let config = registry
         .get_config(dt)
         .ok_or_else(|| format!("No registry entry for {}", db_type))?;
-    if let Some(version) = config.versions.first() {
-        let maven_group = version
-            .maven_group_override
-            .as_deref()
-            .unwrap_or(&config.maven_group);
-        let maven_artifact = version
-            .maven_artifact_override
-            .as_deref()
-            .unwrap_or(&config.maven_artifact);
-        let dest = download::driver_jar_path_for_version(dt, &version.version);
-        download::download_driver_from_maven(
-            maven_group,
-            maven_artifact,
-            &version.version,
-            &dest,
-            &version.jar_sha256,
-            version.maven_classifier.as_deref(),
-        )
-        .await
-        .map_err(|e| e.to_string())?;
+
+    // Start a temporary Java bridge process to resolve the driver
+    let bridge_jar = download::bridge_jar_path();
+    let mut launcher = JdbcBridgeLauncher::new(bridge_jar);
+    launcher.start().map_err(|e| e.to_string())?;
+
+    let req = JdbcRequest::new(
+        JdbcMethod::ResolveDriver,
+        serde_json::json!({
+            "maven_group": config.maven_group,
+            "maven_artifact": config.maven_artifact,
+            "version_cap": config.version_cap,
+            "maven_classifier": config.maven_classifier,
+        }),
+    );
+    let resp = launcher.send_request(&req).map_err(|e| e.to_string())?;
+    if let Some(err) = resp.error {
+        launcher.shutdown();
+        return Err(err);
     }
+
+    // Driver is now cached on disk by the Java bridge
+    launcher.shutdown();
     Ok(())
 }
 
@@ -114,11 +118,10 @@ pub async fn remove_driver(db_type: String) -> Result<(), String> {
     let config = registry
         .get_config(dt)
         .ok_or_else(|| format!("No registry entry for {}", db_type))?;
-    for version in &config.versions {
-        let path = download::driver_jar_path_for_version(dt, &version.version);
-        if path.exists() {
-            std::fs::remove_file(&path).map_err(|e| format!("Failed to remove driver: {}", e))?;
-        }
+    let artifact_dir = drivers_cache_dir().join(&config.maven_artifact);
+    if artifact_dir.exists() {
+        std::fs::remove_dir_all(&artifact_dir)
+            .map_err(|e| format!("Failed to remove driver: {}", e))?;
     }
     Ok(())
 }
@@ -151,30 +154,167 @@ fn parse_db_type(s: &str) -> Result<DatabaseType, String> {
     }
 }
 
-fn db_type_from_registry_key(key: &str) -> Option<DatabaseType> {
-    match key {
-        "oracle" => Some(DatabaseType::Oracle),
-        "duckdb" => Some(DatabaseType::DuckDb),
-        "firebird" => Some(DatabaseType::Firebird),
-        "db2" => Some(DatabaseType::DB2),
-        "h2" => Some(DatabaseType::H2),
-        "derby" => Some(DatabaseType::Derby),
-        "snowflake" => Some(DatabaseType::Snowflake),
-        "dm8_oracle" => Some(DatabaseType::DM8Oracle),
-        "xugudb" => Some(DatabaseType::XuguDB),
-        "gbase8a" => Some(DatabaseType::GBase8a),
-        "hive" => Some(DatabaseType::Hive),
-        "databricks" => Some(DatabaseType::Databricks),
-        "hana" => Some(DatabaseType::Hana),
-        "teradata" => Some(DatabaseType::Teradata),
-        "vertica" => Some(DatabaseType::Vertica),
-        "exasol" => Some(DatabaseType::Exasol),
-        "bigquery" => Some(DatabaseType::BigQuery),
-        "informix" => Some(DatabaseType::Informix),
-        "kylin" => Some(DatabaseType::Kylin),
-        "cassandra" => Some(DatabaseType::Cassandra),
-        "iris" => Some(DatabaseType::Iris),
-        "access" => Some(DatabaseType::Access),
-        _ => None,
+/// Get info about a cached driver: filename and file size.
+/// Returns `None` if no JAR is cached for the given artifact.
+fn driver_cache_info(artifact: &str) -> Option<(String, u64)> {
+    let dir = drivers_cache_dir().join(artifact);
+    if !dir.exists() {
+        return None;
     }
+    std::fs::read_dir(&dir).ok()?.flatten().find_map(|e| {
+        let path = e.path();
+        if path.extension() == Some(std::ffi::OsStr::new("jar")) {
+            let size = std::fs::metadata(&path).ok()?.len();
+            let name = path.file_name()?.to_str()?.to_string();
+            Some((name, size))
+        } else {
+            None
+        }
+    })
+}
+
+/// Parse a version from a JAR filename.
+/// e.g. "h2-2.2.224.jar" -> "2.2.224", "ojdbc11-21.15.0.0.jar" -> "21.15.0.0"
+fn parse_jar_version(filename: &str) -> Option<String> {
+    let stem = filename.strip_suffix(".jar")?;
+    // Find the first digit-segment after a hyphen
+    let dash_idx = stem.rfind('-')?;
+    let version_part = &stem[dash_idx + 1..];
+    if version_part.is_empty() || !version_part.chars().next()?.is_ascii_digit() {
+        return None;
+    }
+    Some(version_part.to_string())
+}
+
+/// Check whether a driver JAR is already cached on disk for the given artifact name.
+/// Looks in `~/.sqlkit/jdbc-bridge/drivers/{artifact}/` for any `.jar` file.
+fn is_driver_cached(artifact: &str) -> bool {
+    let dir = drivers_cache_dir().join(artifact);
+    if !dir.exists() {
+        return false;
+    }
+    std::fs::read_dir(&dir)
+        .map(|entries| {
+            entries.flatten().any(|e| {
+                e.path().extension() == Some(std::ffi::OsStr::new("jar"))
+            })
+        })
+        .unwrap_or(false)
+}
+
+/// Get the path to the JDBC driver cache directory (`~/.sqlkit/jdbc-bridge/drivers/`).
+fn drivers_cache_dir() -> PathBuf {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home)
+        .join(".sqlkit")
+        .join("jdbc-bridge")
+        .join("drivers")
+}
+
+#[derive(Serialize)]
+pub struct BridgeStatus {
+    pub installed: bool,
+    pub current_version: String,
+    pub path: Option<String>,
+}
+
+#[tauri::command]
+pub async fn check_bridge_status() -> Result<BridgeStatus, String> {
+    let jar_path = download::bridge_jar_path();
+    Ok(BridgeStatus {
+        installed: jar_path.exists(),
+        current_version: env!("CARGO_PKG_VERSION").to_string(),
+        path: Some(jar_path.to_string_lossy().to_string()),
+    })
+}
+
+#[tauri::command]
+pub async fn download_bridge_jar() -> Result<(), String> {
+    download::download_bridge_plugin()
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn remove_bridge_jar() -> Result<(), String> {
+    let jar_path = download::bridge_jar_path();
+    if jar_path.exists() {
+        if let Some(parent) = jar_path.parent() {
+            std::fs::remove_dir_all(parent)
+                .map_err(|e| format!("Failed to remove bridge JAR: {}", e))?;
+        }
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+pub struct JreUpdateStatus {
+    pub current_version: Option<String>,
+    pub latest_version: Option<String>,
+    pub update_available: bool,
+}
+
+#[tauri::command]
+pub async fn check_jre_update() -> Result<JreUpdateStatus, String> {
+    let current = jre::read_jre_version();
+    let redirect_url = jre::check_adoptium_update().await;
+    let latest = redirect_url
+        .as_ref()
+        .and_then(|url| jre::parse_adoptium_build_version(url));
+    let update_available = match (&current, &latest) {
+        (Some(c), Some(l)) => compare_versions(l, c) > 0,
+        (None, Some(_)) => true,
+        _ => false,
+    };
+    Ok(JreUpdateStatus {
+        current_version: current,
+        latest_version: latest,
+        update_available,
+    })
+}
+
+#[tauri::command]
+pub async fn get_jdbc_needed() -> Result<bool, String> {
+    Ok(!jdbc_not_needed_path().exists())
+}
+
+#[tauri::command]
+pub async fn set_jdbc_needed(needed: bool) -> Result<(), String> {
+    let path = jdbc_not_needed_path();
+    if needed {
+        let _ = std::fs::remove_file(&path);
+    } else {
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| format!("Failed to create config dir: {}", e))?;
+        }
+        std::fs::write(&path, "")
+            .map_err(|e| format!("Failed to write JDBC preference: {}", e))?;
+    }
+    Ok(())
+}
+
+/// Compare two dotted version strings numerically (e.g. "21.0.11" > "9.0.0").
+/// Returns negative if a < b, positive if a > b, 0 if equal.
+fn compare_versions(a: &str, b: &str) -> i32 {
+    let parts_a: Vec<&str> = a.split('.').collect();
+    let parts_b: Vec<&str> = b.split('.').collect();
+    let max_len = parts_a.len().max(parts_b.len());
+    for i in 0..max_len {
+        let na: u32 = parts_a.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
+        let nb: u32 = parts_b.get(i).and_then(|s| s.parse().ok()).unwrap_or(0);
+        if na != nb {
+            return if na > nb { 1 } else { -1 };
+        }
+    }
+    0
+}
+
+fn jdbc_not_needed_path() -> PathBuf {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    PathBuf::from(home).join(".sqlkit").join(".jdbc_not_needed")
 }

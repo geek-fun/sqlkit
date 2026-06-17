@@ -13,6 +13,7 @@ use crate::database::{
 use crate::ssh::TunnelManager;
 use crate::ssh::start_transport_layers;
 use crate::state::ActiveConnection;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -57,6 +58,12 @@ pub async fn create_and_connect_adapter(
             }
         }
         ConnectionStrategy::JdbcBridge => {
+            if !is_jdbc_needed() {
+                return Err(
+                    "JDBC connections are disabled. Enable them in Settings → JRE & Drivers."
+                        .to_string(),
+                );
+            }
             let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;
             Ok(ActiveConnection::JdbcBridge(Arc::new(Mutex::new(adapter))))
@@ -119,6 +126,12 @@ pub async fn test_connection(
             _ => Err("Native adapter not yet implemented".into()),
         },
         ConnectionStrategy::JdbcBridge => {
+            if !is_jdbc_needed() {
+                return Err(
+                    "JDBC connections are disabled. Enable them in Settings → JRE & Drivers."
+                        .to_string(),
+                );
+            }
             let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;
             adapter.test_connection().await.map_err(|e| e.to_string())
@@ -254,4 +267,14 @@ pub async fn connection_host_port(
         Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),
         None => Ok((config.host.clone(), config.port)),
     }
+}
+
+/// Check whether JDBC connections are allowed.
+/// Returns false when the `~/.sqlkit/.jdbc_not_needed` marker file exists.
+fn is_jdbc_needed() -> bool {
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .unwrap_or_else(|_| ".".to_string());
+    let marker = PathBuf::from(home).join(".sqlkit").join(".jdbc_not_needed");
+    !marker.exists()
 }
