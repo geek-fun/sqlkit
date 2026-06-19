@@ -28,14 +28,17 @@ pub async fn check_jre_status() -> Result<JreStatus, String> {
     if managed_path.exists() {
         Ok(JreStatus {
             installed: true,
-            version: jre::read_jre_version().or_else(|| Some("21".to_string())),
+            version: jre::read_jre_version().or_else(|| Some("25".to_string())),
             path: Some(managed_path.to_string_lossy().to_string()),
             source: "managed".to_string(),
         })
     } else if let Some(system_java) = jre::JreDetector::detect_system_java() {
+        let version = jre::system_java_version(&system_java)
+            .map(|v| format!("{}.x", v))
+            .or_else(|| Some("system".to_string()));
         Ok(JreStatus {
             installed: true,
-            version: Some("system".to_string()),
+            version,
             path: Some(system_java.to_string_lossy().to_string()),
             source: "system".to_string(),
         })
@@ -214,10 +217,10 @@ pub async fn check_bridge_status() -> Result<BridgeStatus, String> {
             .file_stem()
             .and_then(|s| s.to_str())
             .and_then(|s| s.strip_prefix("jdbc-bridge-"))
-            .unwrap_or(env!("CARGO_PKG_VERSION"))
+            .unwrap_or(env!("APP_VERSION"))
             .to_string()
     } else {
-        env!("CARGO_PKG_VERSION").to_string()
+        env!("APP_VERSION").to_string()
     };
     Ok(BridgeStatus {
         installed: jar_path.exists(),

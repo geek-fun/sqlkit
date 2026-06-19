@@ -7,6 +7,8 @@ use crate::database::error::{DbError, DbResult};
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::{Arc, Mutex};
+use std::thread;
 
 use super::protocol::{JdbcRequest, JdbcResponse};
 
@@ -15,6 +17,9 @@ pub struct JdbcBridgeLauncher {
     process: Option<Child>,
     stdin: Option<ChildStdin>,
     jar_path: PathBuf,
+    /// Buffered stderr lines from the Java bridge, drained by a background
+    /// reader thread to prevent the OS pipe buffer from filling up.
+    stderr_buffer: Option<Arc<Mutex<Vec<String>>>>,
 }
 
 impl JdbcBridgeLauncher {
@@ -24,6 +29,7 @@ impl JdbcBridgeLauncher {
             process: None,
             stdin: None,
             jar_path,
+            stderr_buffer: None,
         }
     }
 
@@ -32,7 +38,41 @@ impl JdbcBridgeLauncher {
         super::jre::JreDetector::detect()
     }
 
-    /// Start the Java bridge process.
+    fn read_stderr_buffer(buf: &Arc<Mutex<Vec<String>>>) -> String {
+        buf.lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .join("\n")
+    }
+
+    fn drain_stderr(&self) -> String {
+        self.stderr_buffer
+            .as_ref()
+            .map(|buf| Self::read_stderr_buffer(buf))
+            .unwrap_or_default()
+    }
+
+    fn spawn_stderr_reader(stderr: std::process::ChildStderr) -> Arc<Mutex<Vec<String>>> {
+        let buf: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
+        let buf_clone = buf.clone();
+        thread::spawn(move || {
+            let mut reader = BufReader::new(stderr);
+            let mut line = String::new();
+            while reader.read_line(&mut line).is_ok() && !line.is_empty() {
+                let trimmed = line.trim().to_string();
+                if !trimmed.is_empty() {
+                    if let Ok(mut b) = buf_clone.lock() {
+                        b.push(trimmed);
+                        if b.len() > 200 {
+                            b.remove(0);
+                        }
+                    }
+                }
+                line.clear();
+            }
+        });
+        buf
+    }
+
     pub fn start(&mut self) -> DbResult<()> {
         let java = Self::detect_java().ok_or_else(|| {
             DbError::Connection(
@@ -41,18 +81,11 @@ impl JdbcBridgeLauncher {
             )
         })?;
 
-        if !self.jar_path.exists() {
-            return Err(DbError::Connection(format!(
-                "JDBC bridge JAR not found at {}. Run download_bridge_plugin() first.",
-                self.jar_path.display()
-            )));
-        }
-
         let mut child = Command::new(&java)
             .args(["-jar", self.jar_path.to_str().unwrap_or("")])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| DbError::Connection(format!("Failed to start JDBC bridge: {}", e)))?;
 
@@ -61,6 +94,8 @@ impl JdbcBridgeLauncher {
             .take()
             .ok_or_else(|| DbError::Connection("Failed to capture bridge stdin".to_string()))?;
 
+        let stderr = child.stderr.take().expect("stderr was piped");
+        self.stderr_buffer = Some(Self::spawn_stderr_reader(stderr));
         self.process = Some(child);
         self.stdin = Some(stdin);
 
@@ -70,8 +105,9 @@ impl JdbcBridgeLauncher {
             match child.try_wait() {
                 Ok(Some(status)) => {
                     return Err(DbError::Connection(format!(
-                        "JDBC bridge exited immediately with code: {}",
-                        status
+                        "JDBC bridge exited immediately with code: {}. stderr: {}",
+                        status,
+                        self.drain_stderr()
                     )));
                 }
                 Ok(None) => { /* still running, good */ }
@@ -96,13 +132,6 @@ impl JdbcBridgeLauncher {
             )
         })?;
 
-        if !self.jar_path.exists() {
-            return Err(DbError::Connection(format!(
-                "JDBC bridge JAR not found at {}. Run download_bridge_plugin() first.",
-                self.jar_path.display()
-            )));
-        }
-
         // Build classpath: bridge JAR + driver JARs
         let mut classpath = self.jar_path.to_string_lossy().to_string();
         for jar in &driver_jars {
@@ -115,7 +144,7 @@ impl JdbcBridgeLauncher {
             .args(["-cp", &classpath, "sqlkit.bridge.BridgeMain"])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| DbError::Connection(format!("Failed to start JDBC bridge: {}", e)))?;
 
@@ -124,6 +153,8 @@ impl JdbcBridgeLauncher {
             .take()
             .ok_or_else(|| DbError::Connection("Failed to capture bridge stdin".to_string()))?;
 
+        let stderr = child.stderr.take().expect("stderr was piped");
+        self.stderr_buffer = Some(Self::spawn_stderr_reader(stderr));
         self.process = Some(child);
         self.stdin = Some(stdin);
 
@@ -133,8 +164,9 @@ impl JdbcBridgeLauncher {
             match child.try_wait() {
                 Ok(Some(status)) => {
                     return Err(DbError::Connection(format!(
-                        "JDBC bridge exited immediately with code: {}",
-                        status
+                        "JDBC bridge exited immediately with code: {}. stderr: {}",
+                        status,
+                        self.drain_stderr()
                     )));
                 }
                 Ok(None) => { /* still running, good */ }
@@ -167,27 +199,66 @@ impl JdbcBridgeLauncher {
             .as_mut()
             .ok_or_else(|| DbError::Connection("JDBC bridge stdin not available".to_string()))?;
 
-        // Serialize and write request line
         let json = serde_json::to_string(req)
             .map_err(|e| DbError::Connection(format!("Failed to serialize request: {}", e)))?;
 
-        writeln!(stdin, "{}", json)
-            .map_err(|e| DbError::Connection(format!("Failed to write to bridge stdin: {}", e)))?;
-        stdin
-            .flush()
-            .map_err(|e| DbError::Connection(format!("Failed to flush bridge stdin: {}", e)))?;
+        writeln!(stdin, "{}", json).map_err(|e| {
+            let stderr = self.stderr_buffer.as_ref()
+                .map(Self::read_stderr_buffer)
+                .unwrap_or_default();
+            if stderr.is_empty() {
+                DbError::Connection(format!("Failed to write to bridge stdin: {}", e))
+            } else {
+                DbError::Connection(format!(
+                    "Bridge write error: {}. stderr: {}",
+                    e, stderr
+                ))
+            }
+        })?;
+        stdin.flush().map_err(|e| {
+            let stderr = self.stderr_buffer.as_ref()
+                .map(Self::read_stderr_buffer)
+                .unwrap_or_default();
+            if stderr.is_empty() {
+                DbError::Connection(format!("Failed to flush bridge stdin: {}", e))
+            } else {
+                DbError::Connection(format!(
+                    "Bridge write error: {}. stderr: {}",
+                    e, stderr
+                ))
+            }
+        })?;
 
-        // Read response line
         let mut reader = BufReader::new(stdout);
         let mut line = String::new();
-        reader
-            .read_line(&mut line)
-            .map_err(|e| DbError::Connection(format!("Failed to read bridge response: {}", e)))?;
+        reader.read_line(&mut line).map_err(|e| {
+            let stderr = self.stderr_buffer.as_ref()
+                .map(Self::read_stderr_buffer)
+                .unwrap_or_default();
+            if stderr.is_empty() {
+                DbError::Connection(format!("Failed to read bridge response: {}", e))
+            } else {
+                DbError::Connection(format!(
+                    "Bridge read error: {}. stderr: {}",
+                    e, stderr
+                ))
+            }
+        })?;
 
         if line.trim().is_empty() {
-            return Err(DbError::Connection(
-                "Empty response from JDBC bridge".to_string(),
-            ));
+            let stderr = self.stderr_buffer.as_ref()
+                .map(Self::read_stderr_buffer)
+                .unwrap_or_default();
+            return if stderr.is_empty() {
+                Err(DbError::Connection(
+                    "Empty response from JDBC bridge".to_string(),
+                ))
+            } else {
+                Err(DbError::Connection(format!(
+                    "Bridge read error. stderr: {}",
+                    stderr
+                )))
+            };
         }
 
         let resp: JdbcResponse = serde_json::from_str(line.trim())
@@ -224,6 +295,7 @@ impl JdbcBridgeLauncher {
             let _ = child.wait();
         }
         self.stdin = None;
+        self.stderr_buffer = None;
     }
 }
 
