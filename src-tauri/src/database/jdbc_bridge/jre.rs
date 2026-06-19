@@ -6,8 +6,12 @@
 //! `release` file, and cleaning it up.
 
 use crate::database::error::{DbError, DbResult};
+use crate::APP_HANDLE;
+use futures::StreamExt;
+use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
+use tauri::Emitter;
 use tokio::sync::Mutex;
 
 /// Subdirectory under user home for the managed JRE.
@@ -69,13 +73,13 @@ pub fn is_managed_jre_installed() -> bool {
 
 // ── Adoptium platform ─────────────────────────────────────
 
-/// Determine the Adoptium platform string for the current architecture.
-fn adoptium_platform() -> Option<&'static str> {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))] { Some("macos-aarch64") }
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))] { Some("macos-x64") }
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))] { Some("linux-x64") }
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))] { Some("linux-aarch64") }
-    #[cfg(all(target_os = "windows", target_arch = "x86_64"))] { Some("windows-x64") }
+/// Determine the Adoptium OS and arch strings for the current platform.
+fn adoptium_os_arch() -> Option<(&'static str, &'static str)> {
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))] { Some(("mac", "aarch64")) }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))] { Some(("mac", "x64")) }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))] { Some(("linux", "x64")) }
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))] { Some(("linux", "aarch64")) }
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))] { Some(("windows", "x64")) }
     #[cfg(not(any(
         all(target_os = "macos", target_arch = "aarch64"),
         all(target_os = "macos", target_arch = "x86_64"),
@@ -100,14 +104,45 @@ impl JreDetector {
         if Self::is_valid_java(&managed) {
             return Some(managed);
         }
+        // If the managed JRE exists but isn't executable, try to fix permissions
+        if managed.exists() {
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                if let Ok(meta) = managed.metadata() {
+                    let mode = meta.permissions().mode();
+                    if mode & 0o111 == 0 {
+                        let perms = std::fs::Permissions::from_mode(mode | 0o100);
+                        let _ = std::fs::set_permissions(&managed, perms);
+                        if Self::is_valid_java(&managed) {
+                            return Some(managed);
+                        }
+                    }
+                }
+            }
+        }
 
         // 2. System Java
         Self::detect_system_java()
     }
 
-    /// Check whether `path` points to an existing file.
+    /// Check whether `path` points to an existing, executable java binary.
     pub fn is_valid_java(path: &PathBuf) -> bool {
-        path.exists()
+        if !path.exists() {
+            return false;
+        }
+        // On Unix, verify the file has executable permission
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            path.metadata()
+                .map(|meta| meta.permissions().mode() & 0o111 != 0)
+                .unwrap_or(false)
+        }
+        #[cfg(not(unix))]
+        {
+            true
+        }
     }
 
     /// Probe `JAVA_HOME` then `PATH` for a `java` executable.
@@ -198,9 +233,9 @@ pub fn read_jre_version() -> Option<String> {
 /// Returns `Some(redirect_url)` with the redirect target containing the build
 /// version, or `None` if not available / on error.
 pub async fn check_adoptium_update() -> Option<String> {
-    let platform = adoptium_platform()?;
+    let (os, arch) = adoptium_os_arch()?;
     let url = format!(
-        "https://api.adoptium.net/v3/binary/latest/25/ga/{platform}/jre/hotspot/normal/eclipse"
+        "https://api.adoptium.net/v3/binary/latest/25/ga/{os}/{arch}/jre/hotspot/normal/eclipse"
     );
 
     let client = reqwest::Client::builder()
@@ -235,33 +270,17 @@ pub fn parse_adoptium_build_version(url: &str) -> Option<String> {
 
 // ── download / remove ─────────────────────────────────────
 
-/// Download and extract the managed JRE for the current platform from Adoptium.
-///
-/// Downloads the latest JRE 25 (Eclipse Temurin) build from the Adoptium API,
-/// extracts the archive, and renames the extracted directory to `jre`.
-pub async fn download_managed_jre() -> DbResult<()> {
-    let _guard = JRE_INSTALL_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .await;
-
-    let platform = adoptium_platform().ok_or_else(|| {
-        DbError::Connection("No JRE available for this platform".to_string())
-    })?;
-
-    let parent = jre_base_dir()
-        .parent()
-        .expect("jre_base_dir has a parent")
-        .to_path_buf();
-    tokio::fs::create_dir_all(&parent)
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to create JRE parent dir: {}", e)))?;
-
-    let url = format!(
-        "https://api.adoptium.net/v3/binary/latest/25/ga/{platform}/jre/hotspot/normal/eclipse"
-    );
-
-    let response = reqwest::get(&url)
+/// Stream a JRE download to disk with progress events.
+async fn download_jre_stream(
+    client: &reqwest::Client,
+    url: &str,
+    tmp_path: &Path,
+    os: &str,
+    _parent: &Path,
+) -> DbResult<()> {
+    let response = client
+        .get(url)
+        .send()
         .await
         .map_err(|e| DbError::Connection(format!("Failed to download JRE: {}", e)))?;
 
@@ -273,71 +292,207 @@ pub async fn download_managed_jre() -> DbResult<()> {
         )));
     }
 
-    let is_zip = platform.starts_with("windows");
+    let is_zip = os == "windows";
+    let _ext = if is_zip { "zip" } else { "tar.gz" };
 
-    let bytes = response
-        .bytes()
+    let mut file = tokio::fs::File::create(tmp_path)
         .await
-        .map_err(|e| DbError::Connection(format!("Failed to read JRE download: {}", e)))?;
-
-    let ext = if is_zip { "zip" } else { "tar.gz" };
-    let tmp_path = parent.join(format!("jre_download.{}", ext));
-    tokio::fs::write(&tmp_path, &bytes)
-        .await
-        .map_err(|e| DbError::Connection(format!("Failed to write JRE archive: {}", e)))?;
-
-    let jre_path = jre_base_dir();
-    if jre_path.exists() {
-        tokio::fs::remove_dir_all(&jre_path)
+        .map_err(|e| DbError::Connection(format!("Failed to create temp file: {}", e)))?;
+    use tokio::io::AsyncWriteExt;
+    let mut stream = response.bytes_stream();
+    let mut downloaded: u64 = 0;
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.map_err(|e| DbError::Connection(format!("Download stream error: {}", e)))?;
+        downloaded += chunk.len() as u64;
+        file.write_all(&chunk)
             .await
-            .map_err(|e| DbError::Connection(format!("Failed to remove old JRE: {}", e)))?;
+            .map_err(|e| DbError::Connection(format!("Failed to write chunk: {}", e)))?;
+        if let Some(handle) = APP_HANDLE.get() {
+            let _ = handle.emit(
+                "connection-progress",
+                serde_json::json!({
+                    "step": "jre_download",
+                    "downloaded": downloaded,
+                    "total": 60_000_000,
+                }),
+            );
+        }
+    }
+    file.flush().await.ok();
+    Ok(())
+}
+
+/// Download and extract the managed JRE for the current platform from Adoptium.
+///
+/// Downloads the latest JRE 25 (Eclipse Temurin) build from the Adoptium API,
+/// extracts the archive, and renames the extracted directory to `jre`.
+/// Uses atomic operations: download to temp → validate → extract to temp dir → replace.
+pub async fn download_managed_jre() -> DbResult<()> {
+    let _guard = JRE_INSTALL_LOCK
+        .get_or_init(|| Mutex::new(()))
+        .lock()
+        .await;
+
+    let (os, arch) = adoptium_os_arch().ok_or_else(|| {
+        DbError::Connection("No JRE available for this platform".to_string())
+    })?;
+
+    let base_dir = jre_base_dir(); // ~/.sqlkit/jre
+    let parent = base_dir.parent()
+        .expect("jre_base_dir has a parent")
+        .to_path_buf(); // ~/.sqlkit
+    tokio::fs::create_dir_all(&parent)
+        .await
+        .map_err(|e| DbError::Connection(format!("Failed to create JRE parent dir: {}", e)))?;
+
+    let url = format!(
+        "https://api.adoptium.net/v3/binary/latest/25/ga/{os}/{arch}/jre/hotspot/normal/eclipse"
+    );
+
+    let is_zip = os == "windows";
+    let ext = if is_zip { "zip" } else { "tar.gz" };
+    let tmp_archive = parent.join(format!("jre_download.{}", ext));
+    let tmp_extract = parent.join(format!("jre_extract_{}", uuid::Uuid::new_v4()));
+
+    // Step 1: Download archive (single attempt — retrying the same URL doesn't help)
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .map_err(|e| DbError::Connection(format!("Failed to build HTTP client: {}", e)))?;
+
+    if let Err(e) = download_jre_stream(&client, &url, &tmp_archive, &os, &parent).await {
+        let _ = tokio::fs::remove_file(&tmp_archive).await;
+        return Err(e);
     }
 
-    let extract_result = tokio::task::spawn_blocking(move || -> Result<(), String> {
-        let file =
-            std::fs::File::open(&tmp_path).map_err(|e| format!("Failed to open archive: {}", e))?;
+    // Step 2: Validate downloaded archive (size and magic bytes)
+    let meta = std::fs::metadata(&tmp_archive)
+        .map_err(|e| DbError::Connection(format!("Failed to check JRE archive: {}", e)))?;
+    if meta.len() < 10_000_000 {
+        let _ = tokio::fs::remove_file(&tmp_archive).await;
+        return Err(DbError::Connection(format!(
+            "JRE archive too small: {} bytes (expected ≥ 10MB)", meta.len()
+        )));
+    }
+    // Validate gzip magic bytes (1f 8b) if not a zip file
+    if !is_zip {
+        let magic = std::fs::read(&tmp_archive)
+            .map_err(|e| DbError::Connection(format!("Failed to read JRE archive: {}", e)))?;
+        if magic.len() < 2 || magic[0] != 0x1f || magic[1] != 0x8b {
+            let _ = tokio::fs::remove_file(&tmp_archive).await;
+            return Err(DbError::Connection(
+                "Downloaded JRE archive has invalid gzip magic bytes — corrupt download".to_string()
+            ));
+        }
+    }
+
+    // Step 3: Extract to temporary directory
+    tokio::fs::create_dir_all(&tmp_extract)
+        .await
+        .map_err(|e| DbError::Connection(format!("Failed to create extract dir: {}", e)))?;
+
+    let tmp_archive_clone = tmp_archive.clone();
+    let tmp_extract_clone = tmp_extract.clone();
+    let extract_result = tokio::task::spawn_blocking(move || -> Result<PathBuf, String> {
+        let file = std::fs::File::open(&tmp_archive_clone)
+            .map_err(|e| format!("Failed to open archive: {}", e))?;
 
         if is_zip {
             let mut archive = zip::ZipArchive::new(file)
                 .map_err(|e| format!("Failed to open zip archive: {}", e))?;
-            archive
-                .extract(&parent)
+            archive.extract(&tmp_extract_clone)
                 .map_err(|e| format!("Failed to extract JRE zip: {}", e))?;
         } else {
             let decoder = flate2::read::GzDecoder::new(file);
             let mut archive = tar::Archive::new(decoder);
-            archive
-                .unpack(&parent)
-                .map_err(|e| format!("Failed to extract JRE: {}", e))?;
+            archive.unpack(&tmp_extract_clone)
+                .map_err(|e| format!("Failed to extract JRE tar: {}", e))?;
         }
 
-        // Find the extracted directory that contains bin/java
-        for entry in std::fs::read_dir(&parent)
+        // Find the directory with bin/java — could be directly in extract dir
+        // or inside a subdirectory (e.g. jdk-25.0.1/)
+        let java_bin = if cfg!(target_os = "windows") { "java.exe" } else { "java" };
+        let jdk_contents_home = |p: &Path| p.join("Contents").join("Home").join("bin").join(java_bin);
+
+        // Case 1: directly in extract dir (no wrapper directory)
+        if tmp_extract_clone.join("bin").join(java_bin).exists() {
+            return Ok(tmp_extract_clone.clone());
+        }
+
+        // Case 2: macOS .jdk bundle format (Contents/Home/bin/java)
+        if jdk_contents_home(&tmp_extract_clone).exists() {
+            // Return the Contents/Home directory as the JRE root
+            return Ok(tmp_extract_clone.join("Contents").join("Home"));
+        }
+
+        // Case 3: inside a subdirectory (e.g. jdk-25.0.1/)
+        for entry in std::fs::read_dir(&tmp_extract_clone)
             .map_err(|e| format!("Failed to list extracted files: {}", e))?
             .filter_map(|e| e.ok())
             .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
         {
-            let bin_java = entry.path().join("bin").join(if cfg!(target_os = "windows") {
-                "java.exe"
-            } else {
-                "java"
-            });
-            if bin_java.exists() {
-                let extracted_path = entry.path();
-                let target_path = parent.join("jre");
-                std::fs::rename(&extracted_path, &target_path)
-                    .map_err(|e| format!("Failed to rename JRE directory: {}", e))?;
-                break;
+            let path = entry.path();
+            // Standard: subdir/bin/java
+            if path.join("bin").join(java_bin).exists() {
+                return Ok(path);
+            }
+            // macOS bundle inside subdir: subdir/Contents/Home/bin/java
+            if jdk_contents_home(&path).exists() {
+                return Ok(path.join("Contents").join("Home"));
             }
         }
-
-        let _ = std::fs::remove_file(&tmp_path);
-        Ok(())
+        Err(format!(
+            "Extracted JRE archive does not contain bin/{java_bin} — checked {:?} and its subdirectories",
+            tmp_extract_clone
+        ))
     })
     .await
     .map_err(|e| DbError::Connection(format!("JRE extraction panicked: {}", e)))?;
 
-    extract_result.map_err(|e| DbError::Connection(format!("JRE extraction failed: {}", e)))?;
+    let extracted_dir = extract_result
+        .map_err(|e| DbError::Connection(format!("JRE extraction failed: {}", e)))?;
+
+    // Step 4: Atomic swap — rename temp to final, with rollback
+    let _ = tokio::fs::remove_file(&tmp_archive).await;
+
+    // If target exists, move it aside first (backup), then rename temp, then delete backup
+    if base_dir.exists() {
+        let backup = parent.join(format!("jre_old_{}", uuid::Uuid::new_v4()));
+        tokio::fs::rename(&base_dir, &backup)
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to backup old JRE: {}", e)))?;
+        match tokio::fs::rename(&extracted_dir, &base_dir).await {
+            Ok(()) => {
+                let _ = tokio::fs::remove_dir_all(&backup).await;
+            }
+            Err(_) => {
+                // Rollback: restore backup
+                let _ = tokio::fs::rename(&backup, &base_dir).await;
+                let _ = tokio::fs::remove_dir_all(&extracted_dir).await;
+                return Err(DbError::Connection("Failed to install JRE — restored previous version".to_string()));
+            }
+        }
+    } else {
+        tokio::fs::rename(&extracted_dir, &base_dir)
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to install JRE: {}", e)))?;
+    }
+
+    // Step 5: Ensure java binary is executable (fix permissions if needed)
+    #[cfg(unix)]
+    {
+        let java_bin = base_dir.join("bin").join("java");
+        if java_bin.exists() {
+            use std::os::unix::fs::PermissionsExt;
+            if let Ok(meta) = java_bin.metadata() {
+                let mode = meta.permissions().mode();
+                if mode & 0o111 == 0 {
+                    let perms = std::fs::Permissions::from_mode(mode | 0o100);
+                    let _ = std::fs::set_permissions(&java_bin, perms);
+                }
+            }
+        }
+    }
 
     Ok(())
 }

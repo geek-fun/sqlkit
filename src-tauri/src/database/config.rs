@@ -233,6 +233,9 @@ pub struct ConnectionConfig {
     /// Trust server certificate (SQL Server specific).
     #[serde(default)]
     pub trust_server_certificate: bool,
+    /// Oracle-specific connection options.
+    #[serde(default)]
+    pub oracle_options: Option<OracleConnectionOptions>,
     /// Additional connection options.
     #[serde(default)]
     pub options: std::collections::HashMap<String, String>,
@@ -242,6 +245,18 @@ pub struct ConnectionConfig {
     /// Transport layer configuration (SSH tunnels, proxies).
     #[serde(default)]
     pub transport_layers: Vec<TransportLayerConfig>,
+}
+
+/// Oracle-specific connection options for non-basic connection methods.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct OracleConnectionOptions {
+    pub connection_method: String,
+    pub sid_or_service: Option<String>,
+    pub role: Option<String>,
+    pub tns_admin_dir: Option<String>,
+    pub tns_alias: Option<String>,
+    pub wallet_password: Option<String>,
+    pub service_level: Option<String>,
 }
 
 impl ConnectionConfig {
@@ -264,6 +279,7 @@ impl ConnectionConfig {
             ssl_client_cert: None,
             ssl_client_key: None,
             trust_server_certificate: false,
+            oracle_options: None,
             options: std::collections::HashMap::new(),
             pool_config: PoolConfig::default(),
             transport_layers: Vec::new(),
@@ -291,6 +307,12 @@ impl ConnectionConfig {
     /// Set the pool configuration.
     pub fn with_pool_config(mut self, pool_config: PoolConfig) -> Self {
         self.pool_config = pool_config;
+        self
+    }
+
+    /// Set the Oracle-specific options.
+    pub fn with_oracle_options(mut self, opts: OracleConnectionOptions) -> Self {
+        self.oracle_options = Some(opts);
         self
     }
 

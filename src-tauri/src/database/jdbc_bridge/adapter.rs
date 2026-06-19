@@ -53,6 +53,7 @@ impl JdbcBridgeAdapter {
             self.config.database.as_deref(),
             &self.config.username,
             &self.config.password,
+            self.config.oracle_options.as_ref(),
         )
         .await?;
 

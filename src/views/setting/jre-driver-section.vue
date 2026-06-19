@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { BridgeStatus, DriverInfo, JreStatus, JreUpdateStatus } from '@/datasources'
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,6 +23,19 @@ const jreStatus = ref<JreStatus | null>(null)
 
 const jreUpdate = ref<JreUpdateStatus | null>(null)
 const jreLoading = ref(false)
+
+const jreWarning = computed(() => {
+  const status = jreStatus.value
+  if (!status || status.source !== 'system')
+    return ''
+  const ver = status.version
+  if (!ver || ver === 'system')
+    return t('pages.settings.jre.jreCard.status.systemWarning')
+  const major = Number.parseInt(ver, 10)
+  if (!Number.isNaN(major) && major < 25)
+    return t('pages.settings.jre.jreCard.status.systemWarning')
+  return ''
+})
 
 const bridgeStatus = ref<BridgeStatus | null>(null)
 const bridgeLoading = ref(false)
@@ -212,8 +225,8 @@ onMounted(() => {
       <CardDescription>{{ t('pages.settings.jre.description') }}</CardDescription>
     </CardHeader>
     <CardContent class="space-y-6">
-      <!-- JRE Card -->
-      <div class="p-4 border rounded-lg space-y-2">
+      <!-- Java Runtime Card (single card, two rows: Managed + System) -->
+      <div class="p-4 border rounded-lg space-y-3">
         <div class="space-y-1">
           <p class="text-sm font-medium">
             {{ t('pages.settings.jre.jreCard.title') }}
@@ -223,103 +236,91 @@ onMounted(() => {
           </p>
         </div>
 
-        <div class="flex flex-wrap gap-2 min-h-8 items-center">
-          <!-- Loading state -->
-          <span v-if="jreLoading && !jreStatus" class="text-sm text-muted-foreground">
-            <span class="i-carbon-loading align-middle h-3.5 w-3.5 inline-block animate-spin" />
-            {{ t('pages.settings.jre.jreCard.status.checking') }}
-          </span>
-
-          <!-- JRE status loaded -->
-          <template v-else-if="jreStatus">
-            <span class="text-sm font-medium">
-              {{ t('pages.settings.jre.jreCard.status.installed') }}
-            </span>
-            <span
-              v-if="jreStatus.version"
-              class="text-sm text-muted-foreground"
-            >
-              {{ jreStatus.version }}
-            </span>
-            <Badge
-              :variant="jreStatus.source === 'managed' ? 'default' : 'secondary'"
-            >
-              {{ jreStatus.source === 'managed' ? t('pages.settings.jre.jreCard.status.managed') : t('pages.settings.jre.jreCard.status.system') }}
-            </Badge>
-            <Badge
-              v-if="jreUpdate?.update_available"
-              variant="warning"
-            >
-              {{ t('pages.settings.jre.jreCard.actions.redownload') }}
-            </Badge>
-          </template>
-
-          <!-- Not installed -->
-          <span v-else class="text-sm text-muted-foreground">
-            {{ t('pages.settings.jre.jreCard.status.notInstalled') }}
-          </span>
-
-          <div class="flex-1" />
-
-          <!-- Toolbar -->
-          <div class="flex gap-1 items-center">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    class="h-7 w-7"
-                    :disabled="jreLoading"
-                    @click="handleCheckJreUpdates"
-                  >
-                    <span class="i-carbon-search h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ t('pages.settings.jre.jreCard.actions.checkUpdates') }}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button
-                    v-if="!jreStatus?.installed || jreUpdate?.update_available"
-                    size="icon"
-                    variant="ghost"
-                    class="h-7 w-7"
-                    :disabled="jreLoading"
-                    @click="handleDownloadJre"
-                  >
-                    <span class="i-carbon-download h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ t('pages.settings.jre.jreCard.actions.download') }}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger as-child>
-                  <Button
-                    v-if="jreStatus?.installed && jreStatus?.source === 'managed'"
-                    size="icon"
-                    variant="ghost"
-                    class="h-7 w-7"
-                    :disabled="jreLoading"
-                    @click="handleRemoveJre"
-                  >
-                    <span class="i-carbon-trash-can h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>{{ t('pages.settings.jre.jreCard.actions.remove') }}</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+        <div class="border rounded-md divide-y">
+          <!-- Managed JRE row -->
+          <div class="px-4 py-3 flex gap-3 items-center">
+            <span class="i-carbon-wireless-payment text-muted-foreground flex-shrink-0 h-5 w-5" />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium truncate">
+                {{ t('pages.settings.jre.jreCard.status.managed') }}
+              </p>
+              <p v-if="jreStatus?.source === 'managed'" class="text-xs text-muted-foreground mt-0.5 truncate">
+                {{ jreStatus.version }}
+                <template v-if="jreStatus.path">
+                  · {{ jreStatus.path }}
+                </template>
+              </p>
+              <p v-else class="text-xs text-muted-foreground mt-0.5">
+                {{ t('pages.settings.jre.jreCard.status.notInstalled') }}
+              </p>
+            </div>
+            <div class="flex-shrink-0">
+              <Badge :variant="jreStatus?.source === 'managed' ? 'success' : 'secondary'">
+                {{ jreStatus?.source === 'managed' ? t('pages.settings.jre.jreCard.status.installed') : t('pages.settings.jre.jreCard.status.notInstalled') }}
+              </Badge>
+            </div>
+            <div class="flex flex-shrink-0 gap-1 items-center">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button size="icon" variant="ghost" class="h-7 w-7" :disabled="jreLoading" @click="handleCheckJreUpdates">
+                      <span class="i-carbon-search h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>{{ t('pages.settings.jre.jreCard.actions.checkUpdates') }}</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button v-if="jreStatus?.source !== 'managed' || jreUpdate?.update_available" size="icon" variant="ghost" class="h-7 w-7" :disabled="jreLoading" @click="handleDownloadJre">
+                      <span class="i-carbon-download h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>{{ jreStatus?.source !== 'managed' ? t('pages.settings.jre.jreCard.actions.download') : t('pages.settings.jre.jreCard.actions.redownload') }}</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button v-if="jreStatus?.source === 'managed'" size="icon" variant="ghost" class="h-7 w-7" :disabled="jreLoading" @click="handleRemoveJre">
+                      <span class="i-carbon-trash-can h-3.5 w-3.5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>{{ t('pages.settings.jre.jreCard.actions.remove') }}</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
+
+          <!-- System JRE row -->
+          <div v-if="jreStatus && jreStatus.source !== 'none'" class="px-4 py-3 flex gap-3 items-center">
+            <span class="i-carbon-laptop text-muted-foreground flex-shrink-0 h-5 w-5" />
+            <div class="flex-1 min-w-0">
+              <p class="text-sm font-medium truncate">
+                {{ t('pages.settings.jre.jreCard.status.system') }}
+              </p>
+              <p class="text-xs text-muted-foreground mt-0.5 truncate">
+                {{ jreStatus.path || t('pages.settings.jre.jreCard.status.notInstalled') }}
+                <template v-if="jreStatus.version">
+                  · v{{ jreStatus.version }}
+                </template>
+                <template v-else>
+                  · {{ t('pages.settings.jre.jreCard.status.versionUnknown') }}
+                </template>
+              </p>
+            </div>
+            <div class="flex-shrink-0">
+              <Badge :variant="jreStatus.installed ? 'success' : 'secondary'">
+                {{ jreStatus.installed ? t('pages.settings.jre.jreCard.status.installed') : t('pages.settings.jre.jreCard.status.notInstalled') }}
+              </Badge>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="jreWarning" class="bg-warning/10 text-warning text-xs px-3 py-2 rounded-md flex gap-2 items-start">
+          <span class="i-carbon-warning mt-0.5 flex-shrink-0 h-4 w-4" />
+          <span>{{ jreWarning }}</span>
         </div>
       </div>
 

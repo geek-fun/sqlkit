@@ -2,6 +2,7 @@ export { useAccountStore } from './accountStore'
 export { LanguageType, ThemeType, useAppStore } from './appStore'
 export type { ChatRuntimeConfig, EditorConfig, FeatureModelRoute, LlmProvider, ModelRef, QueryConfig } from './appStore'
 export {
+  buildOracleOptions,
   buildTransportLayers,
   ConnectionStatus,
   DatabaseType,
@@ -12,7 +13,7 @@ export {
   resolveDatabase,
   useConnectionStore,
 } from './connectionStore'
-export type { ServerConnection, SSHTunnelConfig } from './connectionStore'
+export type { OracleConnectionOptions, ServerConnection, SSHTunnelConfig } from './connectionStore'
 export { useDatabaseStore } from './databaseStore'
 export type { DatabaseMetadata, TableInfo } from './databaseStore'
 export { useDataStudioStore } from './dataStudioStore'

@@ -34,6 +34,10 @@ pub struct DatabaseDriverConfig {
     pub maven_artifact: String,
     /// JDBC URL template with `{host}`, `{port}`, `{database}` placeholders.
     pub jdbc_url_template: String,
+    /// Optional service-name format JDBC URL template (Oracle-specific).
+    /// Uses `//{host}:{port}/{database}` format instead of `@{host}:{port}:{database}`.
+    #[serde(default)]
+    pub jdbc_url_template_service: Option<String>,
     /// Default port for this database type.
     #[serde(default)]
     pub default_port: Option<u16>,
@@ -115,14 +119,13 @@ pub fn resolve_maven_url(group: &str, artifact: &str, version: &str, classifier:
 /// When `database` is `None`, the `{database}` placeholder and any associated
 /// parameter prefix (e.g. `;httpPath=`, `/DATABASE=`) are removed from the
 /// template to avoid dangling empty parameters.
-pub fn build_jdbc_url(
-    config: &DatabaseDriverConfig,
+pub fn build_jdbc_url_from_template(
+    template: &str,
     host: &str,
     port: u16,
     database: Option<&str>,
 ) -> String {
-    let url = config
-        .jdbc_url_template
+    let url = template
         .replace("{host}", host)
         .replace("{port}", &port.to_string());
     match database {
@@ -140,6 +143,16 @@ pub fn build_jdbc_url(
             url.trim_end_matches(&[';', '&', '?'][..]).to_string()
         }
     }
+}
+
+/// Build a JDBC URL from the config's template.
+pub fn build_jdbc_url(
+    config: &DatabaseDriverConfig,
+    host: &str,
+    port: u16,
+    database: Option<&str>,
+) -> String {
+    build_jdbc_url_from_template(&config.jdbc_url_template, host, port, database)
 }
 
 // ---------------------------------------------------------------------------
@@ -250,6 +263,7 @@ mod tests {
             maven_group: "com.h2database".into(),
             maven_artifact: "h2".into(),
             jdbc_url_template: "jdbc:h2:tcp://{host}:{port}/{database}".into(),
+            jdbc_url_template_service: None,
             default_port: Some(9092),
             min_jre_version: Some("11".into()),
             version_error_signatures: vec![],
@@ -268,6 +282,7 @@ mod tests {
             maven_group: "com.oracle.database.jdbc".into(),
             maven_artifact: "ojdbc11".into(),
             jdbc_url_template: "jdbc:oracle:thin:@{host}:{port}:{database}".into(),
+            jdbc_url_template_service: None,
             default_port: Some(1521),
             min_jre_version: Some("11".into()),
             version_error_signatures: vec![],
@@ -287,6 +302,7 @@ mod tests {
             maven_group: "com.h2database".into(),
             maven_artifact: "h2".into(),
             jdbc_url_template: "jdbc:h2:tcp://{host}:{port}/{database}".into(),
+            jdbc_url_template_service: None,
             default_port: Some(9092),
             min_jre_version: Some("11".into()),
             version_error_signatures: vec![],
@@ -306,6 +322,7 @@ mod tests {
             maven_group: "com.dameng".into(),
             maven_artifact: "DmJdbcDriver".into(),
             jdbc_url_template: "jdbc:dm://{host}:{port}".into(),
+            jdbc_url_template_service: None,
             default_port: Some(5236),
             min_jre_version: Some("11".into()),
             version_error_signatures: vec![],
@@ -368,6 +385,7 @@ mod tests {
                 maven_group: "test".into(),
                 maven_artifact: "test".into(),
                 jdbc_url_template: template.to_string(),
+                jdbc_url_template_service: None,
                 default_port: None,
                 min_jre_version: None,
                 version_error_signatures: vec![],

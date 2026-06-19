@@ -3,7 +3,7 @@
 //! This module provides the application-wide state that is shared across all Tauri commands.
 //! The state includes connection managers for each database type and application configuration.
 
-use crate::database::config::ConnectionConfig;
+use crate::database::config::{ConnectionConfig, OracleConnectionOptions};
 use crate::ssh::config::TransportLayerConfig;
 use crate::ssh::TunnelManager;
 use serde::{Deserialize, Serialize};
@@ -63,6 +63,9 @@ pub struct ServerConfig {
     /// Additional metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, String>>,
+    /// Oracle-specific connection options.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub oracle_options: Option<OracleConnectionOptions>,
     /// Transport layer configuration (SSH tunnels).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transport_layers: Option<Vec<TransportLayerConfig>>,
@@ -82,6 +85,7 @@ impl ServerConfig {
             database: None,
             ssl_mode: None,
             metadata: None,
+            oracle_options: None,
             transport_layers: None,
         }
     }
@@ -188,6 +192,10 @@ impl ServerConfig {
 
         if let Some(ref layers) = self.transport_layers {
             config = config.with_transport_layers(layers.clone());
+        }
+
+        if let Some(ref oracle_opts) = self.oracle_options {
+            config = config.with_oracle_options(oracle_opts.clone());
         }
 
         Ok(config)

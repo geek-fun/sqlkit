@@ -13,6 +13,7 @@ class_name = "oracle.jdbc.OracleDriver"
 maven_group = "com.oracle.database.jdbc"
 maven_artifact = "ojdbc11"
 jdbc_url_template = "jdbc:oracle:thin:@{host}:{port}:{database}"
+jdbc_url_template_service = "jdbc:oracle:thin:@//{host}:{port}/{database}"
 default_port = 1521
 min_jre_version = "11"
 version_cap = "21.15.0.0"
