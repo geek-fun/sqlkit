@@ -25,6 +25,7 @@ pub mod pool;
 pub mod progress;
 pub mod protocol;
 pub mod registry;
+pub mod tns_parser;
 
 pub use adapter::JdbcBridgeAdapter;
 pub use launcher::JdbcBridgeLauncher;

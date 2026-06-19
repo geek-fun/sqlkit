@@ -18,6 +18,16 @@ export type TransportLayerConfig = {
   keepalive_interval_secs: number
 }
 
+export type OracleConnectionOptions = {
+  connection_method: 'basic' | 'tns' | 'cloud_wallet'
+  sid_or_service?: 'sid' | 'service_name'
+  role?: 'NORMAL' | 'SYSDBA' | 'SYSOPER'
+  tns_admin_dir?: string
+  tns_alias?: string
+  wallet_password?: string
+  service_level?: 'low' | 'medium' | 'high' | 'tp' | 'tpurgent'
+}
+
 export type ServerConfig = {
   id: string
   name: string
@@ -33,6 +43,7 @@ export type ServerConfig = {
   ssl_client_key?: string | null
   trust_server_certificate?: boolean | null
   transport_layers?: TransportLayerConfig[] | null
+  oracle_options?: OracleConnectionOptions | null
 }
 
 export type ConnectionStatus = {

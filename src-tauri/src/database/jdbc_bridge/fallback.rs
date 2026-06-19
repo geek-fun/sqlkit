@@ -1,4 +1,4 @@
-use crate::database::config::DatabaseType;
+use crate::database::config::{DatabaseType, OracleConnectionOptions};
 use crate::database::error::{DbError, DbResult};
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -19,6 +19,46 @@ pub enum DriverAttempt {
     Fatal(DbError),
 }
 
+/// Build an Oracle JDBC URL based on the connection method and options.
+/// Supports: basic SID, basic service name, TNS alias, and cloud wallet formats.
+fn build_oracle_url(
+    config: &DatabaseDriverConfig,
+    host: &str,
+    port: u16,
+    database: Option<&str>,
+    oracle_options: Option<&OracleConnectionOptions>,
+) -> String {
+    let opts = match oracle_options {
+        Some(o) => o,
+        // No Oracle options — fall back to default SID format
+        None => return super::registry::build_jdbc_url(config, host, port, database),
+    };
+
+    match opts.connection_method.as_str() {
+        "basic" => {
+            let use_service = matches!(opts.sid_or_service.as_deref(), Some("service_name"));
+            if use_service {
+                // Service name format: jdbc:oracle:thin:@//host:port/service_name
+                if let Some(ref service_template) = config.jdbc_url_template_service {
+                    super::registry::build_jdbc_url_from_template(service_template, host, port, database)
+                } else {
+                    super::registry::build_jdbc_url(config, host, port, database)
+                }
+            } else {
+                // SID format: jdbc:oracle:thin:@host:port:sid (default template)
+                super::registry::build_jdbc_url(config, host, port, database)
+            }
+        }
+        "tns" | "cloud_wallet" => {
+            // The TNS alias from tnsnames.ora already includes the service level
+            // suffix (e.g. dbname_medium). Use it as-is.
+            let alias = opts.tns_alias.as_deref().unwrap_or("");
+            format!("jdbc:oracle:thin:@{}", alias)
+        }
+        _ => super::registry::build_jdbc_url(config, host, port, database),
+    }
+}
+
 /// Try connecting using the JDBC bridge.
 ///
 /// Starts the bridge, resolves the driver JAR via Java-side `ResolveDriver` RPC,
@@ -33,8 +73,9 @@ pub async fn try_driver(
     username: &str,
     password: &Option<String>,
     use_cap: bool,
+    oracle_options: Option<&OracleConnectionOptions>,
 ) -> DriverAttempt {
-    let url = super::registry::build_jdbc_url(config, host, port, database);
+    let url = build_oracle_url(config, host, port, database, oracle_options);
 
     // Start bridge (no driver JARs yet — ResolveDriver will download on the Java side)
     let bridge_jar = download::bridge_jar_path();
@@ -112,6 +153,7 @@ pub async fn try_driver(
         driver_jars: vec![jar_path],
         pool_min: 1,
         pool_max: 5,
+        oracle_options: oracle_options.cloned(),
     }) {
         Ok(v) => v,
         Err(e) => {
@@ -176,6 +218,7 @@ pub async fn try_driver(
 ///
 /// Ensures JRE and bridge JAR are installed, then delegates to `try_driver`
 /// which resolves the driver dynamically via Java-side `ResolveDriver` RPC.
+/// Supports Oracle-specific URL construction via `oracle_options`.
 pub async fn run_fallback_chain(
     db_type: DatabaseType,
     host: &str,
@@ -183,6 +226,7 @@ pub async fn run_fallback_chain(
     database: Option<&str>,
     username: &str,
     password: &Option<String>,
+    oracle_options: Option<&OracleConnectionOptions>,
 ) -> DbResult<(String, String, Arc<Mutex<JdbcBridgeLauncher>>)> {
     let registry = super::registry::DriverRegistry::load();
     let config = registry.get_config(db_type).ok_or_else(|| {
@@ -237,14 +281,14 @@ pub async fn run_fallback_chain(
 
     // Two-phase driver resolution:
     // 1. Try LATEST (no version_cap)
-    match try_driver(config, host, port, database, username, password, false).await {
+    match try_driver(config, host, port, database, username, password, false, oracle_options).await {
         DriverAttempt::Connected(conn_id, launcher) => {
             return Ok(("resolved".to_string(), conn_id, launcher));
         }
         DriverAttempt::VersionMismatch(_) => {
             // 2. If LATEST fails with version_incompatible and a cap exists, retry with cap
             if config.version_cap.is_some() {
-                match try_driver(config, host, port, database, username, password, true).await {
+                match try_driver(config, host, port, database, username, password, true, oracle_options).await {
                     DriverAttempt::Connected(conn_id, launcher) => {
                         return Ok(("capped".to_string(), conn_id, launcher));
                     }

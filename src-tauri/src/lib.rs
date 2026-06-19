@@ -200,6 +200,8 @@ pub fn run() {
             commands::list_drivers,
             commands::download_driver,
             commands::remove_driver,
+            commands::list_tns_aliases,
+            commands::download_jdbc_driver_direct,
             // Connection management
             commands::save_connection,
             commands::list_connections,

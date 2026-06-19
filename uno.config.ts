@@ -13,7 +13,9 @@ export default defineConfig({
     }),
     presetIcons({
       scale: 1.2,
-      cdn: 'https://esm.sh/',
+      collections: {
+        carbon: () => import('@iconify-json/carbon/icons.json').then(i => i.default as Record<string, unknown>),
+      },
     }),
     presetAnimations(),
   ],

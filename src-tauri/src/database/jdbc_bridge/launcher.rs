@@ -189,6 +189,24 @@ impl JdbcBridgeLauncher {
             .as_mut()
             .ok_or_else(|| DbError::Connection("JDBC bridge not started".to_string()))?;
 
+        // Check if the process is still alive before trying to communicate
+        if let Ok(Some(status)) = process.try_wait() {
+            let stderr = self.stderr_buffer.as_ref()
+                .map(Self::read_stderr_buffer)
+                .unwrap_or_default();
+            return if stderr.is_empty() {
+                Err(DbError::Connection(format!(
+                    "JDBC bridge exited before request (code: {}). No stderr output.",
+                    status
+                )))
+            } else {
+                Err(DbError::Connection(format!(
+                    "JDBC bridge exited before request (code: {}). stderr: {}",
+                    status, stderr
+                )))
+            };
+        }
+
         let stdout = process
             .stdout
             .as_mut()
@@ -231,34 +249,52 @@ impl JdbcBridgeLauncher {
 
         let mut reader = BufReader::new(stdout);
         let mut line = String::new();
-        reader.read_line(&mut line).map_err(|e| {
-            let stderr = self.stderr_buffer.as_ref()
-                .map(Self::read_stderr_buffer)
-                .unwrap_or_default();
-            if stderr.is_empty() {
-                DbError::Connection(format!("Failed to read bridge response: {}", e))
-            } else {
-                DbError::Connection(format!(
-                    "Bridge read error: {}. stderr: {}",
-                    e, stderr
-                ))
-            }
-        })?;
+        let mut read_attempts = 0;
 
-        if line.trim().is_empty() {
-            let stderr = self.stderr_buffer.as_ref()
-                .map(Self::read_stderr_buffer)
-                .unwrap_or_default();
-            return if stderr.is_empty() {
-                Err(DbError::Connection(
-                    "Empty response from JDBC bridge".to_string(),
-                ))
-            } else {
-                Err(DbError::Connection(format!(
-                    "Bridge read error. stderr: {}",
-                    stderr
-                )))
-            };
+        // Skip any non-JSON lines (e.g. JVM prints version info to stdout)
+        // Retry once if first read is empty (JVM may be slow to start)
+        loop {
+            line.clear();
+            reader.read_line(&mut line).map_err(|e| {
+                let stderr = self.stderr_buffer.as_ref()
+                    .map(Self::read_stderr_buffer)
+                    .unwrap_or_default();
+                if stderr.is_empty() {
+                    DbError::Connection(format!("Failed to read bridge response: {}", e))
+                } else {
+                    DbError::Connection(format!(
+                        "Bridge read error: {}. stderr: {}",
+                        e, stderr
+                    ))
+                }
+            })?;
+
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                if read_attempts == 0 {
+                    // JVM may be slow to start — wait and retry once
+                    read_attempts += 1;
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
+                    continue;
+                }
+                let stderr = self.stderr_buffer.as_ref()
+                    .map(Self::read_stderr_buffer)
+                    .unwrap_or_default();
+                return if stderr.is_empty() {
+                    Err(DbError::Connection(
+                        "Empty response from JDBC bridge".to_string(),
+                    ))
+                } else {
+                    Err(DbError::Connection(format!(
+                        "Bridge read error. stderr: {}",
+                        stderr
+                    )))
+                };
+            }
+            // Skip lines that don't start with '{' (non-JSON noise from JVM)
+            if trimmed.starts_with('{') {
+                break;
+            }
         }
 
         let resp: JdbcResponse = serde_json::from_str(line.trim())

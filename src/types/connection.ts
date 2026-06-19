@@ -41,7 +41,7 @@ export const DEFAULT_SSL_MODE = 'prefer'
 /**
  * Database types that support SSL configuration (lowercase for case-insensitive matching)
  */
-export const SSL_SUPPORTED_DATABASES = ['postgresql', 'mysql', 'mariadb', 'sqlserver']
+export const SSL_SUPPORTED_DATABASES = ['postgresql', 'mysql', 'mariadb', 'sqlserver', 'oracle']
 
 /**
  * Database types that require certificate fields for verify-ca/verify-full

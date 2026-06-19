@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { ServerConnection } from '@/store'
+import type { OracleConnectionOptions, ServerConnection } from '@/store'
 import { invoke } from '@tauri-apps/api/core'
-import { open } from '@tauri-apps/plugin-dialog'
+import { listen } from '@tauri-apps/api/event'
+import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
@@ -19,7 +20,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { toast } from '@/composables/useNotifications'
-import { buildTransportLayers, DatabaseType, dbTypeToBackend, resolveDatabase } from '@/store'
+import { jdbcApi } from '@/datasources/jdbcApi'
+import { buildOracleOptions, buildTransportLayers, DatabaseType, dbTypeToBackend, resolveDatabase } from '@/store'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import SslConfigSection from './ssl/SslConfigSection.vue'
 
@@ -119,6 +121,78 @@ const testStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
 const testError = ref<string>('')
 const formErrors = ref<Record<string, string>>({})
 const showAdvanced = ref(false)
+const isPickingFile = ref(false)
+
+// Step tracking for setup progress
+// Each step has its own status; clicking retry re-runs that individual step.
+type StepDef = {
+  id: string
+  label: string
+  status: 'pending' | 'running' | 'done' | 'error'
+  progress?: { downloaded: number, total: number }
+  error?: string
+}
+const setupSteps = ref<StepDef[]>([
+  { id: 'jre', label: 'Java Runtime', status: 'pending' },
+  { id: 'bridge', label: 'Bridge JAR', status: 'pending' },
+  { id: 'driver', label: 'JDBC Driver', status: 'pending' },
+])
+
+// Listen for progress events from any download command
+const progressUnlisten = ref<(() => void) | null>(null)
+
+// TNS alias handling: strip level suffixes for display, combine for connection
+const LEVEL_SUFFIXES = ['_low', '_medium', '_high', '_tp', '_tpurgent']
+function stripLevelSuffix(name: string): string {
+  for (const suffix of LEVEL_SUFFIXES) {
+    if (name.endsWith(suffix)) return name.slice(0, -suffix.length)
+  }
+  return name
+}
+const tnsFullAlias = computed(() => {
+  if (!oracleTnsAlias.value || oracleMethod.value === 'basic') return undefined
+  if (oracleMethod.value === 'cloud_wallet' && oracleServiceLevel.value) {
+    return `${oracleTnsAlias.value}_${oracleServiceLevel.value}`
+  }
+  return oracleTnsAlias.value
+})
+
+async function startProgressListener() {
+  // Clean up previous listener
+  if (progressUnlisten.value) progressUnlisten.value()
+  const unlisten = await listen<{ step: string, downloaded: number, total: number, message?: string }>('connection-progress', (event) => {
+    const stepMap: Record<string, string> = { jre_download: 'jre', bridge_jar: 'bridge' }
+    const stepId = stepMap[event.payload.step]
+    const step = setupSteps.value.find(s => s.id === stepId)
+    if (step && event.payload.step !== 'retry') {
+      step.status = 'running'
+      step.progress = { downloaded: event.payload.downloaded, total: event.payload.total }
+    }
+  })
+  progressUnlisten.value = unlisten
+}
+
+// Run a single setup step (JRE or Bridge) with its own invoke
+async function runStep(step: StepDef): Promise<boolean> {
+  step.status = 'running'
+  step.progress = undefined
+  step.error = undefined
+  try {
+    if (step.id === 'jre') {
+      await invoke('download_jre')
+    }
+    else if (step.id === 'bridge') {
+      await invoke('download_bridge_jar')
+    }
+    step.status = 'done'
+    return true
+  }
+  catch (e) {
+    step.status = 'error'
+    step.error = e instanceof Error ? e.message : String(e)
+    return false
+  }
+}
 
 function toggleSsh(checked: boolean) {
   if (!formData.value.sshTunnel) {
@@ -190,15 +264,21 @@ watch(() => props.open, (open) => {
           savedFilePath.value = props.connection.host
         }
       }
+      // Sync Oracle options when editing
+      if (props.connection.type === DatabaseType.ORACLE) {
+        syncOracleFromFormData()
+      }
     }
     else {
       formData.value = { ...defaultConnection }
       sqliteTab.value = 'file'
       savedFilePath.value = ''
+      resetOracleOptions()
     }
     testStatus.value = 'idle'
     testError.value = ''
     formErrors.value = {}
+    setupSteps.value.forEach(s => { s.status = 'pending'; s.progress = undefined; s.error = undefined })
     loadRecentDatabases()
   }
 })
@@ -231,6 +311,15 @@ function handleDatabaseTypeChange(value: string) {
   if (!props.connection || formData.value.port === defaultPorts[props.connection.type]) {
     formData.value.port = defaultPorts[type]
   }
+  if (type === DatabaseType.ORACLE) {
+    resetOracleOptions()
+    formData.value.host = formData.value.host || 'localhost'
+    formData.value.port = formData.value.port || 1521
+    formData.value.oracleOptions = buildOracleOptionsFromRefs()
+  }
+  else {
+    formData.value.oracleOptions = undefined
+  }
   if (type === DatabaseType.SQLITE || type === DatabaseType.DUCKDB) {
     formData.value.host = ''
     formData.value.port = 0
@@ -246,10 +335,158 @@ const isFileBased = computed(() =>
   || formData.value.type === DatabaseType.DUCKDB,
 )
 
+// ── Oracle-specific state ──
+const isOracle = computed(() => formData.value.type === DatabaseType.ORACLE)
+const oracleMethod = ref<'basic' | 'tns' | 'cloud_wallet'>('basic')
+const oracleSidOrService = ref<'sid' | 'service_name'>('service_name')
+const oracleRole = ref<'NORMAL' | 'SYSDBA' | 'SYSOPER'>('NORMAL')
+const oracleTnsAdminDir = ref('')
+const oracleTnsAlias = ref('')
+const oracleWalletPassword = ref('')
+const oracleServiceLevel = ref<'low' | 'medium' | 'high' | 'tp' | 'tpurgent'>('medium')
+const tnsAliases = ref<string[]>([])
+const loadingAliases = ref(false)
+
+// When Oracle is TNS or Cloud Wallet, standard host/port/database fields are hidden
+const showsStandardHostFields = computed(() =>
+  !isOracle.value
+  || oracleMethod.value === 'basic',
+)
+
+const databaseLabel = computed(() => {
+  if (isOracle.value && oracleMethod.value === 'basic') {
+    return oracleSidOrService.value === 'sid'
+      ? t('components.serverForm.oracle.sid')
+      : t('components.serverForm.oracle.serviceName')
+  }
+  return t('components.serverForm.labels.database')
+})
+
+// Reset Oracle options when toggling method
+function resetOracleOptions() {
+  oracleMethod.value = 'basic'
+  oracleSidOrService.value = 'service_name'
+  oracleRole.value = 'NORMAL'
+  oracleTnsAdminDir.value = ''
+  oracleTnsAlias.value = ''
+  oracleWalletPassword.value = ''
+  oracleServiceLevel.value = 'medium'
+  tnsAliases.value = []
+}
+
+// Sync oracle options from formData when editing existing connection
+function syncOracleFromFormData() {
+  if (formData.value.oracleOptions) {
+    const o = formData.value.oracleOptions
+    oracleMethod.value = o.connectionMethod
+    oracleSidOrService.value = o.sidOrService ?? 'service_name'
+    oracleRole.value = o.role ?? 'NORMAL'
+    oracleTnsAdminDir.value = o.tnsAdminDir ?? ''
+    oracleTnsAlias.value = o.tnsAlias ?? ''
+    oracleWalletPassword.value = o.walletPassword ?? ''
+    oracleServiceLevel.value = o.serviceLevel ?? 'medium'
+  }
+}
+
+// Build oracleOptions from reactive refs
+function buildOracleOptionsFromRefs(): OracleConnectionOptions | undefined {
+  if (!isOracle.value) return undefined
+  const hasTnsAlias = oracleMethod.value !== 'basic' && !!tnsFullAlias.value
+  return {
+    connectionMethod: oracleMethod.value,
+    sidOrService: oracleMethod.value === 'basic' ? oracleSidOrService.value : undefined,
+    role: oracleRole.value,
+    tnsAdminDir: oracleMethod.value !== 'basic' ? oracleTnsAdminDir.value || undefined : undefined,
+    tnsAlias: hasTnsAlias ? tnsFullAlias.value : undefined,
+    walletPassword: oracleMethod.value === 'cloud_wallet' ? oracleWalletPassword.value || undefined : undefined,
+    serviceLevel: oracleMethod.value === 'cloud_wallet' ? oracleServiceLevel.value : undefined,
+  }
+}
+
+function onOracleMethodChange(method: string | number) {
+  oracleMethod.value = method as 'basic' | 'tns' | 'cloud_wallet'
+  oracleTnsAlias.value = ''
+  if (method !== 'basic') {
+    formData.value.host = ''
+    formData.value.port = 0
+  }
+  else {
+    formData.value.host = formData.value.host || 'localhost'
+    formData.value.port = formData.value.port || 1521
+  }
+}
+
+function onServiceLevelChange(val: string) {
+  oracleServiceLevel.value = val as 'low' | 'medium' | 'high' | 'tp' | 'tpurgent'
+}
+
+function onTnsAliasChange(val: string) {
+  oracleTnsAlias.value = val
+}
+
+// Sync formData.oracleOptions whenever relevant refs change
+watch([oracleMethod, oracleSidOrService, oracleRole, oracleTnsAdminDir, oracleTnsAlias, oracleWalletPassword, oracleServiceLevel], () => {
+  formData.value.oracleOptions = buildOracleOptionsFromRefs()
+})
+
+// Load TNS aliases when directory changes (TNS or Cloud Wallet)
+async function loadTnsAliases(dir: string) {
+  if (!dir) {
+    tnsAliases.value = []
+    return
+  }
+  loadingAliases.value = true
+  try {
+    const raw = await jdbcApi.listTnsAliases(dir)
+    // Strip level suffixes and deduplicate to show clean base names
+    const baseNames = new Set(raw.map(stripLevelSuffix))
+    tnsAliases.value = [...baseNames].sort()
+    if (tnsAliases.value.length === 0 && oracleTnsAlias.value) {
+      oracleTnsAlias.value = ''
+    }
+  }
+  catch (e) {
+    console.error('Failed to list TNS aliases:', e)
+    tnsAliases.value = []
+    if (oracleTnsAlias.value) oracleTnsAlias.value = ''
+  }
+  finally {
+    loadingAliases.value = false
+  }
+}
+
+async function browseDirectory(target: 'tns' | 'wallet') {
+  isPickingFile.value = true
+  try {
+    const selected = await openDialog({ directory: true, multiple: false })
+    if (typeof selected === 'string') {
+      if (target === 'tns') {
+        oracleTnsAdminDir.value = selected
+        await loadTnsAliases(selected)
+      }
+      else {
+        // For cloud wallet, tnsAdminDir is the wallet dir
+        oracleTnsAdminDir.value = selected
+        oracleTnsAlias.value = ''
+        await loadTnsAliases(selected)
+      }
+    }
+  }
+  catch (error) {
+    toast.error(t('components.serverForm.errors.filePickerFailed'), {
+      description: error instanceof Error ? error.message : String(error),
+    })
+  }
+  finally {
+    isPickingFile.value = false
+  }
+}
+
 // SQLite file picker function - handles both open existing and create new
 async function selectDatabaseFile() {
+  isPickingFile.value = true
   try {
-    const selected = await open({
+    const selected = await openDialog({
       multiple: false,
       filters: [
         { name: 'SQLite', extensions: ['db', 'sqlite', 'sqlite3'] },
@@ -265,6 +502,9 @@ async function selectDatabaseFile() {
     toast.error(t('components.serverForm.errors.filePickerFailed'), {
       description: error instanceof Error ? error.message : String(error),
     })
+  }
+  finally {
+    isPickingFile.value = false
   }
 }
 
@@ -283,6 +523,15 @@ function validateForm(): boolean {
   if (isFileBased.value) {
     if (formData.value.host !== ':memory:' && !formData.value.host.trim()) {
       errors.host = t('components.serverForm.errors.filePathRequired')
+    }
+  }
+  else if (isOracle.value && !showsStandardHostFields.value) {
+    // Oracle TNS / Cloud Wallet: TNS admin dir and alias required
+    if (!oracleTnsAdminDir.value.trim()) {
+      errors.tnsAdminDir = t('components.serverForm.errors.hostRequired')
+    }
+    if (!oracleTnsAlias.value.trim()) {
+      errors.tnsAlias = t('components.serverForm.errors.hostRequired')
     }
   }
   else {
@@ -305,14 +554,61 @@ function validateForm(): boolean {
 }
 
 async function handleTestConnection() {
-  if (!validateForm()) {
-    return
-  }
+  if (!validateForm()) return
 
   testStatus.value = 'testing'
   testError.value = ''
 
+  // Reset steps to pending — checks will promote to done or running
+  setupSteps.value.forEach(s => { s.status = 'pending'; s.progress = undefined; s.error = undefined })
+
+  await startProgressListener()
+
   try {
+    // Run all three downloads in parallel — none depend on each other
+    const jreStep = setupSteps.value.find(s => s.id === 'jre')!
+    const bridgeStep = setupSteps.value.find(s => s.id === 'bridge')!
+    const driverStep = setupSteps.value.find(s => s.id === 'driver')!
+
+    const dbType = mapDatabaseTypeToBackend(formData.value.type)
+
+    const results = await Promise.allSettled([
+      // JRE download (skips if already installed)
+      invoke('check_jre_status').then(async (status: any) => {
+        if (!status.installed) {
+          const ok = await runStep(jreStep)
+          if (!ok) throw new Error('JRE download failed')
+        }
+        else { jreStep.status = 'done' }
+      }),
+      // Bridge download (skips if already installed)
+      invoke('check_bridge_status').then(async (status: any) => {
+        if (!status.installed) {
+          const ok = await runStep(bridgeStep)
+          if (!ok) throw new Error('Bridge download failed')
+        }
+        else { bridgeStep.status = 'done' }
+      }),
+      // JDBC driver download directly from Maven Central (no Java needed)
+      (async () => {
+        try {
+          await invoke('download_jdbc_driver_direct', { dbType })
+          driverStep.status = 'done'
+        }
+        catch {
+          driverStep.status = 'done' // Non-fatal
+        }
+      })(),
+    ])
+
+    // If JRE or Bridge failed, stop (keep steps visible with error state)
+    if (results[0].status === 'rejected' || results[1].status === 'rejected') {
+      const firstError = setupSteps.value.find(s => s.status === 'error')
+      if (firstError?.error) testError.value = firstError.error
+      return
+    }
+
+    // Step 4: Test the actual connection
     const config = {
       id: formData.value.id || crypto.randomUUID(),
       name: formData.value.name,
@@ -328,21 +624,80 @@ async function handleTestConnection() {
       ssl_client_key: formData.value.ssl.clientKeyPath || null,
       trust_server_certificate: formData.value.ssl.trustServerCertificate ?? null,
       transport_layers: buildTransportLayers(formData.value.sshTunnel),
+      oracle_options: buildOracleOptions(formData.value.oracleOptions),
     }
+
+    // Small yield to let Vue render the loading state before the blocking invoke
+    await new Promise(r => setTimeout(r, 50))
 
     const result = await invoke<{ is_connected: boolean, server_version?: string }>('test_connection', { config })
 
     if (result.is_connected) {
+      driverStep.status = 'done'
       testStatus.value = 'success'
     }
     else {
+      driverStep.status = 'error'
+      const msg = 'Connection returned not connected'
+      driverStep.error = msg
+      testError.value = msg
       testStatus.value = 'error'
-      testError.value = t('common.status.failed')
     }
   }
   catch (error) {
     testStatus.value = 'error'
-    testError.value = error instanceof Error ? error.message : String(error)
+    const msg = error instanceof Error ? error.message : String(error)
+    testError.value = msg
+    // If the error is Java-related, also mark JRE as failed so user can retry it
+    if (msg.includes('Unable to locate a Java Runtime') || msg.includes('Java not found')) {
+      const jreStep = setupSteps.value.find(s => s.id === 'jre')
+      if (jreStep) { jreStep.status = 'error'; jreStep.error = 'JRE is missing or broken' }
+    }
+    const running = setupSteps.value.find(s => s.status === 'running')
+    if (running) { running.status = 'error'; running.error = msg }
+  }
+
+  // If testStatus is error but testError is empty, collect from first errored step
+  if (testStatus.value === 'error' && !testError.value) {
+    const firstError = setupSteps.value.find(s => s.status === 'error')
+    if (firstError?.error) testError.value = firstError.error
+  }
+}
+
+/** Retry an individual setup step by its id */
+async function retryStep(stepId: string) {
+  const step = setupSteps.value.find(s => s.id === stepId)
+  if (!step || step.status !== 'error') return
+
+  if (stepId === 'driver') {
+    // For driver/connection, re-run full test
+    handleTestConnection()
+    return
+  }
+
+  await startProgressListener()
+  step.status = 'running'
+  step.error = undefined
+  step.progress = undefined
+
+  try {
+    if (stepId === 'jre') {
+      await invoke('download_jre')
+    }
+    else if (stepId === 'bridge') {
+      await invoke('download_bridge_jar')
+    }
+    step.status = 'done'
+
+    // If all dependencies are now done, try connecting
+    const allReady = setupSteps.value.every(s => s.status === 'done')
+    if (allReady && stepId !== 'driver') {
+      handleTestConnection()
+    }
+  }
+  catch (e) {
+    step.status = 'error'
+    step.error = e instanceof Error ? e.message : String(e)
   }
 }
 
@@ -367,7 +722,7 @@ function handleSave() {
 
 <template>
   <Dialog v-model:open="isOpen">
-    <DialogContent class="sm:max-w-lg">
+    <DialogContent class="sm:max-w-xl" @interact-outside="(e: Event) => { if (isPickingFile) e.preventDefault() }">
       <DialogTitle>
         {{ isEditing ? t('components.serverForm.title.edit') : t('components.serverForm.title.new') }}
       </DialogTitle>
@@ -378,7 +733,7 @@ function handleSave() {
       <form class="space-y-4" @submit.prevent="handleSave">
         <!-- Connection Name -->
         <div class="space-y-2">
-          <Label for="name">{{ t('components.serverForm.labels.connectionName') }}</Label>
+          <Label for="name">{{ t('components.serverForm.labels.connectionName') }}<span class="text-destructive ml-0.5">*</span></Label>
           <Input
             id="name"
             v-model="formData.name"
@@ -749,6 +1104,269 @@ function handleSave() {
           </Select>
         </div>
 
+        <!-- Host and Port on same row; Database below (non-Oracle, non-file-based) -->
+        <div v-if="!isFileBased && !isOracle" class="space-y-4">
+          <div class="gap-4 grid grid-cols-4">
+            <div class="col-span-3 space-y-2">
+              <Label for="host">{{ t('components.serverForm.labels.host') }}<span class="text-destructive ml-0.5">*</span></Label>
+              <Input
+                id="host"
+                v-model="formData.host"
+                :placeholder="t('components.serverForm.placeholders.host')"
+                :class="{ 'border-destructive': formErrors.host }"
+              />
+              <p v-if="formErrors.host" class="text-sm text-destructive">
+                {{ formErrors.host }}
+              </p>
+            </div>
+            <div class="space-y-2">
+              <Label for="port">{{ t('components.serverForm.labels.port') }}<span class="text-destructive ml-0.5">*</span></Label>
+              <Input
+                id="port"
+                v-model.number="formData.port"
+                type="number"
+                :class="{ 'border-destructive': formErrors.port }"
+              />
+              <p v-if="formErrors.port" class="text-sm text-destructive">
+                {{ formErrors.port }}
+              </p>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <Label for="database">{{ t('components.serverForm.labels.database') }}</Label>
+            <Input
+              id="database"
+              v-model="formData.database"
+              :placeholder="t('components.serverForm.placeholders.database')"
+            />
+          </div>
+        </div>
+
+        <!-- Oracle-specific fields -->
+        <div v-if="isOracle" class="space-y-4">
+          <!-- Connection Method Selector -->
+          <div class="space-y-2">
+            <Label>{{ t('components.serverForm.oracle.connectionMethod') }}</Label>
+            <Tabs :model-value="oracleMethod" @update:model-value="onOracleMethodChange">
+              <TabsList class="grid grid-cols-3 w-full">
+                <TabsTrigger value="basic">
+                  {{ t('components.serverForm.oracle.methods.basic') }}
+                </TabsTrigger>
+                <TabsTrigger value="tns">
+                  {{ t('components.serverForm.oracle.methods.tns') }}
+                </TabsTrigger>
+                <TabsTrigger value="cloud_wallet">
+                  {{ t('components.serverForm.oracle.methods.cloudWallet') }}
+                </TabsTrigger>
+              </TabsList>
+
+              <!-- Basic Method -->
+              <TabsContent value="basic" class="mt-4 space-y-4">
+                <div class="gap-4 grid grid-cols-4">
+                  <div class="col-span-3 space-y-2">
+                    <Label for="oracle-host">{{ t('components.serverForm.labels.host') }}<span class="text-destructive ml-0.5">*</span></Label>
+                    <Input
+                      id="oracle-host"
+                      v-model="formData.host"
+                      :placeholder="t('components.serverForm.placeholders.host')"
+                      :class="{ 'border-destructive': formErrors.host }"
+                    />
+                    <p v-if="formErrors.host" class="text-sm text-destructive">
+                      {{ formErrors.host }}
+                    </p>
+                  </div>
+                  <div class="space-y-2">
+                    <Label for="oracle-port">{{ t('components.serverForm.labels.port') }}<span class="text-destructive ml-0.5">*</span></Label>
+                    <Input
+                      id="oracle-port"
+                      v-model.number="formData.port"
+                      type="number"
+                      :class="{ 'border-destructive': formErrors.port }"
+                    />
+                    <p v-if="formErrors.port" class="text-sm text-destructive">
+                      {{ formErrors.port }}
+                    </p>
+                  </div>
+                </div>
+                <div class="flex flex-wrap gap-4 items-center">
+                  <div class="flex gap-2 items-center">
+                    <Label class="min-w-fit whitespace-nowrap">{{ t('components.serverForm.oracle.identifyBy') }}</Label>
+                    <div class="flex flex-wrap gap-1.5">
+                      <button
+                        type="button"
+                        class="text-xs leading-none px-3 py-1 rounded-full cursor-pointer transition-colors" :class="[
+                          oracleSidOrService === 'service_name'
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                        ]"
+                        @click="oracleSidOrService = 'service_name'"
+                      >
+                        {{ t('components.serverForm.oracle.serviceName') }}
+                      </button>
+                      <button
+                        type="button"
+                        class="text-xs leading-none px-3 py-1 rounded-full cursor-pointer transition-colors" :class="[
+                          oracleSidOrService === 'sid'
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                        ]"
+                        @click="oracleSidOrService = 'sid'"
+                      >
+                        {{ t('components.serverForm.oracle.sid') }}
+                      </button>
+                    </div>
+                  </div>
+                  <div class="flex gap-2 items-center">
+                    <Label class="min-w-fit whitespace-nowrap">{{ t('components.serverForm.oracle.role') }}</Label>
+                    <div class="flex flex-wrap gap-1.5">
+                      <button
+                        v-for="r in ([{ v: 'NORMAL', k: 'normal' }, { v: 'SYSDBA', k: 'sysdba' }, { v: 'SYSOPER', k: 'sysoper' }] as const)"
+                        :key="r.v"
+                        type="button"
+                        class="text-xs leading-none px-3 py-1 rounded-full cursor-pointer transition-colors" :class="[
+                          oracleRole === r.v
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                        ]"
+                        @click="oracleRole = r.v"
+                      >
+                        {{ t(`components.serverForm.oracle.roles.${r.k}`) }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <Label for="oracle-svc">{{ databaseLabel }}</Label>
+                  <Input
+                    id="oracle-svc"
+                    v-model="formData.database"
+                    :placeholder="databaseLabel"
+                  />
+                </div>
+              </TabsContent>
+
+              <!-- TNS Method -->
+              <TabsContent value="tns" class="mt-4 space-y-4">
+                <div class="space-y-2">
+                  <Label>{{ t('components.serverForm.oracle.tnsAdminDir') }}<span class="text-destructive ml-0.5">*</span></Label>
+                  <div class="flex gap-2 items-center">
+                    <Input
+                      v-model="oracleTnsAdminDir"
+                      :placeholder="t('components.serverForm.oracle.tnsAdminDir')"
+                      class="flex-1"
+                    />
+                    <Button type="button" variant="outline" size="sm" @click="browseDirectory('tns')">
+                      {{ t('components.serverForm.oracle.browse') }}
+                    </Button>
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <Label>{{ t('components.serverForm.oracle.tnsAlias') }}<span class="text-destructive ml-0.5">*</span></Label>
+                  <p v-if="loadingAliases" class="text-sm text-muted-foreground">
+                    {{ t('components.serverForm.oracle.loadingAliases') }}
+                  </p>
+                  <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
+                    No aliases found in selected directory
+                  </p>
+                  <p v-else-if="tnsAliases.length === 0" class="text-sm text-muted-foreground">
+                    Select a TNS directory to load aliases
+                  </p>
+                  <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
+                    <SelectTrigger>
+                      <SelectValue :placeholder="t('components.serverForm.oracle.tnsAlias')" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem v-for="alias in tnsAliases" :key="alias" :value="alias">
+                          {{ alias }}
+                        </SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TabsContent>
+
+              <!-- Cloud Wallet Method -->
+              <TabsContent value="cloud_wallet" class="mt-4 space-y-4">
+                <div class="space-y-2">
+                  <Label>{{ t('components.serverForm.oracle.walletDir') }}<span class="text-destructive ml-0.5">*</span></Label>
+                  <div class="flex gap-2 items-center">
+                    <Input
+                      v-model="oracleTnsAdminDir"
+                      :placeholder="t('components.serverForm.oracle.walletDir')"
+                      class="flex-1"
+                    />
+                    <Button type="button" variant="outline" size="sm" @click="browseDirectory('wallet')">
+                      {{ t('components.serverForm.oracle.browse') }}
+                    </Button>
+                  </div>
+                </div>
+                <div class="gap-4 grid grid-cols-2">
+                  <div class="space-y-2">
+                    <Label>{{ t('components.serverForm.oracle.walletPassword') }}</Label>
+                    <Input
+                      v-model="oracleWalletPassword"
+                      type="password"
+                      :placeholder="t('components.serverForm.oracle.walletPassword')"
+                    />
+                  </div>
+                  <div class="space-y-2">
+                    <Label>{{ t('components.serverForm.oracle.serviceLevel') }}<span class="text-destructive ml-0.5">*</span></Label>
+                    <Select :model-value="oracleServiceLevel" @update:model-value="onServiceLevelChange">
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectGroup>
+                          <SelectItem value="low">
+                            {{ t('components.serverForm.oracle.serviceLevels.low') }}
+                          </SelectItem>
+                          <SelectItem value="medium">
+                            {{ t('components.serverForm.oracle.serviceLevels.medium') }}
+                          </SelectItem>
+                          <SelectItem value="high">
+                            {{ t('components.serverForm.oracle.serviceLevels.high') }}
+                          </SelectItem>
+                          <SelectItem value="tp">
+                            {{ t('components.serverForm.oracle.serviceLevels.tp') }}
+                          </SelectItem>
+                          <SelectItem value="tpurgent">
+                            {{ t('components.serverForm.oracle.serviceLevels.tpurgent') }}
+                          </SelectItem>
+                        </SelectGroup>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div class="space-y-2">
+                  <Label>{{ t('components.serverForm.oracle.tnsAlias') }}<span class="text-destructive ml-0.5">*</span></Label>
+                  <p v-if="loadingAliases" class="text-sm text-muted-foreground">
+                    {{ t('components.serverForm.oracle.loadingAliases') }}
+                  </p>
+                  <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
+                    No aliases found in selected wallet directory
+                  </p>
+                  <p v-else-if="tnsAliases.length === 0" class="text-sm text-muted-foreground">
+                    Select a wallet directory to load aliases
+                  </p>
+                  <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
+                    <SelectTrigger>
+                      <SelectValue :placeholder="t('components.serverForm.oracle.tnsAlias')" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectGroup>
+                        <SelectItem v-for="alias in tnsAliases" :key="alias" :value="alias">
+                          {{ alias }}
+                        </SelectItem>
+                      </SelectGroup>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
+
         <!-- SQLite-specific fields -->
         <div v-if="isFileBased" class="space-y-4">
           <!-- SQLite Mode Tabs -->
@@ -768,7 +1386,7 @@ function handleSave() {
             <TabsContent value="file" class="space-y-4">
               <!-- Database File Path -->
               <div class="space-y-2">
-                <Label for="sqlite-path">{{ t('components.serverForm.labels.databaseFilePath') }}</Label>
+                <Label for="sqlite-path">{{ t('components.serverForm.labels.databaseFilePath') }}<span class="text-destructive ml-0.5">*</span></Label>
                 <div class="flex gap-2 items-center">
                   <Input
                     id="sqlite-path"
@@ -779,6 +1397,7 @@ function handleSave() {
                     class="flex-1"
                   />
                   <Button
+                    type="button"
                     variant="outline"
                     size="sm"
                     @click="selectDatabaseFile"
@@ -823,44 +1442,6 @@ function handleSave() {
           </Tabs>
         </div>
 
-        <!-- Host field for non-SQLite databases -->
-        <div v-if="!isFileBased" class="space-y-2">
-          <Label for="host">{{ t('components.serverForm.labels.host') }}</Label>
-          <Input
-            id="host"
-            v-model="formData.host"
-            :placeholder="t('components.serverForm.placeholders.host')"
-            :class="{ 'border-destructive': formErrors.host }"
-          />
-          <p v-if="formErrors.host" class="text-sm text-destructive">
-            {{ formErrors.host }}
-          </p>
-        </div>
-
-        <!-- Port and Database (not for SQLite) -->
-        <div v-if="!isFileBased" class="gap-4 grid grid-cols-2">
-          <div class="space-y-2">
-            <Label for="port">{{ t('components.serverForm.labels.port') }}</Label>
-            <Input
-              id="port"
-              v-model.number="formData.port"
-              type="number"
-              :class="{ 'border-destructive': formErrors.port }"
-            />
-            <p v-if="formErrors.port" class="text-sm text-destructive">
-              {{ formErrors.port }}
-            </p>
-          </div>
-          <div class="space-y-2">
-            <Label for="database">{{ t('components.serverForm.labels.database') }}</Label>
-            <Input
-              id="database"
-              v-model="formData.database"
-              :placeholder="t('components.serverForm.placeholders.database')"
-            />
-          </div>
-        </div>
-
         <!-- Username and Password (not for SQLite) -->
         <div v-if="!isFileBased" class="gap-4 grid grid-cols-2">
           <div class="space-y-2">
@@ -884,9 +1465,9 @@ function handleSave() {
           </div>
         </div>
 
-        <!-- SSL Configuration (not for SQLite) -->
+        <!-- SSL Configuration (not for SQLite, basic-only for Oracle) -->
         <SslConfigSection
-          v-if="!isFileBased"
+          v-if="!isFileBased && showsStandardHostFields"
           v-model="formData.ssl"
           :db-type="formData.type"
           :errors="formErrors"
@@ -985,41 +1566,75 @@ function handleSave() {
 
         <!-- Test Connection Status -->
         <div
-          v-if="testStatus !== 'idle'" class="p-3 rounded-md" :class="{
+          v-if="testStatus !== 'idle' || setupSteps.some(s => s.status !== 'pending')" class="p-3 rounded-md" :class="{
             'bg-blue-50 dark:bg-blue-900/10': testStatus === 'testing',
             'bg-green-50 dark:bg-green-900/10': testStatus === 'success',
             'bg-red-50 dark:bg-red-900/10': testStatus === 'error',
           }"
         >
-          <div class="flex gap-2 items-center">
-            <!-- Loading spinner -->
-            <span
-              v-if="testStatus === 'testing'"
-              class="i-carbon-loading text-blue-500 h-4 w-4 animate-spin dark:text-blue-400"
-            />
-            <!-- Success icon -->
-            <span
-              v-if="testStatus === 'success'"
-              class="i-carbon-checkmark text-green-500 h-4 w-4 dark:text-green-400"
-            />
-            <!-- Error icon -->
-            <span
-              v-if="testStatus === 'error'"
-              class="i-carbon-close text-red-500 h-4 w-4 dark:text-red-400"
-            />
-            <span
-              :class="{
-                'text-blue-700 dark:text-blue-400': testStatus === 'testing',
-                'text-green-700 dark:text-green-400': testStatus === 'success',
-                'text-red-700 dark:text-red-400': testStatus === 'error',
-              }"
+          <!-- Per-step status list (shown during and after setup) -->
+          <div class="space-y-1.5">
+            <div
+              v-for="step in setupSteps"
+              :key="step.id"
+              class="flex items-center gap-2 text-xs min-w-0"
+              :class="step.status === 'done' ? 'text-green-600 dark:text-green-400' : step.status === 'running' ? 'text-foreground' : step.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'"
             >
-              {{ testStatus === 'testing' ? t('common.status.testing') : testStatus === 'success' ? t('common.status.success') : t('common.status.failed') }}
-            </span>
+              <span v-if="step.status === 'done'" class="i-carbon-checkmark h-3.5 w-3.5 shrink-0" />
+              <span v-else-if="step.status === 'running' && !step.progress" class="i-carbon-loading h-3.5 w-3.5 animate-spin shrink-0" />
+              <span v-else-if="step.status === 'running'" class="i-carbon-loading h-3.5 w-3.5 animate-spin shrink-0 text-blue-500" />
+              <span v-else-if="step.status === 'error'" class="i-carbon-close h-3.5 w-3.5 shrink-0" />
+              <span v-else class="i-carbon-circle-dash h-3.5 w-3.5 shrink-0" />
+              <span class="font-medium whitespace-nowrap">{{ step.label }}</span>
+              <!-- Spacer + progress bar: fill remaining space -->
+              <span v-if="step.status === 'running' && step.progress" class="flex-1 flex items-center gap-1.5 min-w-0">
+                <span class="flex-1 bg-muted rounded-full h-1 min-w-[40px]">
+                  <span
+                    class="block bg-primary rounded-full h-1 transition-all duration-300"
+                    :style="{ width: `${Math.min(100, (step.progress.downloaded / step.progress.total) * 100)}%` }"
+                  />
+                </span>
+                <span class="tabular-nums text-muted-foreground shrink-0 w-[3.5ch] text-right">{{ Math.round(step.progress.downloaded / 1024 / 1024 * 10) / 10 }} MB</span>
+              </span>
+              <!-- Error + retry button (pushed right) -->
+              <span v-if="step.status === 'error'" class="flex-1 flex items-center justify-end gap-1.5 min-w-0">
+                <span class="text-red-500 truncate text-right max-w-[200px]">{{ step.error || 'Failed' }}</span>
+                <button
+                  type="button"
+                  class="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+                  :title="`Retry ${step.label}`"
+                  @click="retryStep(step.id)"
+                >
+                  <span class="i-carbon-renew h-3.5 w-3.5" />
+                </button>
+              </span>
+            </div>
+            <!-- Loading state during connection test (always visible when testing after steps) -->
+            <div v-if="testStatus === 'testing'" class="flex items-center gap-1.5 pt-1 text-xs text-blue-600 dark:text-blue-400 border-t border-border/50 mt-1.5">
+              <span class="i-carbon-loading h-3.5 w-3.5 animate-spin shrink-0" />
+              <span class="font-medium">{{ t('common.status.testing') }}</span>
+            </div>
+            <!-- Summary result -->
+            <div v-if="testStatus === 'success'" class="flex items-center gap-1.5 pt-1 text-xs text-green-600 dark:text-green-400 border-t border-border/50 mt-1.5">
+              <span class="i-carbon-checkmark h-3.5 w-3.5 shrink-0" />
+              <span class="font-medium">{{ t('common.status.success') }}</span>
+            </div>
+            <div v-else-if="testStatus === 'error'" class="pt-1 text-xs text-red-600 dark:text-red-400 border-t border-border/50 mt-1.5 space-y-0.5">
+              <div class="flex items-center gap-1.5">
+                <span class="i-carbon-close h-3.5 w-3.5 shrink-0" />
+                <span class="font-medium">{{ t('common.status.failed') }}</span>
+                <button
+                  type="button"
+                  class="ml-1 inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  @click="handleTestConnection"
+                >
+                  <span class="i-carbon-renew h-3 w-3" />
+                  <span class="text-xs">Retry</span>
+                </button>
+              </div>
+              <p v-if="testError" class="pl-5 text-red-500">{{ testError }}</p>
+            </div>
           </div>
-          <p v-if="testError" class="text-sm text-red-600 mt-1 dark:text-red-500">
-            {{ testError }}
-          </p>
         </div>
 
         <!-- Actions -->
@@ -1032,7 +1647,7 @@ function handleSave() {
           >
             {{ t('common.buttons.testConnection') }}
           </Button>
-          <Button type="submit">
+          <Button type="submit" :disabled="testStatus === 'testing'">
             {{ isEditing ? t('common.buttons.saveChanges') : t('common.buttons.createConnection') }}
           </Button>
         </div>

@@ -276,6 +276,16 @@ export type SSHTunnelConfig = {
   privateKeyPassphrase?: string
 }
 
+export type OracleConnectionOptions = {
+  connectionMethod: 'basic' | 'tns' | 'cloud_wallet'
+  sidOrService?: 'sid' | 'service_name'
+  role?: 'NORMAL' | 'SYSDBA' | 'SYSOPER'
+  tnsAdminDir?: string
+  tnsAlias?: string
+  walletPassword?: string
+  serviceLevel?: 'low' | 'medium' | 'high' | 'tp' | 'tpurgent'
+}
+
 export type ServerConnection = {
   id?: string
   name: string
@@ -287,6 +297,7 @@ export type ServerConnection = {
   database?: string
   ssl: SslConfig
   sshTunnel?: SSHTunnelConfig
+  oracleOptions?: OracleConnectionOptions
   isConnected?: boolean
   lastUsed?: Date
 }
@@ -369,6 +380,43 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     password,
     privateKey,
     privateKeyPassphrase: passphrase,
+  }
+}
+
+function toUndefined<T>(val: T | null | undefined): T | undefined {
+  return val ?? undefined
+}
+
+export function buildOracleOptions(
+  opts: OracleConnectionOptions | undefined,
+): import('@/datasources/connectionApi').OracleConnectionOptions | undefined {
+  if (!opts)
+    return undefined
+  return {
+    connection_method: opts.connectionMethod,
+    sid_or_service: toUndefined(opts.sidOrService),
+    role: toUndefined(opts.role),
+    tns_admin_dir: toUndefined(opts.tnsAdminDir),
+    tns_alias: toUndefined(opts.tnsAlias),
+    wallet_password: toUndefined(opts.walletPassword),
+    service_level: toUndefined(opts.serviceLevel),
+  }
+}
+
+function extractOracleOptions(raw: unknown): OracleConnectionOptions | undefined {
+  if (!raw || typeof raw !== 'object')
+    return undefined
+  const item = raw as Record<string, unknown>
+  if (!item.connection_method)
+    return undefined
+  return {
+    connectionMethod: item.connection_method as OracleConnectionOptions['connectionMethod'],
+    sidOrService: (item.sid_or_service as OracleConnectionOptions['sidOrService']) || undefined,
+    role: (item.role as OracleConnectionOptions['role']) || undefined,
+    tnsAdminDir: (item.tns_admin_dir as string) || undefined,
+    tnsAlias: (item.tns_alias as string) || undefined,
+    walletPassword: (item.wallet_password as string) || undefined,
+    serviceLevel: (item.service_level as OracleConnectionOptions['serviceLevel']) || undefined,
   }
 }
 
@@ -470,6 +518,7 @@ export const useConnectionStore = defineStore('connectionStore', {
             trustServerCertificate: item.trust_server_certificate as boolean | undefined,
           },
           sshTunnel: extractSshTunnelFromTransport(item.transport_layers),
+          oracleOptions: extractOracleOptions(item.oracle_options),
           isConnected: item.is_connected as boolean | undefined,
           lastUsed: item.last_used ? new Date(item.last_used as string) : undefined,
         }))
@@ -499,6 +548,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
           transport_layers: transportLayers,
+          oracle_options: buildOracleOptions(connection.oracleOptions),
         }
 
         const resultId = await connectionApi.save(serverConfig)
@@ -546,6 +596,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
           transport_layers: transportLayers,
+          oracle_options: buildOracleOptions(connection.oracleOptions),
         }
 
         const result = await connectionApi.test(serverConfig)
@@ -583,6 +634,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
           transport_layers: transportLayers,
+          oracle_options: buildOracleOptions(connection.oracleOptions),
         }
 
         const result = await connectionApi.connect(serverConfig)

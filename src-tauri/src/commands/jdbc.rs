@@ -1,5 +1,5 @@
 use crate::database::config::DatabaseType;
-use crate::database::jdbc_bridge::{download, jre, launcher::JdbcBridgeLauncher, protocol::{JdbcMethod, JdbcRequest}, registry::DriverRegistry};
+use crate::database::jdbc_bridge::{download, jre, launcher::JdbcBridgeLauncher, protocol::{JdbcMethod, JdbcRequest}, registry::DriverRegistry, tns_parser};
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -34,8 +34,7 @@ pub async fn check_jre_status() -> Result<JreStatus, String> {
         })
     } else if let Some(system_java) = jre::JreDetector::detect_system_java() {
         let version = jre::system_java_version(&system_java)
-            .map(|v| format!("{}.x", v))
-            .or_else(|| Some("system".to_string()));
+            .map(|v| format!("{}.x", v));
         Ok(JreStatus {
             installed: true,
             version,
@@ -207,6 +206,21 @@ pub struct BridgeStatus {
     pub installed: bool,
     pub current_version: String,
     pub path: Option<String>,
+}
+
+/// List TNS alias names from an Oracle tnsnames.ora file in the given directory.
+#[tauri::command]
+pub async fn list_tns_aliases(tns_admin_dir: String) -> Result<Vec<String>, String> {
+    Ok(tns_parser::parse_tns_aliases(&tns_admin_dir))
+}
+
+/// Download a JDBC driver JAR directly from Maven Central via HTTP.
+/// Does NOT require Java — purely HTTP download, parallel-safe.
+#[tauri::command]
+pub async fn download_jdbc_driver_direct(db_type: String) -> Result<(), String> {
+    download::download_jdbc_driver_direct(&db_type)
+        .await
+        .map_err(|e| e.to_string())
 }
 
 #[tauri::command]

@@ -49,4 +49,8 @@ export const jdbcApi = {
   downloadDriver: (dbType: string) => invoke<void>('download_driver', { dbType }),
 
   removeDriver: (dbType: string) => invoke<void>('remove_driver', { dbType }),
+
+  listTnsAliases: (tnsAdminDir: string) => invoke<string[]>('list_tns_aliases', { tnsAdminDir }),
+
+  downloadJdbcDriverDirect: (dbType: string) => invoke<void>('download_jdbc_driver_direct', { dbType }),
 }

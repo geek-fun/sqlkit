@@ -102,6 +102,7 @@
   },
   "devDependencies": {
     "@antfu/eslint-config": "^7.0.1",
+    "@iconify-json/carbon": "^1.2.23",
     "@iconify/json": "^2.2.482",
     "@tauri-apps/cli": "^2",
     "@types/dompurify": "^3.0.5",

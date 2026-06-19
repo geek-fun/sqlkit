@@ -3,6 +3,7 @@
 //! The bridge communicates with a Java subprocess over stdin/stdout
 //! using newline-delimited JSON (one JSON object per line).
 
+use crate::database::config::OracleConnectionOptions;
 use serde::{Deserialize, Serialize};
 
 /// Request methods the Rust side can invoke on the Java bridge.
@@ -75,6 +76,8 @@ pub struct ConnectParams {
     pub pool_min: u32,
     #[serde(default = "default_pool_max")]
     pub pool_max: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub oracle_options: Option<OracleConnectionOptions>,
 }
 
 fn default_pool_min() -> u32 {

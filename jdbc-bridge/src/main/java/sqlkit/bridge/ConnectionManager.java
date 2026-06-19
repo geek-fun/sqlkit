@@ -18,18 +18,21 @@ public class ConnectionManager {
     /**
      * Create a new JDBC connection pool.
      *
-     * @param connId      unique identifier for this connection
-     * @param url         JDBC URL
-     * @param username    database username
-     * @param password    database password
-     * @param driverClass JDBC driver class name
-     * @param minPool     minimum pool size
-     * @param maxPool     maximum pool size
+     * @param connId          unique identifier for this connection
+     * @param url             JDBC URL
+     * @param username        database username
+     * @param password        database password
+     * @param driverClass     JDBC driver class name
+     * @param minPool         minimum pool size
+     * @param maxPool         maximum pool size
+     * @param tnsAdminDir     Oracle TNS_ADMIN directory (optional, for TNS/wallet connections)
+     * @param walletPassword  Oracle wallet password (optional, for encrypted wallets)
      */
     public void connect(String connId, String url, String username,
                         String password, String driverClass,
                         List<String> driverJars,
-                        int minPool, int maxPool) throws ClassifiedException, Exception {
+                        int minPool, int maxPool,
+                        String tnsAdminDir, String walletPassword) throws ClassifiedException, Exception {
         if (pools.containsKey(connId)) {
             throw new Exception("Connection already exists: " + connId);
         }
@@ -56,6 +59,14 @@ public class ConnectionManager {
         config.addDataSourceProperty("cachePrepStmts", "true");
         config.addDataSourceProperty("prepStmtCacheSize", "250");
         config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
+
+        // Oracle-specific data source properties
+        if (tnsAdminDir != null && !tnsAdminDir.isEmpty()) {
+            config.addDataSourceProperty("oracle.net.tns_admin", tnsAdminDir);
+        }
+        if (walletPassword != null && !walletPassword.isEmpty()) {
+            config.addDataSourceProperty("oracle.net.wallet_password", walletPassword);
+        }
 
         HikariDataSource ds = new HikariDataSource(config);
 
