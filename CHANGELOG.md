@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-19
+
+### Added
+
+- Read `APP_VERSION` from `package.json` at compile time to prevent version drift between Cargo.toml and package.json
+- Add `--version` flag to bridge JAR for download validation
+- Prefer managed JRE (auto-downloaded from Adoptium) over system Java; only fall back to system Java when download fails and version is 25+
+- Validate bridge JAR download with HTTP 200 check, minimum file size, and `java -jar --version` verification with automatic retry
+
+### Fixed
+
+- Capture stderr from crashed JDBC bridge subprocess — includes actual JVM error in the error message instead of opaque `exit status: 1`
+- Prevent OS pipe deadlock by draining bridge stderr via background reader thread
+- Show actual parsed Java version (e.g. `25.x`) in settings instead of literal `"system"`
+- Fix stale version references from 21 to 25
+
 ## [0.7.0] - 2026-06-18
 
 ### Added
