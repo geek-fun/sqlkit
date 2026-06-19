@@ -141,19 +141,9 @@ const setupSteps = ref<StepDef[]>([
 // Listen for progress events from any download command
 const progressUnlisten = ref<(() => void) | null>(null)
 
-// TNS alias handling: strip level suffixes for display, combine for connection
-const LEVEL_SUFFIXES = ['_low', '_medium', '_high', '_tp', '_tpurgent']
-function stripLevelSuffix(name: string): string {
-  for (const suffix of LEVEL_SUFFIXES) {
-    if (name.endsWith(suffix)) return name.slice(0, -suffix.length)
-  }
-  return name
-}
+// TNS alias handling: combine base alias with service level for Cloud Wallet
 const tnsFullAlias = computed(() => {
   if (!oracleTnsAlias.value || oracleMethod.value === 'basic') return undefined
-  if (oracleMethod.value === 'cloud_wallet' && oracleServiceLevel.value) {
-    return `${oracleTnsAlias.value}_${oracleServiceLevel.value}`
-  }
   return oracleTnsAlias.value
 })
 
@@ -438,9 +428,8 @@ async function loadTnsAliases(dir: string) {
   loadingAliases.value = true
   try {
     const raw = await jdbcApi.listTnsAliases(dir)
-    // Strip level suffixes and deduplicate to show clean base names
-    const baseNames = new Set(raw.map(stripLevelSuffix))
-    tnsAliases.value = [...baseNames].sort()
+    // Show all aliases as-is from tnsnames.ora
+    tnsAliases.value = raw.sort()
     if (tnsAliases.value.length === 0 && oracleTnsAlias.value) {
       oracleTnsAlias.value = ''
     }
