@@ -18,6 +18,13 @@ public class BridgeMain {
     private static final ProtocolHandler HANDLER = new ProtocolHandler(new ConnectionManager());
 
     public static void main(String[] args) throws Exception {
+        if (args.length > 0 && "--version".equals(args[0])) {
+            String ver = BridgeMain.class.getPackage().getImplementationVersion();
+            System.out.println(ver != null ? ver : "unknown");
+            System.out.flush();
+            return;
+        }
+
         // Disable Jackson's FAIL_ON_EMPTY_BEANS for safety
         MAPPER.disable(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
 
