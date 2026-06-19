@@ -189,18 +189,43 @@ pub async fn run_fallback_chain(
         DbError::Connection(format!("No driver registry entry for {:?}", db_type))
     })?;
 
-    // Ensure JRE is installed.
-    if super::jre::JreDetector::detect().is_none() {
-        super::jre::download_managed_jre().await?;
+    if !super::jre::is_managed_jre_installed() {
+        if let Err(download_err) = super::jre::download_managed_jre().await {
+            match super::jre::JreDetector::detect_system_java() {
+                Some(system_path) => match super::jre::system_java_version(&system_path) {
+                    Some(version) if version >= 25 => {}
+                    Some(version) => {
+                        return Err(DbError::Connection(format!(
+                            "System Java version is {} but Java 25+ is required. \
+                             SQLKit could not download a managed JRE: {}. \
+                             Install Java 25 manually or retry with internet access.",
+                            version, download_err
+                        )));
+                    }
+                    None => {
+                        return Err(DbError::Connection(format!(
+                            "Could not determine system Java version. \
+                             SQLKit could not download a managed JRE: {}. \
+                             Install Java 25 manually or retry with internet access.",
+                            download_err
+                        )));
+                    }
+                },
+                None => {
+                    return Err(DbError::Connection(format!(
+                        "No Java 25+ found. SQLKit could not download a managed JRE: {}. \
+                         Check your internet connection or install Java 25 manually.",
+                        download_err
+                    )));
+                }
+            }
+        }
     } else {
-        // Check for JRE update on connection if managed JRE is installed.
-        if super::jre::is_managed_jre_installed() {
-            if let Some(redirect_url) = super::jre::check_adoptium_update().await {
-                if let Some(latest) = super::jre::parse_adoptium_build_version(&redirect_url) {
-                    if let Some(current) = super::jre::read_jre_version() {
-                        if super::jre::compare_versions(&latest, &current) > 0 {
-                            super::jre::download_managed_jre().await?;
-                        }
+        if let Some(redirect_url) = super::jre::check_adoptium_update().await {
+            if let Some(latest) = super::jre::parse_adoptium_build_version(&redirect_url) {
+                if let Some(current) = super::jre::read_jre_version() {
+                    if super::jre::compare_versions(&latest, &current) > 0 {
+                        super::jre::download_managed_jre().await?;
                     }
                 }
             }

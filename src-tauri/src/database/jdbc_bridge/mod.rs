@@ -11,7 +11,7 @@
 //!
 //! # Prerequisites
 //!
-//! 1. Java Runtime (JRE 17+) installed on the system
+//! 1. Java Runtime (JRE 25+) installed on the system
 //! 2. `jdbc-bridge.jar` downloaded (via `download_bridge_plugin()`)
 //! 3. JDBC driver JARs for target databases (downloaded automatically)
 

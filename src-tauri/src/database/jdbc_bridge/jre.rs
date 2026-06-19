@@ -1,6 +1,6 @@
 //! Managed JRE detection, download, and lifecycle.
 //!
-//! SQLKit downloads a JRE 25 (latest LTS) from Adoptium (Eclipse Temurin) for each supported
+//! SQLKit downloads a JRE 25 (latest stable) from Adoptium (Eclipse Temurin) for each supported
 //! platform. This module handles detecting Java (managed → `JAVA_HOME` → `PATH`),
 //! downloading/extracting the managed JRE, version checking via the built-in
 //! `release` file, and cleaning it up.
@@ -136,6 +136,35 @@ impl JreDetector {
 
 // ── version reading ───────────────────────────────────────
 
+/// Determine the major Java version by running `java -version`.
+///
+/// Handles both pre-Java-9 format (`1.8.0_431` → 8), Java-9+ format
+/// (`25.0.1` → 25), and pre-release builds (`25-ea` → 25). Falls back to
+/// stdout if stderr is empty (some alternative JDK builds output version
+/// there). Returns `None` if the path doesn't exist, isn't a Java binary,
+/// or the version string can't be parsed.
+pub fn system_java_version(java: &PathBuf) -> Option<u32> {
+    let output = std::process::Command::new(java).arg("-version").output().ok()?;
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let version_str = stderr
+        .lines()
+        .chain(stdout.lines())
+        .find(|l| l.contains("version"))
+        .and_then(|l| l.split('"').nth(1))?;
+    let parts: Vec<&str> = version_str.split('.').collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let major_str = parts[0].trim_end_matches(|c: char| !c.is_ascii_digit());
+    let major = major_str.parse::<u32>().ok()?;
+    if major == 1 && parts.len() >= 2 {
+        parts[1].parse::<u32>().ok() // Java 8: "1.8.0_431" → 8
+    } else {
+        Some(major) // Java 9+: "25.0.1" → 25, "25-ea" → 25
+    }
+}
+
 /// Read the JRE version from the built-in `release` file.
 ///
 /// The release file is a Java properties file that ships with every OpenJDK build
@@ -208,7 +237,7 @@ pub fn parse_adoptium_build_version(url: &str) -> Option<String> {
 
 /// Download and extract the managed JRE for the current platform from Adoptium.
 ///
-/// Downloads the latest JRE 21 (Eclipse Temurin) build from the Adoptium API,
+/// Downloads the latest JRE 25 (Eclipse Temurin) build from the Adoptium API,
 /// extracts the archive, and renames the extracted directory to `jre`.
 pub async fn download_managed_jre() -> DbResult<()> {
     let _guard = JRE_INSTALL_LOCK
@@ -416,5 +445,12 @@ mod tests {
             parse_adoptium_build_version("https://example.com/hotspot_"),
             None
         );
+    }
+
+    #[test]
+    fn test_system_java_version_not_java() {
+        // A non-Java binary should return None.
+        let current = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("/"));
+        assert!(system_java_version(&current).is_none());
     }
 }

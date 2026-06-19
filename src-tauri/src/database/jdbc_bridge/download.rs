@@ -7,9 +7,9 @@
 
 use crate::database::error::{DbError, DbResult};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
-/// Current app version, used for bridge JAR version pinning.
-const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
+const APP_VERSION: &str = env!("APP_VERSION");
 
 /// Subdirectory under user home for bridge data.
 const BRIDGE_DIR: &str = ".sqlkit/jdbc-bridge";
@@ -41,6 +41,13 @@ pub async fn download_to_path(url: &str, dest: &Path) -> DbResult<()> {
     let response = reqwest::get(url)
         .await
         .map_err(|e| DbError::Connection(format!("Failed to download from {}: {}", url, e)))?;
+    if !response.status().is_success() {
+        return Err(DbError::Connection(format!(
+            "Download failed: HTTP {} from {}",
+            response.status(),
+            url
+        )));
+    }
     let bytes = response
         .bytes()
         .await
@@ -60,6 +67,13 @@ pub async fn download_to_path(url: &str, dest: &Path) -> DbResult<()> {
 }
 
 /// Download the bridge fat JAR from GitHub Releases (version-pinned).
+///
+/// Validates the downloaded JAR by checking:
+/// 1. HTTP 200 response status
+/// 2. File size ≥ 1 MB (a fat JAR with dependencies)
+/// 3. `java -jar jdbc-bridge.jar --version` exits 0 (if a JRE is available)
+///
+/// Retries once on validation failure.
 pub async fn download_bridge_plugin() -> DbResult<()> {
     let jar_path = bridge_jar_path();
 
@@ -73,7 +87,67 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
         "https://github.com/geek-fun/sqlkit/releases/download/v{}/jdbc-bridge-{}.jar",
         APP_VERSION, APP_VERSION
     );
-    download_to_path(&url, &jar_path).await?;
+
+    let mut last_err = None::<String>;
+    for _attempt in 0..2 {
+        if let Err(e) = download_to_path(&url, &jar_path).await {
+            last_err = Some(e.to_string());
+            continue;
+        }
+
+        let meta = std::fs::metadata(&jar_path).map_err(|e| {
+            DbError::Connection(format!("Failed to check JAR file size: {}", e))
+        })?;
+        if meta.len() < 1_000_000 {
+            let _ = std::fs::remove_file(&jar_path);
+            last_err = Some(format!(
+                "JAR file too small ({} bytes, expected ≥ 1 MB)",
+                meta.len()
+            ));
+            continue;
+        }
+
+        if let Some(java) = super::jre::JreDetector::detect() {
+            let output = Command::new(&java)
+                .args(["-jar", &jar_path.to_string_lossy(), "--version"])
+                .output()
+                .map_err(|e| {
+                    DbError::Connection(format!("Failed to run JAR validation: {}", e))
+                })?;
+
+            if !output.status.success() {
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let _ = std::fs::remove_file(&jar_path);
+                last_err = Some(format!(
+                    "Bridge JAR validation failed (exit: {}): {}",
+                    output.status, stderr
+                ));
+                continue;
+            }
+
+            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if stdout.is_empty() || stdout == "unknown" {
+                let _ = std::fs::remove_file(&jar_path);
+                last_err = Some(format!(
+                    "Bridge JAR --version returned invalid output: {}",
+                    stdout
+                ));
+                continue;
+            }
+        }
+
+        last_err = None;
+        break;
+    }
+
+    if let Some(err) = last_err {
+        let tmp_path = jar_path.with_extension("tmp");
+        let _ = std::fs::remove_file(&tmp_path);
+        return Err(DbError::Connection(format!(
+            "Failed to download valid bridge JAR after retry: {}",
+            err
+        )));
+    }
 
     cleanup_old_bridge_versions().await?;
 
