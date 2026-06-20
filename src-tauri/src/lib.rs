@@ -90,6 +90,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_window_state::Builder::default().build())
         .manage(app_state.clone())
         .manage(store.clone())
         .setup(move |app| {
@@ -158,6 +159,18 @@ pub fn run() {
                         let _ = app_handle.emit("sqlkit://auth", payload);
                     }
                 }
+            }
+
+            // On non-macOS, remove native window decorations BEFORE showing
+            // the window so there is no flash of the native title bar
+            #[cfg(not(target_os = "macos"))]
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_decorations(false);
+            }
+
+            // Show the window after full initialization
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
             }
 
             Ok(())
