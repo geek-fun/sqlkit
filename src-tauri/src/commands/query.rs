@@ -256,6 +256,12 @@ pub async fn execute_query(
             .clone()
     };
 
+    // Cache this handle for future cross-database lookups
+    state.cache.get_or_create(
+        &crate::connection::cache::PoolKey::new(&connection_id, database.as_deref()),
+        state.inner(),
+    ).await.ok();
+
     // Guardian health check
     if let Some(guardian) = crate::GUARDIAN.get() {
         guardian.touch(&connection_id).await;
@@ -669,6 +675,18 @@ pub async fn explain_query(
         ActiveConnection::Rqlite(_) => "rqlite",
         ActiveConnection::Turso(_) => "turso",
     };
+
+    // Guardian health check before EXPLAIN
+    if let Some(guardian) = crate::GUARDIAN.get() {
+        guardian.touch(&connection_id).await;
+        let health_state = guardian.get_state(&connection_id).await;
+        if health_state == HealthState::Dead || health_state == HealthState::Reconnecting {
+            return Err(format!(
+                "Connection is in state '{:?}'. Please wait for it to reconnect or reconnect manually.",
+                health_state
+            ));
+        }
+    }
 
     let (result, plan_format) = match connection {
         ActiveConnection::Postgres(adapter) => {
