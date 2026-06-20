@@ -86,6 +86,11 @@ impl DriverRegistry {
         self.databases.get(key)
     }
 
+    /// Get the full driver configuration by registry key name (e.g., "oracle", "db2").
+    pub fn get_config_by_name(&self, name: &str) -> Option<&DatabaseDriverConfig> {
+        self.databases.get(name)
+    }
+
     /// Return all database entries as (registry_key, config) pairs,
     /// sorted by registry key for deterministic iteration.
     pub fn get_all_databases(&self) -> Vec<(String, &DatabaseDriverConfig)> {

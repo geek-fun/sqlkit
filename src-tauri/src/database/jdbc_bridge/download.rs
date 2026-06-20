@@ -213,19 +213,13 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
 /// Does NOT require Java — purely HTTP.
 pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
     use super::registry::{resolve_maven_url, DriverRegistry};
-    use crate::database::config::DatabaseType;
-
-    let dt = match db_type {
-        "oracle" => DatabaseType::Oracle,
-        "db2" => DatabaseType::DB2,
-        "h2" => DatabaseType::H2,
-        _ => return Err(DbError::Connection(format!("No direct JDBC driver download for {}", db_type))),
-    };
 
     let registry = DriverRegistry::load();
-    let config = registry.get_config(dt).ok_or_else(|| {
-        DbError::Connection(format!("No driver registry entry for {}", db_type))
-    })?;
+    let config = registry
+        .get_config_by_name(db_type)
+        .ok_or_else(|| {
+            DbError::Connection(format!("No driver registry entry for '{}'", db_type))
+        })?;
 
     let version = config.version_cap.as_deref().unwrap_or("latest");
     let classifier = config.maven_classifier.as_deref();
