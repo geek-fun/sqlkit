@@ -27,6 +27,21 @@ version_error_signatures = [
   "AbstractMethodError",
 ]
 
+# ── TDengine ──
+
+[databases.tdengine]
+name = "TDengine"
+class_name = "com.taosdata.jdbc.TSDBDriver"
+maven_group = "com.taosdata.jdbc"
+maven_artifact = "taos-jdbcdriver"
+jdbc_url_template = "jdbc:TAOS://{host}:{port}/{database}"
+default_port = 6030
+min_jre_version = "11"
+version_error_signatures = [
+  "driver version not compatible",
+  "Authentication failed",
+]
+
 # ── DuckDB ──
 
 [databases.duckdb]

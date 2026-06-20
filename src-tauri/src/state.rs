@@ -195,7 +195,9 @@ impl ServerConfig {
         }
 
         if let Some(ref oracle_opts) = self.oracle_options {
-            config = config.with_oracle_options(oracle_opts.clone());
+            if db_type == crate::database::DatabaseType::Oracle {
+                config = config.with_oracle_options(oracle_opts.clone());
+            }
         }
 
         Ok(config)

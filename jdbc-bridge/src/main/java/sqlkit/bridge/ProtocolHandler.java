@@ -132,17 +132,7 @@ public class ProtocolHandler {
         // Extract Oracle-specific connection options
         String tnsAdminDir = null;
         String walletPassword = null;
-        if (params.has("oracle_options") && !params.get("oracle_options").isNull()) {
-            JsonNode oracleOpts = params.get("oracle_options");
-            if (oracleOpts.has("tns_admin_dir") && !oracleOpts.get("tns_admin_dir").isNull()) {
-                tnsAdminDir = oracleOpts.get("tns_admin_dir").asText();
-            }
-            if (oracleOpts.has("wallet_password") && !oracleOpts.get("wallet_password").isNull()) {
-                walletPassword = oracleOpts.get("wallet_password").asText();
-            }
-        }
-
-        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax, tnsAdminDir, walletPassword);
+        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax);
         response.put("result", connId);
     }
 
