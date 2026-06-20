@@ -20,7 +20,7 @@ const { taskCount } = storeToRefs(transferStore)
 <template>
   <div class="pl-[90px] pr-2 border-b bg-muted/30 flex shrink-0 gap-1 h-10 items-center overflow-hidden" data-tauri-drag-region>
     <span class="text-xs text-muted-foreground font-semibold select-none">SqlKit</span>
-    <div class="flex-1" />
+    <div class="flex-1" data-tauri-drag-region />
 
     <TooltipProvider>
       <Tooltip v-if="!hideAiButton">
