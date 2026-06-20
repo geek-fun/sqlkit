@@ -10,14 +10,57 @@ public class MetadataProvider {
 
     /**
      * List all databases (catalogs) on the server.
+     *
+     * For Oracle, getCatalogs() returns empty because Oracle doesn't use
+     * JDBC catalogs in the traditional sense. Fall back to querying the
+     * current container/PDB name via SYS_CONTEXT, then try listing all
+     * PDBs if connected to a CDB.
      */
     public static List<String> listDatabases(Connection conn) throws Exception {
         List<String> databases = new ArrayList<>();
         try (ResultSet rs = conn.getMetaData().getCatalogs()) {
             while (rs.next()) {
-                databases.add(rs.getString("TABLE_CAT"));
+                String cat = rs.getString("TABLE_CAT");
+                if (cat != null && !cat.isEmpty()) {
+                    databases.add(cat);
+                }
             }
         }
+
+        // Oracle fallback: getCatalogs() returns empty for Oracle JDBC.
+        // Try SYS_CONTEXT first (works in any Oracle container),
+        // then v$pdbs (only works in CDB$ROOT).
+        if (databases.isEmpty()) {
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery(
+                     "SELECT SYS_CONTEXT('USERENV', 'CON_NAME') FROM DUAL")) {
+                if (rs.next()) {
+                    String conName = rs.getString(1);
+                    if (conName != null && !conName.isEmpty()) {
+                        databases.add(conName);
+                    }
+                }
+            } catch (SQLException e) {
+                // Fall through to v$pdbs
+            }
+        }
+
+        if (databases.isEmpty()) {
+            try (Statement stmt = conn.createStatement();
+                 ResultSet rs = stmt.executeQuery("SELECT name FROM v$pdbs")) {
+                while (rs.next()) {
+                    String name = rs.getString(1);
+                    if (name != null && !name.isEmpty()) {
+                        databases.add(name);
+                    }
+                }
+            } catch (SQLException e) {
+                // Driver does not support Oracle-specific queries;
+                // leave databases empty (frontend will fall back to
+                // the configured connection database).
+            }
+        }
+
         return databases;
     }
 

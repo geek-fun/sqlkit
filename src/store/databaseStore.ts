@@ -95,9 +95,19 @@ export const useDatabaseStore = defineStore('databases', {
           return
         }
 
+        let databases = result
+
+        if (databases.length === 0) {
+          const connectionStore = useConnectionStore()
+          const currentDb = connectionStore.getCurrentDatabase(connectionId)
+          if (currentDb) {
+            databases = [{ name: currentDb, is_system: false }]
+          }
+        }
+
         if (!this.metadata[connectionId]) {
           this.metadata[connectionId] = {
-            databases: result,
+            databases,
             schemas: {},
             tables: {},
             objects: {},
@@ -105,7 +115,7 @@ export const useDatabaseStore = defineStore('databases', {
           }
         }
         else {
-          this.metadata[connectionId].databases = result
+          this.metadata[connectionId].databases = databases
           this.metadata[connectionId].lastRefresh = new Date().toISOString()
         }
       }
