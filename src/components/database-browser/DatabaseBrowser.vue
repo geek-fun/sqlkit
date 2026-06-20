@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { deleteQueryFile, listSavedQueryFiles } from '@/datasources'
-import { ConnectionStatus, DatabaseType, useConnectionStore, useDatabaseStore } from '@/store'
+import { ConnectionStatus, useConnectionStore, useDatabaseStore } from '@/store'
 
 export type TreeNodeMetadata = TableInfo & {
   database: string
@@ -91,9 +91,17 @@ const isActiveConnectionConnected = computed(() =>
     : false,
 )
 
+/// Whether the currently selected database has known schemas (e.g., PG, MSSQL, Oracle, Dameng).
+/// Driven by actual data rather than a hardcoded allowlist, so any database that
+/// returns schemas from `listSchemas` gets schema-aware browsing automatically.
 const supportsSchemas = computed(() => {
-  const type = activeConnection.value?.type
-  return type === DatabaseType.POSTGRESQL || type === DatabaseType.SQLSERVER
+  if (!props.selectedDatabase || !connectionId.value) {
+    return false
+  }
+  const meta = databaseStore.metadata[connectionId.value]
+  if (!meta) return false
+  const schemas = meta.schemas[props.selectedDatabase]
+  return schemas !== undefined && schemas.length > 0
 })
 
 const availableSchemas = computed<string[]>(() => {
@@ -517,7 +525,12 @@ watch(connectionId, async (newId) => {
 
   await databaseStore.fetchDatabases(newId)
 
-  const connectedDb = connection.database || connectionStore.getCurrentDatabase(newId)
+  // Pick the database to load: prefer the connected database, otherwise
+  // grab the first user database from the metadata (common for single-DB
+  // systems like Dameng, Oracle, etc.).
+  const meta = databaseStore.metadata[newId]
+  const firstDb = meta?.databases.find(db => !db.is_system)?.name
+  const connectedDb = connection.database || connectionStore.getCurrentDatabase(newId) || firstDb
   if (connectedDb) {
     await loadDatabaseData(newId, connectedDb)
   }
@@ -534,7 +547,9 @@ watch(() => activeConnection.value?.isConnected, async (isConnected) => {
 
   await databaseStore.fetchDatabases(connectionId.value)
 
-  const connectedDb = activeConnection.value?.database || connectionStore.getCurrentDatabase(connectionId.value)
+  const meta = databaseStore.metadata[connectionId.value]
+  const firstDb = meta?.databases.find(db => !db.is_system)?.name
+  const connectedDb = activeConnection.value?.database || connectionStore.getCurrentDatabase(connectionId.value) || firstDb
   if (connectedDb) {
     await loadDatabaseData(connectionId.value, connectedDb)
   }
