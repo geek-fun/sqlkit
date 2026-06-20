@@ -69,10 +69,15 @@ body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
   font-size: 14px;
+  -webkit-app-region: drag;
 }
 
 [data-tauri-drag-region] {
   -webkit-app-region: drag;
+}
+
+button, [role='button'], input, textarea, select, a {
+  -webkit-app-region: no-drag;
 }
 
 button:not(:disabled),
