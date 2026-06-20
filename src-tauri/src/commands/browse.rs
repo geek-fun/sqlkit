@@ -714,10 +714,15 @@ pub async fn delete_table_row(
         return Err("Cannot delete row: no primary key values provided".to_string());
     }
 
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
+
+    let db_type = get_db_type_string(&connection);
 
     let build_delete_sql = |db_type: &str| -> String {
         let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
@@ -725,14 +730,15 @@ pub async fn delete_table_row(
         format!("DELETE FROM {} WHERE {}", qualified, where_clause)
     };
 
-    match connection {
+    let sql = build_delete_sql(db_type);
+
+    match &connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("postgres");
             if let Some(ref db) = database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = PostgresAdapter::new(temp_config);
                     temp.connect()
@@ -745,18 +751,17 @@ pub async fn delete_table_row(
                         .map_err(|e| format!("Failed to delete row: {}", e));
                 }
             }
-            adapter
+            connection
                 .execute_query(&sql)
                 .await
                 .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
         ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("mysql");
             if let Some(ref db) = database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = MySQLAdapter::new(temp_config);
                     temp.connect()
@@ -769,18 +774,17 @@ pub async fn delete_table_row(
                         .map_err(|e| format!("Failed to delete row: {}", e));
                 }
             }
-            adapter
+            connection
                 .execute_query(&sql)
                 .await
                 .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("sqlserver");
             if let Some(ref db) = database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = SqlServerAdapter::new(temp_config);
                     temp.connect()
@@ -793,55 +797,13 @@ pub async fn delete_table_row(
                         .map_err(|e| format!("Failed to delete row: {}", e));
                 }
             }
-            adapter
+            connection
                 .execute_query(&sql)
                 .await
                 .map_err(|e| format!("Failed to delete row: {}", e))?;
         }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("sqlite");
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to delete row: {}", e))?;
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("clickhouse");
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to delete row: {}", e))?;
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("jdbc");
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to delete row: {}", e))?;
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("trino");
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to delete row: {}", e))?;
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("sqlite");
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to delete row: {}", e))?;
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_delete_sql("sqlite");
-            adapter
+        _ => {
+            connection
                 .execute_query(&sql)
                 .await
                 .map_err(|e| format!("Failed to delete row: {}", e))?;
