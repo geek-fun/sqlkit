@@ -51,6 +51,10 @@ impl JdbcBridgeLauncher {
             .unwrap_or_default()
     }
 
+    pub fn stderr_snapshot(&self) -> String {
+        self.drain_stderr()
+    }
+
     fn spawn_stderr_reader(stderr: std::process::ChildStderr) -> Arc<Mutex<Vec<String>>> {
         let buf: Arc<Mutex<Vec<String>>> = Arc::new(Mutex::new(Vec::new()));
         let buf_clone = buf.clone();
@@ -73,7 +77,7 @@ impl JdbcBridgeLauncher {
         buf
     }
 
-    pub fn start(&mut self) -> DbResult<()> {
+    pub fn start(&mut self, jvm_args: &[String]) -> DbResult<()> {
         let java = Self::detect_java().ok_or_else(|| {
             DbError::Connection(
                 "Java not found. Install a JRE or call download_jre() to use the bundled JRE."
@@ -81,8 +85,13 @@ impl JdbcBridgeLauncher {
             )
         })?;
 
-        let mut child = Command::new(&java)
-            .args(["-jar", self.jar_path.to_str().unwrap_or("")])
+        let mut cmd = Command::new(&java);
+        for arg in jvm_args {
+            cmd.arg(arg);
+        }
+        cmd.arg("-jar")
+            .arg(self.jar_path.to_str().unwrap_or(""));
+        let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

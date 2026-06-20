@@ -86,15 +86,29 @@ public class ProtocolHandler {
         } catch (ClassifiedException e) {
             ObjectNode errorResp = MAPPER.createObjectNode();
             errorResp.put("id", id);
-            errorResp.put("error", e.getMessage());
+            errorResp.put("error", buildErrorMessage(e));
             errorResp.put("error_type", e.getErrorType().name().toLowerCase());
             return errorResp;
         } catch (Exception e) {
             ObjectNode errorResp = MAPPER.createObjectNode();
             errorResp.put("id", id);
-            errorResp.put("error", e.getMessage());
+            errorResp.put("error", buildErrorMessage(e));
             return errorResp;
         }
+    }
+
+    private static String buildErrorMessage(Throwable e) {
+        StringBuilder sb = new StringBuilder();
+        Throwable current = e;
+        while (current != null) {
+            if (sb.length() > 0) {
+                sb.append("\nCaused by: ");
+            }
+            String msg = current.getMessage();
+            sb.append(msg != null ? msg : current.getClass().getName());
+            current = current.getCause();
+        }
+        return sb.toString();
     }
 
     private void handleConnect(JsonNode params, ObjectNode response) throws Exception {

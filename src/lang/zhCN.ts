@@ -999,6 +999,7 @@ export const zhCN = {
       errors: {
         nameRequired: '连接名称是必填项',
         hostRequired: '主机地址是必填项',
+        databaseRequired: 'SID / 服务名是必填项',
         filePathRequired: '数据库文件路径是必填项',
         portInvalid: '端口必须是正数',
         filePickerFailed: '打开文件选择器失败',

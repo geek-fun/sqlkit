@@ -50,12 +50,39 @@ fn build_oracle_url(
             }
         }
         "tns" | "cloud_wallet" => {
-            // The TNS alias from tnsnames.ora already includes the service level
-            // suffix (e.g. dbname_medium). Use it as-is.
             let alias = opts.tns_alias.as_deref().unwrap_or("");
+            if let Some(ref admin_dir) = opts.tns_admin_dir {
+                if let Some(descriptor) = super::tns_parser::lookup_tns_descriptor(admin_dir, alias)
+                {
+                    return format!("jdbc:oracle:thin:@{}", descriptor);
+                }
+            }
             format!("jdbc:oracle:thin:@{}", alias)
         }
         _ => super::registry::build_jdbc_url(config, host, port, database),
+    }
+}
+
+fn build_jvm_args(oracle_options: Option<&OracleConnectionOptions>) -> Vec<String> {
+    let mut args = Vec::new();
+    if let Some(opts) = oracle_options {
+        if let Some(ref admin_dir) = opts.tns_admin_dir {
+            if let Some(ref pwd) = opts.wallet_password {
+                if !pwd.is_empty() {
+                    args.push(format!("-Djavax.net.ssl.keyStore={}/keystore.jks", admin_dir));
+                    args.push(format!("-Djavax.net.ssl.keyStorePassword={}", pwd));
+                    args.push("-Djavax.net.ssl.keyStoreType=JKS".to_string());
+                }
+            }
+        }
+    }
+    args
+}
+
+fn stderr_from_launcher(launcher: &Arc<Mutex<JdbcBridgeLauncher>>) -> String {
+    match launcher.try_lock() {
+        Ok(guard) => guard.stderr_snapshot(),
+        Err(_) => String::new(),
     }
 }
 
@@ -80,7 +107,8 @@ pub async fn try_driver(
     // Start bridge (no driver JARs yet — ResolveDriver will download on the Java side)
     let bridge_jar = download::bridge_jar_path();
     let mut launcher = JdbcBridgeLauncher::new(bridge_jar);
-    match launcher.start() {
+    let jvm_args = build_jvm_args(oracle_options);
+    match launcher.start(&jvm_args) {
         Ok(_) => {}
         Err(e) => return DriverAttempt::Fatal(e),
     }
@@ -185,7 +213,11 @@ pub async fn try_driver(
                     ErrorCategory::VersionIncompatible => {
                         DriverAttempt::VersionMismatch(err.clone())
                     }
-                    _ => DriverAttempt::Fatal(DbError::Connection(err.clone())),
+                    _ => {
+                        let stderr = stderr_from_launcher(&launcher);
+                        let detail = if stderr.is_empty() { err.clone() } else { format!("{}. stderr: {}", err, stderr) };
+                        DriverAttempt::Fatal(DbError::Connection(detail))
+                    }
                 }
             } else {
                 let conn_id = resp
@@ -196,7 +228,8 @@ pub async fn try_driver(
             }
         }
         Ok(Err(e)) => {
-            let msg = e.to_string();
+            let stderr = stderr_from_launcher(&launcher);
+            let msg = if stderr.is_empty() { e.to_string() } else { format!("{}. stderr: {}", e, stderr) };
             let category = classify_connection_error(
                 db_type_from_config(config),
                 &msg,
@@ -205,7 +238,7 @@ pub async fn try_driver(
             match category {
                 ErrorCategory::VersionIncompatible => DriverAttempt::VersionMismatch(msg),
                 ErrorCategory::Timeout => DriverAttempt::Fatal(DbError::Timeout(msg)),
-                _ => DriverAttempt::Fatal(e),
+                _ => DriverAttempt::Fatal(DbError::Connection(msg)),
             }
         }
         Err(_) => DriverAttempt::Fatal(DbError::Timeout(

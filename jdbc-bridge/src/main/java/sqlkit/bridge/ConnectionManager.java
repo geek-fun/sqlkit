@@ -39,14 +39,39 @@ public class ConnectionManager {
 
         DriverClassLoader loader = new DriverClassLoader(driverJars);
         Class<?> driverCls = Class.forName(driverClass, true, loader);
-        if (java.sql.Driver.class.isAssignableFrom(driverCls)) {
-            java.sql.Driver driver = (java.sql.Driver) driverCls.getDeclaredConstructor().newInstance();
-            java.sql.DriverManager.registerDriver(driver);
+        if (!java.sql.Driver.class.isAssignableFrom(driverCls)) {
+            throw new ClassifiedException("Class " + driverClass + " does not implement java.sql.Driver", null, ErrorClassifier.ErrorType.UNKNOWN);
         }
+        final java.sql.Driver driver = (java.sql.Driver) driverCls.getDeclaredConstructor().newInstance();
         loaders.put(connId, loader);
 
+        final java.util.Properties oracleProps = new java.util.Properties();
+
         HikariConfig config = new HikariConfig();
-        config.setJdbcUrl(url);
+        config.setDataSource(new javax.sql.DataSource() {
+            public java.sql.Connection getConnection() throws java.sql.SQLException {
+                java.util.Properties info = new java.util.Properties();
+                info.putAll(oracleProps);
+                if (username != null) info.setProperty("user", username);
+                if (password != null) info.setProperty("password", password);
+                return driver.connect(url, info);
+            }
+            public java.sql.Connection getConnection(String u, String p) throws java.sql.SQLException {
+                java.util.Properties info = new java.util.Properties();
+                info.putAll(oracleProps);
+                info.setProperty("user", u);
+                info.setProperty("password", p);
+                return driver.connect(url, info);
+            }
+            public java.io.PrintWriter getLogWriter() { return null; }
+            public void setLogWriter(java.io.PrintWriter out) {}
+            public void setLoginTimeout(int seconds) {}
+            public int getLoginTimeout() { return 0; }
+            public java.util.logging.Logger getParentLogger() { return java.util.logging.Logger.getLogger("sqlkit.bridge"); }
+            @SuppressWarnings("unchecked")
+            public <T> T unwrap(Class<T> iface) throws java.sql.SQLException { throw new java.sql.SQLException("Not supported"); }
+            public boolean isWrapperFor(Class<?> iface) { return false; }
+        });
         config.setUsername(username);
         if (password != null && !password.isEmpty()) {
             config.setPassword(password);
@@ -56,17 +81,6 @@ public class ConnectionManager {
         config.setConnectionTimeout(30000);
         config.setIdleTimeout(600000);
         config.setMaxLifetime(1800000);
-        config.addDataSourceProperty("cachePrepStmts", "true");
-        config.addDataSourceProperty("prepStmtCacheSize", "250");
-        config.addDataSourceProperty("prepStmtCacheSqlLimit", "2048");
-
-        // Oracle-specific data source properties
-        if (tnsAdminDir != null && !tnsAdminDir.isEmpty()) {
-            config.addDataSourceProperty("oracle.net.tns_admin", tnsAdminDir);
-        }
-        if (walletPassword != null && !walletPassword.isEmpty()) {
-            config.addDataSourceProperty("oracle.net.wallet_password", walletPassword);
-        }
 
         HikariDataSource ds = new HikariDataSource(config);
 
