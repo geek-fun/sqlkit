@@ -80,7 +80,7 @@ pub fn run() {
     use crate::connection::guardian::ConnectionGuardian;
     use state::AppState;
 
-    let app_state = AppState::new();
+    let app_state = Arc::new(AppState::new());
     let store = commands::store::Store::new();
 
     tauri::Builder::default()
@@ -90,7 +90,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_os::init())
-        .manage(app_state)
+        .plugin(tauri_plugin_window_state::Builder::default().build())
+        .manage(app_state.clone())
         .manage(store.clone())
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -158,6 +159,18 @@ pub fn run() {
                         let _ = app_handle.emit("sqlkit://auth", payload);
                     }
                 }
+            }
+
+            // On non-macOS, remove native window decorations BEFORE showing
+            // the window so there is no flash of the native title bar
+            #[cfg(not(target_os = "macos"))]
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_decorations(false);
+            }
+
+            // Show the window after full initialization
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
             }
 
             Ok(())

@@ -2,6 +2,7 @@ import { platform } from '@tauri-apps/plugin-os'
 import { computed, ref } from 'vue'
 
 const platformCache = ref<string | null>(null)
+const platformReady = ref(false)
 
 async function getPlatform(): Promise<string> {
   if (platformCache.value) {
@@ -10,9 +11,12 @@ async function getPlatform(): Promise<string> {
   try {
     const p = await platform()
     platformCache.value = p
+    platformReady.value = true
     return p
   }
   catch {
+    platformCache.value = 'unknown'
+    platformReady.value = true
     return 'unknown'
   }
 }
@@ -42,6 +46,7 @@ function usePlatform() {
     modifierKey,
     altKey,
     platform: platformCache,
+    platformReady,
   }
 }
 
