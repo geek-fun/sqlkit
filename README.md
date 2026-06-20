@@ -107,8 +107,8 @@ SqlKit supports **70+ databases** across four adapter strategies:
 |----------|-----------|
 | **Native** (Rust) | PostgreSQL, MySQL, SQL Server, SQLite |
 | **PG-wire compat** | CockroachDB, Redshift, YugabyteDB, TimescaleDB, QuestDB, Vastbase, YashanDB, KingbaseES, GaussDB, HighGo, UXDB, OpenGauss, GBase8c, Greenplum, EnterpriseDB, CrateDB, Materialize, AlloyDB, CloudSQLPG, FujitsuPG |
-| **MySQL-wire compat** | MariaDB, TiDB, OceanBase, TDSQL, PolarDB, DM8, Doris, SelectDB, StarRocks, Databend, GoldenDB, ManticoreSearch, SingleStore, CloudSQLMySQL |
-| **JDBC bridge** | Oracle, DuckDB, Firebird, DB2, H2, Snowflake, TDengine, Derby, Hive, Databricks, Hana, Teradata, Vertica, Exasol, BigQuery, Informix, Kylin, Cassandra, Iris, Access, DM8Oracle, XuguDB, GBase8a |
+| **MySQL-wire compat** | MariaDB, TiDB, OceanBase, TDSQL, PolarDB, Doris, SelectDB, StarRocks, Databend, GoldenDB, ManticoreSearch, SingleStore, CloudSQLMySQL |
+| **JDBC bridge** | Oracle, DuckDB, Firebird, DB2, H2, Snowflake, TDengine, Derby, Hive, Databricks, Hana, Teradata, Vertica, Exasol, BigQuery, Informix, Kylin, Cassandra, Iris, Access, Dameng, XuguDB, GBase8a |
 | **HTTP bridge** | ClickHouse, Trino, Presto, RQLite, Turso |
 
 ### Product-Grade Editor
