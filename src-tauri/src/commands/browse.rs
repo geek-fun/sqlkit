@@ -3,6 +3,7 @@
 //! This module provides Tauri commands for browsing database metadata,
 //! including databases, schemas, tables, columns, and table data.
 
+use crate::connection::handle::ConnectionHandle;
 use crate::database::{
     search, ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo, IndexInfo, MySQLAdapter,
     ObjectInfo, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo, TriggerInfo,
@@ -115,52 +116,17 @@ pub async fn list_databases(
     connection_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<DatabaseSchema>, String> {
-    let connections = state.connections.read().await;
-
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
-
-    // Get databases based on connection type
-    let databases = match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_databases().await
-        }
-    }
-    .map_err(|e| format!("Failed to list databases: {}", e))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
+    let databases = connection
+        .list_databases()
+        .await
+        .map_err(|e| format!("Failed to list databases: {}", e))?;
 
     Ok(databases)
 }
@@ -182,52 +148,18 @@ pub async fn list_schemas(
     database: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    let connections = state.connections.read().await;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
-
-    // Get schemas based on connection type
-    let schemas = match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_schemas(Some(&database)).await
-        }
-        ActiveConnection::MySQL(_) => {
-            // MySQL doesn't have schemas separate from databases
-            return Ok(vec![database]);
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_schemas(Some(&database)).await
-        }
-        ActiveConnection::SQLite(_) => {
-            // SQLite doesn't have schemas
-            return Ok(vec!["main".to_string()]);
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_schemas(Some(&database)).await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_schemas(Some(&database)).await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_schemas(Some(&database)).await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_schemas(Some(&database)).await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_schemas(Some(&database)).await
-        }
-    }
-    .map_err(|e| format!("Failed to list schemas: {}", e))?;
+    let schemas = connection
+        .list_schemas(Some(&database))
+        .await
+        .map_err(|e| format!("Failed to list schemas: {}", e))?;
 
     Ok(schemas)
 }
@@ -251,68 +183,18 @@ pub async fn list_tables(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<TableInfo>, String> {
-    let connections = state.connections.read().await;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
-
-    // Get tables based on connection type
-    let tables = match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_tables(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_tables(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_tables(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_tables(None, None).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_tables(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_tables(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_tables(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_tables(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_tables(Some(&database), schema.as_deref())
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to list tables: {}", e))?;
+    let tables = connection
+        .list_tables(Some(&database), schema.as_deref())
+        .await
+        .map_err(|e| format!("Failed to list tables: {}", e))?;
 
     Ok(tables)
 }
@@ -338,68 +220,18 @@ pub async fn get_table_info(
     table_name: String,
     state: State<'_, AppState>,
 ) -> Result<TableInfo, String> {
-    let connections = state.connections.read().await;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
-
-    // Get table info based on connection type
-    let table_info = match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(Some(&database), schema.as_deref(), &table_name)
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(Some(&database), None, &table_name)
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(Some(&database), schema.as_deref(), &table_name)
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.get_table_info(None, None, &table_name).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(Some(&database), None, &table_name)
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(Some(&database), schema.as_deref(), &table_name)
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(Some(&database), schema.as_deref(), &table_name)
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(Some(&database), schema.as_deref(), &table_name)
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_table_info(Some(&database), schema.as_deref(), &table_name)
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to get table info: {}", e))?;
+    let table_info = connection
+        .get_table_info(Some(&database), schema.as_deref(), &table_name)
+        .await
+        .map_err(|e| format!("Failed to get table info: {}", e))?;
 
     Ok(table_info)
 }
@@ -413,17 +245,20 @@ pub async fn list_columns(
     table_name: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<ColumnInfo>, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    let columns = match connection {
+    let columns = match &connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            if Some(database.as_str()) != adapter.config.database.as_deref() {
-                let mut temp_config = adapter.config.clone();
-                drop(adapter);
+            let guard = adapter.lock().await;
+            if Some(database.as_str()) != guard.config.database.as_deref() {
+                let mut temp_config = guard.config.clone();
+                drop(guard);
                 temp_config.database = Some(database.clone());
                 let mut temp = PostgresAdapter::new(temp_config);
                 temp.connect()
@@ -432,22 +267,17 @@ pub async fn list_columns(
                 temp.list_columns(None, schema.as_deref(), &table_name)
                     .await
             } else {
-                adapter
-                    .list_columns(None, schema.as_deref(), &table_name)
+                drop(guard);
+                connection
+                    .list_columns(Some(&database), schema.as_deref(), &table_name)
                     .await
             }
         }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(Some(&database), None, &table_name)
-                .await
-        }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            if Some(database.as_str()) != adapter.config.database.as_deref() {
-                let mut temp_config = adapter.config.clone();
-                drop(adapter);
+            let guard = adapter.lock().await;
+            if Some(database.as_str()) != guard.config.database.as_deref() {
+                let mut temp_config = guard.config.clone();
+                drop(guard);
                 temp_config.database = Some(database.clone());
                 let mut temp = SqlServerAdapter::new(temp_config);
                 temp.connect()
@@ -456,43 +286,15 @@ pub async fn list_columns(
                 temp.list_columns(None, schema.as_deref(), &table_name)
                     .await
             } else {
-                adapter
-                    .list_columns(None, schema.as_deref(), &table_name)
+                drop(guard);
+                connection
+                    .list_columns(Some(&database), schema.as_deref(), &table_name)
                     .await
             }
         }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_columns(None, None, &table_name).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(Some(&database), None, &table_name)
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(None, schema.as_deref(), &table_name)
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(None, schema.as_deref(), &table_name)
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(None, schema.as_deref(), &table_name)
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_columns(None, schema.as_deref(), &table_name)
+        _ => {
+            connection
+                .list_columns(Some(&database), schema.as_deref(), &table_name)
                 .await
         }
     }
@@ -511,65 +313,18 @@ pub async fn get_foreign_keys(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ForeignKeyInfo>, String> {
-    let connections = state.connections.read().await;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
-
-    let result = match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_foreign_keys(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_foreign_keys(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_foreign_keys(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.get_foreign_keys(None, None).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.get_foreign_keys(Some(&database), None).await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_foreign_keys(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_foreign_keys(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_foreign_keys(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_foreign_keys(Some(&database), schema.as_deref())
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to get foreign keys: {}", e))?;
+    let result = connection
+        .get_foreign_keys(Some(&database), schema.as_deref())
+        .await
+        .map_err(|e| format!("Failed to get foreign keys: {}", e))?;
 
     Ok(result)
 }
@@ -591,28 +346,31 @@ pub async fn get_table_data(
     query: TableDataQuery,
     state: State<'_, AppState>,
 ) -> Result<QueryResult, String> {
-    let connections = state.connections.read().await;
-
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
     let limit_val = query.limit.unwrap_or(100);
     let offset_val = query.offset.unwrap_or(0);
     let filter_ref = query.filter.as_deref();
+    let db_type = get_db_type_string(&connection);
 
     // Execute query based on connection type with proper identifier quoting
-    let result = match connection {
+    let result = match &connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
             let qualified =
-                build_qualified_table(query.schema.as_deref(), &query.table, "postgres");
+                build_qualified_table(query.schema.as_deref(), &query.table, db_type);
             let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "postgres");
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
             if let Some(ref db) = query.database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = PostgresAdapter::new(temp_config);
                     temp.connect()
@@ -624,26 +382,18 @@ pub async fn get_table_data(
                         .map_err(|e| format!("Failed to get table data: {}", e));
                 }
             }
-            adapter.execute_query(&sql).await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "mysql");
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "mysql");
-            adapter.execute_query(&sql).await
+            connection.execute_query(&sql).await
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
             let qualified =
-                build_qualified_table(query.schema.as_deref(), &query.table, "sqlserver");
+                build_qualified_table(query.schema.as_deref(), &query.table, db_type);
             let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlserver");
-            // If a different database is requested, create a temporary connection to it.
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
             if let Some(ref db) = query.database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = SqlServerAdapter::new(temp_config);
                     temp.connect()
@@ -655,50 +405,14 @@ pub async fn get_table_data(
                         .map_err(|e| format!("Failed to get table data: {}", e));
                 }
             }
-            adapter.execute_query(&sql).await
+            connection.execute_query(&sql).await
         }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            // SQLite has no schemas
-            let qualified = build_qualified_table(None, &query.table, "sqlite");
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
-            adapter.execute_query(&sql).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
+        _ => {
             let qualified =
-                build_qualified_table(query.schema.as_deref(), &query.table, "clickhouse");
+                build_qualified_table(query.schema.as_deref(), &query.table, db_type);
             let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "clickhouse");
-            adapter.execute_query(&sql).await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "jdbc");
-            let sql = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "jdbc");
-            adapter.execute_query(&sql).await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "trino");
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "trino");
-            adapter.execute_query(&sql).await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "sqlite");
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
-            adapter.execute_query(&sql).await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, "sqlite");
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, "sqlite");
-            adapter.execute_query(&sql).await
+                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
+            connection.execute_query(&sql).await
         }
     }
     .map_err(|e| format!("Failed to get table data: {}", e))?;
@@ -728,23 +442,26 @@ pub async fn get_table_count(
     filter: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<u64, String> {
-    let connections = state.connections.read().await;
-
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
     let filter_ref = filter.as_deref();
+    let db_type = get_db_type_string(&connection);
 
-    let result = match connection {
+    let result = match &connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "postgres");
+            let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
             let query = build_count_query(&qualified, filter_ref);
             if let Some(ref db) = database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = PostgresAdapter::new(temp_config);
                     temp.connect()
@@ -757,22 +474,16 @@ pub async fn get_table_count(
                     return extract_count(r);
                 }
             }
-            adapter.execute_query(&query).await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "mysql");
-            let query = build_count_query(&qualified, filter_ref);
-            adapter.execute_query(&query).await
+            connection.execute_query(&query).await
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlserver");
+            let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
             let query = build_count_query(&qualified, filter_ref);
             if let Some(ref db) = database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = SqlServerAdapter::new(temp_config);
                     temp.connect()
@@ -785,43 +496,12 @@ pub async fn get_table_count(
                     return extract_count(r);
                 }
             }
-            adapter.execute_query(&query).await
+            connection.execute_query(&query).await
         }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(None, &table, "sqlite");
+        _ => {
+            let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
             let query = build_count_query(&qualified, filter_ref);
-            adapter.execute_query(&query).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "clickhouse");
-            let query = build_count_query(&qualified, filter_ref);
-            adapter.execute_query(&query).await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "jdbc");
-            let query = build_count_query(&qualified, filter_ref);
-            adapter.execute_query(&query).await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "trino");
-            let query = build_count_query(&qualified, filter_ref);
-            adapter.execute_query(&query).await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlite");
-            let query = build_count_query(&qualified, filter_ref);
-            adapter.execute_query(&query).await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            let qualified = build_qualified_table(schema.as_deref(), &table, "sqlite");
-            let query = build_count_query(&qualified, filter_ref);
-            adapter.execute_query(&query).await
+            connection.execute_query(&query).await
         }
     }
     .map_err(|e| format!("Failed to get table count: {}", e))?;
@@ -896,10 +576,15 @@ pub async fn update_table_row(
         return Ok(());
     }
 
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
+
+    let db_type = get_db_type_string(&connection);
 
     let build_update_sql = |db_type: &str| -> Result<String, String> {
         if pk_values.is_empty() {
@@ -924,14 +609,15 @@ pub async fn update_table_row(
         ))
     };
 
-    match connection {
+    let sql = build_update_sql(db_type)?;
+
+    match &connection {
         ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("postgres")?;
             if let Some(ref db) = database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = PostgresAdapter::new(temp_config);
                     temp.connect()
@@ -944,18 +630,17 @@ pub async fn update_table_row(
                         .map_err(|e| format!("Failed to update row: {}", e));
                 }
             }
-            adapter
+            connection
                 .execute_query(&sql)
                 .await
                 .map_err(|e| format!("Failed to update row: {}", e))?;
         }
         ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("mysql")?;
             if let Some(ref db) = database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = MySQLAdapter::new(temp_config);
                     temp.connect()
@@ -968,18 +653,17 @@ pub async fn update_table_row(
                         .map_err(|e| format!("Failed to update row: {}", e));
                 }
             }
-            adapter
+            connection
                 .execute_query(&sql)
                 .await
                 .map_err(|e| format!("Failed to update row: {}", e))?;
         }
         ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("sqlserver")?;
             if let Some(ref db) = database {
-                if Some(db.as_str()) != adapter.config.database.as_deref() {
-                    let mut temp_config = adapter.config.clone();
-                    drop(adapter);
+                let guard = adapter.lock().await;
+                if Some(db.as_str()) != guard.config.database.as_deref() {
+                    let mut temp_config = guard.config.clone();
+                    drop(guard);
                     temp_config.database = Some(db.clone());
                     let mut temp = SqlServerAdapter::new(temp_config);
                     temp.connect()
@@ -992,55 +676,13 @@ pub async fn update_table_row(
                         .map_err(|e| format!("Failed to update row: {}", e));
                 }
             }
-            adapter
+            connection
                 .execute_query(&sql)
                 .await
                 .map_err(|e| format!("Failed to update row: {}", e))?;
         }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("sqlite")?;
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to update row: {}", e))?;
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("clickhouse")?;
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to update row: {}", e))?;
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("jdbc")?;
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to update row: {}", e))?;
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("trino")?;
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to update row: {}", e))?;
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("sqlite")?;
-            adapter
-                .execute_query(&sql)
-                .await
-                .map_err(|e| format!("Failed to update row: {}", e))?;
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            let sql = build_update_sql("sqlite")?;
-            adapter
+        _ => {
+            connection
                 .execute_query(&sql)
                 .await
                 .map_err(|e| format!("Failed to update row: {}", e))?;
@@ -1217,50 +859,18 @@ pub async fn list_views(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ObjectInfo>, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(Some(&database), schema.as_deref()).await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(Some(&database), schema.as_deref()).await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(Some(&database), schema.as_deref()).await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(None, None).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(Some(&database), schema.as_deref()).await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(Some(&database), schema.as_deref()).await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(Some(&database), schema.as_deref()).await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(Some(&database), schema.as_deref()).await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_views(Some(&database), schema.as_deref()).await
-        }
-    }
-    .map_err(|e| format!("Failed to list views: {}", e))
+    connection
+        .list_views(Some(&database), schema.as_deref())
+        .await
+        .map_err(|e| format!("Failed to list views: {}", e))
 }
 
 /// List all procedures in the given schema.
@@ -1271,66 +881,18 @@ pub async fn list_procedures(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ObjectInfo>, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_procedures(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_procedures(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_procedures(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_procedures(None, None).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_procedures(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_procedures(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_procedures(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_procedures(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_procedures(Some(&database), schema.as_deref())
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to list procedures: {}", e))
+    connection
+        .list_procedures(Some(&database), schema.as_deref())
+        .await
+        .map_err(|e| format!("Failed to list procedures: {}", e))
 }
 
 /// List all functions in the given schema.
@@ -1341,66 +903,18 @@ pub async fn list_functions(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ObjectInfo>, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_functions(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_functions(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_functions(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_functions(None, None).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_functions(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_functions(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_functions(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_functions(Some(&database), schema.as_deref())
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_functions(Some(&database), schema.as_deref())
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to list functions: {}", e))
+    connection
+        .list_functions(Some(&database), schema.as_deref())
+        .await
+        .map_err(|e| format!("Failed to list functions: {}", e))
 }
 
 /// List all triggers for a table.
@@ -1412,66 +926,18 @@ pub async fn list_triggers(
     table: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<TriggerInfo>, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_triggers(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_triggers(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_triggers(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_triggers(None, None, &table).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_triggers(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_triggers(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_triggers(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_triggers(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_triggers(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to list triggers: {}", e))
+    connection
+        .list_triggers(Some(&database), schema.as_deref(), &table)
+        .await
+        .map_err(|e| format!("Failed to list triggers: {}", e))
 }
 
 /// List all indexes for a table.
@@ -1483,66 +949,18 @@ pub async fn list_indexes(
     table: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<IndexInfo>, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_indexes(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_indexes(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_indexes(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_indexes(None, None, &table).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_indexes(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_indexes(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_indexes(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_indexes(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_indexes(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to list indexes: {}", e))
+    connection
+        .list_indexes(Some(&database), schema.as_deref(), &table)
+        .await
+        .map_err(|e| format!("Failed to list indexes: {}", e))
 }
 
 /// List all foreign keys for a table.
@@ -1554,66 +972,18 @@ pub async fn list_foreign_keys(
     table: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<ForeignKeyInfo>, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter.list_foreign_keys(None, None, &table).await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .list_foreign_keys(Some(&database), schema.as_deref(), &table)
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to list foreign keys: {}", e))
+    connection
+        .list_foreign_keys_for_table(Some(&database), schema.as_deref(), &table)
+        .await
+        .map_err(|e| format!("Failed to list foreign keys: {}", e))
 }
 
 /// Get DDL source for a database object.
@@ -1626,108 +996,18 @@ pub async fn get_object_ddl(
     object_type: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(None, None, &object_name, &object_type)
-                .await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .get_object_ddl(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to get object DDL: {}", e))
+    connection
+        .get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type)
+        .await
+        .map_err(|e| format!("Failed to get object DDL: {}", e))
 }
 
 /// Drop a database object.
@@ -1740,108 +1020,18 @@ pub async fn drop_object(
     object_type: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(None, None, &object_name, &object_type)
-                .await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .drop_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                )
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to drop object: {}", e))
+    connection
+        .drop_object(Some(&database), schema.as_deref(), &object_name, &object_type)
+        .await
+        .map_err(|e| format!("Failed to drop object: {}", e))
 }
 
 /// Rename a database object.
@@ -1855,116 +1045,18 @@ pub async fn rename_object(
     new_name: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(None, None, &object_name, &object_type, &new_name)
-                .await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            adapter
-                .rename_object(
-                    Some(&database),
-                    schema.as_deref(),
-                    &object_name,
-                    &object_type,
-                    &new_name,
-                )
-                .await
-        }
-    }
-    .map_err(|e| format!("Failed to rename object: {}", e))
+    connection
+        .rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name)
+        .await
+        .map_err(|e| format!("Failed to rename object: {}", e))
 }
 
 /// Extract a COUNT(*) value from a single-cell query result.
