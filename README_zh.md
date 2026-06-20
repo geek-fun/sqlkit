@@ -107,8 +107,8 @@ SqlKit 支持 **70+ 种数据库**，通过四种适配策略覆盖：
 |------|--------|
 | **原生** (Rust) | PostgreSQL、MySQL、SQL Server、SQLite |
 | **PG 协议兼容** | CockroachDB、Redshift、YugabyteDB、TimescaleDB、QuestDB、Vastbase、YashanDB、KingbaseES、GaussDB、HighGo、UXDB、OpenGauss、GBase8c、Greenplum、EnterpriseDB、CrateDB、Materialize、AlloyDB、CloudSQLPG、FujitsuPG |
-| **MySQL 协议兼容** | MariaDB、TiDB、OceanBase、TDSQL、PolarDB、DM8、Doris、SelectDB、StarRocks、Databend、GoldenDB、ManticoreSearch、SingleStore、CloudSQLMySQL |
-| **JDBC 桥接** | Oracle、DuckDB、Firebird、DB2、H2、Snowflake、TDengine、Derby、Hive、Databricks、Hana、Teradata、Vertica、Exasol、BigQuery、Informix、Kylin、Cassandra、Iris、Access、DM8Oracle、XuguDB、GBase8a |
+| **MySQL 协议兼容** | MariaDB、TiDB、OceanBase、TDSQL、PolarDB、Doris、SelectDB、StarRocks、Databend、GoldenDB、ManticoreSearch、SingleStore、CloudSQLMySQL |
+| **JDBC 桥接** | Oracle、DuckDB、Firebird、DB2、H2、Snowflake、TDengine、Derby、Hive、Databricks、Hana、Teradata、Vertica、Exasol、BigQuery、Informix、Kylin、Cassandra、Iris、Access、Dameng、XuguDB、GBase8a |
 | **HTTP 桥接** | ClickHouse、Trino、Presto、RQLite、Turso |
 
 ### 专业级编辑器
