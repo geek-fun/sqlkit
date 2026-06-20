@@ -18,19 +18,20 @@ pub async fn connect_server(
 
     let timeout_secs = conn_config.connect_timeout_secs;
 
-    let connection =
-        crate::commands::helpers::create_and_connect_adapter(&config.db_type, conn_config).await?;
+    let connection = tokio::time::timeout(
+        std::time::Duration::from_secs(timeout_secs),
+        crate::commands::helpers::create_and_connect_adapter(&config.db_type, conn_config),
+    )
+    .await
+    .map_err(|_| format!("Connection timed out after {} seconds", timeout_secs))??;
 
     let mut connections = state.connections.write().await;
     connections.insert(id.clone(), connection.clone());
     drop(connections);
-    let status = tokio::time::timeout(
-        std::time::Duration::from_secs(timeout_secs),
-        connection.test_connection(),
-    )
-    .await
-    .map_err(|_| format!("Connection timed out after {} seconds", timeout_secs))?
-    .map_err(|e| format!("Failed to get connection status: {}", e))?;
+    let status = connection
+        .test_connection()
+        .await
+        .map_err(|e| format!("Failed to get connection status: {}", e))?;
 
     Ok(status)
 }
