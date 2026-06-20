@@ -14,7 +14,7 @@ use crate::database::adapter::DatabaseAdapter;
 use crate::state::{ActiveConnection, AppState};
 use crate::APP_HANDLE;
 use serde::Serialize;
-use tauri::Emitter;
+use tauri::{Emitter, Manager};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -91,15 +91,13 @@ impl Default for ConnectionHealth {
 
 pub struct ConnectionGuardian {
     health: Arc<RwLock<HashMap<String, ConnectionHealth>>>,
-    app_state: Arc<AppState>,
     idle_eviction_secs: u64,
 }
 
 impl ConnectionGuardian {
-    pub fn new(app_state: Arc<AppState>) -> Self {
+    pub fn new() -> Self {
         Self {
             health: Arc::new(RwLock::new(HashMap::new())),
-            app_state,
             idle_eviction_secs: DEFAULT_IDLE_EVICTION_SECS,
         }
     }
@@ -302,24 +300,30 @@ impl ConnectionGuardian {
         };
 
         for conn_id in to_evict {
+            let state = APP_HANDLE
+                .get()
+                .expect("APP_HANDLE not initialized")
+                .state::<AppState>();
             let connection_exists = {
-                let conns = self.app_state.connections.read().await;
+                let conns = state.connections.read().await;
                 conns.contains_key(&conn_id)
             };
             if !connection_exists {
+                drop(state);
                 self.health.write().await.remove(&conn_id);
                 continue;
             }
             // Gracefully disconnect idle connection
             log::info!("Connection '{conn_id}' idle for {}s, evicting", self.idle_eviction_secs);
-            let conns = self.app_state.connections.write().await;
+            let conns = state.connections.write().await;
             if let Some(connection) = conns.get(&conn_id) {
                 self.disconnect_connection(connection).await;
             }
             drop(conns);
-            let mut conns = self.app_state.connections.write().await;
+            let mut conns = state.connections.write().await;
             conns.remove(&conn_id);
             drop(conns);
+            drop(state);
             self.health.write().await.remove(&conn_id);
             self.emit_state_change(&conn_id, HealthState::Dead, Some("Idle eviction".into()));
         }
@@ -354,7 +358,11 @@ impl ConnectionGuardian {
 
         // Try to reconnect by calling test_connection on the active connection
         let success = {
-            let conns = self.app_state.connections.read().await;
+            let state = APP_HANDLE
+                .get()
+                .expect("APP_HANDLE not initialized")
+                .state::<AppState>();
+            let conns = state.connections.read().await;
             let conn = conns.get(connection_id);
             match conn {
                 Some(c) => self.ping_connection(c).await,
@@ -382,7 +390,11 @@ impl ConnectionGuardian {
     }
 
     async fn ping(&self, connection_id: &str) {
-        let conns = self.app_state.connections.read().await;
+        let state = APP_HANDLE
+            .get()
+            .expect("APP_HANDLE not initialized")
+            .state::<AppState>();
+        let conns = state.connections.read().await;
         let conn = match conns.get(connection_id) {
             Some(c) => c,
             None => return,

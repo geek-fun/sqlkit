@@ -80,7 +80,7 @@ pub fn run() {
     use crate::connection::guardian::ConnectionGuardian;
     use state::AppState;
 
-    let app_state = Arc::new(AppState::new());
+    let app_state = AppState::new();
     let store = commands::store::Store::new();
 
     tauri::Builder::default()
@@ -90,7 +90,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_os::init())
-        .manage(app_state.clone())
+        .manage(app_state)
         .manage(store.clone())
         .setup(move |app| {
             let handle = app.handle().clone();
@@ -99,7 +99,7 @@ pub fn run() {
             let _ = APP_HANDLE.set(handle.clone());
 
             // Start connection guardian for health monitoring + auto-reconnect
-            let guardian = Arc::new(ConnectionGuardian::new(app_state.clone()));
+            let guardian = Arc::new(ConnectionGuardian::new());
             let _ = GUARDIAN.set(guardian.clone());
             tauri::async_runtime::spawn(async move { guardian.run().await });
 
