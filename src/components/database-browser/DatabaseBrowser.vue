@@ -99,7 +99,8 @@ const supportsSchemas = computed(() => {
     return false
   }
   const meta = databaseStore.metadata[connectionId.value]
-  if (!meta) return false
+  if (!meta)
+    return false
   const schemas = meta.schemas[props.selectedDatabase]
   return schemas !== undefined && schemas.length > 0
 })
