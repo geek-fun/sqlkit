@@ -59,7 +59,7 @@ const AGENT_SUPPORTED_TYPES = new Set<DatabaseType>([
   DatabaseType.OCEANBASE,
   DatabaseType.TDSQL,
   DatabaseType.POLARDB,
-  DatabaseType.DM8,
+  DatabaseType.DAMENG,
   DatabaseType.DORIS,
   DatabaseType.SELECTDB,
   DatabaseType.STARROCKS,

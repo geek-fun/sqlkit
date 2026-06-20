@@ -60,7 +60,6 @@ describe('resolveDialect', () => {
       DatabaseType.OCEANBASE,
       DatabaseType.TDSQL,
       DatabaseType.POLARDB,
-      DatabaseType.DM8,
       DatabaseType.DORIS,
       DatabaseType.SELECTDB,
       DatabaseType.STARROCKS,
