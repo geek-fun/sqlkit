@@ -526,7 +526,7 @@ watch(() => [props.rows, props.columns], () => {
       <!-- Scroll container -->
       <div
         ref="scrollContainer"
-        class="flex-1 overflow-auto"
+        class="flex-1 overflow-auto relative"
         @scroll="() => {}"
       >
         <div
@@ -589,7 +589,7 @@ watch(() => [props.rows, props.columns], () => {
             </div>
             <!-- Actions Column Header -->
             <div
-              v-if="connectionId && tableName"
+              v-if="connectionId"
               class="bg-muted flex-shrink-0 w-10 right-0 sticky z-10"
             >
               <div class="flex h-8 items-center justify-center">
@@ -603,7 +603,7 @@ watch(() => [props.rows, props.columns], () => {
             v-for="virtualRow in rowVirtualizer.getVirtualItems()"
             :key="`r-${virtualRow.index}`"
             :data-index="virtualRow.index"
-            class="border-b border-border/30 flex transition-colors duration-75 left-0 top-0 absolute hover:bg-muted/[0.08]"
+            class="group border-b border-border/30 flex transition-colors duration-75 left-0 top-0 absolute hover:bg-muted/[0.08]"
             :class="[
               virtualRow.index % 2 === 0 ? 'bg-muted/[0.03]' : '',
               selection.isSelected(virtualRow.index) ? 'bg-primary/[0.08]' : '',
@@ -692,7 +692,7 @@ watch(() => [props.rows, props.columns], () => {
 
             <!-- Row Actions -->
             <div
-              v-if="connectionId && tableName"
+              v-if="connectionId"
               class="bg-background/80 opacity-0 flex flex-shrink-0 w-10 transition-opacity items-center right-0 justify-center sticky z-10 group-hover:opacity-100"
               @click.stop
             >
