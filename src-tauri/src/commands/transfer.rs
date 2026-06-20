@@ -15,7 +15,7 @@ pub async fn preview_export_data(
     preview_rows: u32,
     state: State<'_, AppState>,
 ) -> Result<ExportPreview, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&request.connection_id)
         .ok_or_else(|| "No active connection found".to_string())?;
@@ -47,7 +47,7 @@ pub async fn execute_export_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&request.connection_id)
         .ok_or_else(|| "No active connection found".to_string())?;
@@ -93,7 +93,7 @@ pub async fn execute_import_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&request.connection_id)
         .ok_or_else(|| "No active connection found".to_string())?;
@@ -124,7 +124,7 @@ pub async fn preview_migration_data(
     request: MigrationRequest,
     state: State<'_, AppState>,
 ) -> Result<MigrationPreview, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let source_connection = connections
         .get(&request.source_connection_id)
@@ -157,7 +157,7 @@ pub async fn execute_migration_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let source_connection = connections
         .get(&request.source_connection_id)
@@ -269,7 +269,7 @@ pub async fn auto_map_migration_columns(
 ) -> Result<Vec<crate::transfer::MigrationMapping>, String> {
     use crate::database::DatabaseAdapter;
 
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| "No active connection found".to_string())?;
@@ -307,7 +307,7 @@ pub async fn generate_ddl_for_objects(
     request: DdlRequest,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&request.connection_id)
         .ok_or_else(|| "No active connection found".to_string())?;
@@ -441,7 +441,7 @@ pub async fn execute_sql_content(
     on_error: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| "No active connection found".to_string())?;

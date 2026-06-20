@@ -115,7 +115,7 @@ pub async fn list_databases(
     connection_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<DatabaseSchema>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let connection = connections
         .get(&connection_id)
@@ -182,7 +182,7 @@ pub async fn list_schemas(
     database: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let connection = connections
         .get(&connection_id)
@@ -251,7 +251,7 @@ pub async fn list_tables(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<TableInfo>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let connection = connections
         .get(&connection_id)
@@ -338,7 +338,7 @@ pub async fn get_table_info(
     table_name: String,
     state: State<'_, AppState>,
 ) -> Result<TableInfo, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let connection = connections
         .get(&connection_id)
@@ -413,7 +413,7 @@ pub async fn list_columns(
     table_name: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<ColumnInfo>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -511,7 +511,7 @@ pub async fn get_foreign_keys(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ForeignKeyInfo>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let connection = connections
         .get(&connection_id)
@@ -591,7 +591,7 @@ pub async fn get_table_data(
     query: TableDataQuery,
     state: State<'_, AppState>,
 ) -> Result<QueryResult, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let connection = connections
         .get(&connection_id)
@@ -728,7 +728,7 @@ pub async fn get_table_count(
     filter: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<u64, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let connection = connections
         .get(&connection_id)
@@ -896,7 +896,7 @@ pub async fn update_table_row(
         return Ok(());
     }
 
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1072,7 +1072,7 @@ pub async fn delete_table_row(
         return Err("Cannot delete row: no primary key values provided".to_string());
     }
 
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1217,7 +1217,7 @@ pub async fn list_views(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ObjectInfo>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1271,7 +1271,7 @@ pub async fn list_procedures(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ObjectInfo>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1341,7 +1341,7 @@ pub async fn list_functions(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ObjectInfo>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1412,7 +1412,7 @@ pub async fn list_triggers(
     table: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<TriggerInfo>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1483,7 +1483,7 @@ pub async fn list_indexes(
     table: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<IndexInfo>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1554,7 +1554,7 @@ pub async fn list_foreign_keys(
     table: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<ForeignKeyInfo>, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1626,7 +1626,7 @@ pub async fn get_object_ddl(
     object_type: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1740,7 +1740,7 @@ pub async fn drop_object(
     object_type: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -1855,7 +1855,7 @@ pub async fn rename_object(
     new_name: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -2026,7 +2026,7 @@ pub async fn build_table_search_filter(
     search_term: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;

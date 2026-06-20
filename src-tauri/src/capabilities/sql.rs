@@ -24,7 +24,7 @@ async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String
     // Check if already connected
     {
         let state: tauri::State<'_, crate::state::AppState> = app.state();
-        let conns = state.connections.lock().await;
+        let conns = state.connections.read().await;
         if let Some(adapter) = conns.get(connection_id) {
             return Ok(adapter.clone());
         }
@@ -63,7 +63,7 @@ async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String
     // Store the adapter for future use
     {
         let state: tauri::State<'_, crate::state::AppState> = app.state();
-        let mut conns = state.connections.lock().await;
+        let mut conns = state.connections.write().await;
         conns.insert(connection_id.to_string(), adapter.clone());
     }
 

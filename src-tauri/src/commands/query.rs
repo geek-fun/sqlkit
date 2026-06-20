@@ -5,7 +5,7 @@
 
 use crate::api_response::{db_error_to_api_error, ApiResponse};
 use crate::database::{
-    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, ExplainResult,
+    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DbError, ExplainResult,
     HttpSqlAdapter, JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter,
     SqlServerAdapter, TursoAdapter,
 };
@@ -124,7 +124,7 @@ pub async fn execute_query(
         }
 
         let temp_kind: Option<TempKind> = {
-            let connections = state.connections.lock().await;
+            let connections = state.connections.read().await;
             let connection = connections
                 .get(&connection_id)
                 .ok_or_else(|| "No active connection found".to_string())?;
@@ -246,7 +246,7 @@ pub async fn execute_query(
     }
 
     // Common path: use the already-connected adapter
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let connection = connections
         .get(&connection_id)
         .ok_or_else(|| "No active connection found".to_string())?;
@@ -254,39 +254,147 @@ pub async fn execute_query(
     let result = match connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
+            let timeout_secs = adapter.get_config().query_timeout_secs;
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                adapter.execute_query(&sql),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(DbError::Timeout(format!(
+                    "Query timed out after {} seconds",
+                    timeout_secs
+                ))),
+            }
         }
         ActiveConnection::MySQL(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
+            let timeout_secs = adapter.get_config().query_timeout_secs;
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                adapter.execute_query(&sql),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(DbError::Timeout(format!(
+                    "Query timed out after {} seconds",
+                    timeout_secs
+                ))),
+            }
         }
         ActiveConnection::SQLServer(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
+            let timeout_secs = adapter.get_config().query_timeout_secs;
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                adapter.execute_query(&sql),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(DbError::Timeout(format!(
+                    "Query timed out after {} seconds",
+                    timeout_secs
+                ))),
+            }
         }
         ActiveConnection::SQLite(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
+            let timeout_secs = adapter.get_config().query_timeout_secs;
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                adapter.execute_query(&sql),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(DbError::Timeout(format!(
+                    "Query timed out after {} seconds",
+                    timeout_secs
+                ))),
+            }
         }
         ActiveConnection::ClickHouse(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
+            let timeout_secs = adapter.get_config().query_timeout_secs;
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                adapter.execute_query(&sql),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(DbError::Timeout(format!(
+                    "Query timed out after {} seconds",
+                    timeout_secs
+                ))),
+            }
         }
         ActiveConnection::JdbcBridge(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
+            let timeout_secs = adapter.get_config().query_timeout_secs;
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                adapter.execute_query(&sql),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(DbError::Timeout(format!(
+                    "Query timed out after {} seconds",
+                    timeout_secs
+                ))),
+            }
         }
         ActiveConnection::HttpSql(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
+            let timeout_secs = adapter.get_config().query_timeout_secs;
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                adapter.execute_query(&sql),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(DbError::Timeout(format!(
+                    "Query timed out after {} seconds",
+                    timeout_secs
+                ))),
+            }
         }
         ActiveConnection::Rqlite(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
+            let timeout_secs = adapter.get_config().query_timeout_secs;
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                adapter.execute_query(&sql),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(DbError::Timeout(format!(
+                    "Query timed out after {} seconds",
+                    timeout_secs
+                ))),
+            }
         }
         ActiveConnection::Turso(adapter) => {
             let adapter = adapter.lock().await;
-            adapter.execute_query(&sql).await
+            let timeout_secs = adapter.get_config().query_timeout_secs;
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                adapter.execute_query(&sql),
+            )
+            .await
+            {
+                Ok(result) => result,
+                Err(_) => Err(DbError::Timeout(format!(
+                    "Query timed out after {} seconds",
+                    timeout_secs
+                ))),
+            }
         }
     };
 
@@ -371,7 +479,7 @@ pub async fn explain_query(
         }
 
         let temp_kind: Option<TempExplainKind> = {
-            let connections = state.connections.lock().await;
+            let connections = state.connections.read().await;
             let connection = connections
                 .get(&connection_id)
                 .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
@@ -647,7 +755,7 @@ pub async fn explain_query(
     }
 
     // Common path: use the already-connected adapter
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
 
     let connection = connections
         .get(&connection_id)
