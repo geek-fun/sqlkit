@@ -243,6 +243,8 @@ pub struct AppConfig {
 pub struct AppState {
     /// Active database connections indexed by connection ID.
     pub connections: Arc<RwLock<HashMap<String, ActiveConnection>>>,
+    /// LRU cache for cross-database connection handles.
+    pub cache: crate::connection::cache::ConnectionCache,
     /// SSH tunnel lifecycle manager.
     pub tunnels: TunnelManager,
 }
@@ -252,6 +254,7 @@ impl AppState {
     pub fn new() -> Self {
         Self {
             connections: Arc::new(RwLock::new(HashMap::new())),
+            cache: crate::connection::cache::ConnectionCache::default(),
             tunnels: TunnelManager::new(),
         }
     }
