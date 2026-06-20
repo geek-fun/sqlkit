@@ -137,9 +137,34 @@ impl CapabilityHandler for ExecuteQueryHandler {
             .and_then(|v| v.as_str())
             .ok_or_else(|| "Missing 'sql' argument".to_string())?;
         let adapter = resolve_adapter(&conn_id).await?;
+
+        // Check connection quality and warn the AI agent about flaky connections
+        let mut guardian_warning: Option<String> = None;
+        if let Some(guardian) = crate::GUARDIAN.get() {
+            if let Some(quality) = guardian.quality_score(&conn_id).await {
+                if quality.score < 50.0 {
+                    guardian_warning = Some(format!(
+                        "Connection quality is low (score: {:.0}/100). \
+                         Error count: {}, avg latency: {:.0}ms. \
+                         The agent should be cautious about flaky connections.",
+                        quality.score, quality.error_count, quality.avg_latency_ms
+                    ));
+                }
+            }
+        }
+
         let result = execute_on_adapter(&adapter, sql).await?;
-        let json = serde_json::to_string(&result).map_err(|e| e.to_string())?;
-        Ok(crate::common::format::truncate_tool_output(json))
+        let mut response_map = serde_json::Map::new();
+        let json_val = serde_json::to_value(&result).map_err(|e| e.to_string())?;
+        response_map.insert("data".to_string(), json_val);
+        if let Some(warning) = guardian_warning {
+            response_map.insert(
+                "guardian_warning".to_string(),
+                serde_json::Value::String(warning),
+            );
+        }
+        let output = serde_json::to_string(&response_map).map_err(|e| e.to_string())?;
+        Ok(crate::common::format::truncate_tool_output(output))
     }
 }
 

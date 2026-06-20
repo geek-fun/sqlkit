@@ -46,6 +46,19 @@ pub struct ConnectionStateEvent {
     pub error: Option<String>,
 }
 
+/// Quality assessment for a single connection, exposed via Tauri command
+/// and used by agent capabilities to warn about flaky connections.
+#[derive(Debug, Clone, Serialize)]
+pub struct ConnectionQuality {
+    pub connection_id: String,
+    pub state: HealthState,
+    pub error_count: u32,
+    pub total_queries: u64,
+    pub avg_latency_ms: f64,
+    pub uptime_pct: f64,
+    pub score: f64,
+}
+
 #[derive(Debug)]
 struct ConnectionHealth {
     state: HealthState,
@@ -54,6 +67,8 @@ struct ConnectionHealth {
     last_access: Instant,
     reconnect_attempt: u32,
     next_reconnect_at: Option<Instant>,
+    total_queries: u64,
+    total_latency_ms: f64,
 }
 
 impl Default for ConnectionHealth {
@@ -66,6 +81,8 @@ impl Default for ConnectionHealth {
             last_access: now,
             reconnect_attempt: 0,
             next_reconnect_at: None,
+            total_queries: 0,
+            total_latency_ms: 0.0,
         }
     }
 }
@@ -87,12 +104,10 @@ impl ConnectionGuardian {
         }
     }
 
-    /// Start the guardian background task. Returns the JoinHandle so the
-    /// caller can abort it on shutdown.
-    pub fn start(self) -> tokio::task::JoinHandle<()> {
-        tokio::spawn(async move {
-            self.run_loop().await;
-        })
+    /// Start the guardian background task in the given runtime.
+    /// The caller is responsible for spawning via `tauri::async_runtime::spawn`.
+    pub async fn run(self) {
+        self.run_loop().await;
     }
 
     /// Mark a connection as accessed (called by query execution).
@@ -104,7 +119,9 @@ impl ConnectionGuardian {
     }
 
     /// Mark a connection as healthy after a successful operation.
-    pub async fn mark_healthy(&self, connection_id: &str) {
+    /// `latency_ms` is optional — when provided it updates query latency tracking
+    /// for the quality scoring system.
+    pub async fn mark_healthy(&self, connection_id: &str, latency_ms: Option<f64>) {
         let mut health_map = self.health.write().await;
         let h = health_map.entry(connection_id.to_string()).or_default();
         let was_dead = h.state == HealthState::Dead;
@@ -113,17 +130,27 @@ impl ConnectionGuardian {
         h.last_healthy = Instant::now();
         h.reconnect_attempt = 0;
         h.next_reconnect_at = None;
+        if let Some(lat) = latency_ms {
+            h.total_queries = h.total_queries.saturating_add(1);
+            h.total_latency_ms += lat;
+        }
         if was_dead {
             self.emit_state_change(connection_id, HealthState::Healthy, None);
         }
     }
 
     /// Mark a connection as errored after a failed operation.
-    pub async fn mark_error(&self, connection_id: &str, error: &str) {
+    /// `latency_ms` is optional — when provided it updates query latency tracking
+    /// for the quality scoring system.
+    pub async fn mark_error(&self, connection_id: &str, error: &str, latency_ms: Option<f64>) {
         let mut health_map = self.health.write().await;
         let h = health_map.entry(connection_id.to_string()).or_default();
         h.error_count = h.error_count.saturating_add(1);
         h.last_access = Instant::now();
+        if let Some(lat) = latency_ms {
+            h.total_queries = h.total_queries.saturating_add(1);
+            h.total_latency_ms += lat;
+        }
 
         let new_state = if h.error_count >= DEAD_THRESHOLD {
             HealthState::Dead
@@ -147,6 +174,69 @@ impl ConnectionGuardian {
             .get(connection_id)
             .map(|h| h.state)
             .unwrap_or(HealthState::Healthy)
+    }
+
+    /// Compute a connection quality score (0-100) based on latency history and reliability.
+    /// Returns `None` if no health data exists for this connection.
+    pub async fn quality_score(&self, connection_id: &str) -> Option<ConnectionQuality> {
+        let health = self.health.read().await;
+        let h = health.get(connection_id)?;
+
+        let total_queries = h.total_queries;
+        let avg_latency_ms = if total_queries > 0 {
+            h.total_latency_ms / total_queries as f64
+        } else {
+            0.0
+        };
+
+        // Latency score: lower is better, 0-100
+        let latency_score = if total_queries == 0 {
+            100.0
+        } else if avg_latency_ms <= 10.0 {
+            100.0
+        } else if avg_latency_ms <= 50.0 {
+            80.0 + (50.0 - avg_latency_ms) / 40.0 * 20.0
+        } else if avg_latency_ms <= 200.0 {
+            50.0 + (200.0 - avg_latency_ms) / 150.0 * 30.0
+        } else if avg_latency_ms <= 1000.0 {
+            20.0 + (1000.0 - avg_latency_ms) / 800.0 * 30.0
+        } else {
+            0.0
+        };
+
+        // Reliability based on error rate
+        let reliability = if total_queries == 0 {
+            100.0
+        } else {
+            let error_rate = h.error_count as f64 / total_queries as f64;
+            if error_rate <= 0.01 {
+                100.0
+            } else if error_rate <= 0.05 {
+                80.0 + (0.05 - error_rate) / 0.04 * 20.0
+            } else if error_rate <= 0.20 {
+                50.0 + (0.20 - error_rate) / 0.15 * 30.0
+            } else {
+                0.0
+            }
+        };
+
+        let score = latency_score * 0.3 + reliability * 0.7;
+        let uptime_pct = if total_queries > 0 {
+            ((total_queries.saturating_sub(h.error_count as u64)) as f64 / total_queries as f64)
+                * 100.0
+        } else {
+            100.0
+        };
+
+        Some(ConnectionQuality {
+            connection_id: connection_id.to_string(),
+            state: h.state,
+            error_count: h.error_count,
+            total_queries,
+            avg_latency_ms,
+            uptime_pct,
+            score,
+        })
     }
 
     // ── internal ──────────────────────────────────────────────────────
@@ -273,7 +363,7 @@ impl ConnectionGuardian {
         };
 
         if success {
-            self.mark_healthy(connection_id).await;
+            self.mark_healthy(connection_id, None).await;
         } else {
             // Exponential backoff
             let delay = (RECONNECT_BASE_DELAY_SECS * 2u64.pow(attempt_num)).min(RECONNECT_MAX_DELAY_SECS);
@@ -301,9 +391,9 @@ impl ConnectionGuardian {
         drop(conns);
 
         if success {
-            self.mark_healthy(connection_id).await;
+            self.mark_healthy(connection_id, None).await;
         } else {
-            self.mark_error(connection_id, "Health check ping failed").await;
+            self.mark_error(connection_id, "Health check ping failed", None).await;
         }
     }
 
