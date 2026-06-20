@@ -22,12 +22,17 @@ pub mod capabilities;
 pub mod common;
 pub mod db;
 
+use std::sync::Arc;
 use std::sync::OnceLock;
 use tauri::AppHandle;
 
 /// Global AppHandle, set once during app setup. Allows capability handlers
 /// and other background code to access the Tauri application handle.
 pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+
+/// Global ConnectionGuardian, set once during app setup. Used by query execution
+/// for health checks and by capability handlers for connection quality warnings.
+pub static GUARDIAN: OnceLock<Arc<crate::connection::guardian::ConnectionGuardian>> = OnceLock::new();
 
 use agent::executor::SqlKitToolExecutor;
 use agent::query_history::{add_query_history_entry, load_query_history};
@@ -74,7 +79,6 @@ fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
 pub fn run() {
     use crate::connection::guardian::ConnectionGuardian;
     use state::AppState;
-    use std::sync::Arc;
 
     let app_state = Arc::new(AppState::new());
     let store = commands::store::Store::new();
@@ -96,7 +100,7 @@ pub fn run() {
 
             // Start connection guardian for health monitoring + auto-reconnect
             let guardian = ConnectionGuardian::new(app_state.clone());
-            guardian.start();
+            tauri::async_runtime::spawn(guardian.run());
 
             tauri::async_runtime::spawn(async move {
                 store.set_app_handle(handle.clone()).await;
@@ -220,6 +224,7 @@ pub fn run() {
             commands::connect_server,
             commands::disconnect_server,
             commands::get_connection_status,
+            commands::get_connection_quality,
             // Query execution commands
             commands::execute_query,
             commands::cancel_query,

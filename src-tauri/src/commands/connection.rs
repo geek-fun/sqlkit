@@ -122,6 +122,21 @@ pub async fn get_connection_status(
     })
 }
 
+/// Get connection quality score and health metrics for a connection.
+///
+/// Returns quality data including latency, error count, and a composite score (0-100).
+/// Returns an error if no health data exists for the given connection.
+#[tauri::command]
+pub async fn get_connection_quality(connection_id: String) -> Result<crate::connection::guardian::ConnectionQuality, String> {
+    let guardian = crate::GUARDIAN
+        .get()
+        .ok_or_else(|| "Guardian not initialized".to_string())?;
+    guardian
+        .quality_score(&connection_id)
+        .await
+        .ok_or_else(|| format!("No quality data for connection '{}'", connection_id))
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

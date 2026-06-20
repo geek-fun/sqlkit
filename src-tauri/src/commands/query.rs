@@ -4,6 +4,7 @@
 //! and getting query execution plans.
 
 use crate::api_response::{db_error_to_api_error, ApiResponse};
+use crate::connection::guardian::HealthState;
 use crate::database::{
     ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DbError, ExplainResult,
     HttpSqlAdapter, JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter,
@@ -246,12 +247,28 @@ pub async fn execute_query(
     }
 
     // Common path: use the already-connected adapter
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| "No active connection found".to_string())?;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| "No active connection found".to_string())?
+            .clone()
+    };
 
-    let result = match connection {
+    // Guardian health check
+    if let Some(guardian) = crate::GUARDIAN.get() {
+        guardian.touch(&connection_id).await;
+        let health_state = guardian.get_state(&connection_id).await;
+        if health_state == HealthState::Dead || health_state == HealthState::Reconnecting {
+            return Err(format!(
+                "Connection is in state '{:?}'. Please wait for it to reconnect or reconnect manually.",
+                health_state
+            ));
+        }
+    }
+
+    let query_start = std::time::Instant::now();
+    let result = match &connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
             let timeout_secs = adapter.get_config().query_timeout_secs;
@@ -398,9 +415,21 @@ pub async fn execute_query(
         }
     };
 
+    let elapsed_ms = query_start.elapsed().as_secs_f64() * 1000.0;
+
     match result {
-        Ok(data) => Ok(ApiResponse::success(data)),
+        Ok(data) => {
+            if let Some(guardian) = crate::GUARDIAN.get() {
+                guardian.mark_healthy(&connection_id, Some(elapsed_ms)).await;
+            }
+            Ok(ApiResponse::success(data))
+        }
         Err(e) => {
+            if let Some(guardian) = crate::GUARDIAN.get() {
+                guardian
+                    .mark_error(&connection_id, &format!("{}", e), Some(elapsed_ms))
+                    .await;
+            }
             let api_error = db_error_to_api_error(&e);
             Ok(ApiResponse::error(api_error))
         }
