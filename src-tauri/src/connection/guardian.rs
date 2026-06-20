@@ -302,11 +302,11 @@ impl ConnectionGuardian {
         };
 
         for conn_id in to_evict {
-            let exists = {
+            let connection_exists = {
                 let conns = self.app_state.connections.read().await;
-                !conns.contains_key(&conn_id)
+                conns.contains_key(&conn_id)
             };
-            if !exists {
+            if !connection_exists {
                 self.health.write().await.remove(&conn_id);
                 continue;
             }
