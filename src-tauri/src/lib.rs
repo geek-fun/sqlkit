@@ -80,7 +80,6 @@ pub fn run() {
     use crate::connection::guardian::ConnectionGuardian;
     use state::AppState;
 
-    let app_state = Arc::new(AppState::new());
     let store = commands::store::Store::new();
 
     tauri::Builder::default()
@@ -91,7 +90,7 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
-        .manage(app_state.clone())
+        .manage(AppState::new())
         .manage(store.clone())
         .setup(move |app| {
             let handle = app.handle().clone();

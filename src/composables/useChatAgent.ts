@@ -228,6 +228,21 @@ function buildSystemPrompt({ schema, sources, permissionsMode }: {
   }
   parts.push('')
 
+  // Tool usage rules
+  parts.push('## Tool Usage Rules')
+  parts.push(
+    '- READ every tool result before deciding your next action. Do not ignore results.',
+    '- If a tool result shows data that contradicts your assumption, trust the result and update your plan.',
+    '- If a CREATE TABLE returns ORA-00955, the table ALREADY EXISTS. Do NOT retry — move on.',
+    '- If a query returns rows showing tables exist, the database is NOT empty. Acknowledge this.',
+    '- Never repeat a query that already returned a clear result. Use the data you have.',
+    '- If you find yourself repeating the same action, STOP. The previous result already answered your question.',
+    '- When a tool times out, try a simpler query or a different approach instead of retrying.',
+    '- Use sqlkit__list_tables to check if tables exist. Do NOT use sqlkit__get_schema for simple existence checks.',
+    '- Use sqlkit__describe_table for one table\'s columns. Use sqlkit__get_schema only when you need DDL for ALL tables.',
+  )
+  parts.push('')
+
   // Session-wide rules
   parts.push('## Rules')
   parts.push(
@@ -475,6 +490,10 @@ export function useChatAgent(config: UseChatAgentConfig) {
     const sessionId = config.sessionStore.activeSessionId.value
     if (!sessionId)
       return
+    if (!isLoading.value) {
+      config.sessionStore.clearSessionStop?.(sessionId)
+      return
+    }
     try {
       await agentApi.cancelAgentLoop(sessionId)
     }
