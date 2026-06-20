@@ -218,6 +218,12 @@ pub struct ConnectionConfig {
     pub username: String,
     /// Password for authentication.
     pub password: Option<String>,
+    /// Connection timeout in seconds (default: 10).
+    #[serde(default = "default_connect_timeout")]
+    pub connect_timeout_secs: u64,
+    /// Query timeout in seconds (default: 30).
+    #[serde(default = "default_query_timeout")]
+    pub query_timeout_secs: u64,
     /// SSL/TLS mode.
     #[serde(default)]
     pub ssl_mode: SslMode,
@@ -259,6 +265,9 @@ pub struct OracleConnectionOptions {
     pub service_level: Option<String>,
 }
 
+fn default_connect_timeout() -> u64 { 10 }
+fn default_query_timeout() -> u64 { 30 }
+
 impl ConnectionConfig {
     /// Create a new connection configuration.
     pub fn new(
@@ -274,6 +283,8 @@ impl ConnectionConfig {
             database: None,
             username: username.into(),
             password: None,
+            connect_timeout_secs: default_connect_timeout(),
+            query_timeout_secs: default_query_timeout(),
             ssl_mode: SslMode::default(),
             ssl_ca_cert: None,
             ssl_client_cert: None,
@@ -319,6 +330,18 @@ impl ConnectionConfig {
     /// Set the transport layer configuration.
     pub fn with_transport_layers(mut self, layers: Vec<TransportLayerConfig>) -> Self {
         self.transport_layers = layers;
+        self
+    }
+
+    /// Set the connection timeout in seconds.
+    pub fn with_connect_timeout(mut self, secs: u64) -> Self {
+        self.connect_timeout_secs = secs;
+        self
+    }
+
+    /// Set the query timeout in seconds.
+    pub fn with_query_timeout(mut self, secs: u64) -> Self {
+        self.query_timeout_secs = secs;
         self
     }
 

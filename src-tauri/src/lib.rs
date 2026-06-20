@@ -6,6 +6,9 @@ pub mod transfer;
 // Application state management
 pub mod state;
 
+// Connection lifecycle management
+pub mod connection;
+
 // Tauri command handlers
 pub mod commands;
 
@@ -69,9 +72,11 @@ fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    use crate::connection::guardian::ConnectionGuardian;
     use state::AppState;
+    use std::sync::Arc;
 
-    let app_state = AppState::new();
+    let app_state = Arc::new(AppState::new());
     let store = commands::store::Store::new();
 
     tauri::Builder::default()
@@ -81,13 +86,17 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_os::init())
-        .manage(app_state)
+        .manage(app_state.clone())
         .manage(store.clone())
         .setup(move |app| {
             let handle = app.handle().clone();
 
             // Store AppHandle globally for capability handlers and agent
             let _ = APP_HANDLE.set(handle.clone());
+
+            // Start connection guardian for health monitoring + auto-reconnect
+            let guardian = ConnectionGuardian::new(app_state.clone());
+            guardian.start();
 
             tauri::async_runtime::spawn(async move {
                 store.set_app_handle(handle.clone()).await;

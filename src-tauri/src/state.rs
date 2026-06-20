@@ -9,7 +9,7 @@ use crate::ssh::TunnelManager;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::database::rqlite::RqliteAdapter;
@@ -66,10 +66,19 @@ pub struct ServerConfig {
     /// Oracle-specific connection options.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub oracle_options: Option<OracleConnectionOptions>,
+    /// Connection timeout in seconds (default: 10).
+    #[serde(default = "default_timeout_10")]
+    pub connect_timeout_secs: u64,
+    /// Query timeout in seconds (default: 30).
+    #[serde(default = "default_timeout_30")]
+    pub query_timeout_secs: u64,
     /// Transport layer configuration (SSH tunnels).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transport_layers: Option<Vec<TransportLayerConfig>>,
 }
+
+fn default_timeout_10() -> u64 { 10 }
+fn default_timeout_30() -> u64 { 30 }
 
 impl ServerConfig {
     /// Create a new server configuration.
@@ -86,6 +95,8 @@ impl ServerConfig {
             ssl_mode: None,
             metadata: None,
             oracle_options: None,
+            connect_timeout_secs: default_timeout_10(),
+            query_timeout_secs: default_timeout_30(),
             transport_layers: None,
         }
     }
@@ -166,7 +177,9 @@ impl ServerConfig {
     pub fn to_connection_config(&self) -> Result<ConnectionConfig, String> {
         let db_type = self.parse_db_type()?;
 
-        let mut config = ConnectionConfig::new(db_type, &self.host, self.port, &self.username);
+        let mut config = ConnectionConfig::new(db_type, &self.host, self.port, &self.username)
+            .with_connect_timeout(self.connect_timeout_secs)
+            .with_query_timeout(self.query_timeout_secs);
 
         if let Some(ref password) = self.password {
             config = config.with_password(password);
@@ -229,7 +242,7 @@ pub struct AppConfig {
 /// Application state shared across all Tauri commands.
 pub struct AppState {
     /// Active database connections indexed by connection ID.
-    pub connections: Arc<Mutex<HashMap<String, ActiveConnection>>>,
+    pub connections: Arc<RwLock<HashMap<String, ActiveConnection>>>,
     /// SSH tunnel lifecycle manager.
     pub tunnels: TunnelManager,
 }
@@ -238,7 +251,7 @@ impl AppState {
     /// Create a new application state.
     pub fn new() -> Self {
         Self {
-            connections: Arc::new(Mutex::new(HashMap::new())),
+            connections: Arc::new(RwLock::new(HashMap::new())),
             tunnels: TunnelManager::new(),
         }
     }

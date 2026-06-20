@@ -2,6 +2,7 @@ import type { SslConfig } from '@/types/connection'
 import { defineStore } from 'pinia'
 import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
 import { connectionApi } from '../datasources'
+import { listen } from '@tauri-apps/api/event'
 
 export enum DatabaseType {
   MYSQL = 'MYSQL',
@@ -298,6 +299,8 @@ export type ServerConnection = {
   ssl: SslConfig
   sshTunnel?: SSHTunnelConfig
   oracleOptions?: OracleConnectionOptions
+  connectTimeoutSecs?: number
+  queryTimeoutSecs?: number
   isConnected?: boolean
   lastUsed?: Date
 }
@@ -595,6 +598,8 @@ export const useConnectionStore = defineStore('connectionStore', {
           ssl_client_cert: connection.ssl.clientCertPath || null,
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
+          connect_timeout_secs: connection.connectTimeoutSecs ?? 10,
+          query_timeout_secs: connection.queryTimeoutSecs ?? 30,
           transport_layers: transportLayers,
           oracle_options: buildOracleOptions(connection.oracleOptions),
         }
@@ -633,6 +638,8 @@ export const useConnectionStore = defineStore('connectionStore', {
           ssl_client_cert: connection.ssl.clientCertPath || null,
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? null,
+          connect_timeout_secs: connection.connectTimeoutSecs ?? 10,
+          query_timeout_secs: connection.queryTimeoutSecs ?? 30,
           transport_layers: transportLayers,
           oracle_options: buildOracleOptions(connection.oracleOptions),
         }
@@ -678,6 +685,31 @@ export const useConnectionStore = defineStore('connectionStore', {
 
     setCurrentDatabase(connectionId: string, database: string) {
       this.currentDatabases[connectionId] = database
+    },
+
+    async startStateListener() {
+      const unlisten = await listen<{
+        connection_id: string
+        state: 'healthy' | 'degraded' | 'dead' | 'reconnecting'
+        error: string | null
+      }>('connection-state-changed', (event) => {
+        const { connection_id, state, error } = event.payload
+        if (state === 'dead') {
+          this.connectionStatus[connection_id] = ConnectionStatus.ERROR
+        } else if (state === 'reconnecting') {
+          this.connectionStatus[connection_id] = ConnectionStatus.CONNECTING
+        } else if (state === 'healthy' || state === 'degraded') {
+          const conn = this.getConnectionById(connection_id)
+          if (conn) {
+            conn.isConnected = true
+          }
+          this.connectionStatus[connection_id] = ConnectionStatus.CONNECTED
+        }
+        if (error) {
+          console.warn(`[${connection_id}] ${state}: ${error}`)
+        }
+      })
+      return unlisten
     },
   },
 })

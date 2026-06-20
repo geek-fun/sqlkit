@@ -15,50 +15,59 @@ pub async fn connect_server(
     conn_config.host = host;
     conn_config.port = port;
 
+    let timeout_secs = conn_config.connect_timeout_secs;
+
     let connection =
         crate::commands::helpers::create_and_connect_adapter(&config.db_type, conn_config).await?;
 
-    let mut connections = state.connections.lock().await;
+    let mut connections = state.connections.write().await;
     connections.insert(id.clone(), connection.clone());
-
-    let status = match &connection {
-        ActiveConnection::Postgres(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-        ActiveConnection::MySQL(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-        ActiveConnection::SQLite(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-        ActiveConnection::Turso(adapter) => {
-            let a = adapter.lock().await;
-            a.test_connection().await
-        }
-    }
+    drop(connections);
+    let status = tokio::time::timeout(
+        std::time::Duration::from_secs(timeout_secs),
+        async {
+            match &connection {
+                ActiveConnection::Postgres(adapter) => {
+                    let a = adapter.lock().await;
+                    a.test_connection().await
+                }
+                ActiveConnection::MySQL(adapter) => {
+                    let a = adapter.lock().await;
+                    a.test_connection().await
+                }
+                ActiveConnection::SQLServer(adapter) => {
+                    let a = adapter.lock().await;
+                    a.test_connection().await
+                }
+                ActiveConnection::SQLite(adapter) => {
+                    let a = adapter.lock().await;
+                    a.test_connection().await
+                }
+                ActiveConnection::ClickHouse(adapter) => {
+                    let a = adapter.lock().await;
+                    a.test_connection().await
+                }
+                ActiveConnection::JdbcBridge(adapter) => {
+                    let a = adapter.lock().await;
+                    a.test_connection().await
+                }
+                ActiveConnection::HttpSql(adapter) => {
+                    let a = adapter.lock().await;
+                    a.test_connection().await
+                }
+                ActiveConnection::Rqlite(adapter) => {
+                    let a = adapter.lock().await;
+                    a.test_connection().await
+                }
+                ActiveConnection::Turso(adapter) => {
+                    let a = adapter.lock().await;
+                    a.test_connection().await
+                }
+            }
+        },
+    )
+    .await
+    .map_err(|_| format!("Connection timed out after {} seconds", timeout_secs))?
     .map_err(|e| format!("Failed to get connection status: {}", e))?;
 
     Ok(status)
@@ -68,7 +77,7 @@ pub async fn connect_server(
 pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result<(), String> {
     state.tunnels.stop_tunnel(&id).await;
 
-    let mut connections = state.connections.lock().await;
+    let mut connections = state.connections.write().await;
 
     let connection = connections
         .remove(&id)
@@ -101,7 +110,7 @@ pub async fn get_connection_status(
     id: String,
     state: State<'_, AppState>,
 ) -> Result<ConnectionStatus, String> {
-    let connections = state.connections.lock().await;
+    let connections = state.connections.read().await;
     let is_connected = connections.contains_key(&id);
 
     Ok(ConnectionStatus {
