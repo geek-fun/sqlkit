@@ -1,6 +1,6 @@
 use crate::connection::handle::ConnectionHandle;
-use crate::database::{ConnectionStatus, DatabaseAdapter};
-use crate::state::{ActiveConnection, AppState};
+use crate::database::ConnectionStatus;
+use crate::state::AppState;
 use tauri::State;
 
 #[tauri::command]
