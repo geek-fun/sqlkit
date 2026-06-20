@@ -45,6 +45,43 @@ pub fn parse_tns_aliases(tns_admin_dir: &str) -> Vec<String> {
     aliases
 }
 
+fn read_tnsnames(tns_admin_dir: &str) -> Option<String> {
+    let dir = Path::new(tns_admin_dir);
+    let filenames = ["tnsnames.ora", "TNSNAMES.ORA", "Tnsnames.ora"];
+    filenames
+        .iter()
+        .find_map(|name| fs::read_to_string(dir.join(name)).ok())
+}
+
+pub fn lookup_tns_descriptor(tns_admin_dir: &str, alias: &str) -> Option<String> {
+    let content = read_tnsnames(tns_admin_dir)?;
+    let mut capturing = false;
+    let mut result = String::new();
+    for line in content.lines() {
+        let trimmed = line.trim();
+        if !capturing {
+            if let Some(eq_pos) = trimmed.find('=') {
+                let before_eq = trimmed[..eq_pos].trim();
+                if before_eq.eq_ignore_ascii_case(alias) {
+                    capturing = true;
+                    let value = trimmed[eq_pos + 1..].trim();
+                    result.push_str(value);
+                }
+            }
+        } else if trimmed.is_empty() {
+            break;
+        } else {
+            result.push(' ');
+            result.push_str(trimmed);
+        }
+    }
+    if capturing && !result.is_empty() {
+        Some(result)
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -104,5 +141,28 @@ dbname_high = (DESCRIPTION=(ADDRESS=...))"#,
         let aliases = parse_tns_aliases(&dir_path);
         assert!(aliases.is_empty());
         let _ = fs::remove_dir_all(std::env::temp_dir().join("tns_test_empty_file"));
+    }
+
+    #[test]
+    fn test_lookup_tns_descriptor() {
+        let dir_path = with_temp_tnsnames(
+            "lookup",
+            r#"dbname_medium =
+  (description=
+    (retry_count=20)(retry_delay=3)
+    (address=(protocol=tcps)(port=1522)(host=adb.example.com))
+    (connect_data=(service_name=dbname_medium.adb.example.com))
+    (security=(ssl_server_dn_match=yes))
+  )
+
+dbname_low =
+  (description=(address=(protocol=tcps)(port=1522)(host=adb.example.com))(connect_data=(service_name=dbname_low.adb.example.com))(security=(ssl_server_dn_match=yes)))
+"#,
+        );
+        let desc = lookup_tns_descriptor(&dir_path, "dbname_low");
+        assert!(desc.is_some());
+        assert!(desc.unwrap().contains("dbname_low"));
+        assert!(lookup_tns_descriptor(&dir_path, "nonexistent").is_none());
+        let _ = fs::remove_dir_all(std::env::temp_dir().join("tns_test_lookup"));
     }
 }

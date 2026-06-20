@@ -141,15 +141,15 @@ const setupSteps = ref<StepDef[]>([
 // Listen for progress events from any download command
 const progressUnlisten = ref<(() => void) | null>(null)
 
-// TNS alias handling: combine base alias with service level for Cloud Wallet
-const tnsFullAlias = computed(() => {
-  if (!oracleTnsAlias.value || oracleMethod.value === 'basic') return undefined
-  return oracleTnsAlias.value
-})
+const showPasswords = ref<Record<string, boolean>>({})
+function togglePassword(key: string) {
+  showPasswords.value[key] = !showPasswords.value[key]
+}
 
 async function startProgressListener() {
   // Clean up previous listener
-  if (progressUnlisten.value) progressUnlisten.value()
+  if (progressUnlisten.value)
+    progressUnlisten.value()
   const unlisten = await listen<{ step: string, downloaded: number, total: number, message?: string }>('connection-progress', (event) => {
     const stepMap: Record<string, string> = { jre_download: 'jre', bridge_jar: 'bridge' }
     const stepId = stepMap[event.payload.step]
@@ -262,6 +262,10 @@ watch(() => props.open, (open) => {
       // Sync Oracle options when editing
       if (props.connection.type === DatabaseType.ORACLE) {
         syncOracleFromFormData()
+        const opts = formData.value.oracleOptions
+        if (opts?.connectionMethod !== 'basic' && opts?.tnsAdminDir) {
+          loadTnsAliases(opts.tnsAdminDir, true)
+        }
       }
     }
     else {
@@ -273,7 +277,11 @@ watch(() => props.open, (open) => {
     testStatus.value = 'idle'
     testError.value = ''
     formErrors.value = {}
-    setupSteps.value.forEach(s => { s.status = 'pending'; s.progress = undefined; s.error = undefined })
+    setupSteps.value.forEach((s) => {
+      s.status = 'pending'
+      s.progress = undefined
+      s.error = undefined
+    })
     loadRecentDatabases()
   }
 })
@@ -342,6 +350,13 @@ const oracleServiceLevel = ref<'low' | 'medium' | 'high' | 'tp' | 'tpurgent'>('m
 const tnsAliases = ref<string[]>([])
 const loadingAliases = ref(false)
 
+// TNS alias handling: return the selected alias as-is for TNS/Cloud Wallet
+const tnsFullAlias = computed(() => {
+  if (!oracleTnsAlias.value || oracleMethod.value === 'basic')
+    return undefined
+  return oracleTnsAlias.value
+})
+
 // When Oracle is TNS or Cloud Wallet, standard host/port/database fields are hidden
 const showsStandardHostFields = computed(() =>
   !isOracle.value
@@ -385,7 +400,8 @@ function syncOracleFromFormData() {
 
 // Build oracleOptions from reactive refs
 function buildOracleOptionsFromRefs(): OracleConnectionOptions | undefined {
-  if (!isOracle.value) return undefined
+  if (!isOracle.value)
+    return undefined
   const hasTnsAlias = oracleMethod.value !== 'basic' && !!tnsFullAlias.value
   return {
     connectionMethod: oracleMethod.value,
@@ -394,7 +410,8 @@ function buildOracleOptionsFromRefs(): OracleConnectionOptions | undefined {
     tnsAdminDir: oracleMethod.value !== 'basic' ? oracleTnsAdminDir.value || undefined : undefined,
     tnsAlias: hasTnsAlias ? tnsFullAlias.value : undefined,
     walletPassword: oracleMethod.value === 'cloud_wallet' ? oracleWalletPassword.value || undefined : undefined,
-    serviceLevel: oracleMethod.value === 'cloud_wallet' ? oracleServiceLevel.value : undefined,
+    // Service level is encoded in the TNS alias suffix (e.g. dbname_low, dbname_medium)
+    serviceLevel: undefined,
   }
 }
 
@@ -402,10 +419,6 @@ function onOracleMethodChange(method: string | number) {
   oracleMethod.value = method as 'basic' | 'tns' | 'cloud_wallet'
   oracleTnsAlias.value = ''
   // Preserve host/port across method switches — don't clear user-entered values
-}
-
-function onServiceLevelChange(val: string) {
-  oracleServiceLevel.value = val as 'low' | 'medium' | 'high' | 'tp' | 'tpurgent'
 }
 
 function onTnsAliasChange(val: string) {
@@ -418,7 +431,8 @@ watch([oracleMethod, oracleSidOrService, oracleRole, oracleTnsAdminDir, oracleTn
 })
 
 // Load TNS aliases when directory changes (TNS or Cloud Wallet)
-async function loadTnsAliases(dir: string) {
+// Set preserveAlias=true when editing to avoid clearing a previously saved alias
+async function loadTnsAliases(dir: string, preserveAlias = false) {
   if (!dir) {
     tnsAliases.value = []
     return
@@ -426,16 +440,21 @@ async function loadTnsAliases(dir: string) {
   loadingAliases.value = true
   try {
     const raw = await jdbcApi.listTnsAliases(dir)
-    // Show all aliases as-is from tnsnames.ora
     tnsAliases.value = raw.sort()
-    if (tnsAliases.value.length === 0 && oracleTnsAlias.value) {
+    if (!preserveAlias && tnsAliases.value.length === 0 && oracleTnsAlias.value) {
+      oracleTnsAlias.value = ''
+    }
+    // In edit mode, drop the alias if it no longer exists in the loaded list
+    // (handles corrupted saved data, e.g. alias with repeated _medium suffix)
+    if (preserveAlias && oracleTnsAlias.value && tnsAliases.value.length > 0 && !tnsAliases.value.includes(oracleTnsAlias.value)) {
       oracleTnsAlias.value = ''
     }
   }
   catch (e) {
     console.error('Failed to list TNS aliases:', e)
     tnsAliases.value = []
-    if (oracleTnsAlias.value) oracleTnsAlias.value = ''
+    if (!preserveAlias && oracleTnsAlias.value)
+      oracleTnsAlias.value = ''
   }
   finally {
     loadingAliases.value = false
@@ -522,11 +541,16 @@ function validateForm(): boolean {
     }
   }
   else {
+    // Non-Oracle OR Oracle Basic: host, port, database (SID/Service Name) required
     if (!formData.value.host.trim()) {
       errors.host = t('components.serverForm.errors.hostRequired')
     }
     if (!formData.value.port || formData.value.port <= 0) {
       errors.port = t('components.serverForm.errors.portInvalid')
+    }
+    // For Oracle Basic, database field IS the SID/Service Name — required
+    if (isOracle.value && !formData.value.database?.trim()) {
+      errors.database = t('components.serverForm.errors.databaseRequired')
     }
 
     const dbTypeBackend = mapDatabaseTypeToBackend(formData.value.type)
@@ -541,14 +565,20 @@ function validateForm(): boolean {
 }
 
 async function handleTestConnection() {
-  if (testStatus.value === 'testing') return
-  if (!validateForm()) return
+  if (testStatus.value === 'testing')
+    return
+  if (!validateForm())
+    return
 
   testStatus.value = 'testing'
   testError.value = ''
 
   // Reset steps to pending — checks will promote to done or running
-  setupSteps.value.forEach(s => { s.status = 'pending'; s.progress = undefined; s.error = undefined })
+  setupSteps.value.forEach((s) => {
+    s.status = 'pending'
+    s.progress = undefined
+    s.error = undefined
+  })
 
   await startProgressListener()
 
@@ -565,7 +595,8 @@ async function handleTestConnection() {
       invoke('check_jre_status').then(async (status: any) => {
         if (!status.installed) {
           const ok = await runStep(jreStep)
-          if (!ok) throw new Error('JRE download failed')
+          if (!ok)
+            throw new Error('JRE download failed')
         }
         else { jreStep.status = 'done' }
       }),
@@ -573,7 +604,8 @@ async function handleTestConnection() {
       invoke('check_bridge_status').then(async (status: any) => {
         if (!status.installed) {
           const ok = await runStep(bridgeStep)
-          if (!ok) throw new Error('Bridge download failed')
+          if (!ok)
+            throw new Error('Bridge download failed')
         }
         else { bridgeStep.status = 'done' }
       }),
@@ -592,7 +624,8 @@ async function handleTestConnection() {
     // If JRE or Bridge failed, stop (keep steps visible with error state)
     if (results[0].status === 'rejected' || results[1].status === 'rejected') {
       const firstError = setupSteps.value.find(s => s.status === 'error')
-      if (firstError?.error) testError.value = firstError.error
+      if (firstError?.error)
+        testError.value = firstError.error
       return
     }
 
@@ -639,23 +672,31 @@ async function handleTestConnection() {
     // If the error is Java-related, also mark JRE as failed so user can retry it
     if (msg.includes('Unable to locate a Java Runtime') || msg.includes('Java not found')) {
       const jreStep = setupSteps.value.find(s => s.id === 'jre')
-      if (jreStep) { jreStep.status = 'error'; jreStep.error = 'JRE is missing or broken' }
+      if (jreStep) {
+        jreStep.status = 'error'
+        jreStep.error = 'JRE is missing or broken'
+      }
     }
     const running = setupSteps.value.find(s => s.status === 'running')
-    if (running) { running.status = 'error'; running.error = msg }
+    if (running) {
+      running.status = 'error'
+      running.error = msg
+    }
   }
 
   // If testStatus is error but testError is empty, collect from first errored step
   if (testStatus.value === 'error' && !testError.value) {
     const firstError = setupSteps.value.find(s => s.status === 'error')
-    if (firstError?.error) testError.value = firstError.error
+    if (firstError?.error)
+      testError.value = firstError.error
   }
 }
 
 /** Retry an individual setup step by its id */
 async function retryStep(stepId: string) {
   const step = setupSteps.value.find(s => s.id === stepId)
-  if (!step || step.status !== 'error') return
+  if (!step || step.status !== 'error')
+    return
 
   if (stepId === 'driver') {
     // For driver/connection, re-run full test
@@ -680,7 +721,7 @@ async function retryStep(stepId: string) {
     // If all dependencies are now done, try connecting
     const allReady = setupSteps.value.every(s => s.status === 'done')
     if (allReady && stepId !== 'driver') {
-      handleTestConnection()
+      await handleTestConnection()
     }
   }
   catch (e) {
@@ -1224,12 +1265,16 @@ function handleSave() {
                   </div>
                 </div>
                 <div class="space-y-2">
-                  <Label for="oracle-svc">{{ databaseLabel }}</Label>
+                  <Label for="oracle-svc">{{ databaseLabel }}<span class="text-destructive ml-0.5">*</span></Label>
                   <Input
                     id="oracle-svc"
                     v-model="formData.database"
                     :placeholder="databaseLabel"
+                    :class="{ 'border-destructive': formErrors.database }"
                   />
+                  <p v-if="formErrors.database" class="text-sm text-destructive">
+                    {{ formErrors.database }}
+                  </p>
                 </div>
               </TabsContent>
 
@@ -1256,6 +1301,10 @@ function handleSave() {
                   <Label>{{ t('components.serverForm.oracle.tnsAlias') }}<span class="text-destructive ml-0.5">*</span></Label>
                   <p v-if="loadingAliases" class="text-sm text-muted-foreground">
                     {{ t('components.serverForm.oracle.loadingAliases') }}
+                  </p>
+                  <!-- Show saved alias value when aliases haven't loaded yet (edit mode) -->
+                  <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir && oracleTnsAlias" class="text-sm text-muted-foreground">
+                    {{ oracleTnsAlias }}
                   </p>
                   <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
                     No aliases found in selected directory
@@ -1300,47 +1349,28 @@ function handleSave() {
                     {{ formErrors.tnsAdminDir }}
                   </p>
                 </div>
-                <div class="gap-4 grid grid-cols-2">
-                  <div class="space-y-2">
-                    <Label>{{ t('components.serverForm.oracle.walletPassword') }}</Label>
+                <div class="space-y-2">
+                  <Label>{{ t('components.serverForm.oracle.walletPassword') }}</Label>
+                  <div class="relative">
                     <Input
                       v-model="oracleWalletPassword"
-                      type="password"
+                      :type="showPasswords.wallet ? 'text' : 'password'"
                       :placeholder="t('components.serverForm.oracle.walletPassword')"
+                      class="pr-8"
                     />
-                  </div>
-                  <div class="space-y-2">
-                    <Label>{{ t('components.serverForm.oracle.serviceLevel') }}<span class="text-destructive ml-0.5">*</span></Label>
-                    <Select :model-value="oracleServiceLevel" @update:model-value="onServiceLevelChange">
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectItem value="low">
-                            {{ t('components.serverForm.oracle.serviceLevels.low') }}
-                          </SelectItem>
-                          <SelectItem value="medium">
-                            {{ t('components.serverForm.oracle.serviceLevels.medium') }}
-                          </SelectItem>
-                          <SelectItem value="high">
-                            {{ t('components.serverForm.oracle.serviceLevels.high') }}
-                          </SelectItem>
-                          <SelectItem value="tp">
-                            {{ t('components.serverForm.oracle.serviceLevels.tp') }}
-                          </SelectItem>
-                          <SelectItem value="tpurgent">
-                            {{ t('components.serverForm.oracle.serviceLevels.tpurgent') }}
-                          </SelectItem>
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
+                    <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('wallet')">
+                      <span class="i-carbon-view h-4 w-4 block" />
+                    </button>
                   </div>
                 </div>
                 <div class="space-y-2">
                   <Label>{{ t('components.serverForm.oracle.tnsAlias') }}<span class="text-destructive ml-0.5">*</span></Label>
                   <p v-if="loadingAliases" class="text-sm text-muted-foreground">
                     {{ t('components.serverForm.oracle.loadingAliases') }}
+                  </p>
+                  <!-- Show saved alias value when aliases haven't loaded yet (edit mode) -->
+                  <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir && oracleTnsAlias" class="text-sm text-muted-foreground">
+                    {{ oracleTnsAlias }}
                   </p>
                   <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
                     No aliases found in selected wallet directory
@@ -1457,13 +1487,19 @@ function handleSave() {
           </div>
           <div class="space-y-2">
             <Label for="password">{{ t('components.serverForm.labels.password') }}</Label>
-            <Input
-              id="password"
-              v-model="formData.password"
-              type="password"
-              :placeholder="t('components.serverForm.placeholders.password')"
-              autocomplete="new-password"
-            />
+            <div class="relative">
+              <Input
+                id="password"
+                v-model="formData.password"
+                :type="showPasswords.db ? 'text' : 'password'"
+                :placeholder="t('components.serverForm.placeholders.password')"
+                autocomplete="new-password"
+                class="pr-8"
+              />
+              <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('db')">
+                <span class="i-carbon-view h-4 w-4 block" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1542,7 +1578,12 @@ function handleSave() {
               <template v-if="formData.sshTunnel.authMethod === 'password'">
                 <div class="space-y-2">
                   <Label for="ssh-password">{{ t('components.serverForm.ssh.sshPassword') }}</Label>
-                  <Input id="ssh-password" v-model="formData.sshTunnel.password" type="password" :placeholder="t('components.serverForm.ssh.sshPasswordPlaceholder')" autocomplete="off" />
+                  <div class="relative">
+                    <Input id="ssh-password" v-model="formData.sshTunnel.password" :type="showPasswords.ssh ? 'text' : 'password'" :placeholder="t('components.serverForm.ssh.sshPasswordPlaceholder')" autocomplete="off" class="pr-8" />
+                    <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('ssh')">
+                      <span class="i-carbon-view h-4 w-4 block" />
+                    </button>
+                  </div>
                 </div>
               </template>
 
@@ -1553,7 +1594,12 @@ function handleSave() {
                 </div>
                 <div class="space-y-2">
                   <Label for="ssh-passphrase">{{ t('components.serverForm.ssh.passphraseOptional') }}</Label>
-                  <Input id="ssh-passphrase" v-model="formData.sshTunnel.privateKeyPassphrase" type="password" :placeholder="t('components.serverForm.ssh.keyPassphrasePlaceholder')" autocomplete="off" />
+                  <div class="relative">
+                    <Input id="ssh-passphrase" v-model="formData.sshTunnel.privateKeyPassphrase" :type="showPasswords.sshkey ? 'text' : 'password'" :placeholder="t('components.serverForm.ssh.keyPassphrasePlaceholder')" autocomplete="off" class="pr-8" />
+                    <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('sshkey')">
+                      <span class="i-carbon-view h-4 w-4 block" />
+                    </button>
+                  </div>
                 </div>
               </template>
 
@@ -1579,31 +1625,31 @@ function handleSave() {
             <div
               v-for="step in setupSteps"
               :key="step.id"
-              class="flex items-center gap-2 text-xs min-w-0"
+              class="text-xs flex gap-2 min-w-0 items-center"
               :class="step.status === 'done' ? 'text-green-600 dark:text-green-400' : step.status === 'running' ? 'text-foreground' : step.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'"
             >
-              <span v-if="step.status === 'done'" class="i-carbon-checkmark h-3.5 w-3.5 shrink-0" />
-              <span v-else-if="step.status === 'running' && !step.progress" class="i-carbon-loading h-3.5 w-3.5 animate-spin shrink-0" />
-              <span v-else-if="step.status === 'running'" class="i-carbon-loading h-3.5 w-3.5 animate-spin shrink-0 text-blue-500" />
-              <span v-else-if="step.status === 'error'" class="i-carbon-close h-3.5 w-3.5 shrink-0" />
-              <span v-else class="i-carbon-circle-dash h-3.5 w-3.5 shrink-0" />
+              <span v-if="step.status === 'done'" class="i-carbon-checkmark shrink-0 h-3.5 w-3.5" />
+              <span v-else-if="step.status === 'running' && !step.progress" class="i-carbon-loading shrink-0 h-3.5 w-3.5 animate-spin" />
+              <span v-else-if="step.status === 'running'" class="i-carbon-loading text-blue-500 shrink-0 h-3.5 w-3.5 animate-spin" />
+              <span v-else-if="step.status === 'error'" class="i-carbon-close shrink-0 h-3.5 w-3.5" />
+              <span v-else class="i-carbon-circle-dash shrink-0 h-3.5 w-3.5" />
               <span class="font-medium whitespace-nowrap">{{ step.label }}</span>
               <!-- Spacer + progress bar: fill remaining space -->
-              <span v-if="step.status === 'running' && step.progress" class="flex-1 flex items-center gap-1.5 min-w-0">
-                <span class="flex-1 bg-muted rounded-full h-1 min-w-[40px]">
+              <span v-if="step.status === 'running' && step.progress" class="flex flex-1 gap-1.5 min-w-0 items-center">
+                <span class="rounded-full bg-muted flex-1 h-1 min-w-[40px]">
                   <span
-                    class="block bg-primary rounded-full h-1 transition-all duration-300"
+                    class="rounded-full bg-primary h-1 block transition-all duration-300"
                     :style="{ width: `${Math.min(100, (step.progress.downloaded / step.progress.total) * 100)}%` }"
                   />
                 </span>
-                <span class="tabular-nums text-muted-foreground shrink-0 w-[3.5ch] text-right">{{ Math.round(step.progress.downloaded / 1024 / 1024 * 10) / 10 }} MB</span>
+                <span class="text-muted-foreground text-right shrink-0 w-[3.5ch] tabular-nums">{{ Math.round(step.progress.downloaded / 1024 / 1024 * 10) / 10 }} MB</span>
               </span>
               <!-- Error + retry button (pushed right) -->
-              <span v-if="step.status === 'error'" class="flex-1 flex items-center justify-end gap-1.5 min-w-0">
-                <span class="text-red-500 truncate text-right max-w-[200px]">{{ step.error || 'Failed' }}</span>
+              <span v-if="step.status === 'error'" class="flex flex-1 gap-1.5 min-w-0 items-center justify-end">
+                <span class="text-red-500 text-right max-w-[200px] truncate">{{ step.error || 'Failed' }}</span>
                 <button
                   type="button"
-                  class="inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0"
+                  class="text-muted-foreground inline-flex shrink-0 gap-0.5 cursor-pointer transition-colors items-center hover:text-foreground"
                   :title="`Retry ${step.label}`"
                   @click="retryStep(step.id)"
                 >
@@ -1612,29 +1658,31 @@ function handleSave() {
               </span>
             </div>
             <!-- Loading state during connection test (always visible when testing after steps) -->
-            <div v-if="testStatus === 'testing'" class="flex items-center gap-1.5 pt-1 text-xs text-blue-600 dark:text-blue-400 border-t border-border/50 mt-1.5">
-              <span class="i-carbon-loading h-3.5 w-3.5 animate-spin shrink-0" />
+            <div v-if="testStatus === 'testing'" class="text-xs text-blue-600 mt-1.5 pt-1 border-t border-border/50 flex gap-1.5 items-center dark:text-blue-400">
+              <span class="i-carbon-loading shrink-0 h-3.5 w-3.5 animate-spin" />
               <span class="font-medium">{{ t('common.status.testing') }}</span>
             </div>
             <!-- Summary result -->
-            <div v-if="testStatus === 'success'" class="flex items-center gap-1.5 pt-1 text-xs text-green-600 dark:text-green-400 border-t border-border/50 mt-1.5">
-              <span class="i-carbon-checkmark h-3.5 w-3.5 shrink-0" />
+            <div v-if="testStatus === 'success'" class="text-xs text-green-600 mt-1.5 pt-1 border-t border-border/50 flex gap-1.5 items-center dark:text-green-400">
+              <span class="i-carbon-checkmark shrink-0 h-3.5 w-3.5" />
               <span class="font-medium">{{ t('common.status.success') }}</span>
             </div>
-            <div v-else-if="testStatus === 'error'" class="pt-1 text-xs text-red-600 dark:text-red-400 border-t border-border/50 mt-1.5 space-y-0.5">
-              <div class="flex items-center gap-1.5">
-                <span class="i-carbon-close h-3.5 w-3.5 shrink-0" />
+            <div v-else-if="testStatus === 'error'" class="text-xs text-red-600 mt-1.5 pt-1 border-t border-border/50 space-y-0.5 dark:text-red-400">
+              <div class="flex gap-1.5 items-center">
+                <span class="i-carbon-close shrink-0 h-3.5 w-3.5" />
                 <span class="font-medium">{{ t('common.status.failed') }}</span>
                 <button
                   type="button"
-                  class="ml-1 inline-flex items-center gap-0.5 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  class="text-muted-foreground ml-1 inline-flex gap-0.5 cursor-pointer transition-colors items-center hover:text-foreground"
                   @click="handleTestConnection"
                 >
                   <span class="i-carbon-renew h-3 w-3" />
                   <span class="text-xs">Retry</span>
                 </button>
               </div>
-              <p v-if="testError" class="pl-5 text-red-500">{{ testError }}</p>
+              <p v-if="testError" class="text-red-500 pl-5">
+                {{ testError }}
+              </p>
             </div>
           </div>
         </div>

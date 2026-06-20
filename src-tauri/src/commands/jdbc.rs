@@ -93,7 +93,7 @@ pub async fn download_driver(db_type: String) -> Result<(), String> {
     // Start a temporary Java bridge process to resolve the driver
     let bridge_jar = download::bridge_jar_path();
     let mut launcher = JdbcBridgeLauncher::new(bridge_jar);
-    launcher.start().map_err(|e| e.to_string())?;
+    launcher.start(&[]).map_err(|e| e.to_string())?;
 
     let req = JdbcRequest::new(
         JdbcMethod::ResolveDriver,

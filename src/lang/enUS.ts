@@ -999,6 +999,7 @@ export const enUS = {
       errors: {
         nameRequired: 'Connection name is required',
         hostRequired: 'Host is required',
+        databaseRequired: 'SID / Service Name is required',
         filePathRequired: 'Database file path is required',
         portInvalid: 'Port must be a positive number',
         filePickerFailed: 'Failed to open file picker',
