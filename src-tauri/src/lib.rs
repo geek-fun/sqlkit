@@ -98,6 +98,14 @@ pub fn run() {
             // Store AppHandle globally for capability handlers and agent
             let _ = APP_HANDLE.set(handle.clone());
 
+            // Disable native decorations so data-tauri-drag-region works for
+            // the custom header. On macOS with titleBarStyle:Overlay, this
+            // removes the native titlebar making the drag-region active.
+            #[cfg(target_os = "macos")]
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_decorations(false);
+            }
+
             // Start connection guardian for health monitoring + auto-reconnect
             let guardian = ConnectionGuardian::new(app_state.clone());
             tauri::async_runtime::spawn(guardian.run());
