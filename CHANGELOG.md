@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-06-21
+
+### Added
+
+- Consolidate DM8 and DM8Oracle into a single Dameng database type
+- Add connection resilience layer — health guardian, trait dispatch, LRU cache, JDBC driver expansion (#109)
+- Add custom window controls with draggable regions across platforms
+- Add Oracle Cloud Wallet (ATP/ADW) connection support
+- Enhance Oracle connection form with 3 connection methods and robust JRE download
+
+### Fixed
+
+- Aggregate multi-statement SQL results properly in JDBC bridge
+- Enable schema browser for JDBC databases and show Actions column in query results
+- Split multi-statement SQL in JDBC bridge and make list_connections resilient
+- Fix Oracle DB listDatabases returning empty causing broken DB browser
+- Fix agent self-healing, tool timeout, JDBC bridge hang, and UI polish
+- Expand download_jdbc_driver_direct to all 22 JDBC databases
+- Complete trait migration for remaining match arms in browse and explain_query
+- Fix MySQL list_schemas regression — return only requested database
+- Fix connection P0 connect timeout and P1 evict_idle logic bug
+- Fix Oracle connection form issues and show full TNS alias names as-is
+- Fix window dragging behavior across platforms
+- Fix cross-database audit issues in JDBC bridge
+
+### Changed
+
+- Update READMEs for Dameng DM8 consolidation
+
 ## [0.7.1] - 2026-06-19
 
 ### Added
