@@ -99,8 +99,9 @@ pub fn run() {
             let _ = APP_HANDLE.set(handle.clone());
 
             // Start connection guardian for health monitoring + auto-reconnect
-            let guardian = ConnectionGuardian::new(app_state.clone());
-            tauri::async_runtime::spawn(guardian.run());
+            let guardian = Arc::new(ConnectionGuardian::new(app_state.clone()));
+            let _ = GUARDIAN.set(guardian.clone());
+            tauri::async_runtime::spawn(async move { guardian.run().await });
 
             tauri::async_runtime::spawn(async move {
                 store.set_app_handle(handle.clone()).await;

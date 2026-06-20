@@ -169,4 +169,18 @@ impl ConnectionHandle for ActiveConnection {
     async fn disconnect(&self) -> DbResult<()> {
         delegate!(self, disconnect)
     }
+
+    async fn query_timeout_secs(&self) -> u64 {
+        match self {
+            ActiveConnection::Postgres(a) => a.lock().await.get_config().query_timeout_secs,
+            ActiveConnection::MySQL(a) => a.lock().await.get_config().query_timeout_secs,
+            ActiveConnection::SQLServer(a) => a.lock().await.get_config().query_timeout_secs,
+            ActiveConnection::SQLite(a) => a.lock().await.get_config().query_timeout_secs,
+            ActiveConnection::ClickHouse(a) => a.lock().await.get_config().query_timeout_secs,
+            ActiveConnection::JdbcBridge(a) => a.lock().await.get_config().query_timeout_secs,
+            ActiveConnection::HttpSql(a) => a.lock().await.get_config().query_timeout_secs,
+            ActiveConnection::Rqlite(a) => a.lock().await.get_config().query_timeout_secs,
+            ActiveConnection::Turso(a) => a.lock().await.get_config().query_timeout_secs,
+        }
+    }
 }

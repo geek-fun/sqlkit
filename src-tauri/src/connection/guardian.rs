@@ -106,7 +106,7 @@ impl ConnectionGuardian {
 
     /// Start the guardian background task in the given runtime.
     /// The caller is responsible for spawning via `tauri::async_runtime::spawn`.
-    pub async fn run(self) {
+    pub async fn run(self: Arc<Self>) {
         self.run_loop().await;
     }
 

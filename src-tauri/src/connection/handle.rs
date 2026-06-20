@@ -36,4 +36,5 @@ pub trait ConnectionHandle: Send + Sync {
     async fn drop_object(&self, database: Option<&str>, schema: Option<&str>, object_name: &str, object_type: &str) -> DbResult<()>;
     async fn rename_object(&self, database: Option<&str>, schema: Option<&str>, object_name: &str, object_type: &str, new_name: &str) -> DbResult<()>;
     async fn disconnect(&self) -> DbResult<()>;
+    async fn query_timeout_secs(&self) -> u64;
 }

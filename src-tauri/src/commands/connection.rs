@@ -1,3 +1,4 @@
+use crate::connection::handle::ConnectionHandle;
 use crate::database::{ConnectionStatus, DatabaseAdapter};
 use crate::state::{ActiveConnection, AppState};
 use tauri::State;
@@ -25,46 +26,7 @@ pub async fn connect_server(
     drop(connections);
     let status = tokio::time::timeout(
         std::time::Duration::from_secs(timeout_secs),
-        async {
-            match &connection {
-                ActiveConnection::Postgres(adapter) => {
-                    let a = adapter.lock().await;
-                    a.test_connection().await
-                }
-                ActiveConnection::MySQL(adapter) => {
-                    let a = adapter.lock().await;
-                    a.test_connection().await
-                }
-                ActiveConnection::SQLServer(adapter) => {
-                    let a = adapter.lock().await;
-                    a.test_connection().await
-                }
-                ActiveConnection::SQLite(adapter) => {
-                    let a = adapter.lock().await;
-                    a.test_connection().await
-                }
-                ActiveConnection::ClickHouse(adapter) => {
-                    let a = adapter.lock().await;
-                    a.test_connection().await
-                }
-                ActiveConnection::JdbcBridge(adapter) => {
-                    let a = adapter.lock().await;
-                    a.test_connection().await
-                }
-                ActiveConnection::HttpSql(adapter) => {
-                    let a = adapter.lock().await;
-                    a.test_connection().await
-                }
-                ActiveConnection::Rqlite(adapter) => {
-                    let a = adapter.lock().await;
-                    a.test_connection().await
-                }
-                ActiveConnection::Turso(adapter) => {
-                    let a = adapter.lock().await;
-                    a.test_connection().await
-                }
-            }
-        },
+        connection.test_connection(),
     )
     .await
     .map_err(|_| format!("Connection timed out after {} seconds", timeout_secs))?
@@ -83,17 +45,7 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
         .remove(&id)
         .ok_or_else(|| format!("No active connection found for server '{}'", id))?;
 
-    let disconnect_result = match connection {
-        ActiveConnection::Postgres(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::MySQL(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::SQLServer(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::SQLite(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::ClickHouse(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::HttpSql(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::Rqlite(adapter) => adapter.lock().await.disconnect().await,
-        ActiveConnection::Turso(adapter) => adapter.lock().await.disconnect().await,
-    };
+    let disconnect_result = connection.disconnect().await;
 
     if let Err(e) = disconnect_result {
         eprintln!(
@@ -101,6 +53,8 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
             id, e
         );
     }
+
+    state.cache.remove_all(&id).await;
 
     Ok(())
 }
