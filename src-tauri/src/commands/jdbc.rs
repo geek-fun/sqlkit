@@ -139,7 +139,7 @@ fn parse_db_type(s: &str) -> Result<DatabaseType, String> {
         "h2" => Ok(DatabaseType::H2),
         "derby" => Ok(DatabaseType::Derby),
         "snowflake" => Ok(DatabaseType::Snowflake),
-        "dm8_oracle" | "dm8oracle" => Ok(DatabaseType::DM8Oracle),
+        "dameng" | "dm8" | "dm" | "dm8_oracle" | "dm8oracle" => Ok(DatabaseType::Dameng),
         "xugudb" | "xugu" => Ok(DatabaseType::XuguDB),
         "gbase8a" | "gbase_8a" => Ok(DatabaseType::GBase8a),
         "hive" => Ok(DatabaseType::Hive),

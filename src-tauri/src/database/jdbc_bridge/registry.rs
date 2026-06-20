@@ -175,7 +175,7 @@ fn db_type_to_registry_key(db: DatabaseType) -> Option<&'static str> {
         DatabaseType::Derby => Some("derby"),
         DatabaseType::Snowflake => Some("snowflake"),
         DatabaseType::TDengine => Some("tdengine"),
-        DatabaseType::DM8Oracle => Some("dm8_oracle"),
+        DatabaseType::Dameng => Some("dameng"),
         DatabaseType::XuguDB => Some("xugudb"),
         DatabaseType::GBase8a => Some("gbase8a"),
         DatabaseType::Hive => Some("hive"),
@@ -321,12 +321,12 @@ mod tests {
 
     #[test]
     fn test_build_jdbc_url_no_database_placeholder() {
-        // DM8 template has no {database} — should remain unchanged
+        // Dameng DM8 template has no {database} — should remain unchanged
         let config = DatabaseDriverConfig {
-            name: "DM8".into(),
+            name: "达梦 Dameng".into(),
             class_name: "dm.jdbc.driver.DmDriver".into(),
             maven_group: "com.dameng".into(),
-            maven_artifact: "DmJdbcDriver".into(),
+            maven_artifact: "DmJdbcDriver8".into(),
             jdbc_url_template: "jdbc:dm://{host}:{port}".into(),
             jdbc_url_template_service: None,
             default_port: Some(5236),
