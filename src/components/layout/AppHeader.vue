@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
+import { computed } from 'vue'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { usePlatform } from '@/composables/usePlatform'
+import { shouldReserveMacTrafficLightInset, useWindowControls } from '@/composables/useWindowControls'
 import { useTransferStore } from '@/store/transferStore'
+import WindowControls from './WindowControls.vue'
 
 defineProps<{
   hideAiButton?: boolean
@@ -15,10 +19,24 @@ const emit = defineEmits<{
 
 const transferStore = useTransferStore()
 const { taskCount } = storeToRefs(transferStore)
+
+const windowControls = useWindowControls()
+const { isMac, platformReady } = usePlatform()
+
+const trafficLightInset = computed(() => {
+  if (!platformReady.value)
+    return '78px'
+  return shouldReserveMacTrafficLightInset(isMac.value, windowControls.isFullscreen.value, true) ? '78px' : '0px'
+})
 </script>
 
 <template>
-  <div class="pl-[90px] pr-2 border-b bg-muted/30 flex shrink-0 gap-1 h-10 items-center overflow-hidden" data-tauri-drag-region>
+  <div
+    class="pr-2 border-b bg-muted/30 flex shrink-0 gap-1 h-10 items-center overflow-hidden"
+    :style="{ paddingLeft: trafficLightInset }"
+    data-tauri-drag-region
+  >
+    <WindowControls />
     <span class="text-xs text-muted-foreground font-semibold select-none">SqlKit</span>
     <div class="flex-1" data-tauri-drag-region />
 

@@ -20,7 +20,7 @@ const { t } = useI18n()
 <template>
   <aside class="border-r bg-background flex flex-shrink-0 flex-col h-full w-16 z-50">
     <!-- Logo -->
-    <div class="border-b flex h-14 items-center justify-center">
+    <div class="border-b flex h-14 items-center justify-center" data-tauri-drag-region>
       <div class="text-lg text-white font-bold rounded-md bg-primary flex h-8 w-8 items-center justify-center">
         S
       </div>
