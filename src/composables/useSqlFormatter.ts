@@ -39,7 +39,6 @@ const dialectMap: Record<string, string> = {
   [DatabaseType.OCEANBASE]: 'mysql',
   [DatabaseType.TDSQL]: 'mysql',
   [DatabaseType.POLARDB]: 'mysql',
-  [DatabaseType.DM8]: 'mysql',
   [DatabaseType.DORIS]: 'mysql',
   [DatabaseType.SELECTDB]: 'mysql',
   [DatabaseType.STARROCKS]: 'mysql',
@@ -56,7 +55,7 @@ const dialectMap: Record<string, string> = {
   [DatabaseType.CLICKHOUSE]: 'clickhouse',
 
   [DatabaseType.ORACLE]: 'plsql',
-  [DatabaseType.DM8ORACLE]: 'plsql',
+  [DatabaseType.DAMENG]: 'plsql',
 
   [DatabaseType.DB2]: 'db2',
 

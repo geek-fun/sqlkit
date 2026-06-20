@@ -29,7 +29,7 @@ export enum DatabaseType {
   OCEANBASE = 'OCEANBASE',
   TDSQL = 'TDSQL',
   POLARDB = 'POLARDB',
-  DM8 = 'DM8',
+  DAMENG = 'DAMENG',
   DORIS = 'DORIS',
   SELECTDB = 'SELECTDB',
   STARROCKS = 'STARROCKS',
@@ -40,7 +40,6 @@ export enum DatabaseType {
   DB2 = 'DB2',
   H2 = 'H2',
   SNOWFLAKE = 'SNOWFLAKE',
-  DM8ORACLE = 'DM8ORACLE',
   XUGUDB = 'XUGUDB',
   GBASE8A = 'GBASE8A',
   TRINO = 'TRINO',
@@ -101,7 +100,7 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.OCEANBASE]: MYSQL_BACKEND,
   [DatabaseType.TDSQL]: MYSQL_BACKEND,
   [DatabaseType.POLARDB]: MYSQL_BACKEND,
-  [DatabaseType.DM8]: MYSQL_BACKEND,
+  [DatabaseType.DAMENG]: 'dameng',
   [DatabaseType.DORIS]: MYSQL_BACKEND,
   [DatabaseType.SELECTDB]: MYSQL_BACKEND,
   [DatabaseType.STARROCKS]: MYSQL_BACKEND,
@@ -112,7 +111,6 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.DB2]: 'db2',
   [DatabaseType.H2]: 'h2',
   [DatabaseType.SNOWFLAKE]: 'snowflake',
-  [DatabaseType.DM8ORACLE]: 'dm8_oracle',
   [DatabaseType.XUGUDB]: 'xugudb',
   [DatabaseType.GBASE8A]: 'gbase8a',
   [DatabaseType.TRINO]: 'trino',
@@ -156,7 +154,7 @@ export const dbTypeFromBackend: Record<string, DatabaseType> = {
   db2: DatabaseType.DB2,
   h2: DatabaseType.H2,
   snowflake: DatabaseType.SNOWFLAKE,
-  dm8_oracle: DatabaseType.DM8ORACLE,
+  dameng: DatabaseType.DAMENG,
   xugudb: DatabaseType.XUGUDB,
   gbase8a: DatabaseType.GBASE8A,
   trino: DatabaseType.TRINO,
@@ -209,7 +207,7 @@ export function isJdbcDatabase(type: DatabaseType): boolean {
     DatabaseType.DB2,
     DatabaseType.H2,
     DatabaseType.SNOWFLAKE,
-    DatabaseType.DM8ORACLE,
+    DatabaseType.DAMENG,
     DatabaseType.XUGUDB,
     DatabaseType.GBASE8A,
     DatabaseType.DERBY,
@@ -236,7 +234,7 @@ export const jdbcDatabaseTypes: DatabaseType[] = [
   DatabaseType.DB2,
   DatabaseType.H2,
   DatabaseType.SNOWFLAKE,
-  DatabaseType.DM8ORACLE,
+  DatabaseType.DAMENG,
   DatabaseType.XUGUDB,
   DatabaseType.GBASE8A,
   DatabaseType.DERBY,
@@ -504,27 +502,33 @@ export const useConnectionStore = defineStore('connectionStore', {
     async fetchConnections() {
       try {
         const result = await connectionApi.list()
-        this.connections = result.map((item: Record<string, unknown>) => ({
-          id: item.id as string,
-          name: item.name as string,
-          type: dbTypeFromBackend[item.db_type as string] || DatabaseType.POSTGRESQL,
-          host: item.host as string,
-          port: item.port as number,
-          username: item.username as string,
-          password: item.password as string | undefined,
-          database: item.database as string | undefined,
-          ssl: {
-            mode: sslModeFromBackend(item.ssl_mode as string | null).mode,
-            caCertPath: item.ssl_ca_cert as string | undefined,
-            clientCertPath: item.ssl_client_cert as string | undefined,
-            clientKeyPath: item.ssl_client_key as string | undefined,
-            trustServerCertificate: item.trust_server_certificate as boolean | undefined,
-          },
-          sshTunnel: extractSshTunnelFromTransport(item.transport_layers),
-          oracleOptions: extractOracleOptions(item.oracle_options),
-          isConnected: item.is_connected as boolean | undefined,
-          lastUsed: item.last_used ? new Date(item.last_used as string) : undefined,
-        }))
+        // The backend doesn't track runtime connection state, so we preserve
+        // `isConnected` from the existing store entries.
+        const existing = new Map(this.connections.map(c => [c.id, c.isConnected]))
+        this.connections = result.map((item: Record<string, unknown>) => {
+          const id = item.id as string
+          return {
+            id,
+            name: item.name as string,
+            type: dbTypeFromBackend[item.db_type as string] || DatabaseType.POSTGRESQL,
+            host: item.host as string,
+            port: item.port as number,
+            username: item.username as string,
+            password: item.password as string | undefined,
+            database: item.database as string | undefined,
+            ssl: {
+              mode: sslModeFromBackend(item.ssl_mode as string | null).mode,
+              caCertPath: item.ssl_ca_cert as string | undefined,
+              clientCertPath: item.ssl_client_cert as string | undefined,
+              clientKeyPath: item.ssl_client_key as string | undefined,
+              trustServerCertificate: item.trust_server_certificate as boolean | undefined,
+            },
+            sshTunnel: extractSshTunnelFromTransport(item.transport_layers),
+            oracleOptions: extractOracleOptions(item.oracle_options),
+            isConnected: existing.has(id) ? existing.get(id) : (item.is_connected as boolean | undefined),
+            lastUsed: item.last_used ? new Date(item.last_used as string) : undefined,
+          }
+        })
       }
       catch (error) {
         console.error('Failed to fetch connections:', error)

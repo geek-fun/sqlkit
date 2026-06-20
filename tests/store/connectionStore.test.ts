@@ -51,7 +51,7 @@ describe('connectionStore', () => {
       expect(dbTypeToBackend[DatabaseType.OCEANBASE]).toBe('MySQL')
       expect(dbTypeToBackend[DatabaseType.TDSQL]).toBe('MySQL')
       expect(dbTypeToBackend[DatabaseType.POLARDB]).toBe('MySQL')
-      expect(dbTypeToBackend[DatabaseType.DM8]).toBe('MySQL')
+      expect(dbTypeToBackend[DatabaseType.DAMENG]).toBe('dameng')
     })
 
     it('maps standalone native types correctly', () => {
@@ -68,7 +68,7 @@ describe('connectionStore', () => {
       expect(dbTypeToBackend[DatabaseType.DB2]).toBe('db2')
       expect(dbTypeToBackend[DatabaseType.H2]).toBe('h2')
       expect(dbTypeToBackend[DatabaseType.SNOWFLAKE]).toBe('snowflake')
-      expect(dbTypeToBackend[DatabaseType.DM8ORACLE]).toBe('dm8_oracle')
+      expect(dbTypeToBackend[DatabaseType.DAMENG]).toBe('dameng')
       expect(dbTypeToBackend[DatabaseType.XUGUDB]).toBe('xugudb')
       expect(dbTypeToBackend[DatabaseType.GBASE8A]).toBe('gbase8a')
     })

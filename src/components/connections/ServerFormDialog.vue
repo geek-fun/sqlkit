@@ -70,7 +70,7 @@ const defaultPorts: Record<string, number> = {
   [DatabaseType.OCEANBASE]: 2883,
   [DatabaseType.TDSQL]: 3306,
   [DatabaseType.POLARDB]: 3306,
-  [DatabaseType.DM8]: 5236,
+  [DatabaseType.DAMENG]: 5236,
   [DatabaseType.DORIS]: 9030,
   [DatabaseType.SELECTDB]: 9030,
   [DatabaseType.STARROCKS]: 9030,
@@ -81,7 +81,6 @@ const defaultPorts: Record<string, number> = {
   [DatabaseType.DB2]: 50000,
   [DatabaseType.H2]: 9092,
   [DatabaseType.SNOWFLAKE]: 443,
-  [DatabaseType.DM8ORACLE]: 5236,
   [DatabaseType.XUGUDB]: 5138,
   [DatabaseType.GBASE8A]: 5258,
   [DatabaseType.TRINO]: 8080,
@@ -1068,16 +1067,10 @@ function handleSave() {
                     {{ t('components.serverForm.databaseTypes.databend') }}
                   </div>
                 </SelectItem>
-                <SelectItem :value="DatabaseType.DM8">
+                <SelectItem :value="DatabaseType.DAMENG">
                   <div class="flex gap-2 items-center">
-                    <img :src="getDatabaseIcon(DatabaseType.DM8)" alt="" class="h-5 w-5 object-contain">
-                    {{ t('components.serverForm.databaseTypes.dm8') }}
-                  </div>
-                </SelectItem>
-                <SelectItem :value="DatabaseType.DM8ORACLE">
-                  <div class="flex gap-2 items-center">
-                    <img :src="getDatabaseIcon(DatabaseType.DM8ORACLE)" alt="" class="h-5 w-5 object-contain">
-                    {{ t('components.serverForm.databaseTypes.dm8oracle') }}
+                    <img :src="getDatabaseIcon(DatabaseType.DAMENG)" alt="" class="h-5 w-5 object-contain">
+                    {{ t('components.serverForm.databaseTypes.dameng') }}
                   </div>
                 </SelectItem>
                 <SelectItem :value="DatabaseType.GAUSSDB">

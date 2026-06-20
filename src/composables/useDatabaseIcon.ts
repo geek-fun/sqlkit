@@ -12,8 +12,7 @@ import databendLogo from '@/assets/images/database-icons/databend-logo.svg'
 import databricksLogo from '@/assets/images/database-icons/databricks-logo.svg'
 import db2Logo from '@/assets/images/database-icons/db2-logo.svg'
 import derbyLogo from '@/assets/images/database-icons/derby-logo.svg'
-import dm8Logo from '@/assets/images/database-icons/dm8-logo.svg'
-import dm8oracleLogo from '@/assets/images/database-icons/dm8oracle-logo.svg'
+import damengLogo from '@/assets/images/database-icons/dm8-logo.svg'
 import dorisLogo from '@/assets/images/database-icons/doris-logo.svg'
 import duckdbLogo from '@/assets/images/database-icons/duckdb-logo.svg'
 import enterprisedbLogo from '@/assets/images/database-icons/enterprisedb-logo.svg'
@@ -94,7 +93,7 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   OCEANBASE: { icon: oceanbaseLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   TDSQL: { icon: tdsqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   POLARDB: { icon: polardbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
-  DM8: { icon: dm8Logo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  DAMENG: { icon: damengLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   DORIS: { icon: dorisLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
   SELECTDB: { icon: selectdbLogo, color: 'bg-cyan-100 dark:bg-cyan-900/30' },
   STARROCKS: { icon: starrocksLogo, color: 'bg-yellow-100 dark:bg-yellow-900/30' },
@@ -105,7 +104,6 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   DB2: { icon: db2Logo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   H2: { icon: h2Logo, color: 'bg-green-100 dark:bg-green-900/30' },
   SNOWFLAKE: { icon: snowflakeLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
-  DM8ORACLE: { icon: dm8oracleLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   XUGUDB: { icon: xugudbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   GBASE8A: { icon: gbaseLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   TRINO: { icon: trinoLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
