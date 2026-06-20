@@ -3,7 +3,7 @@ import type { OracleConnectionOptions, ServerConnection } from '@/store'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -161,6 +161,11 @@ async function startProgressListener() {
   })
   progressUnlisten.value = unlisten
 }
+
+// Clean up event listener on component unmount
+onUnmounted(() => {
+  progressUnlisten.value?.()
+})
 
 // Run a single setup step (JRE or Bridge) with its own invoke
 async function runStep(step: StepDef): Promise<boolean> {
@@ -396,14 +401,7 @@ function buildOracleOptionsFromRefs(): OracleConnectionOptions | undefined {
 function onOracleMethodChange(method: string | number) {
   oracleMethod.value = method as 'basic' | 'tns' | 'cloud_wallet'
   oracleTnsAlias.value = ''
-  if (method !== 'basic') {
-    formData.value.host = ''
-    formData.value.port = 0
-  }
-  else {
-    formData.value.host = formData.value.host || 'localhost'
-    formData.value.port = formData.value.port || 1521
-  }
+  // Preserve host/port across method switches — don't clear user-entered values
 }
 
 function onServiceLevelChange(val: string) {
@@ -517,10 +515,10 @@ function validateForm(): boolean {
   else if (isOracle.value && !showsStandardHostFields.value) {
     // Oracle TNS / Cloud Wallet: TNS admin dir and alias required
     if (!oracleTnsAdminDir.value.trim()) {
-      errors.tnsAdminDir = t('components.serverForm.errors.hostRequired')
+      errors.tnsAdminDir = t('components.serverForm.errors.tnsAdminDirRequired')
     }
     if (!oracleTnsAlias.value.trim()) {
-      errors.tnsAlias = t('components.serverForm.errors.hostRequired')
+      errors.tnsAlias = t('components.serverForm.errors.tnsAliasRequired')
     }
   }
   else {
@@ -543,6 +541,7 @@ function validateForm(): boolean {
 }
 
 async function handleTestConnection() {
+  if (testStatus.value === 'testing') return
   if (!validateForm()) return
 
   testStatus.value = 'testing'
@@ -660,7 +659,7 @@ async function retryStep(stepId: string) {
 
   if (stepId === 'driver') {
     // For driver/connection, re-run full test
-    handleTestConnection()
+    await handleTestConnection()
     return
   }
 
@@ -1242,12 +1241,16 @@ function handleSave() {
                     <Input
                       v-model="oracleTnsAdminDir"
                       :placeholder="t('components.serverForm.oracle.tnsAdminDir')"
+                      :class="{ 'border-destructive': formErrors.tnsAdminDir }"
                       class="flex-1"
                     />
                     <Button type="button" variant="outline" size="sm" @click="browseDirectory('tns')">
                       {{ t('components.serverForm.oracle.browse') }}
                     </Button>
                   </div>
+                  <p v-if="formErrors.tnsAdminDir" class="text-sm text-destructive">
+                    {{ formErrors.tnsAdminDir }}
+                  </p>
                 </div>
                 <div class="space-y-2">
                   <Label>{{ t('components.serverForm.oracle.tnsAlias') }}<span class="text-destructive ml-0.5">*</span></Label>
@@ -1261,7 +1264,7 @@ function handleSave() {
                     Select a TNS directory to load aliases
                   </p>
                   <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
-                    <SelectTrigger>
+                    <SelectTrigger :class="{ 'border-destructive': formErrors.tnsAlias }">
                       <SelectValue :placeholder="t('components.serverForm.oracle.tnsAlias')" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1272,6 +1275,9 @@ function handleSave() {
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                  <p v-if="formErrors.tnsAlias" class="text-sm text-destructive">
+                    {{ formErrors.tnsAlias }}
+                  </p>
                 </div>
               </TabsContent>
 
@@ -1283,12 +1289,16 @@ function handleSave() {
                     <Input
                       v-model="oracleTnsAdminDir"
                       :placeholder="t('components.serverForm.oracle.walletDir')"
+                      :class="{ 'border-destructive': formErrors.tnsAdminDir }"
                       class="flex-1"
                     />
                     <Button type="button" variant="outline" size="sm" @click="browseDirectory('wallet')">
                       {{ t('components.serverForm.oracle.browse') }}
                     </Button>
                   </div>
+                  <p v-if="formErrors.tnsAdminDir" class="text-sm text-destructive">
+                    {{ formErrors.tnsAdminDir }}
+                  </p>
                 </div>
                 <div class="gap-4 grid grid-cols-2">
                   <div class="space-y-2">
@@ -1339,7 +1349,7 @@ function handleSave() {
                     Select a wallet directory to load aliases
                   </p>
                   <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
-                    <SelectTrigger>
+                    <SelectTrigger :class="{ 'border-destructive': formErrors.tnsAlias }">
                       <SelectValue :placeholder="t('components.serverForm.oracle.tnsAlias')" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1350,6 +1360,9 @@ function handleSave() {
                       </SelectGroup>
                     </SelectContent>
                   </Select>
+                  <p v-if="formErrors.tnsAlias" class="text-sm text-destructive">
+                    {{ formErrors.tnsAlias }}
+                  </p>
                 </div>
               </TabsContent>
             </Tabs>

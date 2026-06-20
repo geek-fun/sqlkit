@@ -1002,6 +1002,8 @@ export const enUS = {
         filePathRequired: 'Database file path is required',
         portInvalid: 'Port must be a positive number',
         filePickerFailed: 'Failed to open file picker',
+        tnsAdminDirRequired: 'TNS admin directory is required',
+        tnsAliasRequired: 'TNS alias is required',
       },
       ssh: {
         useSshTunnel: 'Use SSH Tunnel',

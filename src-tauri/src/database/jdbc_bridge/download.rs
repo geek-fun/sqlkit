@@ -54,7 +54,7 @@ pub async fn download_to_path(url: &str, dest: &Path, event_label: &str, expecte
         )));
     }
 
-    let total = expected_size_hint.max(1);
+    let total = response.content_length().unwrap_or(expected_size_hint).max(1);
     let mut downloaded: u64 = 0;
 
     if let Some(parent) = dest.parent() {
