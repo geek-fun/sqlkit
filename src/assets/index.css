@@ -71,6 +71,10 @@ body {
   font-size: 14px;
 }
 
+[data-tauri-drag-region] {
+  -webkit-app-region: drag;
+}
+
 button:not(:disabled),
 [role='button']:not(:disabled) {
   cursor: pointer;
