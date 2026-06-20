@@ -351,7 +351,7 @@ fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
         "H2 Database" => DatabaseType::H2,
         "Apache Derby" => DatabaseType::Derby,
         "Snowflake" => DatabaseType::Snowflake,
-        "达梦 DM8" => DatabaseType::DM8Oracle,
+        "达梦 Dameng" => DatabaseType::Dameng,
         "虚谷 XuguDB" => DatabaseType::XuguDB,
         "GBase 8a" => DatabaseType::GBase8a,
         "Apache Hive" => DatabaseType::Hive,

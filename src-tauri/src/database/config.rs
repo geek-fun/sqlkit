@@ -84,8 +84,6 @@ pub enum DatabaseType {
     TDSQL,
     /// 阿里云 PolarDB (MySQL mode) — MySQL wire protocol.
     PolarDB,
-    /// 达梦 DM8 (MySQL mode, secondary) — MySQL wire protocol alias.
-    DM8,
     /// Apache Doris — MySQL wire protocol.
     Doris,
     /// SelectDB (Doris fork) — MySQL wire protocol.
@@ -139,8 +137,8 @@ pub enum DatabaseType {
     Iris,
     /// Microsoft Access — JDBC bridge.
     Access,
-    /// 达梦 DM8 (Oracle mode, primary) — JDBC bridge.
-    DM8Oracle,
+    /// 达梦 Dameng DM8 — JDBC bridge.
+    Dameng,
     /// 虚谷 XuguDB — JDBC bridge.
     XuguDB,
     /// 南大通用 GBase 8a — JDBC bridge.

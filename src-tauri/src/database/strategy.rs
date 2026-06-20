@@ -17,7 +17,6 @@ pub enum CoreDatabaseType {
     DB2,
     H2,
     Snowflake,
-    DM8Oracle,
     Trino,
     Presto,
 }
@@ -54,7 +53,7 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         // Native MySQL adapter
         MySQL => ConnectionStrategy::Native(CoreDatabaseType::MySQL),
         // MySQL wire protocol compat
-        MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 | Doris | SelectDB | StarRocks
+        MariaDB | TiDB | OceanBase | TDSQL | PolarDB | Doris | SelectDB | StarRocks
         | Databend | GoldenDB | ManticoreSearch
         | SingleStoreMemSQL | CloudSQLMySQL => {
             ConnectionStrategy::Native(CoreDatabaseType::MySQL)
@@ -73,7 +72,7 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         H2 => ConnectionStrategy::JdbcBridge,
         Snowflake => ConnectionStrategy::JdbcBridge,
         TDengine => ConnectionStrategy::JdbcBridge,
-        DM8Oracle => ConnectionStrategy::JdbcBridge,
+        Dameng => ConnectionStrategy::JdbcBridge,
         XuguDB => ConnectionStrategy::JdbcBridge,
         GBase8a => ConnectionStrategy::JdbcBridge,
         Derby => ConnectionStrategy::JdbcBridge,
@@ -124,7 +123,7 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
         | AlloyDB | CloudSQLPG | FujitsuPG => Some(5432),
         QuestDB => Some(8812),
         YashanDB => Some(1688),
-        MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | DM8 | GoldenDB
+        MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | GoldenDB
         | SingleStoreMemSQL | CloudSQLMySQL => Some(3306),
         Doris | SelectDB | StarRocks => Some(9030),
         Databend => Some(3307),
@@ -139,7 +138,7 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
         H2 => Some(9092),
         Snowflake => Some(443),
         TDengine => Some(6030),
-        DM8Oracle => Some(5236),
+        Dameng => Some(5236),
         XuguDB => Some(5138),
         GBase8a => Some(5258),
         Derby => Some(1527),
@@ -257,7 +256,7 @@ mod tests {
             DatabaseType::H2,
             DatabaseType::Snowflake,
             DatabaseType::TDengine,
-            DatabaseType::DM8Oracle,
+            DatabaseType::Dameng,
             DatabaseType::XuguDB,
             DatabaseType::GBase8a,
             DatabaseType::Derby,
@@ -305,7 +304,7 @@ mod tests {
         assert_eq!(default_port(DatabaseType::PostgreSQL), Some(5432));
         assert_eq!(default_port(DatabaseType::MySQL), Some(3306));
         assert_eq!(default_port(DatabaseType::SqlServer), Some(1433));
-        assert_eq!(default_port(DatabaseType::DM8Oracle), Some(5236));
+        assert_eq!(default_port(DatabaseType::Dameng), Some(5236));
         assert_eq!(default_port(DatabaseType::Oracle), Some(1521));
         assert_eq!(default_port(DatabaseType::Doris), Some(9030));
         assert_eq!(default_port(DatabaseType::SelectDB), Some(9030));

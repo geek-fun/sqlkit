@@ -143,13 +143,13 @@ version_error_signatures = [
   "Incompatible driver version",
 ]
 
-# ── 达梦 DM8 (Oracle mode) ──
+# ── 达梦 Dameng DM8 (JDBC bridge) ──
 
-[databases.dm8_oracle]
-name = "达梦 DM8"
+[databases.dameng]
+name = "达梦 Dameng"
 class_name = "dm.jdbc.driver.DmDriver"
 maven_group = "com.dameng"
-maven_artifact = "DmJdbcDriver"
+maven_artifact = "DmJdbcDriver8"
 jdbc_url_template = "jdbc:dm://{host}:{port}"
 default_port = 5236
 min_jre_version = "11"
