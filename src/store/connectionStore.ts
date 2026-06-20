@@ -1,8 +1,8 @@
 import type { SslConfig } from '@/types/connection'
+import { listen } from '@tauri-apps/api/event'
 import { defineStore } from 'pinia'
 import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
 import { connectionApi } from '../datasources'
-import { listen } from '@tauri-apps/api/event'
 
 export enum DatabaseType {
   MYSQL = 'MYSQL',
@@ -696,9 +696,11 @@ export const useConnectionStore = defineStore('connectionStore', {
         const { connection_id, state, error } = event.payload
         if (state === 'dead') {
           this.connectionStatus[connection_id] = ConnectionStatus.ERROR
-        } else if (state === 'reconnecting') {
+        }
+        else if (state === 'reconnecting') {
           this.connectionStatus[connection_id] = ConnectionStatus.CONNECTING
-        } else if (state === 'healthy' || state === 'degraded') {
+        }
+        else if (state === 'healthy' || state === 'degraded') {
           const conn = this.getConnectionById(connection_id)
           if (conn) {
             conn.isConnected = true

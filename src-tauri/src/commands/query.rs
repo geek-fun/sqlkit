@@ -12,7 +12,9 @@ use crate::database::{
     SqlServerAdapter, TursoAdapter,
 };
 use crate::state::{ActiveConnection, AppState};
+use std::sync::Arc;
 use tauri::State;
+use tokio::sync::Mutex;
 
 /// Extract raw plan text from a QueryResult.
 /// For JSON format (single row, single column), extracts the JSON string cleanly.
@@ -476,22 +478,23 @@ pub async fn explain_query(
         if let Some(kind) = temp_kind {
             return match kind {
                 TempExplainKind::Postgres(cfg) => {
-                    let database_type = "postgresql";
                     let mut temp = PostgresAdapter::new(cfg);
                     temp.connect().await.map_err(|e| {
                         format!("Failed to connect to database for EXPLAIN: {}", e)
                     })?;
+                    let connection = ActiveConnection::Postgres(Arc::new(Mutex::new(temp)));
+                    let database_type = "postgresql";
                     let explain_sql = if analyze {
                         format!("EXPLAIN (ANALYZE, FORMAT JSON) {}", sql)
                     } else {
                         format!("EXPLAIN (FORMAT JSON) {}", sql)
                     };
-                    let result = temp
+                    let result = connection
                         .execute_query(&explain_sql)
                         .await
                         .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
                     let raw = extract_plan_text(&result);
-                    let _ = temp.disconnect().await;
+                    let _ = connection.disconnect().await;
                     Ok(ExplainResult {
                         database_type: database_type.to_string(),
                         raw,
@@ -500,22 +503,23 @@ pub async fn explain_query(
                     })
                 }
                 TempExplainKind::MySQL(cfg) => {
-                    let database_type = "mysql";
                     let mut temp = MySQLAdapter::new(cfg);
                     temp.connect().await.map_err(|e| {
                         format!("Failed to connect to database for EXPLAIN: {}", e)
                     })?;
+                    let connection = ActiveConnection::MySQL(Arc::new(Mutex::new(temp)));
+                    let database_type = "mysql";
                     let (explain_sql, plan_format) = if analyze {
                         (format!("EXPLAIN ANALYZE {}", sql), "text")
                     } else {
                         (format!("EXPLAIN FORMAT=JSON {}", sql), "json")
                     };
-                    let result = temp
+                    let result = connection
                         .execute_query(&explain_sql)
                         .await
                         .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
                     let raw = extract_plan_text(&result);
-                    let _ = temp.disconnect().await;
+                    let _ = connection.disconnect().await;
                     Ok(ExplainResult {
                         database_type: database_type.to_string(),
                         raw,
@@ -524,11 +528,12 @@ pub async fn explain_query(
                     })
                 }
                 TempExplainKind::SQLServer(cfg) => {
-                    let database_type = "sqlserver";
                     let mut temp = SqlServerAdapter::new(cfg);
                     temp.connect().await.map_err(|e| {
                         format!("Failed to connect to database for EXPLAIN: {}", e)
                     })?;
+                    let connection = ActiveConnection::SQLServer(Arc::new(Mutex::new(temp)));
+                    let database_type = "sqlserver";
                     let settings = if analyze {
                         "SET STATISTICS PROFILE ON"
                     } else {
@@ -540,12 +545,12 @@ pub async fn explain_query(
                         "SET SHOWPLAN_TEXT OFF"
                     };
                     let explain_sql = format!("{}; {}; {}", settings, sql, cleanup);
-                    let result = temp
+                    let result = connection
                         .execute_query(&explain_sql)
                         .await
                         .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
                     let raw = extract_plan_text_for_sqlserver(&result);
-                    let _ = temp.disconnect().await;
+                    let _ = connection.disconnect().await;
                     Ok(ExplainResult {
                         database_type: database_type.to_string(),
                         raw,
@@ -554,18 +559,19 @@ pub async fn explain_query(
                     })
                 }
                 TempExplainKind::ClickHouse(cfg) => {
-                    let database_type = "clickhouse";
                     let mut temp = ClickHouseAdapter::new(cfg);
                     temp.connect().await.map_err(|e| {
                         format!("Failed to connect to database for EXPLAIN: {}", e)
                     })?;
+                    let connection = ActiveConnection::ClickHouse(Arc::new(Mutex::new(temp)));
+                    let database_type = "clickhouse";
                     let explain_sql = format!("EXPLAIN {}", sql);
-                    let result = temp
+                    let result = connection
                         .execute_query(&explain_sql)
                         .await
                         .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
                     let raw = extract_plan_text(&result);
-                    let _ = temp.disconnect().await;
+                    let _ = connection.disconnect().await;
                     Ok(ExplainResult {
                         database_type: database_type.to_string(),
                         raw,
@@ -574,18 +580,19 @@ pub async fn explain_query(
                     })
                 }
                 TempExplainKind::JdbcBridge(cfg) => {
-                    let database_type = "generic";
                     let mut temp = JdbcBridgeAdapter::new(cfg);
                     temp.connect().await.map_err(|e| {
                         format!("Failed to connect to database for EXPLAIN: {}", e)
                     })?;
+                    let connection = ActiveConnection::JdbcBridge(Arc::new(Mutex::new(temp)));
+                    let database_type = "generic";
                     let explain_sql = format!("EXPLAIN {}", sql);
-                    let result = temp
+                    let result = connection
                         .execute_query(&explain_sql)
                         .await
                         .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
                     let raw = extract_plan_text(&result);
-                    let _ = temp.disconnect().await;
+                    let _ = connection.disconnect().await;
                     Ok(ExplainResult {
                         database_type: database_type.to_string(),
                         raw,
@@ -594,18 +601,19 @@ pub async fn explain_query(
                     })
                 }
                 TempExplainKind::HttpSql(cfg) => {
-                    let database_type = "generic";
                     let mut temp = HttpSqlAdapter::new(cfg);
                     temp.connect().await.map_err(|e| {
                         format!("Failed to connect to database for EXPLAIN: {}", e)
                     })?;
+                    let connection = ActiveConnection::HttpSql(Arc::new(Mutex::new(temp)));
+                    let database_type = "generic";
                     let explain_sql = format!("EXPLAIN {}", sql);
-                    let result = temp
+                    let result = connection
                         .execute_query(&explain_sql)
                         .await
                         .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
                     let raw = extract_plan_text(&result);
-                    let _ = temp.disconnect().await;
+                    let _ = connection.disconnect().await;
                     Ok(ExplainResult {
                         database_type: database_type.to_string(),
                         raw,
@@ -614,18 +622,19 @@ pub async fn explain_query(
                     })
                 }
                 TempExplainKind::Rqlite(cfg) => {
-                    let database_type = "rqlite";
                     let mut temp = RqliteAdapter::new(cfg);
                     temp.connect().await.map_err(|e| {
                         format!("Failed to connect to database for EXPLAIN: {}", e)
                     })?;
+                    let connection = ActiveConnection::Rqlite(Arc::new(Mutex::new(temp)));
+                    let database_type = "rqlite";
                     let explain_sql = format!("EXPLAIN {}", sql);
-                    let result = temp
+                    let result = connection
                         .execute_query(&explain_sql)
                         .await
                         .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
                     let raw = extract_plan_text(&result);
-                    let _ = temp.disconnect().await;
+                    let _ = connection.disconnect().await;
                     Ok(ExplainResult {
                         database_type: database_type.to_string(),
                         raw,
@@ -634,18 +643,19 @@ pub async fn explain_query(
                     })
                 }
                 TempExplainKind::Turso(cfg) => {
-                    let database_type = "turso";
                     let mut temp = TursoAdapter::new(cfg);
                     temp.connect().await.map_err(|e| {
                         format!("Failed to connect to database for EXPLAIN: {}", e)
                     })?;
+                    let connection = ActiveConnection::Turso(Arc::new(Mutex::new(temp)));
+                    let database_type = "turso";
                     let explain_sql = format!("EXPLAIN {}", sql);
-                    let result = temp
+                    let result = connection
                         .execute_query(&explain_sql)
                         .await
                         .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
                     let raw = extract_plan_text(&result);
-                    let _ = temp.disconnect().await;
+                    let _ = connection.disconnect().await;
                     Ok(ExplainResult {
                         database_type: database_type.to_string(),
                         raw,
@@ -658,13 +668,15 @@ pub async fn explain_query(
     }
 
     // Common path: use the already-connected adapter
-    let connections = state.connections.read().await;
+    let connection = {
+        let connections = state.connections.read().await;
+        connections
+            .get(&connection_id)
+            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
+            .clone()
+    };
 
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
-
-    let database_type = match connection {
+    let database_type = match &connection {
         ActiveConnection::Postgres(_) => "postgresql",
         ActiveConnection::MySQL(_) => "mysql",
         ActiveConnection::SQLite(_) => "sqlite",
@@ -688,27 +700,23 @@ pub async fn explain_query(
         }
     }
 
-    let (result, plan_format) = match connection {
-        ActiveConnection::Postgres(adapter) => {
-            let adapter = adapter.lock().await;
+    let (explain_sql, plan_format) = match database_type {
+        "postgresql" => {
             let explain_sql = if analyze {
                 format!("EXPLAIN (ANALYZE, FORMAT JSON) {}", sql)
             } else {
                 format!("EXPLAIN (FORMAT JSON) {}", sql)
             };
-            (adapter.execute_query(&explain_sql).await, "json")
+            (explain_sql, "json")
         }
-        ActiveConnection::MySQL(adapter) => {
-            let adapter = adapter.lock().await;
+        "mysql" => {
             if analyze {
-                // MySQL EXPLAIN ANALYZE returns TREE text, not JSON
-                (adapter.execute_query(&format!("EXPLAIN ANALYZE {}", sql)).await, "text")
+                (format!("EXPLAIN ANALYZE {}", sql), "text")
             } else {
-                (adapter.execute_query(&format!("EXPLAIN FORMAT=JSON {}", sql)).await, "json")
+                (format!("EXPLAIN FORMAT=JSON {}", sql), "json")
             }
         }
-        ActiveConnection::SQLServer(adapter) => {
-            let adapter = adapter.lock().await;
+        "sqlserver" => {
             let settings = if analyze {
                 "SET STATISTICS PROFILE ON"
             } else {
@@ -719,41 +727,20 @@ pub async fn explain_query(
             } else {
                 "SET SHOWPLAN_TEXT OFF"
             };
-            let explain_sql = format!("{}; {}; {}", settings, sql, cleanup);
-            (adapter.execute_query(&explain_sql).await, "text")
+            (format!("{}; {}; {}", settings, sql, cleanup), "text")
         }
-        ActiveConnection::SQLite(adapter) => {
-            let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN QUERY PLAN {}", sql);
-            (adapter.execute_query(&explain_sql).await, "text")
-        }
-        ActiveConnection::ClickHouse(adapter) => {
-            let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            (adapter.execute_query(&explain_sql).await, "text")
-        }
-        ActiveConnection::JdbcBridge(adapter) => {
-            let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            (adapter.execute_query(&explain_sql).await, "text")
-        }
-        ActiveConnection::HttpSql(adapter) => {
-            let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            (adapter.execute_query(&explain_sql).await, "text")
-        }
-        ActiveConnection::Rqlite(adapter) => {
-            let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            (adapter.execute_query(&explain_sql).await, "text")
-        }
-        ActiveConnection::Turso(adapter) => {
-            let adapter = adapter.lock().await;
-            let explain_sql = format!("EXPLAIN {}", sql);
-            (adapter.execute_query(&explain_sql).await, "text")
-        }
+        "sqlite" => (format!("EXPLAIN QUERY PLAN {}", sql), "text"),
+        "clickhouse" => (format!("EXPLAIN {}", sql), "text"),
+        "generic" => (format!("EXPLAIN {}", sql), "text"),
+        "rqlite" => (format!("EXPLAIN {}", sql), "text"),
+        "turso" => (format!("EXPLAIN {}", sql), "text"),
+        _ => (format!("EXPLAIN {}", sql), "text"),
     };
-    let result = result.map_err(|e| format!("EXPLAIN query failed: {}", e))?;
+
+    let result = connection
+        .execute_query(&explain_sql)
+        .await
+        .map_err(|e| format!("EXPLAIN query failed: {}", e))?;
 
     // SQL Server SHOWPLAN_TEXT returns a single "StmtText" column.
     // STATISTICS PROFILE returns multiple columns — use StmtText-specific
