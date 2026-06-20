@@ -178,10 +178,27 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                 truncated: false,
             });
         }
-        // Execute each statement individually; return the last non-error result.
-        // Many JDBC drivers (notably Dameng) reject multiple DDL/DML statements
-        // sent as a single string, so splitting is required.
-        let mut last_result = None;
+        // Execute each statement individually. Many JDBC drivers (notably
+        // Dameng) reject multiple DDL/DML statements sent as a single string,
+        // so splitting is required.
+        //
+        // Result aggregation: for SELECT statements we want to show the last
+        // result (the user is interested in the final query output). For DML
+        // statements (no rows, has rows_affected) we accumulate the total so
+        // that multi-statement INSERTs and UPDATEs report correct counts.
+        //
+        // Note: statements are NOT wrapped in a transaction — each executes
+        // in autocommit mode. If statement N fails, statements 1..N-1 are
+        // already committed. This matches the behavior of executing each
+        // statement individually in the editor.
+        let mut result = QueryResult {
+            columns: Vec::new(),
+            column_types: Vec::new(),
+            rows: Vec::new(),
+            rows_affected: Some(0),
+            execution_time_ms: None,
+            truncated: false,
+        };
         for stmt in &statements {
             let data = Self::send_request(
                 &launcher,
@@ -194,9 +211,21 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                 ),
             )
             .await?;
-            last_result = Some(Self::parse_query_result(data)?);
+            let stmt_result = Self::parse_query_result(data)?;
+            let has_rows = !stmt_result.columns.is_empty() || !stmt_result.rows.is_empty();
+            if has_rows {
+                result.columns = stmt_result.columns;
+                result.column_types = stmt_result.column_types;
+                result.rows = stmt_result.rows;
+                result.rows_affected = stmt_result.rows_affected;
+            } else if let Some(affected) = stmt_result.rows_affected {
+                let total = result.rows_affected.unwrap_or(0) + affected;
+                result.rows_affected = Some(total);
+            }
+            result.execution_time_ms = stmt_result.execution_time_ms;
+            result.truncated = result.truncated || stmt_result.truncated;
         }
-        last_result.ok_or_else(|| DbError::Connection("No statements executed".to_string()))
+        Ok(result)
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
