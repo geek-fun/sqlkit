@@ -1002,6 +1002,8 @@ export const zhCN = {
         filePathRequired: '数据库文件路径是必填项',
         portInvalid: '端口必须是正数',
         filePickerFailed: '打开文件选择器失败',
+        tnsAdminDirRequired: 'TNS admin 目录是必填项',
+        tnsAliasRequired: 'TNS 别名是必填项',
       },
       ssh: {
         useSshTunnel: '使用 SSH 隧道',

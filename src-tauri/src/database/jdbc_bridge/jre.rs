@@ -295,6 +295,8 @@ async fn download_jre_stream(
     let is_zip = os == "windows";
     let _ext = if is_zip { "zip" } else { "tar.gz" };
 
+    let total = response.content_length().unwrap_or(60_000_000).max(1);
+
     let mut file = tokio::fs::File::create(tmp_path)
         .await
         .map_err(|e| DbError::Connection(format!("Failed to create temp file: {}", e)))?;
@@ -313,7 +315,7 @@ async fn download_jre_stream(
                 serde_json::json!({
                     "step": "jre_download",
                     "downloaded": downloaded,
-                    "total": 60_000_000,
+                    "total": total,
                 }),
             );
         }
