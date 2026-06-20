@@ -278,21 +278,6 @@ onBeforeUnmount(() => {
             <span class="i-carbon-close h-3.5 w-3.5" />
           </button>
         </div>
-
-        <!-- Progress indicator -->
-        <div v-if="isLoading && progress" class="text-xs text-muted-foreground py-1 flex gap-2 items-center justify-center">
-          <span class="i-carbon-loading h-3.5 w-3.5 animate-spin" />
-          <span v-if="progress.phase === 'iterating'">
-            {{ t('dataStudio.agent.iteration') }} {{ progress.iter }}/{{ progress.maxIter }}
-          </span>
-          <!-- waiting_llm phase hidden — message bubble activity timeline already shows "Waiting for model" -->
-          <span v-else-if="progress.phase === 'compacting'">
-            {{ t('dataStudio.agent.compacting') }}
-          </span>
-          <span v-else-if="progress.phase === 'preparing'">
-            {{ t('dataStudio.agent.preparing') }}
-          </span>
-        </div>
       </ScrollArea>
     </div>
 

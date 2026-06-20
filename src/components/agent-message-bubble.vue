@@ -87,11 +87,13 @@ const activeToolName = computed(() => {
   )
 })
 
-function resultStatus(tc: AgentToolCall): 'success' | 'error' | 'denied' {
+function resultStatus(tc: AgentToolCall): 'success' | 'error' | 'denied' | 'executing' {
   if (tc.status === 'denied')
     return 'denied'
   if (tc.status === 'error')
     return 'error'
+  if (tc.status === 'executing')
+    return 'executing'
   return 'success'
 }
 
@@ -360,7 +362,10 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
         </div>
 
         <template v-for="tc in message.toolCalls" :key="tc.id">
-          <details class="activity-item-details">
+          <details
+            class="activity-item-details"
+            :open="tc.status === 'error' || tc.status === 'denied' || tc.status === 'executing'"
+          >
             <summary class="activity-item">
               <span class="activity-icon" :class="toolIcon(tc.toolName)" />
               <span class="tool-name-badge">{{ tc.toolName }}</span>
@@ -394,7 +399,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
               <span
                 v-if="
                   toolResultText(tc)
-                    && (tc.status === 'done' || tc.status === 'error' || tc.status === 'denied')
+                    && (tc.status === 'done' || tc.status === 'error' || tc.status === 'denied' || tc.status === 'executing')
                 "
                 class="result-preview"
                 :class="`result-preview-${resultStatus(tc)}`"
@@ -654,6 +659,10 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
 
 .result-preview-error {
   color: hsl(var(--destructive) / 0.7);
+}
+
+.result-preview-executing {
+  color: hsl(var(--primary) / 0.7);
 }
 
 .tool-body-wrapper {

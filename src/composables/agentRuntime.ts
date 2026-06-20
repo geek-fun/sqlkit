@@ -151,6 +151,7 @@ async function initAgentRuntime(): Promise<void> {
     await agentApi.onAgentLoopToolCall(({ session_id, tool_call_id, tool_name, arguments: args }) => {
       const store = useDataStudioStore()
       store.removePreparingPlaceholder()
+      store.setSessionActiveTool(session_id, tool_name)
       const session = getSessionById(store.sessions, session_id)
       if (!session)
         return
@@ -215,6 +216,7 @@ async function initAgentRuntime(): Promise<void> {
     await agentApi.onAgentLoopToolResult(({ session_id, tool_call_id, envelope, error }) => {
       clearToolTimeout(tool_call_id)
       const store = useDataStudioStore()
+      store.setSessionActiveTool(session_id, null)
       const session = getSessionById(store.sessions, session_id)
       if (!session)
         return
@@ -390,6 +392,35 @@ async function initAgentRuntime(): Promise<void> {
   unlisteners.push(
     await agentApi.onAgentLoopWarning(({ session_id, warning }) => {
       console.warn(`[AgentRuntime] Session ${session_id}: ${warning}`)
+    }),
+  )
+
+  unlisteners.push(
+    await agentApi.onAgentContextUsage((payload) => {
+      const store = useDataStudioStore()
+      store.setSessionTokenUsage(payload.session_id, payload.used_tokens, payload.capacity)
+    }),
+  )
+
+  unlisteners.push(
+    await agentApi.onAgentLoopToolRetry(({ session_id, tool_call_id, attempt, max_attempts, delay_secs }) => {
+      const store = useDataStudioStore()
+      const session = getSessionById(store.sessions, session_id)
+      if (!session)
+        return
+      const assistantMsg = [...session.messages].reverse().find(
+        m => m.role === 'assistant' && m.toolCalls?.some(tc => tc.id === tool_call_id),
+      )
+      if (assistantMsg) {
+        store.updateToolCallStatus(
+          assistantMsg.id,
+          tool_call_id,
+          'executing',
+          `Retrying in ${delay_secs}s (${attempt}/${max_attempts})`,
+          undefined,
+          session_id,
+        )
+      }
     }),
   )
 

@@ -74,8 +74,13 @@ impl JdbcBridgeAdapter {
         launcher: &Arc<Mutex<JdbcBridgeLauncher>>,
         req: JdbcRequest,
     ) -> DbResult<serde_json::Value> {
-        let mut guard = launcher.lock().await;
-        let resp = guard.send_request(&req)?;
+        let launcher = launcher.clone();
+        let resp = tokio::task::spawn_blocking(move || {
+            let mut guard = launcher.blocking_lock();
+            guard.send_request(&req)
+        })
+        .await
+        .map_err(|e| DbError::Connection(format!("JDBC bridge task panicked: {}", e)))??;
         Ok(resp.result.unwrap_or(serde_json::Value::Null))
     }
 

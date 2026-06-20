@@ -262,6 +262,18 @@ export const agentApi = {
   ): Promise<() => void> =>
     listen('agent-loop-tool-result', e => handler(e.payload as any)),
 
+  onAgentLoopToolRetry: (
+    handler: (payload: {
+      session_id: string
+      tool_call_id: string
+      tool_name: string
+      attempt: number
+      max_attempts: number
+      delay_secs: number
+    }) => void,
+  ): Promise<() => void> =>
+    listen('agent-loop-tool-retry', e => handler(e.payload as any)),
+
   onAgentLoopStepDone: (
     handler: (payload: { session_id: string }) => void,
   ): Promise<() => void> =>
@@ -373,5 +385,6 @@ export const deleteAttachedSource = agentApi.deleteAttachedSource
 export const compactAgentSession = agentApi.compactAgentSession
 export const getAgentContextUsage = agentApi.getAgentContextUsage
 export const onAgentContextUsage = agentApi.onAgentContextUsage
+export const onAgentLoopToolRetry = agentApi.onAgentLoopToolRetry
 
 export default agentApi

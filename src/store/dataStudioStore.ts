@@ -269,6 +269,9 @@ type DataStudioStoreState = {
   toolResultFullBodies: Record<string, string>
   sessionErrors: Record<string, string>
   sessionProgress: Record<string, SessionProgress>
+  sessionStartTimes: Record<string, number>
+  sessionTokenUsage: Record<string, { used: number, capacity: number }>
+  sessionActiveTool: Record<string, string | null>
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -283,6 +286,9 @@ export const useDataStudioStore = defineStore('dataStudio', {
     toolResultFullBodies: {},
     sessionErrors: {},
     sessionProgress: {},
+    sessionStartTimes: {},
+    sessionTokenUsage: {},
+    sessionActiveTool: {},
   }),
   persist: {
     pick: ['activeSessionId', 'sidebarSessionId'],
@@ -831,12 +837,29 @@ export const useDataStudioStore = defineStore('dataStudio', {
       this.sessionProgress = rest
     },
 
+    setSessionTokenUsage(sessionId: string, used: number, capacity: number) {
+      this.sessionTokenUsage = {
+        ...this.sessionTokenUsage,
+        [sessionId]: { used, capacity },
+      }
+    },
+
+    setSessionActiveTool(sessionId: string, toolName: string | null) {
+      this.sessionActiveTool = {
+        ...this.sessionActiveTool,
+        [sessionId]: toolName,
+      }
+    },
+
     // ── Status ─────────────────────────────────────────────────────────────
 
     setSessionStatus(sessionId: string, status: AgentSessionStatus) {
       this.sessions = this.sessions.map(s =>
         s.id === sessionId ? { ...s, status, updated_at: Date.now() } : s,
       )
+      if (status === 'running') {
+        this.sessionStartTimes = { ...this.sessionStartTimes, [sessionId]: Date.now() }
+      }
       if (status !== 'error') {
         const { [sessionId]: _removed, ...rest } = this.sessionErrors
         this.sessionErrors = rest
@@ -844,6 +867,12 @@ export const useDataStudioStore = defineStore('dataStudio', {
       if (status === 'idle' || status === 'stopped' || status === 'error') {
         this.clearSessionProgress(sessionId)
         this.removePreparingPlaceholder()
+        const { [sessionId]: _st, ...restStart } = this.sessionStartTimes
+        this.sessionStartTimes = restStart
+        const { [sessionId]: _tu, ...restToken } = this.sessionTokenUsage
+        this.sessionTokenUsage = restToken
+        const { [sessionId]: _at, ...restTool } = this.sessionActiveTool
+        this.sessionActiveTool = restTool
       }
     },
 

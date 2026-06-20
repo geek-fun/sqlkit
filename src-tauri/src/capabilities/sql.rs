@@ -96,7 +96,36 @@ async fn execute_on_adapter(adapter: &ActiveConnection, sql: &str) -> Result<Que
             .execute_query(sql)
             .await
             .map_err(|e| e.to_string()),
-        _ => todo!(),
+        ActiveConnection::ClickHouse(a) => a
+            .lock()
+            .await
+            .execute_query(sql)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::JdbcBridge(a) => a
+            .lock()
+            .await
+            .execute_query(sql)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::HttpSql(a) => a
+            .lock()
+            .await
+            .execute_query(sql)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Rqlite(a) => a
+            .lock()
+            .await
+            .execute_query(sql)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Turso(a) => a
+            .lock()
+            .await
+            .execute_query(sql)
+            .await
+            .map_err(|e| e.to_string()),
     }
 }
 
@@ -202,7 +231,36 @@ impl CapabilityHandler for ListDatabasesHandler {
                 .list_databases()
                 .await
                 .map_err(|e| e.to_string())?,
-            _ => todo!(),
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_databases()
+                .await
+                .map_err(|e| e.to_string())?,
         };
         serde_json::to_string(&dbs).map_err(|e| e.to_string())
     }
@@ -238,7 +296,36 @@ impl CapabilityHandler for ListSchemasHandler {
                 .list_schemas(database)
                 .await
                 .map_err(|e| e.to_string())?,
-            _ => todo!(),
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_schemas(database)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_schemas(database)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_schemas(database)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_schemas(database)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_schemas(database)
+                .await
+                .map_err(|e| e.to_string())?,
         };
         serde_json::to_string(&schemas).map_err(|e| e.to_string())
     }
@@ -280,7 +367,36 @@ impl CapabilityHandler for ListTablesHandler {
                 .list_tables(database, schema)
                 .await
                 .map_err(|e| e.to_string())?,
-            _ => todo!(),
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
         };
         serde_json::to_string(&tables).map_err(|e| e.to_string())
     }
@@ -323,10 +439,48 @@ impl CapabilityHandler for GetSchemaHandler {
                 .list_tables(database, schema)
                 .await
                 .map_err(|e| e.to_string())?,
-            _ => todo!(),
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_tables(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
         };
 
+        const MAX_SCHEMA_TABLES: usize = 30;
+        let tables: Vec<_> = tables.into_iter().take(MAX_SCHEMA_TABLES).collect();
+
         let mut schema_lines: Vec<String> = Vec::new();
+        if tables.len() >= MAX_SCHEMA_TABLES {
+            schema_lines.push(format!(
+                "-- Showing first {} tables. Specify a schema filter for complete results.\n",
+                MAX_SCHEMA_TABLES
+            ));
+        }
         for table in &tables {
             let cols = match &adapter {
                 ActiveConnection::Postgres(a) => a
@@ -353,7 +507,36 @@ impl CapabilityHandler for GetSchemaHandler {
                     .list_columns(database, schema, &table.name)
                     .await
                     .map_err(|e| e.to_string())?,
-                _ => todo!(),
+                ActiveConnection::ClickHouse(a) => a
+                    .lock()
+                    .await
+                    .list_columns(database, schema, &table.name)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                ActiveConnection::JdbcBridge(a) => a
+                    .lock()
+                    .await
+                    .list_columns(database, schema, &table.name)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                ActiveConnection::HttpSql(a) => a
+                    .lock()
+                    .await
+                    .list_columns(database, schema, &table.name)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                ActiveConnection::Rqlite(a) => a
+                    .lock()
+                    .await
+                    .list_columns(database, schema, &table.name)
+                    .await
+                    .map_err(|e| e.to_string())?,
+                ActiveConnection::Turso(a) => a
+                    .lock()
+                    .await
+                    .list_columns(database, schema, &table.name)
+                    .await
+                    .map_err(|e| e.to_string())?,
             };
 
             let schema_name = table.schema.as_deref().unwrap_or("public");
@@ -425,7 +608,36 @@ impl CapabilityHandler for DescribeTableHandler {
                 .list_columns(database, schema, table)
                 .await
                 .map_err(|e| e.to_string())?,
-            _ => todo!(),
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_columns(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_columns(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_columns(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_columns(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_columns(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
         };
         serde_json::to_string(&cols).map_err(|e| e.to_string())
     }
@@ -504,7 +716,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
 
     reg.register(Capability {
         name: "sqlkit__list_tables",
-        description: "List all tables in a database schema.",
+        description: "List all tables in a database schema. Returns table names, types, and row counts — fast and lightweight. Use this to check if tables exist or browse available objects. For full column details, use sqlkit__describe_table or sqlkit__get_schema.",
         handler: Arc::new(ListTablesHandler),
         input_schema: json!({"type": "object", "properties": {
             "connection_id": connection_id_schema(),
@@ -518,7 +730,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
 
     reg.register(Capability {
         name: "sqlkit__get_schema",
-        description: "Get the full database schema (all tables and columns) as DDL-like text. Use this before writing queries to understand the structure.",
+        description: "Get the full database schema (all tables and all columns) as DDL-like text. SLOW on databases with many objects. Prefer sqlkit__list_tables for browsing and sqlkit__describe_table for single-table details.",
         handler: Arc::new(GetSchemaHandler),
         input_schema: json!({"type": "object", "properties": {
             "connection_id": connection_id_schema(),
