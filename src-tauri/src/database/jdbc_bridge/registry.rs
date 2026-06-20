@@ -169,6 +169,7 @@ fn db_type_to_registry_key(db: DatabaseType) -> Option<&'static str> {
         DatabaseType::H2 => Some("h2"),
         DatabaseType::Derby => Some("derby"),
         DatabaseType::Snowflake => Some("snowflake"),
+        DatabaseType::TDengine => Some("tdengine"),
         DatabaseType::DM8Oracle => Some("dm8_oracle"),
         DatabaseType::XuguDB => Some("xugudb"),
         DatabaseType::GBase8a => Some("gbase8a"),

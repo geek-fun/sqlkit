@@ -18,21 +18,18 @@ public class ConnectionManager {
     /**
      * Create a new JDBC connection pool.
      *
-     * @param connId          unique identifier for this connection
-     * @param url             JDBC URL
-     * @param username        database username
-     * @param password        database password
-     * @param driverClass     JDBC driver class name
-     * @param minPool         minimum pool size
-     * @param maxPool         maximum pool size
-     * @param tnsAdminDir     Oracle TNS_ADMIN directory (optional, for TNS/wallet connections)
-     * @param walletPassword  Oracle wallet password (optional, for encrypted wallets)
+     * @param connId      unique identifier for this connection
+     * @param url         JDBC URL
+     * @param username    database username
+     * @param password    database password
+     * @param driverClass JDBC driver class name
+     * @param minPool     minimum pool size
+     * @param maxPool     maximum pool size
      */
     public void connect(String connId, String url, String username,
                         String password, String driverClass,
                         List<String> driverJars,
-                        int minPool, int maxPool,
-                        String tnsAdminDir, String walletPassword) throws ClassifiedException, Exception {
+                        int minPool, int maxPool) throws ClassifiedException, Exception {
         if (pools.containsKey(connId)) {
             throw new Exception("Connection already exists: " + connId);
         }
@@ -45,20 +42,16 @@ public class ConnectionManager {
         final java.sql.Driver driver = (java.sql.Driver) driverCls.getDeclaredConstructor().newInstance();
         loaders.put(connId, loader);
 
-        final java.util.Properties oracleProps = new java.util.Properties();
-
         HikariConfig config = new HikariConfig();
         config.setDataSource(new javax.sql.DataSource() {
             public java.sql.Connection getConnection() throws java.sql.SQLException {
                 java.util.Properties info = new java.util.Properties();
-                info.putAll(oracleProps);
                 if (username != null) info.setProperty("user", username);
                 if (password != null) info.setProperty("password", password);
                 return driver.connect(url, info);
             }
             public java.sql.Connection getConnection(String u, String p) throws java.sql.SQLException {
                 java.util.Properties info = new java.util.Properties();
-                info.putAll(oracleProps);
                 info.setProperty("user", u);
                 info.setProperty("password", p);
                 return driver.connect(url, info);
@@ -89,7 +82,7 @@ public class ConnectionManager {
             // ok
         } catch (Exception e) {
             ds.close();
-            ErrorClassifier.ErrorType errorType = ErrorClassifier.classify(e.getMessage());
+            ErrorClassifier.ErrorType errorType = ErrorClassifier.classify(e);
             throw new ClassifiedException("Failed to verify connection: " + e.getMessage(), e, errorType);
         }
 

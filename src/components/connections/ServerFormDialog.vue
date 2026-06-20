@@ -151,7 +151,7 @@ async function startProgressListener() {
   if (progressUnlisten.value)
     progressUnlisten.value()
   const unlisten = await listen<{ step: string, downloaded: number, total: number, message?: string }>('connection-progress', (event) => {
-    const stepMap: Record<string, string> = { jre_download: 'jre', bridge_jar: 'bridge' }
+    const stepMap: Record<string, string> = { jre_download: 'jre', bridge_jar: 'bridge', jdbc_driver: 'driver' }
     const stepId = stepMap[event.payload.step]
     const step = setupSteps.value.find(s => s.id === stepId)
     if (step && event.payload.step !== 'retry') {
