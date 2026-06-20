@@ -102,7 +102,8 @@ export const useDatabaseStore = defineStore('databases', {
           const currentDb = connectionStore.getCurrentDatabase(connectionId)
           if (currentDb) {
             databases = [{ name: currentDb, is_system: false }]
-          } else {
+          }
+          else {
             // JDBC databases (Oracle, Dameng, DB2, etc.) often don't support
             // listing databases. Show a single synthetic entry so the browser
             // tree (via userDatabaseNodes) is non-empty and schemas can be

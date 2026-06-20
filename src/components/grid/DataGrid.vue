@@ -526,7 +526,7 @@ watch(() => [props.rows, props.columns], () => {
       <!-- Scroll container -->
       <div
         ref="scrollContainer"
-        class="flex-1 overflow-auto relative"
+        class="flex-1 relative overflow-auto"
         @scroll="() => {}"
       >
         <div
