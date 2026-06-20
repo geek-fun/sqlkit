@@ -448,10 +448,14 @@ impl DatabaseAdapter for MySQLAdapter {
         Ok(databases)
     }
 
-    async fn list_schemas(&self, _database: Option<&str>) -> DbResult<Vec<String>> {
-        // MySQL doesn't have separate schemas like PostgreSQL
-        // In MySQL, databases are the top-level namespace
-        // Return the list of databases instead
+    async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
+        // MySQL doesn't have separate schemas like PostgreSQL.
+        // In MySQL, databases are the top-level namespace.
+        // When a specific database is requested (e.g., from the sidebar tree),
+        // return just that one — otherwise return all databases.
+        if let Some(db) = database {
+            return Ok(vec![db.to_string()]);
+        }
         let databases = self.list_databases().await?;
         Ok(databases.into_iter().map(|db| db.name).collect())
     }
