@@ -67,7 +67,7 @@ impl ConnectionCache {
     pub async fn get_or_create(
         &self,
         key: &PoolKey,
-        app_state: &Arc<AppState>,
+        app_state: &AppState,
     ) -> Result<ActiveConnection, String> {
         let string_key = key.to_string_key();
 
