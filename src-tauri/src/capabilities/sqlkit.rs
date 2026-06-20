@@ -19,13 +19,15 @@ pub(crate) struct TauriStoreReader;
 
 impl ConnectionStoreReader for TauriStoreReader {
     fn get_connections(&self) -> Result<Value, String> {
-        let app = crate::APP_HANDLE
-            .get()
-            .ok_or_else(|| "AppHandle not initialized — app may still be starting".to_string())?;
+        let app = match crate::APP_HANDLE.get() {
+            Some(handle) => handle,
+            None => return Ok(Value::Array(vec![])),
+        };
 
-        let store = app
-            .store(".store.dat")
-            .map_err(|e| format!("Failed to open store: {}", e))?;
+        let store = match app.store(".store.dat") {
+            Ok(s) => s,
+            Err(_) => return Ok(Value::Array(vec![])),
+        };
 
         Ok(store.get("connections").unwrap_or(Value::Array(vec![])))
     }

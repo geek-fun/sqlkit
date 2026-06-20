@@ -167,18 +167,36 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
 
     async fn execute_query(&self, query: &str) -> DbResult<QueryResult> {
         let launcher = self.launcher()?;
-        let data = Self::send_request(
-            &launcher,
-            JdbcRequest::new(
-                JdbcMethod::ExecuteQuery,
-                serde_json::json!({
-                    "conn_id": self.conn_id,
-                    "sql": query,
-                }),
-            ),
-        )
-        .await?;
-        Self::parse_query_result(data)
+        let statements = split_sql_statements(query);
+        if statements.is_empty() {
+            return Ok(QueryResult {
+                columns: Vec::new(),
+                column_types: Vec::new(),
+                rows: Vec::new(),
+                rows_affected: Some(0),
+                execution_time_ms: None,
+                truncated: false,
+            });
+        }
+        // Execute each statement individually; return the last non-error result.
+        // Many JDBC drivers (notably Dameng) reject multiple DDL/DML statements
+        // sent as a single string, so splitting is required.
+        let mut last_result = None;
+        for stmt in &statements {
+            let data = Self::send_request(
+                &launcher,
+                JdbcRequest::new(
+                    JdbcMethod::ExecuteQuery,
+                    serde_json::json!({
+                        "conn_id": self.conn_id,
+                        "sql": stmt,
+                    }),
+                ),
+            )
+            .await?;
+            last_result = Some(Self::parse_query_result(data)?);
+        }
+        last_result.ok_or_else(|| DbError::Connection("No statements executed".to_string()))
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
@@ -341,5 +359,176 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
 
     fn get_config(&self) -> &ConnectionConfig {
         &self.config
+    }
+}
+
+/// Split a SQL string into individual statements separated by `;`.
+///
+/// Handles:
+/// - Single-quoted string literals (`'...'`)
+/// - Double-quoted identifiers (`"..."`)
+/// - `--` single-line comments
+/// - `/* ... */` block comments
+/// - Trailing semicolons and whitespace
+/// - Empty statements are skipped
+fn split_sql_statements(sql: &str) -> Vec<String> {
+    let mut statements: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let chars: Vec<char> = sql.chars().collect();
+    let mut i = 0;
+
+    while i < chars.len() {
+        let c = chars[i];
+
+        // Single-quoted string literal
+        if c == '\'' {
+            current.push(c);
+            i += 1;
+            while i < chars.len() {
+                current.push(chars[i]);
+                if chars[i] == '\'' {
+                    // Check for escaped single quote ''
+                    if i + 1 < chars.len() && chars[i + 1] == '\'' {
+                        i += 1;
+                        current.push(chars[i]);
+                    } else {
+                        break;
+                    }
+                }
+                i += 1;
+            }
+        }
+        // Double-quoted identifier
+        else if c == '"' {
+            current.push(c);
+            i += 1;
+            while i < chars.len() {
+                current.push(chars[i]);
+                if chars[i] == '"' {
+                    // Check for escaped double quote ""
+                    if i + 1 < chars.len() && chars[i + 1] == '"' {
+                        i += 1;
+                        current.push(chars[i]);
+                    } else {
+                        break;
+                    }
+                }
+                i += 1;
+            }
+        }
+        // Single-line comment
+        else if c == '-' && i + 1 < chars.len() && chars[i + 1] == '-' {
+            i += 2;
+            while i < chars.len() && chars[i] != '\n' {
+                i += 1;
+            }
+        }
+        // Block comment
+        else if c == '/' && i + 1 < chars.len() && chars[i + 1] == '*' {
+            i += 2;
+            while i + 1 < chars.len() {
+                if chars[i] == '*' && chars[i + 1] == '/' {
+                    i += 2;
+                    break;
+                }
+                i += 1;
+            }
+        }
+        // Statement separator
+        else if c == ';' {
+            let trimmed = current.trim().to_string();
+            if !trimmed.is_empty() {
+                statements.push(trimmed);
+            }
+            current.clear();
+        } else {
+            current.push(c);
+        }
+
+        i += 1;
+    }
+
+    // Last statement (after final semicolon or no trailing semicolon)
+    let trimmed = current.trim().to_string();
+    if !trimmed.is_empty() {
+        statements.push(trimmed);
+    }
+
+    statements
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_split_single_statement() {
+        let stmts = split_sql_statements("SELECT * FROM users");
+        assert_eq!(stmts, vec!["SELECT * FROM users"]);
+    }
+
+    #[test]
+    fn test_split_with_trailing_semicolon() {
+        let stmts = split_sql_statements("SELECT * FROM users;");
+        assert_eq!(stmts, vec!["SELECT * FROM users"]);
+    }
+
+    #[test]
+    fn test_split_multi_statement() {
+        let stmts = split_sql_statements(
+            "CREATE TABLE t (id INT); INSERT INTO t VALUES (1); SELECT * FROM t",
+        );
+        assert_eq!(
+            stmts,
+            vec![
+                "CREATE TABLE t (id INT)",
+                "INSERT INTO t VALUES (1)",
+                "SELECT * FROM t",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_split_comment_statement() {
+        let stmts = split_sql_statements(
+            "CREATE TABLE t (id INT);\nCOMMENT ON TABLE t IS 'hello';",
+        );
+        assert_eq!(
+            stmts,
+            vec![
+                "CREATE TABLE t (id INT)",
+                "COMMENT ON TABLE t IS 'hello'",
+            ]
+        );
+    }
+
+    #[test]
+    fn test_split_with_semicolon_in_string() {
+        let stmts = split_sql_statements("SELECT 'hello;world' AS x");
+        assert_eq!(stmts, vec!["SELECT 'hello;world' AS x"]);
+    }
+
+    #[test]
+    fn test_skip_empty_statements() {
+        let stmts = split_sql_statements(";;SELECT 1;;;");
+        assert_eq!(stmts, vec!["SELECT 1"]);
+    }
+
+    #[test]
+    fn test_split_complex_ddl() {
+        let sql = "CREATE TABLE SYSDBA.CLASSES (\n    class_id INT PRIMARY KEY\n);\nCOMMENT ON TABLE SYSDBA.CLASSES IS '班级信息表';\nCOMMENT ON COLUMN SYSDBA.CLASSES.class_id IS '班级ID';";
+        let stmts = split_sql_statements(sql);
+        assert_eq!(stmts.len(), 3);
+        assert!(stmts[0].starts_with("CREATE TABLE"));
+        assert!(stmts[1].starts_with("COMMENT ON TABLE"));
+        assert!(stmts[2].starts_with("COMMENT ON COLUMN"));
+    }
+
+    #[test]
+    fn test_split_dollar_sign_is_not_comment() {
+        let stmts = split_sql_statements("SELECT * FROM t WHERE x = 1; -- comment\nSELECT 2");
+        assert_eq!(stmts.len(), 2);
+        assert_eq!(stmts[0], "SELECT * FROM t WHERE x = 1");
+        assert_eq!(stmts[1], "SELECT 2");
     }
 }
