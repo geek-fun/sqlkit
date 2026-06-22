@@ -428,6 +428,15 @@ export const zhCN = {
             redownload: '重新下载',
             checkUpdates: '检查更新',
           },
+          notifications: {
+            upToDate: 'JRE 已是最新版本',
+            updateAvailable: '发现 JRE 新版本',
+            newVersion: '版本 {version} 可用',
+            checkUpdatesFailed: '检查 JRE 更新失败',
+            downloadFailed: '下载 JRE 失败',
+            downloadSuccess: 'JRE 下载成功',
+            removeFailed: '移除 JRE 失败',
+          },
         },
         bridgeCard: {
           title: '桥接 JAR',
@@ -440,6 +449,11 @@ export const zhCN = {
           actions: {
             download: '下载桥接',
             remove: '移除桥接',
+          },
+          notifications: {
+            downloadFailed: '下载桥接 JAR 失败',
+            downloadSuccess: '桥接 JAR 下载成功',
+            removeFailed: '移除桥接 JAR 失败',
           },
         },
         jdbcToggle: {
@@ -464,6 +478,17 @@ export const zhCN = {
           actions: {
             download: '下载',
             remove: '移除',
+            checkUpdates: '检查更新',
+          },
+          notifications: {
+            upToDate: '驱动已是最新版本',
+            updateAvailable: '发现驱动新版本',
+            newVersion: '版本 {version} 可用',
+            checkUpdatesFailed: '检查驱动更新失败',
+            downloadFailed: '下载驱动失败',
+            downloadSuccess: '驱动下载成功',
+            removeFailed: '移除驱动失败',
+            installBridgeFirst: '请先安装桥接 JAR，再下载驱动',
           },
           empty: {
             title: '暂无驱动',
