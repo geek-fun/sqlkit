@@ -168,6 +168,7 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
         "mariadb" => Ok(DatabaseType::MariaDB),
         "tidb" => Ok(DatabaseType::TiDB),
         "oceanbase" => Ok(DatabaseType::OceanBase),
+        "oceanbase-oracle" | "oceanbase_oracle" => Ok(DatabaseType::OceanbaseOracle),
         "tdsql" => Ok(DatabaseType::TDSQL),
         "polardb" => Ok(DatabaseType::PolarDB),
         "dameng" | "dm" | "dm8" | "dm8_oracle" | "dm8oracle" => Ok(DatabaseType::Dameng),

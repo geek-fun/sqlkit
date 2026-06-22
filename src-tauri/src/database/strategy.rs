@@ -90,6 +90,7 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         Access => ConnectionStrategy::JdbcBridge,
         YashanDB => ConnectionStrategy::JdbcBridge,
         KingbaseES => ConnectionStrategy::JdbcBridge,
+        OceanbaseOracle => ConnectionStrategy::JdbcBridge,
 
         // HTTP SQL bridge
         Trino | Presto => ConnectionStrategy::Http,
@@ -126,6 +127,7 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
         QuestDB => Some(8812),
         YashanDB => Some(1688),
         KingbaseES => Some(54321),
+        OceanbaseOracle => Some(2881),
         MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | GoldenDB
         | SingleStoreMemSQL | CloudSQLMySQL => Some(3306),
         Doris | SelectDB | StarRocks => Some(9030),
@@ -275,6 +277,7 @@ mod tests {
             DatabaseType::Access,
             DatabaseType::YashanDB,
             DatabaseType::KingbaseES,
+            DatabaseType::OceanbaseOracle,
         ] {
             assert_eq!(
                 resolve_effective_type(db),
@@ -319,6 +322,7 @@ mod tests {
         assert_eq!(default_port(DatabaseType::Vastbase), Some(5432));
         assert_eq!(default_port(DatabaseType::YashanDB), Some(1688));
         assert_eq!(default_port(DatabaseType::KingbaseES), Some(54321));
+        assert_eq!(default_port(DatabaseType::OceanbaseOracle), Some(2881));
         assert_eq!(default_port(DatabaseType::Hive), Some(10000));
         assert_eq!(default_port(DatabaseType::Databricks), Some(443));
         assert_eq!(default_port(DatabaseType::Hana), Some(30015));
