@@ -162,12 +162,13 @@ version_error_signatures = [
 
 [databases.xugudb]
 name = "虚谷 XuguDB"
-class_name = "com.xugudb.jdbc.Driver"
+class_name = "com.xugu.cloudjdbc.Driver"
 maven_group = "com.xugudb"
-maven_artifact = "xugudb-jdbc"
-jdbc_url_template = "jdbc:xugudb://{host}:{port}/{database}"
+maven_artifact = "xugu-jdbc"
+jdbc_url_template = "jdbc:xugu://{host}:{port}/{database}"
 default_port = 5138
 min_jre_version = "11"
+credentials_in_url = true
 version_error_signatures = [ "driver version not compatible", ]
 
 # ── 南大通用 GBase 8a ──
@@ -180,6 +181,8 @@ maven_artifact = "gbase-connector-java"
 jdbc_url_template = "jdbc:gbase://{host}:{port}/{database}"
 default_port = 5258
 min_jre_version = "11"
+version_cap = "8.3.81.53"
+download_url = "https://www.gbase8.cn/wp-content/uploads/2020/10/gbase-connector-java-8.3.81.53-build55.5.7-bin_min_mix.jar"
 version_error_signatures = [ "driver version not compatible", ]
 
 # ── Apache Hive ──
@@ -330,5 +333,36 @@ maven_group = "net.sf.ucanaccess"
 maven_artifact = "ucanaccess"
 jdbc_url_template = "jdbc:ucanaccess://{host}/{database}"
 default_port = 0
+min_jre_version = "11"
+version_error_signatures = [ "driver version not compatible", ]
+
+# ── YashanDB (崖山数据库) ──
+#
+# Official JDBC driver from Yashan Technologies. Published on Maven Central.
+# Uses `jdbc:yasdb:` protocol — NOT PG-wire compatible.
+
+[databases.yashandb]
+name = "YashanDB (崖山数据库)"
+class_name = "com.yashandb.jdbc.Driver"
+maven_group = "com.yashandb"
+maven_artifact = "yashandb-jdbc"
+jdbc_url_template = "jdbc:yasdb://{host}:{port}/{database}"
+default_port = 1688
+min_jre_version = "11"
+version_error_signatures = [ "driver version not compatible", ]
+
+# ── KingbaseES (人大金仓) ──
+#
+# Official JDBC driver from 电科金仓. Published on Maven Central.
+# Uses `jdbc:kingbase8:` protocol — PG-wire compatible but JDBC bridge
+# gives access to advanced features (read-write splitting, Oracle-compat mode).
+
+[databases.kingbase]
+name = "KingbaseES (人大金仓)"
+class_name = "com.kingbase8.Driver"
+maven_group = "cn.com.kingbase"
+maven_artifact = "kingbase8"
+jdbc_url_template = "jdbc:kingbase8://{host}:{port}/{database}"
+default_port = 54321
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
