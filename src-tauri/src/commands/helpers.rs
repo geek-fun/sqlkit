@@ -10,8 +10,8 @@ use crate::database::{
     mysql::MySQLAdapter, postgres::PostgresAdapter, sqlite::SQLiteAdapter,
     sqlserver::SqlServerAdapter,
 };
-use crate::ssh::TunnelManager;
 use crate::ssh::start_transport_layers;
+use crate::ssh::TunnelManager;
 use crate::state::ActiveConnection;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -26,36 +26,34 @@ pub async fn create_and_connect_adapter(
     let strategy = resolve_effective_type(db_type_enum);
 
     match strategy {
-        ConnectionStrategy::Native(core) => {
-            match core {
-                CoreDatabaseType::PostgreSQL => {
-                    let mut adapter = PostgresAdapter::new(conn_config);
-                    adapter.connect().await.map_err(|e| e.to_string())?;
-                    Ok(ActiveConnection::Postgres(Arc::new(Mutex::new(adapter))))
-                }
-                CoreDatabaseType::MySQL => {
-                    let mut adapter = MySQLAdapter::new(conn_config);
-                    adapter.connect().await.map_err(|e| e.to_string())?;
-                    Ok(ActiveConnection::MySQL(Arc::new(Mutex::new(adapter))))
-                }
-                CoreDatabaseType::SqlServer => {
-                    let mut adapter = SqlServerAdapter::new(conn_config);
-                    adapter.connect().await.map_err(|e| e.to_string())?;
-                    Ok(ActiveConnection::SQLServer(Arc::new(Mutex::new(adapter))))
-                }
-                CoreDatabaseType::SQLite => {
-                    let mut adapter = SQLiteAdapter::new(conn_config);
-                    adapter.connect().await.map_err(|e| e.to_string())?;
-                    Ok(ActiveConnection::SQLite(Arc::new(Mutex::new(adapter))))
-                }
-                CoreDatabaseType::ClickHouse => {
-                    let mut adapter = ClickHouseAdapter::new(conn_config);
-                    adapter.connect().await.map_err(|e| e.to_string())?;
-                    Ok(ActiveConnection::ClickHouse(Arc::new(Mutex::new(adapter))))
-                }
-                _ => Err(format!("Native adapter not yet implemented for {:?}", core)),
+        ConnectionStrategy::Native(core) => match core {
+            CoreDatabaseType::PostgreSQL => {
+                let mut adapter = PostgresAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                Ok(ActiveConnection::Postgres(Arc::new(Mutex::new(adapter))))
             }
-        }
+            CoreDatabaseType::MySQL => {
+                let mut adapter = MySQLAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                Ok(ActiveConnection::MySQL(Arc::new(Mutex::new(adapter))))
+            }
+            CoreDatabaseType::SqlServer => {
+                let mut adapter = SqlServerAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                Ok(ActiveConnection::SQLServer(Arc::new(Mutex::new(adapter))))
+            }
+            CoreDatabaseType::SQLite => {
+                let mut adapter = SQLiteAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                Ok(ActiveConnection::SQLite(Arc::new(Mutex::new(adapter))))
+            }
+            CoreDatabaseType::ClickHouse => {
+                let mut adapter = ClickHouseAdapter::new(conn_config);
+                adapter.connect().await.map_err(|e| e.to_string())?;
+                Ok(ActiveConnection::ClickHouse(Arc::new(Mutex::new(adapter))))
+            }
+            _ => Err(format!("Native adapter not yet implemented for {:?}", core)),
+        },
         ConnectionStrategy::JdbcBridge => {
             let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;
@@ -250,7 +248,8 @@ pub async fn connection_host_port(
         return Ok((config.host.clone(), config.port));
     }
 
-    match start_transport_layers(connection_id, &layers, &config.host, config.port, tunnels).await? {
+    match start_transport_layers(connection_id, &layers, &config.host, config.port, tunnels).await?
+    {
         Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),
         None => Ok((config.host.clone(), config.port)),
     }

@@ -14,10 +14,10 @@ use crate::database::adapter::DatabaseAdapter;
 use crate::state::{ActiveConnection, AppState};
 use crate::APP_HANDLE;
 use serde::Serialize;
-use tauri::{Emitter, Manager};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tauri::{Emitter, Manager};
 use tokio::sync::RwLock;
 use tokio::time::MissedTickBehavior;
 
@@ -314,7 +314,10 @@ impl ConnectionGuardian {
                 continue;
             }
             // Gracefully disconnect idle connection
-            log::info!("Connection '{conn_id}' idle for {}s, evicting", self.idle_eviction_secs);
+            log::info!(
+                "Connection '{conn_id}' idle for {}s, evicting",
+                self.idle_eviction_secs
+            );
             let conns = state.connections.write().await;
             if let Some(connection) = conns.get(&conn_id) {
                 self.disconnect_connection(connection).await;
@@ -374,7 +377,8 @@ impl ConnectionGuardian {
             self.mark_healthy(connection_id, None).await;
         } else {
             // Exponential backoff
-            let delay = (RECONNECT_BASE_DELAY_SECS * 2u64.pow(attempt_num)).min(RECONNECT_MAX_DELAY_SECS);
+            let delay =
+                (RECONNECT_BASE_DELAY_SECS * 2u64.pow(attempt_num)).min(RECONNECT_MAX_DELAY_SECS);
             let next = Instant::now() + Duration::from_secs(delay);
             let mut health_map = self.health.write().await;
             if let Some(h) = health_map.get_mut(connection_id) {
@@ -384,7 +388,10 @@ impl ConnectionGuardian {
             self.emit_state_change(
                 connection_id,
                 HealthState::Dead,
-                Some(&format!("Reconnect attempt {} failed, retrying in {}s", attempt_num, delay)),
+                Some(&format!(
+                    "Reconnect attempt {} failed, retrying in {}s",
+                    attempt_num, delay
+                )),
             );
         }
     }
@@ -405,39 +412,22 @@ impl ConnectionGuardian {
         if success {
             self.mark_healthy(connection_id, None).await;
         } else {
-            self.mark_error(connection_id, "Health check ping failed", None).await;
+            self.mark_error(connection_id, "Health check ping failed", None)
+                .await;
         }
     }
 
     async fn ping_connection(&self, connection: &ActiveConnection) -> bool {
         let result = match connection {
-            ActiveConnection::Postgres(adapter) => {
-                adapter.lock().await.test_connection().await
-            }
-            ActiveConnection::MySQL(adapter) => {
-                adapter.lock().await.test_connection().await
-            }
-            ActiveConnection::SQLServer(adapter) => {
-                adapter.lock().await.test_connection().await
-            }
-            ActiveConnection::SQLite(adapter) => {
-                adapter.lock().await.test_connection().await
-            }
-            ActiveConnection::ClickHouse(adapter) => {
-                adapter.lock().await.test_connection().await
-            }
-            ActiveConnection::JdbcBridge(adapter) => {
-                adapter.lock().await.test_connection().await
-            }
-            ActiveConnection::HttpSql(adapter) => {
-                adapter.lock().await.test_connection().await
-            }
-            ActiveConnection::Rqlite(adapter) => {
-                adapter.lock().await.test_connection().await
-            }
-            ActiveConnection::Turso(adapter) => {
-                adapter.lock().await.test_connection().await
-            }
+            ActiveConnection::Postgres(adapter) => adapter.lock().await.test_connection().await,
+            ActiveConnection::MySQL(adapter) => adapter.lock().await.test_connection().await,
+            ActiveConnection::SQLServer(adapter) => adapter.lock().await.test_connection().await,
+            ActiveConnection::SQLite(adapter) => adapter.lock().await.test_connection().await,
+            ActiveConnection::ClickHouse(adapter) => adapter.lock().await.test_connection().await,
+            ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.test_connection().await,
+            ActiveConnection::HttpSql(adapter) => adapter.lock().await.test_connection().await,
+            ActiveConnection::Rqlite(adapter) => adapter.lock().await.test_connection().await,
+            ActiveConnection::Turso(adapter) => adapter.lock().await.test_connection().await,
         };
         result.is_ok()
     }
