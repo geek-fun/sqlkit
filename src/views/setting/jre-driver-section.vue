@@ -27,6 +27,7 @@ const jreStatus = ref<JreStatus | null>(null)
 
 const jreUpdate = ref<JreUpdateStatus | null>(null)
 const jreLoading = ref(false)
+const jreChecking = ref(false)
 
 const jreDownloading = computed(() => dl.isDownloading('jre'))
 const jreDownloadProgress = computed(() => dl.getProgress('jre'))
@@ -48,6 +49,7 @@ const bridgeDownloadProgress = computed(() => dl.getProgress('bridge'))
 const drivers = ref<DriverInfo[]>([])
 const driversLoading = ref(false)
 const removingDriver = ref<string | null>(null)
+const checkingDriver = ref<string | null>(null)
 
 // --- Computed sort: installed first, then alphabetical by name ---
 const sortedDrivers = ref<DriverInfo[]>([])
@@ -97,16 +99,30 @@ async function loadJreStatus() {
 }
 
 async function handleCheckJreUpdates() {
+  jreChecking.value = true
   jreLoading.value = true
   try {
-    jreUpdate.value = await jdbcApi.checkJreUpdate()
+    const update = await jdbcApi.checkJreUpdate()
+    jreUpdate.value = update
+
+    if (update.update_available) {
+      toast.info(t('pages.settings.jre.jreCard.notifications.updateAvailable'), {
+        description: t('pages.settings.jre.jreCard.notifications.newVersion', { version: update.latest_version ?? '' }),
+      })
+      // Auto-start download with progress (like uninstall → install flow)
+      await handleDownloadJre()
+    }
+    else {
+      toast.success(t('pages.settings.jre.jreCard.notifications.upToDate'))
+    }
   }
   catch (error) {
-    toast.error(t('pages.settings.jre.jreCard.errors.checkUpdatesFailed'), {
+    toast.error(t('pages.settings.jre.jreCard.notifications.checkUpdatesFailed'), {
       description: error instanceof Error ? error.message : String(error),
     })
   }
   finally {
+    jreChecking.value = false
     jreLoading.value = false
   }
 }
@@ -115,10 +131,13 @@ async function handleDownloadJre() {
   jreLoading.value = true
   dl.reset('jre')
   const ok = await dl.startDownload('jre', 'jre', () => jdbcApi.downloadJre())
-  if (!ok)
-    toast.error(t('pages.settings.jre.jreCard.errors.downloadFailed'), { description: dl.getError('jre') ?? '' })
-  else
+  if (!ok) {
+    toast.error(t('pages.settings.jre.jreCard.notifications.downloadFailed'), { description: dl.getError('jre') ?? '' })
+  }
+  else {
+    toast.success(t('pages.settings.jre.jreCard.notifications.downloadSuccess'))
     await loadJreStatus()
+  }
   jreLoading.value = false
   dl.reset('jre')
 }
@@ -132,7 +151,7 @@ async function handleRemoveJre() {
     await loadJreStatus()
   }
   catch (error) {
-    toast.error(t('pages.settings.jre.jreCard.errors.removeFailed'), {
+    toast.error(t('pages.settings.jre.jreCard.notifications.removeFailed'), {
       description: error instanceof Error ? error.message : String(error),
     })
   }
@@ -159,10 +178,13 @@ async function handleDownloadBridge() {
   bridgeLoading.value = true
   dl.reset('bridge')
   const ok = await dl.startDownload('bridge', 'bridge', () => jdbcApi.downloadBridgeJar())
-  if (!ok)
-    toast.error(t('pages.settings.jre.bridgeCard.errors.downloadFailed'), { description: dl.getError('bridge') ?? '' })
-  else
+  if (!ok) {
+    toast.error(t('pages.settings.jre.bridgeCard.notifications.downloadFailed'), { description: dl.getError('bridge') ?? '' })
+  }
+  else {
+    toast.success(t('pages.settings.jre.bridgeCard.notifications.downloadSuccess'))
     await loadBridgeStatus()
+  }
   bridgeLoading.value = false
   dl.reset('bridge')
 }
@@ -175,7 +197,7 @@ async function handleRemoveBridge() {
     await loadBridgeStatus()
   }
   catch (error) {
-    toast.error(t('pages.settings.jre.bridgeCard.errors.removeFailed'), {
+    toast.error(t('pages.settings.jre.bridgeCard.notifications.removeFailed'), {
       description: error instanceof Error ? error.message : String(error),
     })
   }
@@ -200,12 +222,19 @@ async function loadDrivers() {
 }
 
 async function handleDownloadDriver(dbType: string) {
+  if (!bridgeStatus.value?.installed) {
+    toast.error(t('pages.settings.jre.driversCard.notifications.installBridgeFirst'))
+    return
+  }
   dl.reset(dbType)
   const ok = await dl.startDownload('driver', dbType, () => jdbcApi.downloadDriver(dbType))
-  if (!ok)
-    toast.error(t('pages.settings.jre.driversCard.errors.downloadFailed'), { description: dl.getError(dbType) ?? '' })
-  else
+  if (!ok) {
+    toast.error(t('pages.settings.jre.driversCard.notifications.downloadFailed'), { description: dl.getError(dbType) ?? '' })
+  }
+  else {
+    toast.success(t('pages.settings.jre.driversCard.notifications.downloadSuccess'))
     await loadDrivers()
+  }
   dl.reset(dbType)
 }
 
@@ -216,12 +245,36 @@ async function handleRemoveDriver(dbType: string) {
     await loadDrivers()
   }
   catch (error) {
-    toast.error(t('pages.settings.jre.driversCard.errors.removeFailed'), {
+    toast.error(t('pages.settings.jre.driversCard.notifications.removeFailed'), {
       description: error instanceof Error ? error.message : String(error),
     })
   }
   finally {
     removingDriver.value = null
+  }
+}
+
+async function handleCheckDriverUpdates(dbType: string) {
+  checkingDriver.value = dbType
+  try {
+    const update = await jdbcApi.checkDriverUpdate(dbType)
+    if (update.update_available) {
+      toast.info(t('pages.settings.jre.driversCard.notifications.updateAvailable'), {
+        description: t('pages.settings.jre.driversCard.notifications.newVersion', { version: update.latest_version ?? '' }),
+      })
+      await handleDownloadDriver(dbType)
+    }
+    else {
+      toast.success(t('pages.settings.jre.driversCard.notifications.upToDate'))
+    }
+  }
+  catch (error) {
+    toast.error(t('pages.settings.jre.driversCard.notifications.checkUpdatesFailed'), {
+      description: error instanceof Error ? error.message : String(error),
+    })
+  }
+  finally {
+    checkingDriver.value = null
   }
 }
 
@@ -304,7 +357,7 @@ onMounted(() => {
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button size="icon" variant="ghost" class="h-7 w-7" :disabled="jreLoading" @click="handleCheckJreUpdates">
-                      <span class="i-carbon-update-now h-3.5 w-3.5" />
+                      <span class="i-carbon-update-now h-3.5 w-3.5" :class="{ 'animate-spin': jreChecking }" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent><p>{{ t('pages.settings.jre.jreCard.actions.checkUpdates') }}</p></TooltipContent>
@@ -586,6 +639,27 @@ onMounted(() => {
               </Badge>
             </div>
             <div class="flex flex-shrink-0 gap-1 items-center">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      class="h-7 w-7"
+                      :disabled="!driver.installed || checkingDriver === driver.db_type || dl.isDownloading(driver.db_type)"
+                      @click="handleCheckDriverUpdates(driver.db_type)"
+                    >
+                      <span
+                        class="i-carbon-update-now h-3.5 w-3.5"
+                        :class="{ 'animate-spin': checkingDriver === driver.db_type }"
+                      />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{{ t('pages.settings.jre.driversCard.actions.checkUpdates') }}</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger as-child>
