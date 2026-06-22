@@ -717,6 +717,7 @@ export const enUS = {
         noStatementFound: 'No SQL statement found at cursor position',
         formatFailed: 'Failed to format SQL',
         noActiveConnection: 'No active connection',
+        selectConnectionFirst: 'Please select a connection and database before executing a query',
         tableActionSuccess: 'Table {action} successfully',
         tableActionFailed: 'Failed to {action} table: {error}',
       },

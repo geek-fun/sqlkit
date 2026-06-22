@@ -717,6 +717,7 @@ export const zhCN = {
         noStatementFound: '未找到光标位置的 SQL 语句',
         formatFailed: 'SQL 格式化失败',
         noActiveConnection: '无活跃连接',
+        selectConnectionFirst: '请先选择连接和数据库后再执行查询',
         tableActionSuccess: '表{table} {action}成功',
         tableActionFailed: '{action}表失败: {error}',
       },

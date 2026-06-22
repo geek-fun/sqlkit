@@ -250,6 +250,7 @@ async function executeQuery(details?: StatementToExecute) {
 
   const connId = getConnectionId()
   if (!connId) {
+    toast.warning(t('pages.queries.notifications.selectConnectionFirst'))
     return
   }
 
@@ -265,8 +266,10 @@ async function handleExplainQuery(analyze = false) {
   if (!activeTab.value.content.trim())
     return
   const connId = getConnectionId()
-  if (!connId)
+  if (!connId) {
+    toast.warning(t('pages.queries.notifications.selectConnectionFirst'))
     return
+  }
   showResultPanel.value = true
   await tabStore.explainQuery(activeTab.value.id, analyze)
 }
