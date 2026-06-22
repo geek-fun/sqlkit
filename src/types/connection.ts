@@ -41,12 +41,73 @@ export const DEFAULT_SSL_MODE = 'prefer'
 /**
  * Database types that support SSL configuration (lowercase for case-insensitive matching)
  */
-export const SSL_SUPPORTED_DATABASES = ['postgresql', 'mysql', 'mariadb', 'sqlserver', 'oracle']
+export const SSL_UNSUPPORTED_DATABASES = ['sqlite', 'duckdb', 'access']
 
 /**
  * Database types that require certificate fields for verify-ca/verify-full
  */
-export const CERT_FIELD_DATABASES = ['postgresql', 'mysql', 'mariadb']
+export const CERT_FIELD_DATABASES = [
+  'postgresql',
+  'cockroachdb',
+  'redshift',
+  'yugabytedb',
+  'timescaledb',
+  'kingbasees',
+  'gaussdb',
+  'highgo',
+  'uxdb',
+  'opengauss',
+  'gbase8c',
+  'questdb',
+  'vastbase',
+  'yashandb',
+  'greenplum',
+  'enterprisedb',
+  'cratedb',
+  'materialize',
+  'alloydb',
+  'cloudsqlpg',
+  'fujitsupg',
+  'mysql',
+  'mariadb',
+  'tidb',
+  'oceanbase',
+  'tdsql',
+  'polardb',
+  'doris',
+  'selectdb',
+  'starrocks',
+  'databend',
+  'goldendb',
+  'manticore',
+  'manticoresearch',
+  'singlestore',
+  'singlestorememsql',
+  'cloudsqlmysql',
+  'oracle',
+  'db2',
+  'h2',
+  'snowflake',
+  'tdengine',
+  'derby',
+  'hive',
+  'databricks',
+  'hana',
+  'teradata',
+  'vertica',
+  'exasol',
+  'bigquery',
+  'informix',
+  'kylin',
+  'cassandra',
+  'iris',
+  'dameng',
+  'xugudb',
+  'gbase8a',
+  'firebird',
+  'oceanbase-oracle',
+  'oceanbase_oracle',
+]
 
 const normalizeDbType = (dbType: string): string => dbType.toLowerCase()
 
@@ -54,7 +115,7 @@ const normalizeDbType = (dbType: string): string => dbType.toLowerCase()
  * Check if database type supports SSL
  */
 export function isSslSupported(dbType: string): boolean {
-  return SSL_SUPPORTED_DATABASES.includes(normalizeDbType(dbType))
+  return !SSL_UNSUPPORTED_DATABASES.includes(normalizeDbType(dbType))
 }
 
 /**
