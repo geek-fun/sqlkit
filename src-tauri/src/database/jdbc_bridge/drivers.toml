@@ -366,3 +366,20 @@ jdbc_url_template = "jdbc:kingbase8://{host}:{port}/{database}"
 default_port = 54321
 min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
+
+# ── OceanBase Oracle ──
+
+[databases.oceanbase_oracle]
+name = "OceanBase Oracle"
+class_name = "com.oceanbase.jdbc.Driver"
+maven_group = "com.oceanbase"
+maven_artifact = "oceanbase-client"
+jdbc_url_template = "jdbc:oceanbase://{host}:{port}/{database}?compatibleOjdbcVersion=8"
+default_port = 2881
+min_jre_version = "11"
+version_error_signatures = [
+  "OB-",
+  "compatibleOjdbcVersion",
+  "unsupported protocol",
+  "AbstractMethodError",
+]

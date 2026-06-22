@@ -80,6 +80,16 @@ pub struct ConnectParams {
     pub oracle_options: Option<OracleConnectionOptions>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub credentials_in_url: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssl_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssl_ca_cert: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssl_client_cert: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssl_client_key: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub trust_server_certificate: bool,
 }
 
 fn default_pool_min() -> u32 {

@@ -43,6 +43,13 @@ impl JdbcBridgeAdapter {
     /// Uses the fallback chain to try multiple driver versions automatically.
     async fn init_bridge(&mut self) -> DbResult<Arc<Mutex<JdbcBridgeLauncher>>> {
         let db_type = self.config.db_type;
+        let ssl_mode_str = match self.config.ssl_mode {
+            crate::database::config::SslMode::Disable => "disable",
+            crate::database::config::SslMode::Prefer => "prefer",
+            crate::database::config::SslMode::Require => "require",
+            crate::database::config::SslMode::VerifyCA => "verify-ca",
+            crate::database::config::SslMode::VerifyFull => "verify-full",
+        };
 
         // Use fallback chain for JDBC-dependent databases (Oracle, DB2, H2, etc.)
         // For non-registry types, fall back to the old single-driver approach
@@ -54,6 +61,11 @@ impl JdbcBridgeAdapter {
             &self.config.username,
             &self.config.password,
             self.config.oracle_options.as_ref(),
+            Some(ssl_mode_str),
+            self.config.ssl_ca_cert.as_deref(),
+            self.config.ssl_client_cert.as_deref(),
+            self.config.ssl_client_key.as_deref(),
+            self.config.trust_server_certificate,
         )
         .await?;
 

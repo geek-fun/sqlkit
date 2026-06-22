@@ -131,10 +131,13 @@ public class ProtocolHandler {
             }
         }
 
-        // Extract Oracle-specific connection options
-        String tnsAdminDir = null;
-        String walletPassword = null;
-        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax, credentialsInUrl);
+        String sslMode = params.has("ssl_mode") && !params.get("ssl_mode").isNull() ? params.get("ssl_mode").asText() : null;
+        String sslCaCert = params.has("ssl_ca_cert") && !params.get("ssl_ca_cert").isNull() ? params.get("ssl_ca_cert").asText() : null;
+        String sslClientCert = params.has("ssl_client_cert") && !params.get("ssl_client_cert").isNull() ? params.get("ssl_client_cert").asText() : null;
+        String sslClientKey = params.has("ssl_client_key") && !params.get("ssl_client_key").isNull() ? params.get("ssl_client_key").asText() : null;
+        boolean trustServerCertificate = params.has("trust_server_certificate") && params.get("trust_server_certificate").asBoolean(false);
+
+        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax, credentialsInUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate);
         response.put("result", connId);
     }
 

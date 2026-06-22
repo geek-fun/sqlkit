@@ -30,7 +30,10 @@ public class ConnectionManager {
                         String password, String driverClass,
                         List<String> driverJars,
                         int minPool, int maxPool,
-                        boolean credentialsInUrl) throws ClassifiedException, Exception {
+                        boolean credentialsInUrl,
+                        String sslMode, String sslCaCert,
+                        String sslClientCert, String sslClientKey,
+                        boolean trustServerCertificate) throws ClassifiedException, Exception {
         if (pools.containsKey(connId)) {
             throw new Exception("Connection already exists: " + connId);
         }
@@ -60,12 +63,14 @@ public class ConnectionManager {
                 java.util.Properties info = new java.util.Properties();
                 if (username != null) info.setProperty("user", username);
                 if (password != null) info.setProperty("password", password);
+                SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
                 return driver.connect(jdbcUrl, info);
             }
             public java.sql.Connection getConnection(String u, String p) throws java.sql.SQLException {
                 java.util.Properties info = new java.util.Properties();
                 if (u != null) info.setProperty("user", u);
                 if (p != null) info.setProperty("password", p);
+                SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
                 return driver.connect(jdbcUrl, info);
             }
             public java.io.PrintWriter getLogWriter() { return null; }
