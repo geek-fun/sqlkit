@@ -101,6 +101,11 @@ pub async fn try_driver(
     password: &Option<String>,
     use_cap: bool,
     oracle_options: Option<&OracleConnectionOptions>,
+    ssl_mode: Option<&str>,
+    ssl_ca_cert: Option<&str>,
+    ssl_client_cert: Option<&str>,
+    ssl_client_key: Option<&str>,
+    trust_server_certificate: bool,
 ) -> DriverAttempt {
     let url = build_oracle_url(config, host, port, database, oracle_options);
 
@@ -123,6 +128,7 @@ pub async fn try_driver(
         "maven_artifact": config.maven_artifact,
         "version_cap": effective_cap,
         "maven_classifier": config.maven_classifier,
+        "download_url": config.download_url,
     });
     let resolve_req = JdbcRequest::new(JdbcMethod::ResolveDriver, resolve_params);
 
@@ -182,6 +188,12 @@ pub async fn try_driver(
         pool_min: 1,
         pool_max: 5,
         oracle_options: oracle_options.cloned(),
+        credentials_in_url: config.credentials_in_url,
+        ssl_mode: ssl_mode.map(|s| s.to_string()),
+        ssl_ca_cert: ssl_ca_cert.map(|s| s.to_string()),
+        ssl_client_cert: ssl_client_cert.map(|s| s.to_string()),
+        ssl_client_key: ssl_client_key.map(|s| s.to_string()),
+        trust_server_certificate,
     }) {
         Ok(v) => v,
         Err(e) => {
@@ -260,6 +272,11 @@ pub async fn run_fallback_chain(
     username: &str,
     password: &Option<String>,
     oracle_options: Option<&OracleConnectionOptions>,
+    ssl_mode: Option<&str>,
+    ssl_ca_cert: Option<&str>,
+    ssl_client_cert: Option<&str>,
+    ssl_client_key: Option<&str>,
+    trust_server_certificate: bool,
 ) -> DbResult<(String, String, Arc<Mutex<JdbcBridgeLauncher>>)> {
     let registry = super::registry::DriverRegistry::load();
     let config = registry.get_config(db_type).ok_or_else(|| {
@@ -314,14 +331,14 @@ pub async fn run_fallback_chain(
 
     // Two-phase driver resolution:
     // 1. Try LATEST (no version_cap)
-    match try_driver(config, host, port, database, username, password, false, oracle_options).await {
+    match try_driver(config, host, port, database, username, password, false, oracle_options, ssl_mode, ssl_ca_cert, ssl_client_cert, ssl_client_key, trust_server_certificate).await {
         DriverAttempt::Connected(conn_id, launcher) => {
             return Ok(("resolved".to_string(), conn_id, launcher));
         }
         DriverAttempt::VersionMismatch(_) => {
             // 2. If LATEST fails with version_incompatible and a cap exists, retry with cap
             if config.version_cap.is_some() {
-                match try_driver(config, host, port, database, username, password, true, oracle_options).await {
+                match try_driver(config, host, port, database, username, password, true, oracle_options, ssl_mode, ssl_ca_cert, ssl_client_cert, ssl_client_key, trust_server_certificate).await {
                     DriverAttempt::Connected(conn_id, launcher) => {
                         return Ok(("capped".to_string(), conn_id, launcher));
                     }

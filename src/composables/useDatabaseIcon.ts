@@ -91,6 +91,7 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   YASHANDB: { icon: yashandbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   TIDB: { icon: tidbLogo, color: 'bg-red-100 dark:bg-red-900/30' },
   OCEANBASE: { icon: oceanbaseLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
+  OCEANBASE_ORACLE: { icon: oceanbaseLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   TDSQL: { icon: tdsqlLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   POLARDB: { icon: polardbLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   DAMENG: { icon: damengLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },

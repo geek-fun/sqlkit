@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import type { DatabaseType } from '@/store/connectionStore'
 import type { SslConfig, SslMode } from '@/types/connection'
 import { computed } from 'vue'
-import { DatabaseType } from '@/store/connectionStore'
 import {
   DEFAULT_SSL_MODE,
   isSslSupported,
@@ -21,40 +21,7 @@ const sslConfig = defineModel<SslConfig>({
   default: () => ({ mode: DEFAULT_SSL_MODE }),
 })
 
-const SSL_DB_TYPE_LABELS: Record<string, string> = {
-  [DatabaseType.POSTGRESQL]: 'PostgreSQL',
-  [DatabaseType.MYSQL]: 'MySQL',
-  [DatabaseType.MARIADB]: 'MariaDB',
-  [DatabaseType.SQLSERVER]: 'SQLServer',
-  [DatabaseType.SQLITE]: 'SQLite',
-  [DatabaseType.DUCKDB]: 'DuckDB',
-  [DatabaseType.CLICKHOUSE]: 'ClickHouse',
-  [DatabaseType.COCKROACHDB]: 'CockroachDB',
-  [DatabaseType.REDSHIFT]: 'Redshift',
-  [DatabaseType.YUGABYTEDB]: 'YugabyteDB',
-  [DatabaseType.TIMESCALEDB]: 'TimescaleDB',
-  [DatabaseType.KINGBASEES]: 'KingbaseES',
-  [DatabaseType.GAUSSDB]: 'GaussDB',
-  [DatabaseType.HIGHGO]: 'HighGo',
-  [DatabaseType.UXDB]: 'UXDB',
-  [DatabaseType.OPENGAUSS]: 'openGauss',
-  [DatabaseType.GBASE8C]: 'GBase 8c',
-  [DatabaseType.TIDB]: 'TiDB',
-  [DatabaseType.OCEANBASE]: 'OceanBase',
-  [DatabaseType.TDSQL]: 'TDSQL',
-  [DatabaseType.POLARDB]: 'PolarDB',
-  [DatabaseType.DAMENG]: 'Dameng',
-  [DatabaseType.ORACLE]: 'Oracle',
-  [DatabaseType.DB2]: 'DB2',
-  [DatabaseType.H2]: 'H2',
-  [DatabaseType.SNOWFLAKE]: 'Snowflake',
-  [DatabaseType.XUGUDB]: 'XuguDB',
-  [DatabaseType.GBASE8A]: 'GBase 8a',
-  [DatabaseType.TRINO]: 'Trino',
-  [DatabaseType.PRESTO]: 'Presto',
-}
-
-const dbTypeLabel = computed(() => SSL_DB_TYPE_LABELS[props.dbType] || props.dbType)
+const dbTypeLabel = computed(() => props.dbType)
 
 const showSslSection = computed(() => isSslSupported(dbTypeLabel.value))
 

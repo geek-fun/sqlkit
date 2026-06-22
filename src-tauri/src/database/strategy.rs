@@ -43,8 +43,8 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         //         Native PG adapter
         PostgreSQL => ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL),
         // PG wire protocol compat
-        CockroachDB | Redshift | YugabyteDB | TimescaleDB | KingbaseES | GaussDB | HighGo
-        | UXDB | OpenGauss | GBase8c | QuestDB | Vastbase | YashanDB
+        CockroachDB | Redshift | YugabyteDB | TimescaleDB | GaussDB | HighGo
+        | UXDB | OpenGauss | GBase8c | QuestDB | Vastbase
         | Greenplum | EnterpriseDB | CrateDB | Materialize
         | AlloyDB | CloudSQLPG | FujitsuPG => {
             ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL)
@@ -88,6 +88,9 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         Cassandra => ConnectionStrategy::JdbcBridge,
         Iris => ConnectionStrategy::JdbcBridge,
         Access => ConnectionStrategy::JdbcBridge,
+        YashanDB => ConnectionStrategy::JdbcBridge,
+        KingbaseES => ConnectionStrategy::JdbcBridge,
+        OceanbaseOracle => ConnectionStrategy::JdbcBridge,
 
         // HTTP SQL bridge
         Trino | Presto => ConnectionStrategy::Http,
@@ -117,12 +120,14 @@ pub fn is_pg_family(db: DatabaseType) -> bool {
 pub fn default_port(db: DatabaseType) -> Option<u16> {
     use DatabaseType::*;
     match db {
-        PostgreSQL | CockroachDB | Redshift | YugabyteDB | TimescaleDB | KingbaseES | GaussDB
+        PostgreSQL | CockroachDB | Redshift | YugabyteDB | TimescaleDB | GaussDB
         | HighGo | UXDB | OpenGauss | GBase8c | Vastbase
         | Greenplum | EnterpriseDB | CrateDB | Materialize
         | AlloyDB | CloudSQLPG | FujitsuPG => Some(5432),
         QuestDB => Some(8812),
         YashanDB => Some(1688),
+        KingbaseES => Some(54321),
+        OceanbaseOracle => Some(2881),
         MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | GoldenDB
         | SingleStoreMemSQL | CloudSQLMySQL => Some(3306),
         Doris | SelectDB | StarRocks => Some(9030),
@@ -171,12 +176,10 @@ mod tests {
             DatabaseType::PostgreSQL,
             DatabaseType::CockroachDB,
             DatabaseType::Redshift,
-            DatabaseType::KingbaseES,
             DatabaseType::GaussDB,
             DatabaseType::HighGo,
             DatabaseType::QuestDB,
             DatabaseType::Vastbase,
-            DatabaseType::YashanDB,
             DatabaseType::Greenplum,
             DatabaseType::EnterpriseDB,
             DatabaseType::CrateDB,
@@ -272,6 +275,9 @@ mod tests {
             DatabaseType::Cassandra,
             DatabaseType::Iris,
             DatabaseType::Access,
+            DatabaseType::YashanDB,
+            DatabaseType::KingbaseES,
+            DatabaseType::OceanbaseOracle,
         ] {
             assert_eq!(
                 resolve_effective_type(db),
@@ -315,6 +321,8 @@ mod tests {
         assert_eq!(default_port(DatabaseType::QuestDB), Some(8812));
         assert_eq!(default_port(DatabaseType::Vastbase), Some(5432));
         assert_eq!(default_port(DatabaseType::YashanDB), Some(1688));
+        assert_eq!(default_port(DatabaseType::KingbaseES), Some(54321));
+        assert_eq!(default_port(DatabaseType::OceanbaseOracle), Some(2881));
         assert_eq!(default_port(DatabaseType::Hive), Some(10000));
         assert_eq!(default_port(DatabaseType::Databricks), Some(443));
         assert_eq!(default_port(DatabaseType::Hana), Some(30015));

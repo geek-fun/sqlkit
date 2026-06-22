@@ -177,11 +177,34 @@ impl TursoAdapter {
     }
 
     /// Create the `reqwest::Client` used for all HTTP calls.
-    fn build_client() -> DbResult<reqwest::Client> {
-        reqwest::Client::builder()
+    fn build_client(&self) -> DbResult<reqwest::Client> {
+        let mut builder = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
-            .user_agent("sqlkit-turso-adapter/0.1")
-            .build()
+            .user_agent("sqlkit-turso-adapter/0.1");
+
+        if let Some(ref ca_cert) = self.config.ssl_ca_cert {
+            let pem = std::fs::read(ca_cert)
+                .map_err(|e| DbError::Connection(format!("Failed to read CA certificate: {}", e)))?;
+            let cert = reqwest::Certificate::from_pem(&pem)
+                .map_err(|e| DbError::Connection(format!("Failed to parse CA certificate: {}", e)))?;
+            builder = builder.add_root_certificate(cert);
+        }
+
+        if let (Some(ref cert_path), Some(ref key_path)) =
+            (&self.config.ssl_client_cert, &self.config.ssl_client_key)
+        {
+            let cert_pem = std::fs::read(cert_path)
+                .map_err(|e| DbError::Connection(format!("Failed to read client certificate: {}", e)))?;
+            let key_pem = std::fs::read(key_path)
+                .map_err(|e| DbError::Connection(format!("Failed to read client key: {}", e)))?;
+            let mut combined = cert_pem;
+            combined.extend_from_slice(&key_pem);
+            let identity = reqwest::Identity::from_pem(&combined)
+                .map_err(|e| DbError::Connection(format!("Failed to parse client identity: {}", e)))?;
+            builder = builder.identity(identity);
+        }
+
+        builder.build()
             .map_err(|e| DbError::Connection(format!("Failed to create HTTP client: {}", e)))
     }
 
@@ -352,7 +375,7 @@ impl DatabaseAdapter for TursoAdapter {
     type Pool = TursoPool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        let client = Self::build_client()?;
+        let client = self.build_client()?;
 
         // Verify connectivity by sending a simple "SELECT 1" pipeline
         let url = format!("{}/v2/pipeline", self.build_base_url());

@@ -124,6 +124,8 @@ public class ProtocolHandler {
         String driverClass = requiredString(params, "driver_class", null);
         int poolMin = params.has("pool_min") ? params.get("pool_min").asInt(1) : 1;
         int poolMax = params.has("pool_max") ? params.get("pool_max").asInt(5) : 5;
+        boolean credentialsInUrl = params.has("credentials_in_url") && !params.get("credentials_in_url").isNull()
+                && params.get("credentials_in_url").asBoolean(false);
 
         List<String> driverJars = new ArrayList<>();
         if (params.has("driver_jars") && params.get("driver_jars").isArray()) {
@@ -132,10 +134,13 @@ public class ProtocolHandler {
             }
         }
 
-        // Extract Oracle-specific connection options
-        String tnsAdminDir = null;
-        String walletPassword = null;
-        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax);
+        String sslMode = params.has("ssl_mode") && !params.get("ssl_mode").isNull() ? params.get("ssl_mode").asText() : null;
+        String sslCaCert = params.has("ssl_ca_cert") && !params.get("ssl_ca_cert").isNull() ? params.get("ssl_ca_cert").asText() : null;
+        String sslClientCert = params.has("ssl_client_cert") && !params.get("ssl_client_cert").isNull() ? params.get("ssl_client_cert").asText() : null;
+        String sslClientKey = params.has("ssl_client_key") && !params.get("ssl_client_key").isNull() ? params.get("ssl_client_key").asText() : null;
+        boolean trustServerCertificate = params.has("trust_server_certificate") && params.get("trust_server_certificate").asBoolean(false);
+
+        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax, credentialsInUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate);
         response.put("result", connId);
     }
 
@@ -217,7 +222,9 @@ public class ProtocolHandler {
                 ? params.get("version_cap").asText() : null;
         String classifier = params.has("maven_classifier") && !params.get("maven_classifier").isNull()
                 ? params.get("maven_classifier").asText() : null;
-        
+        String downloadUrl = params.has("download_url") && !params.get("download_url").isNull()
+                ? params.get("download_url").asText() : null;
+
         DriverResolver.ProgressCallback progressCb = (downloaded, total) -> {
             try {
                 ObjectNode progressNode = MAPPER.createObjectNode();
@@ -229,9 +236,9 @@ public class ProtocolHandler {
                 // Ignore progress reporting errors
             }
         };
-        
+
         DriverResolver.DriverResult result = DriverResolver.resolve(
-            mavenGroup, mavenArtifact, versionCap, classifier, progressCb);
+            mavenGroup, mavenArtifact, versionCap, classifier, downloadUrl, progressCb);
         
         ObjectNode resultNode = MAPPER.createObjectNode();
         resultNode.put("jar_path", result.getJarPath());

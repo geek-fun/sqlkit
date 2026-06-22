@@ -32,25 +32,25 @@ describe('connectionStore', () => {
       }
     })
 
-    it('maps PG-family types to PostgreSQL', () => {
-      expect(dbTypeToBackend[DatabaseType.COCKROACHDB]).toBe('PostgreSQL')
-      expect(dbTypeToBackend[DatabaseType.REDSHIFT]).toBe('PostgreSQL')
-      expect(dbTypeToBackend[DatabaseType.YUGABYTEDB]).toBe('PostgreSQL')
-      expect(dbTypeToBackend[DatabaseType.TIMESCALEDB]).toBe('PostgreSQL')
-      expect(dbTypeToBackend[DatabaseType.KINGBASEES]).toBe('PostgreSQL')
-      expect(dbTypeToBackend[DatabaseType.GAUSSDB]).toBe('PostgreSQL')
-      expect(dbTypeToBackend[DatabaseType.HIGHGO]).toBe('PostgreSQL')
-      expect(dbTypeToBackend[DatabaseType.UXDB]).toBe('PostgreSQL')
-      expect(dbTypeToBackend[DatabaseType.OPENGAUSS]).toBe('PostgreSQL')
-      expect(dbTypeToBackend[DatabaseType.GBASE8C]).toBe('PostgreSQL')
+    it('maps each type to its own unique backend string (preserves round-trip)', () => {
+      expect(dbTypeToBackend[DatabaseType.COCKROACHDB]).toBe('cockroachdb')
+      expect(dbTypeToBackend[DatabaseType.REDSHIFT]).toBe('redshift')
+      expect(dbTypeToBackend[DatabaseType.YUGABYTEDB]).toBe('yugabytedb')
+      expect(dbTypeToBackend[DatabaseType.TIMESCALEDB]).toBe('timescaledb')
+      expect(dbTypeToBackend[DatabaseType.KINGBASEES]).toBe('kingbasees')
+      expect(dbTypeToBackend[DatabaseType.GAUSSDB]).toBe('gaussdb')
+      expect(dbTypeToBackend[DatabaseType.HIGHGO]).toBe('highgo')
+      expect(dbTypeToBackend[DatabaseType.UXDB]).toBe('uxdb')
+      expect(dbTypeToBackend[DatabaseType.OPENGAUSS]).toBe('opengauss')
+      expect(dbTypeToBackend[DatabaseType.GBASE8C]).toBe('gbase8c')
     })
 
-    it('maps MySQL-family types to MySQL', () => {
-      expect(dbTypeToBackend[DatabaseType.MARIADB]).toBe('MySQL')
-      expect(dbTypeToBackend[DatabaseType.TIDB]).toBe('MySQL')
-      expect(dbTypeToBackend[DatabaseType.OCEANBASE]).toBe('MySQL')
-      expect(dbTypeToBackend[DatabaseType.TDSQL]).toBe('MySQL')
-      expect(dbTypeToBackend[DatabaseType.POLARDB]).toBe('MySQL')
+    it('maps each MySQL-family type to its own unique backend string', () => {
+      expect(dbTypeToBackend[DatabaseType.MARIADB]).toBe('mariadb')
+      expect(dbTypeToBackend[DatabaseType.TIDB]).toBe('tidb')
+      expect(dbTypeToBackend[DatabaseType.OCEANBASE]).toBe('oceanbase')
+      expect(dbTypeToBackend[DatabaseType.TDSQL]).toBe('tdsql')
+      expect(dbTypeToBackend[DatabaseType.POLARDB]).toBe('polardb')
       expect(dbTypeToBackend[DatabaseType.DAMENG]).toBe('dameng')
     })
 

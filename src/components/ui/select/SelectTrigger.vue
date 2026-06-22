@@ -17,7 +17,7 @@ const delegatedProps = computed(() => {
   <SelectTrigger
     v-bind="delegatedProps"
     :class="cn(
-      'flex h-10 w-full items-center justify-between rounded-md border border-input bg-secondary px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 [&>span]:flex-1 [&>span]:min-w-0 [&>span]:overflow-hidden cursor-pointer',
+      'flex h-8 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-1.5 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50 [&>span]:line-clamp-1 [&>span]:flex-1 [&>span]:min-w-0 [&>span]:overflow-hidden cursor-pointer',
       props.class,
     )"
   >

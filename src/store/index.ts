@@ -5,15 +5,19 @@ export {
   buildOracleOptions,
   buildTransportLayers,
   ConnectionStatus,
+  databasePlaceholderFor,
   DatabaseType,
   dbTypeFromBackend,
   dbTypeToBackend,
+  formatServerVersion,
+  getConnectionStrategy,
+  isDatabaseRequired,
   isJdbcDatabase,
   jdbcDatabaseTypes,
   resolveDatabase,
   useConnectionStore,
 } from './connectionStore'
-export type { OracleConnectionOptions, ServerConnection, SSHTunnelConfig } from './connectionStore'
+export type { ConnectionStrategyType, OracleConnectionOptions, ServerConnection, SSHTunnelConfig } from './connectionStore'
 export { useDatabaseStore } from './databaseStore'
 export type { DatabaseMetadata, TableInfo } from './databaseStore'
 export { useDataStudioStore } from './dataStudioStore'

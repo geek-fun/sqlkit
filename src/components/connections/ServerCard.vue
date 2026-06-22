@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
-import { ConnectionStatus, DatabaseType } from '@/store'
+import { ConnectionStatus, DatabaseType, formatServerVersion, getConnectionStrategy } from '@/store'
 
 const props = defineProps<{
   connection: ServerConnection
@@ -59,13 +59,31 @@ const statusText = computed(() => {
 })
 
 const connectionUrl = computed(() => {
-  const { host, port, database, type } = props.connection
+  const { host, port, database, type, oracleOptions } = props.connection
   if (type === DatabaseType.SQLITE) {
     return host
+  }
+  if (type === DatabaseType.ORACLE && oracleOptions) {
+    if (oracleOptions.connectionMethod === 'tns' && oracleOptions.tnsAlias) {
+      return oracleOptions.tnsAlias
+    }
+    if (oracleOptions.connectionMethod === 'cloud_wallet') {
+      return 'Cloud Wallet'
+    }
   }
   const portStr = port ? `:${port}` : ''
   const dbStr = database ? `/${database}` : ''
   return `${host}${portStr}${dbStr}`
+})
+
+const strategy = computed(() => getConnectionStrategy(props.connection.type))
+const strategyTooltip = computed(() => {
+  switch (strategy.value) {
+    case 'native': return t('components.serverCard.strategy.nativeTooltip')
+    case 'jdbc-bridge': return t('components.serverCard.strategy.jdbcBridgeTooltip')
+    case 'http-bridge': return t('components.serverCard.strategy.httpBridgeTooltip')
+    default: return ''
+  }
 })
 
 const handleConnect = () => emit('connect', props.connection)
@@ -122,6 +140,81 @@ const handleDuplicate = () => emit('duplicate', props.connection)
         <Badge variant="outline" class="text-xs">
           {{ connection.type }}
         </Badge>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Badge variant="outline" class="text-xs">
+                <svg
+                  v-if="strategy === 'native'"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                <svg
+                  v-else-if="strategy === 'jdbc-bridge'"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+                  <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+                  <line x1="6" x2="6" y1="2" y2="4" />
+                  <line x1="10" x2="10" y1="2" y2="4" />
+                  <line x1="14" x2="14" y1="2" y2="4" />
+                </svg>
+                <svg
+                  v-else
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <line x1="2" x2="22" y1="12" y2="12" />
+                  <path d="M12 2a15.3 15.3 0 1 1 0 20a15.3 15.3 0 1 1 0-20" />
+                </svg>
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p class="max-w-xs">
+                {{ strategyTooltip }}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider v-if="connection.serverVersion">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Badge variant="secondary" class="text-xs">
+                {{ formatServerVersion(connection.serverVersion) }}
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>
+                {{ connection.serverVersion }}
+              </p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
         <Badge v-if="connection.ssl" variant="outline" class="text-xs">
           SSL
         </Badge>
