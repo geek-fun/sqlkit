@@ -117,11 +117,14 @@ impl DriverRegistry {
 ///
 /// When `classifier` is `Some`, the JAR filename becomes
 /// `{artifact}-{version}-{classifier}.jar` (e.g. `hive-jdbc-3.1.3-standalone.jar`).
-pub fn resolve_maven_url(group: &str, artifact: &str, version: &str, classifier: Option<&str>) -> String {
+pub fn resolve_maven_url(
+    group: &str,
+    artifact: &str,
+    version: &str,
+    classifier: Option<&str>,
+) -> String {
     let group_path = group.replace('.', "/");
-    let classifier_suffix = classifier
-        .map(|c| format!("-{c}"))
-        .unwrap_or_default();
+    let classifier_suffix = classifier.map(|c| format!("-{c}")).unwrap_or_default();
     format!(
         "https://repo1.maven.org/maven2/{group_path}/{artifact}/{version}/{artifact}-{version}{classifier_suffix}.jar"
     )
@@ -201,6 +204,7 @@ fn db_type_to_registry_key(db: DatabaseType) -> Option<&'static str> {
         DatabaseType::Access => Some("access"),
         DatabaseType::YashanDB => Some("yashandb"),
         DatabaseType::KingbaseES => Some("kingbase"),
+        DatabaseType::OceanbaseOracle => Some("oceanbase_oracle"),
         _ => None,
     }
 }

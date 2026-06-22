@@ -162,12 +162,8 @@ pub async fn test_connection(config: ServerConfig) -> Result<ConnectionStatus, S
         let tunnels = TunnelManager::new();
         let connection_id = Uuid::new_v4().to_string();
 
-        match crate::commands::helpers::connection_host_port(
-            &connection_id,
-            &conn_config,
-            &tunnels,
-        )
-        .await
+        match crate::commands::helpers::connection_host_port(&connection_id, &conn_config, &tunnels)
+            .await
         {
             Ok((host, port)) => {
                 conn_config.host = host;

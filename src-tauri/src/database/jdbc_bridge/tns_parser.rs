@@ -8,10 +8,11 @@ use std::path::Path;
 /// Tries common filename variants: `tnsnames.ora`, `TNSNAMES.ORA`.
 pub fn parse_tns_aliases(tns_admin_dir: &str) -> Vec<String> {
     let dir = Path::new(tns_admin_dir);
-    
+
     // Try common filename variants
     let filenames = ["tnsnames.ora", "TNSNAMES.ORA", "Tnsnames.ora"];
-    let content = filenames.iter()
+    let content = filenames
+        .iter()
         .find_map(|name| fs::read_to_string(dir.join(name)).ok());
 
     let content = match content {

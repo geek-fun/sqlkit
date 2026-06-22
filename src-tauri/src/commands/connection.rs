@@ -82,7 +82,9 @@ pub async fn get_connection_status(
 /// Returns quality data including latency, error count, and a composite score (0-100).
 /// Returns an error if no health data exists for the given connection.
 #[tauri::command]
-pub async fn get_connection_quality(connection_id: String) -> Result<crate::connection::guardian::ConnectionQuality, String> {
+pub async fn get_connection_quality(
+    connection_id: String,
+) -> Result<crate::connection::guardian::ConnectionQuality, String> {
     let guardian = crate::GUARDIAN
         .get()
         .ok_or_else(|| "Guardian not initialized".to_string())?;

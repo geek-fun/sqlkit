@@ -16,9 +16,9 @@ use crate::database::rqlite::RqliteAdapter;
 use crate::database::turso::TursoAdapter;
 /// Core adapter types used in dispatch logic.
 use crate::database::{
-    clickhouse::ClickHouseAdapter, http_sql::HttpSqlAdapter,
-    jdbc_bridge::JdbcBridgeAdapter, mysql::MySQLAdapter, postgres::PostgresAdapter,
-    sqlite::SQLiteAdapter, sqlserver::SqlServerAdapter,
+    clickhouse::ClickHouseAdapter, http_sql::HttpSqlAdapter, jdbc_bridge::JdbcBridgeAdapter,
+    mysql::MySQLAdapter, postgres::PostgresAdapter, sqlite::SQLiteAdapter,
+    sqlserver::SqlServerAdapter,
 };
 
 /// Server configuration with connection details.
@@ -85,8 +85,12 @@ pub struct ServerConfig {
     pub transport_layers: Option<Vec<TransportLayerConfig>>,
 }
 
-fn default_timeout_10() -> u64 { 10 }
-fn default_timeout_30() -> u64 { 30 }
+fn default_timeout_10() -> u64 {
+    10
+}
+fn default_timeout_30() -> u64 {
+    30
+}
 
 impl ServerConfig {
     /// Create a new server configuration.

@@ -88,7 +88,7 @@ http = "1"
 log = "0.4"
 futures = "0.3"
 rand = "0.8"
-data-studio-agent = { path = "/Users/blankll/Documents/devs/geekfun/data-studio-agent" }
+data-studio-agent = { path = "../../data-studio-agent" }
 
 # Archive extraction (JRE downloads)
 flate2 = "1.0"

@@ -1,5 +1,11 @@
 use crate::database::config::DatabaseType;
-use crate::database::jdbc_bridge::{download, jre, launcher::JdbcBridgeLauncher, protocol::{JdbcMethod, JdbcRequest}, registry::DriverRegistry, tns_parser};
+use crate::database::jdbc_bridge::{
+    download, jre,
+    launcher::JdbcBridgeLauncher,
+    protocol::{JdbcMethod, JdbcRequest},
+    registry::DriverRegistry,
+    tns_parser,
+};
 use serde::Serialize;
 use std::path::PathBuf;
 
@@ -33,8 +39,7 @@ pub async fn check_jre_status() -> Result<JreStatus, String> {
             source: "managed".to_string(),
         })
     } else if let Some(system_java) = jre::JreDetector::detect_system_java() {
-        let version = jre::system_java_version(&system_java)
-            .map(|v| format!("{}.x", v));
+        let version = jre::system_java_version(&system_java).map(|v| format!("{}.x", v));
         Ok(JreStatus {
             installed: true,
             version,
@@ -53,7 +58,18 @@ pub async fn check_jre_status() -> Result<JreStatus, String> {
 
 #[tauri::command]
 pub async fn download_jre() -> Result<(), String> {
-    jre::download_managed_jre().await.map_err(|e| e.to_string())
+    let result = jre::download_managed_jre().await;
+    match result {
+        Ok(()) => {
+            crate::download::emit_complete("jre", crate::download::DownloadKind::Jre);
+            Ok(())
+        }
+        Err(e) => {
+            let err = e.to_string();
+            crate::download::emit_error("jre", crate::download::DownloadKind::Jre, &err);
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]
@@ -74,9 +90,13 @@ pub async fn list_drivers() -> Result<Vec<DriverInfo>, String> {
             version_cap: config.version_cap.clone(),
             filename: cached.as_ref().map(|c| c.0.clone()),
             file_size: cached.as_ref().map(|c| c.1),
-            resolved_version: cached
-                .as_ref()
-                .and_then(|c| parse_jar_version(&config.maven_artifact, config.maven_classifier.as_deref(), &c.0)),
+            resolved_version: cached.as_ref().and_then(|c| {
+                parse_jar_version(
+                    &config.maven_artifact,
+                    config.maven_classifier.as_deref(),
+                    &c.0,
+                )
+            }),
         });
     }
     Ok(result)
@@ -90,10 +110,16 @@ pub async fn download_driver(db_type: String) -> Result<(), String> {
         .get_config(dt)
         .ok_or_else(|| format!("No registry entry for {}", db_type))?;
 
+    crate::download::emit_progress(&db_type, crate::download::DownloadKind::Driver, 0, 1);
+
     // Start a temporary Java bridge process to resolve the driver
     let bridge_jar = download::bridge_jar_path();
     let mut launcher = JdbcBridgeLauncher::new(bridge_jar);
-    launcher.start(&[]).map_err(|e| e.to_string())?;
+    if let Err(e) = launcher.start(&[]) {
+        let err = e.to_string();
+        crate::download::emit_error(&db_type, crate::download::DownloadKind::Driver, &err);
+        return Err(err);
+    }
 
     let req = JdbcRequest::new(
         JdbcMethod::ResolveDriver,
@@ -104,14 +130,29 @@ pub async fn download_driver(db_type: String) -> Result<(), String> {
             "maven_classifier": config.maven_classifier,
         }),
     );
-    let resp = launcher.send_request(&req).map_err(|e| e.to_string())?;
+    let resp = launcher
+        .send_request_with_progress(&req, |downloaded, total| {
+            crate::download::emit_progress(
+                &db_type,
+                crate::download::DownloadKind::Driver,
+                downloaded,
+                total,
+            );
+        })
+        .map_err(|e| {
+            let err = e.to_string();
+            crate::download::emit_error(&db_type, crate::download::DownloadKind::Driver, &err);
+            err
+        })?;
     if let Some(err) = resp.error {
         launcher.shutdown();
+        crate::download::emit_error(&db_type, crate::download::DownloadKind::Driver, &err);
         return Err(err);
     }
 
     // Driver is now cached on disk by the Java bridge
     launcher.shutdown();
+    crate::download::emit_complete(&db_type, crate::download::DownloadKind::Driver);
     Ok(())
 }
 
@@ -154,6 +195,10 @@ fn parse_db_type(s: &str) -> Result<DatabaseType, String> {
         "cassandra" => Ok(DatabaseType::Cassandra),
         "iris" => Ok(DatabaseType::Iris),
         "access" => Ok(DatabaseType::Access),
+        "tdengine" | "td" => Ok(DatabaseType::TDengine),
+        "yashandb" => Ok(DatabaseType::YashanDB),
+        "kingbasees" | "kingbase" => Ok(DatabaseType::KingbaseES),
+        "oceanbase_oracle" | "oceanbase-oracle" => Ok(DatabaseType::OceanbaseOracle),
         _ => Err(format!("Unknown JDBC database type: {}", s)),
     }
 }
@@ -218,9 +263,18 @@ pub async fn list_tns_aliases(tns_admin_dir: String) -> Result<Vec<String>, Stri
 /// Does NOT require Java — purely HTTP download, parallel-safe.
 #[tauri::command]
 pub async fn download_jdbc_driver_direct(db_type: String) -> Result<(), String> {
-    download::download_jdbc_driver_direct(&db_type)
-        .await
-        .map_err(|e| e.to_string())
+    let result = download::download_jdbc_driver_direct(&db_type).await;
+    match result {
+        Ok(()) => {
+            crate::download::emit_complete(&db_type, crate::download::DownloadKind::Driver);
+            Ok(())
+        }
+        Err(e) => {
+            let err = e.to_string();
+            crate::download::emit_error(&db_type, crate::download::DownloadKind::Driver, &err);
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]
@@ -245,9 +299,18 @@ pub async fn check_bridge_status() -> Result<BridgeStatus, String> {
 
 #[tauri::command]
 pub async fn download_bridge_jar() -> Result<(), String> {
-    download::download_bridge_plugin()
-        .await
-        .map_err(|e| e.to_string())
+    let result = download::download_bridge_plugin().await;
+    match result {
+        Ok(()) => {
+            crate::download::emit_complete("bridge", crate::download::DownloadKind::Bridge);
+            Ok(())
+        }
+        Err(e) => {
+            let err = e.to_string();
+            crate::download::emit_error("bridge", crate::download::DownloadKind::Bridge, &err);
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]
@@ -265,6 +328,102 @@ pub struct JreUpdateStatus {
     pub current_version: Option<String>,
     pub latest_version: Option<String>,
     pub update_available: bool,
+}
+
+#[derive(Serialize)]
+pub struct DriverUpdateStatus {
+    pub current_version: Option<String>,
+    pub latest_version: Option<String>,
+    pub update_available: bool,
+}
+
+#[tauri::command]
+pub async fn check_driver_update(db_type: String) -> Result<DriverUpdateStatus, String> {
+    let registry = DriverRegistry::load();
+    let config = registry
+        .get_config_by_name(&db_type)
+        .ok_or_else(|| format!("Unknown driver type: {}", db_type))?;
+
+    let current_version = driver_cache_info(&config.maven_artifact).and_then(|(filename, _)| {
+        parse_jar_version(
+            &config.maven_artifact,
+            config.maven_classifier.as_deref(),
+            &filename,
+        )
+    });
+
+    // Drivers served from a direct URL (not on Maven Central, e.g. GBase 8a).
+    // Check by HEAD'ing the URL and comparing the Content-Length against the
+    // locally cached JAR size — a different length signals a new release.
+    if let Some(download_url) = &config.download_url {
+        let local_size = driver_cache_info(&config.maven_artifact).map(|(_, size)| size);
+        match reqwest::Client::new().head(download_url).send().await {
+            Ok(resp) if resp.status().is_success() => {
+                let remote_size = resp
+                    .headers()
+                    .get(reqwest::header::CONTENT_LENGTH)
+                    .and_then(|v| v.to_str().ok())
+                    .and_then(|s| s.parse::<u64>().ok());
+                let update_available = match (remote_size, local_size) {
+                    (Some(r), Some(l)) => r != l,
+                    (Some(_), None) => true,
+                    _ => false,
+                };
+                let latest_version = remote_size.map(|s| format!("{} bytes", s));
+                return Ok(DriverUpdateStatus {
+                    current_version: local_size.map(|s| format!("{} bytes", s)),
+                    latest_version,
+                    update_available,
+                });
+            }
+            _ => {
+                return Ok(DriverUpdateStatus {
+                    current_version: local_size.map(|s| format!("{} bytes", s)),
+                    latest_version: None,
+                    update_available: false,
+                });
+            }
+        }
+    }
+
+    // If version_cap is set, treat it as the pinned latest version
+    // (avoids spurious "update available" for intentionally pinned drivers)
+    let latest_version = if let Some(cap) = &config.version_cap {
+        Some(cap.clone())
+    } else {
+        let group_path = config.maven_group.replace('.', "/");
+        let url = format!(
+            "https://repo1.maven.org/maven2/{}/{}/maven-metadata.xml",
+            group_path, config.maven_artifact
+        );
+        match reqwest::get(&url).await {
+            Ok(resp) if resp.status().is_success() => match resp.text().await {
+                Ok(xml) => parse_maven_latest_version(&xml),
+                Err(_) => None,
+            },
+            _ => None,
+        }
+    };
+
+    let update_available = match (&current_version, &latest_version) {
+        (Some(c), Some(l)) => c != l,
+        (None, Some(_)) => true,
+        _ => false,
+    };
+
+    Ok(DriverUpdateStatus {
+        current_version,
+        latest_version,
+        update_available,
+    })
+}
+
+/// Extract the `<latest>` version tag from a Maven metadata XML string.
+fn parse_maven_latest_version(xml: &str) -> Option<String> {
+    let start = xml.find("<latest>")?;
+    let value_start = start + "<latest>".len();
+    let end = xml[value_start..].find("</latest>")?;
+    Some(xml[value_start..value_start + end].to_string())
 }
 
 #[tauri::command]

@@ -6,12 +6,10 @@
 //! `release` file, and cleaning it up.
 
 use crate::database::error::{DbError, DbResult};
-use crate::APP_HANDLE;
 use futures::StreamExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use tauri::Emitter;
 use tokio::sync::Mutex;
 
 /// Subdirectory under user home for the managed JRE.
@@ -75,18 +73,36 @@ pub fn is_managed_jre_installed() -> bool {
 
 /// Determine the Adoptium OS and arch strings for the current platform.
 fn adoptium_os_arch() -> Option<(&'static str, &'static str)> {
-    #[cfg(all(target_os = "macos", target_arch = "aarch64"))] { Some(("mac", "aarch64")) }
-    #[cfg(all(target_os = "macos", target_arch = "x86_64"))] { Some(("mac", "x64")) }
-    #[cfg(all(target_os = "linux", target_arch = "x86_64"))] { Some(("linux", "x64")) }
-    #[cfg(all(target_os = "linux", target_arch = "aarch64"))] { Some(("linux", "aarch64")) }
-    #[cfg(all(target_os = "windows", target_arch = "x86_64"))] { Some(("windows", "x64")) }
+    #[cfg(all(target_os = "macos", target_arch = "aarch64"))]
+    {
+        Some(("mac", "aarch64"))
+    }
+    #[cfg(all(target_os = "macos", target_arch = "x86_64"))]
+    {
+        Some(("mac", "x64"))
+    }
+    #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
+    {
+        Some(("linux", "x64"))
+    }
+    #[cfg(all(target_os = "linux", target_arch = "aarch64"))]
+    {
+        Some(("linux", "aarch64"))
+    }
+    #[cfg(all(target_os = "windows", target_arch = "x86_64"))]
+    {
+        Some(("windows", "x64"))
+    }
     #[cfg(not(any(
         all(target_os = "macos", target_arch = "aarch64"),
         all(target_os = "macos", target_arch = "x86_64"),
         all(target_os = "linux", target_arch = "x86_64"),
         all(target_os = "linux", target_arch = "aarch64"),
         all(target_os = "windows", target_arch = "x86_64"),
-    )))] { None }
+    )))]
+    {
+        None
+    }
 }
 
 // ── detection ─────────────────────────────────────────────
@@ -179,7 +195,10 @@ impl JreDetector {
 /// there). Returns `None` if the path doesn't exist, isn't a Java binary,
 /// or the version string can't be parsed.
 pub fn system_java_version(java: &PathBuf) -> Option<u32> {
-    let output = std::process::Command::new(java).arg("-version").output().ok()?;
+    let output = std::process::Command::new(java)
+        .arg("-version")
+        .output()
+        .ok()?;
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
     let version_str = stderr
@@ -265,7 +284,11 @@ pub fn parse_adoptium_build_version(url: &str) -> Option<String> {
         .chars()
         .take_while(|c| c.is_ascii_digit() || *c == '.')
         .collect();
-    if version.is_empty() { None } else { Some(version) }
+    if version.is_empty() {
+        None
+    } else {
+        Some(version)
+    }
 }
 
 // ── download / remove ─────────────────────────────────────
@@ -304,21 +327,18 @@ async fn download_jre_stream(
     let mut stream = response.bytes_stream();
     let mut downloaded: u64 = 0;
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| DbError::Connection(format!("Download stream error: {}", e)))?;
+        let chunk =
+            chunk.map_err(|e| DbError::Connection(format!("Download stream error: {}", e)))?;
         downloaded += chunk.len() as u64;
         file.write_all(&chunk)
             .await
             .map_err(|e| DbError::Connection(format!("Failed to write chunk: {}", e)))?;
-        if let Some(handle) = APP_HANDLE.get() {
-            let _ = handle.emit(
-                "connection-progress",
-                serde_json::json!({
-                    "step": "jre_download",
-                    "downloaded": downloaded,
-                    "total": total,
-                }),
-            );
-        }
+        crate::download::emit_progress(
+            "jre",
+            crate::download::DownloadKind::Jre,
+            downloaded,
+            total,
+        );
     }
     file.flush().await.ok();
     Ok(())
@@ -330,17 +350,14 @@ async fn download_jre_stream(
 /// extracts the archive, and renames the extracted directory to `jre`.
 /// Uses atomic operations: download to temp → validate → extract to temp dir → replace.
 pub async fn download_managed_jre() -> DbResult<()> {
-    let _guard = JRE_INSTALL_LOCK
-        .get_or_init(|| Mutex::new(()))
-        .lock()
-        .await;
+    let _guard = JRE_INSTALL_LOCK.get_or_init(|| Mutex::new(())).lock().await;
 
-    let (os, arch) = adoptium_os_arch().ok_or_else(|| {
-        DbError::Connection("No JRE available for this platform".to_string())
-    })?;
+    let (os, arch) = adoptium_os_arch()
+        .ok_or_else(|| DbError::Connection("No JRE available for this platform".to_string()))?;
 
     let base_dir = jre_base_dir(); // ~/.sqlkit/jre
-    let parent = base_dir.parent()
+    let parent = base_dir
+        .parent()
         .expect("jre_base_dir has a parent")
         .to_path_buf(); // ~/.sqlkit
     tokio::fs::create_dir_all(&parent)
@@ -373,7 +390,8 @@ pub async fn download_managed_jre() -> DbResult<()> {
     if meta.len() < 10_000_000 {
         let _ = tokio::fs::remove_file(&tmp_archive).await;
         return Err(DbError::Connection(format!(
-            "JRE archive too small: {} bytes (expected ≥ 10MB)", meta.len()
+            "JRE archive too small: {} bytes (expected ≥ 10MB)",
+            meta.len()
         )));
     }
     // Validate gzip magic bytes (1f 8b) if not a zip file
@@ -383,7 +401,8 @@ pub async fn download_managed_jre() -> DbResult<()> {
         if magic.len() < 2 || magic[0] != 0x1f || magic[1] != 0x8b {
             let _ = tokio::fs::remove_file(&tmp_archive).await;
             return Err(DbError::Connection(
-                "Downloaded JRE archive has invalid gzip magic bytes — corrupt download".to_string()
+                "Downloaded JRE archive has invalid gzip magic bytes — corrupt download"
+                    .to_string(),
             ));
         }
     }
@@ -451,8 +470,8 @@ pub async fn download_managed_jre() -> DbResult<()> {
     .await
     .map_err(|e| DbError::Connection(format!("JRE extraction panicked: {}", e)))?;
 
-    let extracted_dir = extract_result
-        .map_err(|e| DbError::Connection(format!("JRE extraction failed: {}", e)))?;
+    let extracted_dir =
+        extract_result.map_err(|e| DbError::Connection(format!("JRE extraction failed: {}", e)))?;
 
     // Step 4: Atomic swap — rename temp to final, with rollback
     let _ = tokio::fs::remove_file(&tmp_archive).await;
@@ -471,7 +490,9 @@ pub async fn download_managed_jre() -> DbResult<()> {
                 // Rollback: restore backup
                 let _ = tokio::fs::rename(&backup, &base_dir).await;
                 let _ = tokio::fs::remove_dir_all(&extracted_dir).await;
-                return Err(DbError::Connection("Failed to install JRE — restored previous version".to_string()));
+                return Err(DbError::Connection(
+                    "Failed to install JRE — restored previous version".to_string(),
+                ));
             }
         }
     } else {

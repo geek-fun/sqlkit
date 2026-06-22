@@ -66,7 +66,9 @@ fn ssh_client_config() -> client::Config {
 use russh::keys::agent::AgentIdentity;
 
 async fn authenticate_with_agent_inner(
-    mut agent: russh::keys::agent::client::AgentClient<impl tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static>,
+    mut agent: russh::keys::agent::client::AgentClient<
+        impl tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin + Send + 'static,
+    >,
     session: &mut Handle<SshClient>,
     username: &str,
     timeout: &Duration,
@@ -80,16 +82,30 @@ async fn authenticate_with_agent_inner(
         return Err("SSH agent has no identities".to_string());
     }
 
-    let hash_alg = session.best_supported_rsa_hash().await.ok().flatten().flatten();
+    let hash_alg = session
+        .best_supported_rsa_hash()
+        .await
+        .ok()
+        .flatten()
+        .flatten();
 
     let auth_result = tokio::time::timeout(*timeout, async {
         for identity in &identities {
             let result = match identity {
                 AgentIdentity::PublicKey { key, .. } => {
-                    session.authenticate_publickey_with(username, key.clone(), hash_alg, &mut agent).await
+                    session
+                        .authenticate_publickey_with(username, key.clone(), hash_alg, &mut agent)
+                        .await
                 }
                 AgentIdentity::Certificate { certificate, .. } => {
-                    session.authenticate_certificate_with(username, certificate.clone(), hash_alg, &mut agent).await
+                    session
+                        .authenticate_certificate_with(
+                            username,
+                            certificate.clone(),
+                            hash_alg,
+                            &mut agent,
+                        )
+                        .await
                 }
             };
 
@@ -137,8 +153,12 @@ async fn authenticate_with_agent(
     authenticate_with_agent_inner(agent, session, username, timeout).await
 }
 
-fn load_ssh_private_key(path: &str, passphrase: Option<&str>) -> Result<russh::keys::PrivateKey, String> {
-    let secret = std::fs::read_to_string(path).map_err(|e| format!("Cannot read SSH key file: {}", e))?;
+fn load_ssh_private_key(
+    path: &str,
+    passphrase: Option<&str>,
+) -> Result<russh::keys::PrivateKey, String> {
+    let secret =
+        std::fs::read_to_string(path).map_err(|e| format!("Cannot read SSH key file: {}", e))?;
 
     match russh::keys::decode_secret_key(&secret, passphrase) {
         Ok(key) => Ok(key),
@@ -408,24 +428,42 @@ async fn tunnel_reconnect_loop(
         match client::connect(
             Arc::new(ssh_client_config()),
             (&*connect_host, connect_port),
-            SshClient { verify_host_key: current_config.verify_host_key },
+            SshClient {
+                verify_host_key: current_config.verify_host_key,
+            },
         )
         .await
         {
             Ok(mut raw_session) => {
-                match authenticate_session(&mut raw_session, &current_config, connect_timeout_secs).await {
+                match authenticate_session(&mut raw_session, &current_config, connect_timeout_secs)
+                    .await
+                {
                     Ok(()) => {
                         let ka = Duration::from_secs(current_config.keepalive_interval_secs);
                         forward_loop(&raw_session, &listener, &remote_host, remote_port, ka).await;
-                        log::warn!("SSH tunnel lost ({}:{}), reconnecting...", connect_host, connect_port);
+                        log::warn!(
+                            "SSH tunnel lost ({}:{}), reconnecting...",
+                            connect_host,
+                            connect_port
+                        );
                     }
                     Err(e) => {
-                        log::error!("SSH tunnel auth failed ({}:{}): {}", connect_host, connect_port, e);
+                        log::error!(
+                            "SSH tunnel auth failed ({}:{}): {}",
+                            connect_host,
+                            connect_port,
+                            e
+                        );
                     }
                 }
             }
             Err(e) => {
-                log::error!("SSH tunnel connect failed ({}:{}): {}", connect_host, connect_port, e);
+                log::error!(
+                    "SSH tunnel connect failed ({}:{}): {}",
+                    connect_host,
+                    connect_port,
+                    e
+                );
             }
         }
 
@@ -448,12 +486,20 @@ async fn tunnel_reconnect_loop(
             match client::connect(
                 Arc::new(ssh_client_config()),
                 (&*connect_host, connect_port),
-                SshClient { verify_host_key: current_config.verify_host_key },
+                SshClient {
+                    verify_host_key: current_config.verify_host_key,
+                },
             )
             .await
             {
                 Ok(mut raw_session) => {
-                    match authenticate_session(&mut raw_session, &current_config, connect_timeout_secs).await {
+                    match authenticate_session(
+                        &mut raw_session,
+                        &current_config,
+                        connect_timeout_secs,
+                    )
+                    .await
+                    {
                         Ok(()) => {
                             current_config = initial_config.clone();
                             log::info!(
@@ -463,7 +509,8 @@ async fn tunnel_reconnect_loop(
                                 attempts + 1
                             );
                             let ka = Duration::from_secs(current_config.keepalive_interval_secs);
-                            forward_loop(&raw_session, &listener, &remote_host, remote_port, ka).await;
+                            forward_loop(&raw_session, &listener, &remote_host, remote_port, ka)
+                                .await;
                             break;
                         }
                         Err(e) => {
@@ -504,10 +551,13 @@ async fn authenticate_session(
 
     match &config.auth_method {
         SshAuthMethod::Password { password } => {
-            let auth_res = tokio::time::timeout(timeout, session.authenticate_password(&config.username, password))
-                .await
-                .map_err(|_| format!("Auth timed out ({}s)", connect_timeout_secs))?
-                .map_err(|e| format!("Auth failed: {}", e))?;
+            let auth_res = tokio::time::timeout(
+                timeout,
+                session.authenticate_password(&config.username, password),
+            )
+            .await
+            .map_err(|_| format!("Auth timed out ({}s)", connect_timeout_secs))?
+            .map_err(|e| format!("Auth failed: {}", e))?;
             if !auth_res.success() {
                 return Err("Password authentication failed".to_string());
             }
@@ -518,7 +568,12 @@ async fn authenticate_session(
         } => {
             let key_pair = load_ssh_private_key(private_key_path, passphrase.as_deref())
                 .map_err(|e| format!("Failed to load key: {}", e))?;
-            let hash_alg = session.best_supported_rsa_hash().await.ok().flatten().flatten();
+            let hash_alg = session
+                .best_supported_rsa_hash()
+                .await
+                .ok()
+                .flatten()
+                .flatten();
             let auth_res = tokio::time::timeout(
                 timeout,
                 session.authenticate_publickey(
@@ -587,10 +642,7 @@ impl TunnelManager {
 
         tunnels.insert(
             connection_id.to_string(),
-            TunnelEntry {
-                handle,
-                local_port,
-            },
+            TunnelEntry { handle, local_port },
         );
         Ok(local_port)
     }
@@ -614,10 +666,7 @@ impl TunnelManager {
     }
 }
 
-fn get_active_port(
-    tunnels: &mut HashMap<String, TunnelEntry>,
-    connection_id: &str,
-) -> Option<u16> {
+fn get_active_port(tunnels: &mut HashMap<String, TunnelEntry>, connection_id: &str) -> Option<u16> {
     let entry = tunnels.get(connection_id)?;
     if entry.handle.is_finished() {
         tunnels.remove(connection_id);
@@ -649,7 +698,13 @@ async fn spawn_tunnel_task(
     let timeout_dur = Duration::from_secs(timeout);
     let mut init_session = tokio::time::timeout(
         timeout_dur,
-        client::connect(ssh_config_init, (&*config.host, config.port), SshClient { verify_host_key: config.verify_host_key }),
+        client::connect(
+            ssh_config_init,
+            (&*config.host, config.port),
+            SshClient {
+                verify_host_key: config.verify_host_key,
+            },
+        ),
     )
     .await
     .map_err(|_| format!("SSH connection timed out ({}s)", timeout))?
@@ -701,7 +756,11 @@ mod tests {
         );
 
         let result = sanitize_openssh_key_comment(&pem);
-        assert!(result.is_ok(), "sanitize should succeed: {:?}", result.err());
+        assert!(
+            result.is_ok(),
+            "sanitize should succeed: {:?}",
+            result.err()
+        );
         let sanitized = result.unwrap();
         assert!(sanitized.starts_with("-----BEGIN OPENSSH PRIVATE KEY-----"));
         assert!(sanitized.ends_with("-----\n"));
@@ -709,7 +768,8 @@ mod tests {
 
     #[test]
     fn test_sanitize_rejects_non_openssh() {
-        let pkcs1 = "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA\n-----END RSA PRIVATE KEY-----";
+        let pkcs1 =
+            "-----BEGIN RSA PRIVATE KEY-----\nMIIEpAIBAAKCAQEA\n-----END RSA PRIVATE KEY-----";
         let result = sanitize_openssh_key_comment(pkcs1);
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("not an OpenSSH format"));
@@ -727,7 +787,10 @@ mod tests {
         assert_eq!(find_padding_len(&data), Ok(8));
 
         let data2 = vec![1, 2, 4, 8];
-        assert_eq!(find_padding_len(&data2), Err("Invalid private key padding".to_string()));
+        assert_eq!(
+            find_padding_len(&data2),
+            Err("Invalid private key padding".to_string())
+        );
     }
 
     #[test]

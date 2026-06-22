@@ -40,7 +40,12 @@ fn build_oracle_url(
             if use_service {
                 // Service name format: jdbc:oracle:thin:@//host:port/service_name
                 if let Some(ref service_template) = config.jdbc_url_template_service {
-                    super::registry::build_jdbc_url_from_template(service_template, host, port, database)
+                    super::registry::build_jdbc_url_from_template(
+                        service_template,
+                        host,
+                        port,
+                        database,
+                    )
                 } else {
                     super::registry::build_jdbc_url(config, host, port, database)
                 }
@@ -69,7 +74,10 @@ fn build_jvm_args(oracle_options: Option<&OracleConnectionOptions>) -> Vec<Strin
         if let Some(ref admin_dir) = opts.tns_admin_dir {
             if let Some(ref pwd) = opts.wallet_password {
                 if !pwd.is_empty() {
-                    args.push(format!("-Djavax.net.ssl.keyStore={}/keystore.jks", admin_dir));
+                    args.push(format!(
+                        "-Djavax.net.ssl.keyStore={}/keystore.jks",
+                        admin_dir
+                    ));
                     args.push(format!("-Djavax.net.ssl.keyStorePassword={}", pwd));
                     args.push("-Djavax.net.ssl.keyStoreType=JKS".to_string());
                 }
@@ -122,7 +130,11 @@ pub async fn try_driver(
     // Step 1: ResolveDriver — let the Java bridge download / resolve the driver JAR
     // On the first attempt, try without version_cap (LATEST).
     // If the config has no cap, or we're explicitly using it, send the cap.
-    let effective_cap = if use_cap { config.version_cap.as_deref() } else { None };
+    let effective_cap = if use_cap {
+        config.version_cap.as_deref()
+    } else {
+        None
+    };
     let resolve_params = serde_json::json!({
         "maven_group": config.maven_group,
         "maven_artifact": config.maven_artifact,
@@ -132,13 +144,10 @@ pub async fn try_driver(
     });
     let resolve_req = JdbcRequest::new(JdbcMethod::ResolveDriver, resolve_params);
 
-    let resolve_result = tokio::time::timeout(
-        std::time::Duration::from_secs(120),
-        async {
-            let mut guard = launcher.lock().await;
-            guard.send_request(&resolve_req)
-        },
-    )
+    let resolve_result = tokio::time::timeout(std::time::Duration::from_secs(120), async {
+        let mut guard = launcher.lock().await;
+        guard.send_request(&resolve_req)
+    })
     .await;
 
     let jar_path = match resolve_result {
@@ -152,7 +161,10 @@ pub async fn try_driver(
                 )));
             }
             // Parse the ResolveDriverResult to get the resolved JAR path
-            match resp.result.and_then(|v| serde_json::from_value::<ResolveDriverResult>(v).ok()) {
+            match resp
+                .result
+                .and_then(|v| serde_json::from_value::<ResolveDriverResult>(v).ok())
+            {
                 Some(result) => result.jar_path,
                 None => {
                     let mut guard = launcher.lock().await;
@@ -227,7 +239,11 @@ pub async fn try_driver(
                     }
                     _ => {
                         let stderr = stderr_from_launcher(&launcher);
-                        let detail = if stderr.is_empty() { err.clone() } else { format!("{}. stderr: {}", err, stderr) };
+                        let detail = if stderr.is_empty() {
+                            err.clone()
+                        } else {
+                            format!("{}. stderr: {}", err, stderr)
+                        };
                         DriverAttempt::Fatal(DbError::Connection(detail))
                     }
                 }
@@ -241,7 +257,11 @@ pub async fn try_driver(
         }
         Ok(Err(e)) => {
             let stderr = stderr_from_launcher(&launcher);
-            let msg = if stderr.is_empty() { e.to_string() } else { format!("{}. stderr: {}", e, stderr) };
+            let msg = if stderr.is_empty() {
+                e.to_string()
+            } else {
+                format!("{}. stderr: {}", e, stderr)
+            };
             let category = classify_connection_error(
                 db_type_from_config(config),
                 &msg,
@@ -331,14 +351,46 @@ pub async fn run_fallback_chain(
 
     // Two-phase driver resolution:
     // 1. Try LATEST (no version_cap)
-    match try_driver(config, host, port, database, username, password, false, oracle_options, ssl_mode, ssl_ca_cert, ssl_client_cert, ssl_client_key, trust_server_certificate).await {
+    match try_driver(
+        config,
+        host,
+        port,
+        database,
+        username,
+        password,
+        false,
+        oracle_options,
+        ssl_mode,
+        ssl_ca_cert,
+        ssl_client_cert,
+        ssl_client_key,
+        trust_server_certificate,
+    )
+    .await
+    {
         DriverAttempt::Connected(conn_id, launcher) => {
             return Ok(("resolved".to_string(), conn_id, launcher));
         }
         DriverAttempt::VersionMismatch(_) => {
             // 2. If LATEST fails with version_incompatible and a cap exists, retry with cap
             if config.version_cap.is_some() {
-                match try_driver(config, host, port, database, username, password, true, oracle_options, ssl_mode, ssl_ca_cert, ssl_client_cert, ssl_client_key, trust_server_certificate).await {
+                match try_driver(
+                    config,
+                    host,
+                    port,
+                    database,
+                    username,
+                    password,
+                    true,
+                    oracle_options,
+                    ssl_mode,
+                    ssl_ca_cert,
+                    ssl_client_cert,
+                    ssl_client_key,
+                    trust_server_certificate,
+                )
+                .await
+                {
                     DriverAttempt::Connected(conn_id, launcher) => {
                         return Ok(("capped".to_string(), conn_id, launcher));
                     }

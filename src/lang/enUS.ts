@@ -419,6 +419,7 @@ export const enUS = {
             system: 'System',
             versionUnknown: 'Unknown',
             systemWarning: 'System Java version is unknown or incompatible. Download managed JRE for guaranteed compatibility.',
+            systemInvalid: 'No valid JRE',
             managedRecommended: 'Use managed JRE',
           },
           actions: {
@@ -426,6 +427,15 @@ export const enUS = {
             remove: 'Remove JRE',
             redownload: 'Re-download',
             checkUpdates: 'Check for Updates',
+          },
+          notifications: {
+            upToDate: 'JRE is up to date',
+            updateAvailable: 'JRE update available',
+            newVersion: 'Version {version} is available',
+            checkUpdatesFailed: 'Failed to check for JRE updates',
+            downloadFailed: 'Failed to download JRE',
+            downloadSuccess: 'JRE downloaded successfully',
+            removeFailed: 'Failed to remove JRE',
           },
         },
         bridgeCard: {
@@ -439,6 +449,11 @@ export const enUS = {
           actions: {
             download: 'Download Bridge',
             remove: 'Remove Bridge',
+          },
+          notifications: {
+            downloadFailed: 'Failed to download bridge JAR',
+            downloadSuccess: 'Bridge JAR downloaded successfully',
+            removeFailed: 'Failed to remove bridge JAR',
           },
         },
         jdbcToggle: {
@@ -463,6 +478,17 @@ export const enUS = {
           actions: {
             download: 'Download',
             remove: 'Remove',
+            checkUpdates: 'Check for Updates',
+          },
+          notifications: {
+            upToDate: 'Driver is up to date',
+            updateAvailable: 'Driver update available',
+            newVersion: 'Version {version} is available',
+            checkUpdatesFailed: 'Failed to check for driver updates',
+            downloadFailed: 'Failed to download driver',
+            downloadSuccess: 'Driver downloaded successfully',
+            removeFailed: 'Failed to remove driver',
+            installBridgeFirst: 'Please install the Bridge JAR first, then try downloading drivers',
           },
           empty: {
             title: 'No drivers configured',

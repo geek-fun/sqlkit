@@ -1,5 +1,6 @@
 pub mod api_response;
 pub mod database;
+pub mod download;
 pub mod ssh;
 pub mod transfer;
 
@@ -32,7 +33,8 @@ pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
 /// Global ConnectionGuardian, set once during app setup. Used by query execution
 /// for health checks and by capability handlers for connection quality warnings.
-pub static GUARDIAN: OnceLock<Arc<crate::connection::guardian::ConnectionGuardian>> = OnceLock::new();
+pub static GUARDIAN: OnceLock<Arc<crate::connection::guardian::ConnectionGuardian>> =
+    OnceLock::new();
 
 use agent::executor::SqlKitToolExecutor;
 use agent::query_history::{add_query_history_entry, load_query_history};
@@ -50,7 +52,7 @@ use agent_adapters::{
 };
 use capabilities::commands::{get_available_tools, invoke_capability};
 use data_studio_agent as lib;
-use data_studio_agent::storage as storage;
+use data_studio_agent::storage;
 
 #[derive(Clone, serde::Serialize)]
 struct AuthPayload {
@@ -220,6 +222,7 @@ pub fn run() {
             commands::download_jre,
             commands::remove_jre,
             commands::check_jre_update,
+            commands::check_driver_update,
             commands::check_bridge_status,
             commands::download_bridge_jar,
             commands::remove_bridge_jar,

@@ -8,8 +8,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use data_studio_agent as lib;
+use data_studio_agent::storage;
 use data_studio_agent::traits::{CancelMap, ConfirmMap, EventEmitter};
-use data_studio_agent::storage as storage;
 use serde_json::Value;
 use tauri::{AppHandle, Emitter, Manager, State};
 
@@ -44,7 +44,8 @@ pub async fn run_agent_loop(
     let confirm_map: ConfirmMap = confirm_state.inner().clone();
     let cancel_state: State<CancelMap> = app.state::<CancelMap>();
     let cancel_map: CancelMap = cancel_state.inner().clone();
-    let executor_state: State<Arc<dyn lib::ToolExecutor>> = app.state::<Arc<dyn lib::ToolExecutor>>();
+    let executor_state: State<Arc<dyn lib::ToolExecutor>> =
+        app.state::<Arc<dyn lib::ToolExecutor>>();
     let executor: Arc<dyn lib::ToolExecutor> = executor_state.inner().clone();
 
     let connections: HashMap<String, Value> = settings
@@ -158,8 +159,7 @@ pub async fn run_agent_step(
     base_url: Option<String>,
 ) -> Result<String, String> {
     let result = lib::harness::run_agent_step(
-        provider, model, messages, tools,
-        http_proxy, proxy_mode, api_key, base_url,
+        provider, model, messages, tools, http_proxy, proxy_mode, api_key, base_url,
     )
     .await?;
 
@@ -178,7 +178,8 @@ pub async fn validate_llm_config(
     proxy_mode: Option<String>,
     base_url: Option<String>,
 ) -> Result<bool, String> {
-    lib::harness::validate_llm_config(provider, api_key, model, http_proxy, proxy_mode, base_url).await
+    lib::harness::validate_llm_config(provider, api_key, model, http_proxy, proxy_mode, base_url)
+        .await
 }
 
 #[tauri::command]

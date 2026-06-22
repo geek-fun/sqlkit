@@ -7,9 +7,9 @@ use crate::api_response::{db_error_to_api_error, ApiResponse};
 use crate::connection::guardian::HealthState;
 use crate::connection::handle::ConnectionHandle;
 use crate::database::{
-    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DbError, ExplainResult,
-    HttpSqlAdapter, JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter,
-    SqlServerAdapter, TursoAdapter,
+    ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DbError, ExplainResult, HttpSqlAdapter,
+    JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter, SqlServerAdapter,
+    TursoAdapter,
 };
 use crate::state::{ActiveConnection, AppState};
 use std::sync::Arc;
@@ -259,10 +259,14 @@ pub async fn execute_query(
     };
 
     // Cache this handle for future cross-database lookups
-    state.cache.get_or_create(
-        &crate::connection::cache::PoolKey::new(&connection_id, database.as_deref()),
-        state.inner(),
-    ).await.ok();
+    state
+        .cache
+        .get_or_create(
+            &crate::connection::cache::PoolKey::new(&connection_id, database.as_deref()),
+            state.inner(),
+        )
+        .await
+        .ok();
 
     // Guardian health check
     if let Some(guardian) = crate::GUARDIAN.get() {
@@ -296,7 +300,9 @@ pub async fn execute_query(
     match result {
         Ok(data) => {
             if let Some(guardian) = crate::GUARDIAN.get() {
-                guardian.mark_healthy(&connection_id, Some(elapsed_ms)).await;
+                guardian
+                    .mark_healthy(&connection_id, Some(elapsed_ms))
+                    .await;
             }
             Ok(ApiResponse::success(data))
         }
@@ -479,9 +485,9 @@ pub async fn explain_query(
             return match kind {
                 TempExplainKind::Postgres(cfg) => {
                     let mut temp = PostgresAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database for EXPLAIN: {}", e))?;
                     let connection = ActiveConnection::Postgres(Arc::new(Mutex::new(temp)));
                     let database_type = "postgresql";
                     let explain_sql = if analyze {
@@ -504,9 +510,9 @@ pub async fn explain_query(
                 }
                 TempExplainKind::MySQL(cfg) => {
                     let mut temp = MySQLAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database for EXPLAIN: {}", e))?;
                     let connection = ActiveConnection::MySQL(Arc::new(Mutex::new(temp)));
                     let database_type = "mysql";
                     let (explain_sql, plan_format) = if analyze {
@@ -529,9 +535,9 @@ pub async fn explain_query(
                 }
                 TempExplainKind::SQLServer(cfg) => {
                     let mut temp = SqlServerAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database for EXPLAIN: {}", e))?;
                     let connection = ActiveConnection::SQLServer(Arc::new(Mutex::new(temp)));
                     let database_type = "sqlserver";
                     let settings = if analyze {
@@ -560,9 +566,9 @@ pub async fn explain_query(
                 }
                 TempExplainKind::ClickHouse(cfg) => {
                     let mut temp = ClickHouseAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database for EXPLAIN: {}", e))?;
                     let connection = ActiveConnection::ClickHouse(Arc::new(Mutex::new(temp)));
                     let database_type = "clickhouse";
                     let explain_sql = format!("EXPLAIN {}", sql);
@@ -581,9 +587,9 @@ pub async fn explain_query(
                 }
                 TempExplainKind::JdbcBridge(cfg) => {
                     let mut temp = JdbcBridgeAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database for EXPLAIN: {}", e))?;
                     let connection = ActiveConnection::JdbcBridge(Arc::new(Mutex::new(temp)));
                     let database_type = "generic";
                     let explain_sql = format!("EXPLAIN {}", sql);
@@ -602,9 +608,9 @@ pub async fn explain_query(
                 }
                 TempExplainKind::HttpSql(cfg) => {
                     let mut temp = HttpSqlAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database for EXPLAIN: {}", e))?;
                     let connection = ActiveConnection::HttpSql(Arc::new(Mutex::new(temp)));
                     let database_type = "generic";
                     let explain_sql = format!("EXPLAIN {}", sql);
@@ -623,9 +629,9 @@ pub async fn explain_query(
                 }
                 TempExplainKind::Rqlite(cfg) => {
                     let mut temp = RqliteAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database for EXPLAIN: {}", e))?;
                     let connection = ActiveConnection::Rqlite(Arc::new(Mutex::new(temp)));
                     let database_type = "rqlite";
                     let explain_sql = format!("EXPLAIN {}", sql);
@@ -644,9 +650,9 @@ pub async fn explain_query(
                 }
                 TempExplainKind::Turso(cfg) => {
                     let mut temp = TursoAdapter::new(cfg);
-                    temp.connect().await.map_err(|e| {
-                        format!("Failed to connect to database for EXPLAIN: {}", e)
-                    })?;
+                    temp.connect()
+                        .await
+                        .map_err(|e| format!("Failed to connect to database for EXPLAIN: {}", e))?;
                     let connection = ActiveConnection::Turso(Arc::new(Mutex::new(temp)));
                     let database_type = "turso";
                     let explain_sql = format!("EXPLAIN {}", sql);

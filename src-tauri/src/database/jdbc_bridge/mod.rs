@@ -30,4 +30,6 @@ pub mod tns_parser;
 pub use adapter::JdbcBridgeAdapter;
 pub use launcher::JdbcBridgeLauncher;
 pub use pool::{JdbcBridgeConnection, JdbcBridgePool};
-pub use protocol::{JdbcMethod, JdbcRequest, JdbcResponse, ResolveDriverParams, ResolveDriverResult};
+pub use protocol::{
+    JdbcMethod, JdbcRequest, JdbcResponse, ResolveDriverParams, ResolveDriverResult,
+};

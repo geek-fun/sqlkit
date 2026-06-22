@@ -1,9 +1,8 @@
 <script setup lang="ts">
 import type { OracleConnectionOptions, ServerConnection } from '@/store'
 import { invoke } from '@tauri-apps/api/core'
-import { listen } from '@tauri-apps/api/event'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
@@ -20,6 +19,7 @@ import {
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
+import { useDownloadEvents } from '@/composables/useDownloadEvents'
 import { toast } from '@/composables/useNotifications'
 import { jdbcApi } from '@/datasources/jdbcApi'
 import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase } from '@/store'
@@ -38,6 +38,7 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 const { getDatabaseIcon } = useDatabaseIcon()
+const dl = useDownloadEvents()
 
 const isOpen = computed({
   get: () => props.open,
@@ -139,34 +140,23 @@ const setupSteps = ref<StepDef[]>([
   { id: 'driver', label: 'JDBC Driver', status: 'pending' },
 ])
 
-// Listen for progress events from any download command
-const progressUnlisten = ref<(() => void) | null>(null)
-
 const showPasswords = ref<Record<string, boolean>>({})
 function togglePassword(key: string) {
   showPasswords.value[key] = !showPasswords.value[key]
 }
 
-async function startProgressListener() {
-  // Clean up previous listener
-  if (progressUnlisten.value)
-    progressUnlisten.value()
-  const unlisten = await listen<{ step: string, downloaded: number, total: number, message?: string }>('connection-progress', (event) => {
-    const stepMap: Record<string, string> = { jre_download: 'jre', bridge_jar: 'bridge', jdbc_driver: 'driver' }
-    const stepId = stepMap[event.payload.step]
+// Sync download progress events into setup steps
+watch(() => ({ ...dl.progress }), (progress) => {
+  for (const [id] of Object.entries(progress)) {
+    const kind = dl.getKind(id)
+    const stepId = kind === 'driver' ? 'driver' : kind // jre→jre, bridge→bridge, driver→driver
     const step = setupSteps.value.find(s => s.id === stepId)
-    if (step && event.payload.step !== 'retry') {
-      step.status = 'running'
-      step.progress = { downloaded: event.payload.downloaded, total: event.payload.total }
+    if (step && step.status === 'running' && dl.getProgress(id)) {
+      const p = dl.getProgress(id)!
+      step.progress = { downloaded: p.downloaded, total: p.total }
     }
-  })
-  progressUnlisten.value = unlisten
-}
-
-// Clean up event listener on component unmount
-onUnmounted(() => {
-  progressUnlisten.value?.()
-})
+  }
+}, { deep: true })
 
 // Run a single setup step (JRE or Bridge) with its own invoke
 async function runStep(step: StepDef): Promise<boolean> {
@@ -606,8 +596,6 @@ async function handleTestConnection() {
     s.error = undefined
   })
 
-  await startProgressListener()
-
   try {
     const dbType = mapDatabaseTypeToBackend(formData.value.type)
 
@@ -638,6 +626,7 @@ async function handleTestConnection() {
         }),
         // JDBC driver download directly from Maven Central (no Java needed)
         (async () => {
+          driverStep.status = 'running'
           try {
             await invoke('download_jdbc_driver_direct', { dbType })
             driverStep.status = 'done'
@@ -739,7 +728,6 @@ async function retryStep(stepId: string) {
     return
   }
 
-  await startProgressListener()
   step.status = 'running'
   step.error = undefined
   step.progress = undefined
@@ -1344,8 +1332,8 @@ function handleSave() {
               :class="step.status === 'done' ? 'text-green-600 dark:text-green-400' : step.status === 'running' ? 'text-foreground' : step.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'"
             >
               <span v-if="step.status === 'done'" class="i-carbon-checkmark shrink-0 h-3.5 w-3.5" />
-              <span v-else-if="step.status === 'running' && !step.progress" class="i-carbon-loading shrink-0 h-3.5 w-3.5 animate-spin" />
-              <span v-else-if="step.status === 'running'" class="i-carbon-loading text-blue-500 shrink-0 h-3.5 w-3.5 animate-spin" />
+              <span v-else-if="step.status === 'running' && !step.progress" class="i-carbon-circle-dash shrink-0 h-3.5 w-3.5 animate-spin" />
+              <span v-else-if="step.status === 'running'" class="i-carbon-circle-dash text-blue-500 shrink-0 h-3.5 w-3.5 animate-spin" />
               <span v-else-if="step.status === 'error'" class="i-carbon-close shrink-0 h-3.5 w-3.5" />
               <span v-else class="i-carbon-circle-dash shrink-0 h-3.5 w-3.5" />
               <span class="font-medium whitespace-nowrap">{{ step.label }}</span>
@@ -1376,7 +1364,7 @@ function handleSave() {
           <div class="space-y-1.5">
             <!-- Loading state during connection test (always visible when testing after steps) -->
             <div v-if="testStatus === 'testing'" class="text-xs text-blue-600 mt-1.5 pt-1 flex gap-1.5 items-center dark:text-blue-400" :class="{ 'border-t border-border/50': isJdbcDb }">
-              <span class="i-carbon-loading shrink-0 h-3.5 w-3.5 animate-spin" />
+              <span class="i-carbon-circle-dash shrink-0 h-3.5 w-3.5 animate-spin" />
               <span class="font-medium">{{ t('common.status.testing') }}</span>
             </div>
             <!-- Summary result -->

@@ -362,8 +362,7 @@ pub async fn get_table_data(
     // Execute query based on connection type with proper identifier quoting
     let result = match &connection {
         ActiveConnection::Postgres(adapter) => {
-            let qualified =
-                build_qualified_table(query.schema.as_deref(), &query.table, db_type);
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, db_type);
             let sql =
                 build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
             if let Some(ref db) = query.database {
@@ -385,8 +384,7 @@ pub async fn get_table_data(
             connection.execute_query(&sql).await
         }
         ActiveConnection::SQLServer(adapter) => {
-            let qualified =
-                build_qualified_table(query.schema.as_deref(), &query.table, db_type);
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, db_type);
             let sql =
                 build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
             if let Some(ref db) = query.database {
@@ -408,8 +406,7 @@ pub async fn get_table_data(
             connection.execute_query(&sql).await
         }
         _ => {
-            let qualified =
-                build_qualified_table(query.schema.as_deref(), &query.table, db_type);
+            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, db_type);
             let sql =
                 build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
             connection.execute_query(&sql).await
@@ -967,7 +964,12 @@ pub async fn get_object_ddl(
     };
 
     connection
-        .get_object_ddl(Some(&database), schema.as_deref(), &object_name, &object_type)
+        .get_object_ddl(
+            Some(&database),
+            schema.as_deref(),
+            &object_name,
+            &object_type,
+        )
         .await
         .map_err(|e| format!("Failed to get object DDL: {}", e))
 }
@@ -991,7 +993,12 @@ pub async fn drop_object(
     };
 
     connection
-        .drop_object(Some(&database), schema.as_deref(), &object_name, &object_type)
+        .drop_object(
+            Some(&database),
+            schema.as_deref(),
+            &object_name,
+            &object_type,
+        )
         .await
         .map_err(|e| format!("Failed to drop object: {}", e))
 }
@@ -1016,7 +1023,13 @@ pub async fn rename_object(
     };
 
     connection
-        .rename_object(Some(&database), schema.as_deref(), &object_name, &object_type, &new_name)
+        .rename_object(
+            Some(&database),
+            schema.as_deref(),
+            &object_name,
+            &object_type,
+            &new_name,
+        )
         .await
         .map_err(|e| format!("Failed to rename object: {}", e))
 }
