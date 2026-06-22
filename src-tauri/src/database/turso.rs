@@ -178,8 +178,9 @@ impl TursoAdapter {
 
     /// Create the `reqwest::Client` used for all HTTP calls.
     fn build_client(&self) -> DbResult<reqwest::Client> {
+        let timeout = std::time::Duration::from_secs(self.config.connect_timeout_secs);
         let mut builder = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(60))
+            .timeout(timeout)
             .user_agent("sqlkit-turso-adapter/0.1");
 
         if let Some(ref ca_cert) = self.config.ssl_ca_cert {

@@ -93,7 +93,8 @@ impl DatabaseAdapter for HttpSqlAdapter {
     type Pool = HttpSqlPool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        let mut builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(30));
+        let connect_timeout = std::time::Duration::from_secs(self.config.connect_timeout_secs);
+        let mut builder = reqwest::Client::builder().timeout(connect_timeout);
 
         builder = match self.config.ssl_mode {
             SslMode::Disable => builder,
