@@ -999,6 +999,7 @@ export const enUS = {
         nameRequired: 'Connection name is required',
         hostRequired: 'Host is required',
         databaseRequired: 'SID / Service Name is required',
+        databaseNameRequired: 'Database name is required',
         filePathRequired: 'Database file path is required',
         portInvalid: 'Port must be a positive number',
         filePickerFailed: 'Failed to open file picker',
@@ -1028,6 +1029,11 @@ export const enUS = {
         edit: 'Edit',
         duplicate: 'Duplicate',
         delete: 'Delete',
+      },
+      strategy: {
+        nativeTooltip: 'Direct connection via native Rust driver — best performance, no external dependencies',
+        jdbcBridgeTooltip: 'Connects through JDBC driver via embedded Java runtime — widest database compatibility',
+        httpBridgeTooltip: 'Connects via HTTP SQL protocol — for REST-based databases',
       },
     },
     connectingModal: {
