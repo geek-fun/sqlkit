@@ -36,10 +36,7 @@ pub async fn start_transport_layers(
     }
 }
 
-pub async fn stop_transport_layers(
-    connection_id: &str,
-    tunnels: &TunnelManager,
-) {
+pub async fn stop_transport_layers(connection_id: &str, tunnels: &TunnelManager) {
     tunnels.stop_tunnel(connection_id).await;
 }
 
@@ -74,7 +71,8 @@ mod tests {
         config.enabled = false;
         let layers = vec![TransportLayerConfig::Ssh(config)];
         let tunnels = TunnelManager::new();
-        let result = start_transport_layers("test", &layers, "db.example.com", 5432, &tunnels).await;
+        let result =
+            start_transport_layers("test", &layers, "db.example.com", 5432, &tunnels).await;
         assert_eq!(result.unwrap(), None);
     }
 
@@ -85,7 +83,8 @@ mod tests {
             TransportLayerConfig::Ssh(ssh_config()),
         ];
         let tunnels = TunnelManager::new();
-        let result = start_transport_layers("test", &layers, "db.example.com", 5432, &tunnels).await;
+        let result =
+            start_transport_layers("test", &layers, "db.example.com", 5432, &tunnels).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Multi-hop"));
     }

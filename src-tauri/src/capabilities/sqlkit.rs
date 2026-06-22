@@ -163,13 +163,12 @@ mod tests {
     #[tokio::test]
     async fn test_list_connections_returns_safe_list() {
         let mut mock = MockConnectionStoreReader::new();
-        mock.expect_get_connections()
-            .return_once(|| {
-                Ok(json!([
-                    {"id": 1, "name": "My PG", "db_type": "POSTGRESQL", "password": "secret"},
-                    {"id": 2, "name": "My MySQL", "db_type": "MYSQL", "password": "s3cret"},
-                ]))
-            });
+        mock.expect_get_connections().return_once(|| {
+            Ok(json!([
+                {"id": 1, "name": "My PG", "db_type": "POSTGRESQL", "password": "secret"},
+                {"id": 2, "name": "My MySQL", "db_type": "MYSQL", "password": "s3cret"},
+            ]))
+        });
 
         let handler = ListConnections::with_store(Box::new(mock));
         let result = handler.handle(&json!({}), None).await;
@@ -189,8 +188,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_connections_empty() {
         let mut mock = MockConnectionStoreReader::new();
-        mock.expect_get_connections()
-            .return_once(|| Ok(json!([])));
+        mock.expect_get_connections().return_once(|| Ok(json!([])));
 
         let handler = ListConnections::with_store(Box::new(mock));
         let result = handler.handle(&json!({}), None).await;
@@ -215,13 +213,12 @@ mod tests {
     #[tokio::test]
     async fn test_list_connections_filters_nulls() {
         let mut mock = MockConnectionStoreReader::new();
-        mock.expect_get_connections()
-            .return_once(|| {
-                Ok(json!([
-                    {"id": null, "name": null, "db_type": null},
-                    {"id": 1, "name": "valid", "db_type": "PG"},
-                ]))
-            });
+        mock.expect_get_connections().return_once(|| {
+            Ok(json!([
+                {"id": null, "name": null, "db_type": null},
+                {"id": 1, "name": "valid", "db_type": "PG"},
+            ]))
+        });
 
         let handler = ListConnections::with_store(Box::new(mock));
         let result = handler.handle(&json!({}), None).await;

@@ -41,22 +41,22 @@ async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String
 
     let conn_value = all_connections
         .into_iter()
-        .find(|c| {
-            c.get("id")
-                .and_then(|v| v.as_str())
-                == Some(connection_id)
-        })
+        .find(|c| c.get("id").and_then(|v| v.as_str()) == Some(connection_id))
         .ok_or_else(|| {
-            format!("Connection '{}' not found in store. Connect manually first.", connection_id)
+            format!(
+                "Connection '{}' not found in store. Connect manually first.",
+                connection_id
+            )
         })?;
 
-    let server_config: ServerConfig =
-        serde_json::from_value(conn_value)
-            .map_err(|e| format!("Failed to parse connection config: {}", e))?;
+    let server_config: ServerConfig = serde_json::from_value(conn_value)
+        .map_err(|e| format!("Failed to parse connection config: {}", e))?;
 
     let adapter = crate::commands::helpers::create_and_connect_adapter(
         &server_config.db_type,
-        server_config.to_connection_config().map_err(|e| format!("Invalid connection config: {}", e))?,
+        server_config
+            .to_connection_config()
+            .map_err(|e| format!("Invalid connection config: {}", e))?,
     )
     .await?;
 
@@ -709,8 +709,10 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
             "connection_id": connection_id_schema(),
             "database": {"type": "string", "description": "Database name (optional)"}
         }, "required": ["connection_id"]}),
-        risk_level: RiskLevel::Safe, required_permission: "read",
-        source_kind: SourceKind::SqlDatabase, tags: &["agent"],
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
         parallel_ok: true,
     });
 
@@ -759,14 +761,17 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
 
     reg.register(Capability {
         name: "sqlkit__explain_query",
-        description: "Get the query execution plan for a SQL statement. Useful for optimizing slow queries.",
+        description:
+            "Get the query execution plan for a SQL statement. Useful for optimizing slow queries.",
         handler: Arc::new(ExplainQueryHandler),
         input_schema: json!({"type": "object", "properties": {
             "connection_id": connection_id_schema(),
             "sql": {"type": "string", "description": "The SQL query to explain"}
         }, "required": ["connection_id", "sql"]}),
-        risk_level: RiskLevel::Safe, required_permission: "read",
-        source_kind: SourceKind::SqlDatabase, tags: &["agent"],
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
         parallel_ok: true,
     });
 }

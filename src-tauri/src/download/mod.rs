@@ -44,10 +44,7 @@ pub enum DownloadEvent {
         total: u64,
     },
     /// Download completed successfully.
-    Complete {
-        id: String,
-        kind: DownloadKind,
-    },
+    Complete { id: String, kind: DownloadKind },
     /// Download failed with an error message.
     Error {
         id: String,
