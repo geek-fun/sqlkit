@@ -5,7 +5,7 @@
 
 use crate::database::{
     adapter::DatabaseAdapter,
-    config::{ConnectionConfig, SslMode},
+    config::{ConnectionConfig, DatabaseType, SslMode},
     error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{
@@ -138,6 +138,36 @@ fn deadpool_pool_error_to_db_error(error: deadpool_postgres::PoolError) -> DbErr
     }
 }
 
+/// Enrich deadpool error with connection context (host:port, database) so even
+/// generic messages like "error communicating with the server" include the target.
+fn enrich_pool_error(error: deadpool_postgres::PoolError, config: &ConnectionConfig) -> DbError {
+    let target = format!("{}:{}", config.host, config.port);
+    let db_hint = config
+        .database
+        .as_ref()
+        .map(|d| format!(" database={}", d))
+        .unwrap_or_default();
+    let ctx = format!(" (connecting to {}{})", target, db_hint);
+    let err = deadpool_pool_error_to_db_error(error);
+    match err {
+        DbError::Connection(msg) => {
+            if msg.contains(&target) {
+                DbError::Connection(msg)
+            } else {
+                DbError::Connection(format!("{}{}", msg, ctx))
+            }
+        }
+        DbError::Timeout(msg) => {
+            if msg.contains(&target) {
+                DbError::Timeout(msg)
+            } else {
+                DbError::Timeout(format!("{}{}", msg, ctx))
+            }
+        }
+        other => DbError::Connection(format!("{}{}", other, ctx)),
+    }
+}
+
 /// PostgreSQL connection pool wrapper.
 pub struct PostgresPool {
     pool: Pool,
@@ -227,6 +257,17 @@ impl PostgresAdapter {
 
         if let Some(ref database) = self.config.database {
             parts.push(format!("dbname={}", database));
+        } else if matches!(self.config.db_type, DatabaseType::PostgreSQL) {
+            // Real PostgreSQL servers always have a 'postgres' maintenance DB;
+            // use it as the default when the user leaves the field empty.
+            parts.push("dbname=postgres".to_string());
+        } else {
+            // PG-wire-compat engines (KingbaseES, OpenGauss, HighGo, etc.)
+            // typically don't ship a 'postgres' database. The libpq convention
+            // is to fall back to the username-matching database, but
+            // deadpool-postgres does not implement this fallback — it requires
+            // an explicit dbname. Use the username as the fallback here.
+            parts.push(format!("dbname={}", self.config.username));
         }
 
         // Add SSL mode
@@ -238,6 +279,9 @@ impl PostgresAdapter {
             SslMode::VerifyFull => "verify-full",
         };
         parts.push(format!("sslmode={}", ssl_mode));
+
+        // Add connection timeout
+        parts.push(format!("connect_timeout={}", self.config.connect_timeout_secs));
 
         // Add additional options
         for (key, value) in &self.config.options {
@@ -821,7 +865,10 @@ impl DatabaseAdapter for PostgresAdapter {
             }
         };
 
-        let _client = pool.get().await.map_err(deadpool_pool_error_to_db_error)?;
+        let _client = pool
+            .get()
+            .await
+            .map_err(|e| enrich_pool_error(e, &self.config))?;
 
         self.pool = Some(Arc::new(PostgresPool { pool }));
 
@@ -2172,7 +2219,29 @@ mod tests {
         assert!(conn_str.contains("port=5432"));
         assert!(conn_str.contains("user=postgres"));
         assert!(conn_str.contains("password=password"));
-        assert!(!conn_str.contains("dbname="));
+        assert!(conn_str.contains("dbname=postgres"));
+    }
+
+    #[test]
+    fn test_pg_compat_without_database_falls_back_to_username() {
+        let config =
+            ConnectionConfig::new(DatabaseType::OpenGauss, "10.84.1.213", 5432, "SYSTEM")
+                .with_password("kingbase@123");
+
+        let adapter = PostgresAdapter::new(config);
+        let conn_str = adapter.build_connection_string();
+
+        assert!(conn_str.contains("host=10.84.1.213"));
+        assert!(conn_str.contains("port=5432"));
+        assert!(conn_str.contains("user=SYSTEM"));
+        assert!(
+            conn_str.contains("dbname=SYSTEM"),
+            "PG-wire-compat engines must fall back to username as dbname (libpq convention)"
+        );
+        assert!(
+            !conn_str.contains("dbname=postgres"),
+            "PG-wire-compat engines must not force dbname=postgres"
+        );
     }
 
     #[test]
