@@ -999,6 +999,7 @@ export const zhCN = {
         nameRequired: '连接名称是必填项',
         hostRequired: '主机地址是必填项',
         databaseRequired: 'SID / 服务名是必填项',
+        databaseNameRequired: '数据库名称是必填项',
         filePathRequired: '数据库文件路径是必填项',
         portInvalid: '端口必须是正数',
         filePickerFailed: '打开文件选择器失败',
@@ -1028,6 +1029,11 @@ export const zhCN = {
         edit: '编辑',
         duplicate: '复制',
         delete: '删除',
+      },
+      strategy: {
+        nativeTooltip: '通过原生 Rust 驱动直接连接 — 性能最佳，无需外部依赖',
+        jdbcBridgeTooltip: '通过内嵌 Java 运行时的 JDBC 驱动连接 — 兼容性最广',
+        httpBridgeTooltip: '通过 HTTP SQL 协议连接 — 适用于 REST 接口数据库',
       },
     },
     connectingModal: {

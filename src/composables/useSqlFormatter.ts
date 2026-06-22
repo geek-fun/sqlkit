@@ -31,7 +31,7 @@ const dialectMap: Record<string, string> = {
   [DatabaseType.GBASE8C]: 'postgresql',
   [DatabaseType.QUESTDB]: 'postgresql',
   [DatabaseType.VASTBASE]: 'postgresql',
-  [DatabaseType.YASHANDB]: 'postgresql',
+  [DatabaseType.YASHANDB]: 'oracle',
 
   [DatabaseType.MYSQL]: 'mysql',
   [DatabaseType.MARIADB]: 'mariadb',

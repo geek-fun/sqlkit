@@ -78,35 +78,35 @@ const MYSQL_BACKEND = 'MySQL'
 export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.POSTGRESQL]: PG_BACKEND,
   [DatabaseType.MYSQL]: MYSQL_BACKEND,
-  [DatabaseType.MARIADB]: MYSQL_BACKEND,
+  [DatabaseType.MARIADB]: 'mariadb',
   [DatabaseType.SQLITE]: 'SQLite',
   [DatabaseType.SQLSERVER]: 'SqlServer',
   [DatabaseType.DUCKDB]: 'duckdb',
   [DatabaseType.CLICKHOUSE]: 'clickhouse',
-  [DatabaseType.COCKROACHDB]: PG_BACKEND,
-  [DatabaseType.REDSHIFT]: PG_BACKEND,
-  [DatabaseType.YUGABYTEDB]: PG_BACKEND,
-  [DatabaseType.TIMESCALEDB]: PG_BACKEND,
-  [DatabaseType.KINGBASEES]: PG_BACKEND,
-  [DatabaseType.GAUSSDB]: PG_BACKEND,
-  [DatabaseType.HIGHGO]: PG_BACKEND,
-  [DatabaseType.UXDB]: PG_BACKEND,
-  [DatabaseType.OPENGAUSS]: PG_BACKEND,
-  [DatabaseType.GBASE8C]: PG_BACKEND,
-  [DatabaseType.QUESTDB]: PG_BACKEND,
-  [DatabaseType.VASTBASE]: PG_BACKEND,
-  [DatabaseType.YASHANDB]: PG_BACKEND,
-  [DatabaseType.TIDB]: MYSQL_BACKEND,
-  [DatabaseType.OCEANBASE]: MYSQL_BACKEND,
-  [DatabaseType.TDSQL]: MYSQL_BACKEND,
-  [DatabaseType.POLARDB]: MYSQL_BACKEND,
+  [DatabaseType.COCKROACHDB]: 'cockroachdb',
+  [DatabaseType.REDSHIFT]: 'redshift',
+  [DatabaseType.YUGABYTEDB]: 'yugabytedb',
+  [DatabaseType.TIMESCALEDB]: 'timescaledb',
+  [DatabaseType.KINGBASEES]: 'kingbasees',
+  [DatabaseType.GAUSSDB]: 'gaussdb',
+  [DatabaseType.HIGHGO]: 'highgo',
+  [DatabaseType.UXDB]: 'uxdb',
+  [DatabaseType.OPENGAUSS]: 'opengauss',
+  [DatabaseType.GBASE8C]: 'gbase8c',
+  [DatabaseType.QUESTDB]: 'questdb',
+  [DatabaseType.VASTBASE]: 'vastbase',
+  [DatabaseType.YASHANDB]: 'yashandb',
+  [DatabaseType.TIDB]: 'tidb',
+  [DatabaseType.OCEANBASE]: 'oceanbase',
+  [DatabaseType.TDSQL]: 'tdsql',
+  [DatabaseType.POLARDB]: 'polardb',
   [DatabaseType.DAMENG]: 'dameng',
-  [DatabaseType.DORIS]: MYSQL_BACKEND,
-  [DatabaseType.SELECTDB]: MYSQL_BACKEND,
-  [DatabaseType.STARROCKS]: MYSQL_BACKEND,
-  [DatabaseType.DATABEND]: MYSQL_BACKEND,
-  [DatabaseType.GOLDENDB]: MYSQL_BACKEND,
-  [DatabaseType.MANTICORESEARCH]: MYSQL_BACKEND,
+  [DatabaseType.DORIS]: 'doris',
+  [DatabaseType.SELECTDB]: 'selectdb',
+  [DatabaseType.STARROCKS]: 'starrocks',
+  [DatabaseType.DATABEND]: 'databend',
+  [DatabaseType.GOLDENDB]: 'goldendb',
+  [DatabaseType.MANTICORESEARCH]: 'manticore',
   [DatabaseType.ORACLE]: 'oracle',
   [DatabaseType.DB2]: 'db2',
   [DatabaseType.H2]: 'h2',
@@ -132,29 +132,53 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.RQLITE]: 'rqlite',
   [DatabaseType.TURSO]: 'turso',
   [DatabaseType.TDENGINE]: 'tdengine',
-  [DatabaseType.GREENPLUM]: PG_BACKEND,
-  [DatabaseType.ENTERPRISEDB]: PG_BACKEND,
-  [DatabaseType.CRATEDB]: PG_BACKEND,
-  [DatabaseType.MATERIALIZE]: PG_BACKEND,
-  [DatabaseType.ALLOYDB]: PG_BACKEND,
-  [DatabaseType.CLOUDSQLPG]: PG_BACKEND,
-  [DatabaseType.FUJITSUPG]: PG_BACKEND,
-  [DatabaseType.SINGLESTOREMEMSQL]: MYSQL_BACKEND,
-  [DatabaseType.CLOUDSQLMYSQL]: MYSQL_BACKEND,
+  [DatabaseType.GREENPLUM]: 'greenplum',
+  [DatabaseType.ENTERPRISEDB]: 'enterprisedb',
+  [DatabaseType.CRATEDB]: 'cratedb',
+  [DatabaseType.MATERIALIZE]: 'materialize',
+  [DatabaseType.ALLOYDB]: 'alloydb',
+  [DatabaseType.CLOUDSQLPG]: 'cloudsqlpg',
+  [DatabaseType.FUJITSUPG]: 'fujitsupg',
+  [DatabaseType.SINGLESTOREMEMSQL]: 'singlestore',
+  [DatabaseType.CLOUDSQLMYSQL]: 'cloudsqlmysql',
 }
 
 export const dbTypeFromBackend: Record<string, DatabaseType> = {
   PostgreSQL: DatabaseType.POSTGRESQL,
   MySQL: DatabaseType.MYSQL,
+  mariadb: DatabaseType.MARIADB,
   SqlServer: DatabaseType.SQLSERVER,
   SQLite: DatabaseType.SQLITE,
   duckdb: DatabaseType.DUCKDB,
   clickhouse: DatabaseType.CLICKHOUSE,
+  cockroachdb: DatabaseType.COCKROACHDB,
+  redshift: DatabaseType.REDSHIFT,
+  yugabytedb: DatabaseType.YUGABYTEDB,
+  timescaledb: DatabaseType.TIMESCALEDB,
+  kingbasees: DatabaseType.KINGBASEES,
+  gaussdb: DatabaseType.GAUSSDB,
+  highgo: DatabaseType.HIGHGO,
+  uxdb: DatabaseType.UXDB,
+  opengauss: DatabaseType.OPENGAUSS,
+  gbase8c: DatabaseType.GBASE8C,
+  questdb: DatabaseType.QUESTDB,
+  vastbase: DatabaseType.VASTBASE,
+  yashandb: DatabaseType.YASHANDB,
+  tidb: DatabaseType.TIDB,
+  oceanbase: DatabaseType.OCEANBASE,
+  tdsql: DatabaseType.TDSQL,
+  polardb: DatabaseType.POLARDB,
+  dameng: DatabaseType.DAMENG,
+  doris: DatabaseType.DORIS,
+  selectdb: DatabaseType.SELECTDB,
+  starrocks: DatabaseType.STARROCKS,
+  databend: DatabaseType.DATABEND,
+  goldendb: DatabaseType.GOLDENDB,
+  manticore: DatabaseType.MANTICORESEARCH,
   oracle: DatabaseType.ORACLE,
   db2: DatabaseType.DB2,
   h2: DatabaseType.H2,
   snowflake: DatabaseType.SNOWFLAKE,
-  dameng: DatabaseType.DAMENG,
   xugudb: DatabaseType.XUGUDB,
   gbase8a: DatabaseType.GBASE8A,
   trino: DatabaseType.TRINO,
@@ -189,17 +213,82 @@ export const dbTypeFromBackend: Record<string, DatabaseType> = {
 
 const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
   [DatabaseType.POSTGRESQL]: 'postgres',
+  [DatabaseType.GBASE8C]: 'postgres',
   [DatabaseType.SQLSERVER]: 'master',
   [DatabaseType.DUCKDB]: ':memory:',
   [DatabaseType.CLICKHOUSE]: 'default',
   [DatabaseType.HIGHGO]: 'highgo',
+  [DatabaseType.COCKROACHDB]: 'defaultdb',
+  [DatabaseType.YUGABYTEDB]: 'yugabyte',
+  [DatabaseType.ALLOYDB]: 'postgres',
+  [DatabaseType.CLOUDSQLPG]: 'postgres',
+  [DatabaseType.FUJITSUPG]: 'postgres',
+  [DatabaseType.GREENPLUM]: 'postgres',
+  [DatabaseType.OPENGAUSS]: 'postgres',
+  [DatabaseType.GAUSSDB]: 'postgres',
+  [DatabaseType.VASTBASE]: 'vastbase',
+  [DatabaseType.UXDB]: 'uxdb',
+  [DatabaseType.MATERIALIZE]: 'materialize',
+  [DatabaseType.CRATEDB]: 'crate',
+  [DatabaseType.QUESTDB]: 'qdb',
+  [DatabaseType.KINGBASEES]: 'test',
+}
+
+const requiredDatabaseFor: Set<DatabaseType> = new Set([
+  DatabaseType.ENTERPRISEDB,
+  DatabaseType.TIMESCALEDB,
+  DatabaseType.REDSHIFT,
+])
+
+const databasePlaceholderFor: Partial<Record<DatabaseType, string>> = {
+  [DatabaseType.ENTERPRISEDB]: 'edb (Oracle-compat) / postgres (PG mode)',
+  [DatabaseType.TIMESCALEDB]: 'tsdb (cloud) / postgres (self-hosted)',
+  [DatabaseType.REDSHIFT]: 'database name (required)',
+}
+
+function isDatabaseRequired(type: DatabaseType): boolean {
+  return requiredDatabaseFor.has(type)
 }
 
 function resolveDatabase(type: DatabaseType, database?: string): string | null {
   return database || defaultDatabaseFor[type] || null
 }
 
-export { resolveDatabase }
+export { databasePlaceholderFor, isDatabaseRequired, resolveDatabase }
+
+export function formatServerVersion(version: string): string {
+  const kingbaseMatch = version.match(/V(\d+)R(\d+)/i)
+  if (kingbaseMatch) {
+    return `V${Number.parseInt(kingbaseMatch[1], 10)}R${Number.parseInt(kingbaseMatch[2], 10)}`
+  }
+
+  const tidbMatch = version.match(/TiDB-v?(\d+\.\d+)/i)
+  if (tidbMatch) {
+    return `VTiDB ${tidbMatch[1]}`
+  }
+
+  const oceanbaseMatch = version.match(/OceanBase\D*(\d+\.\d+\.\d+)/i)
+  if (oceanbaseMatch) {
+    return `VOceanBase ${oceanbaseMatch[1]}`
+  }
+
+  const greenplumMatch = version.match(/Greenplum\s+v?(\d+\.\d+)/i)
+  if (greenplumMatch) {
+    return `VGreenplum ${greenplumMatch[1]}`
+  }
+
+  const openGaussMatch = version.match(/openGauss\s+(\d+\.\d+)/i)
+  if (openGaussMatch) {
+    return `VOpenGauss ${openGaussMatch[1]}`
+  }
+
+  const versionMatch = version.match(/(\d+\.\d+)/)
+  if (versionMatch) {
+    return `V${versionMatch[1]}`
+  }
+
+  return version.length > 20 ? `${version.slice(0, 20)}...` : version
+}
 
 export function isJdbcDatabase(type: DatabaseType): boolean {
   return [
@@ -226,6 +315,8 @@ export function isJdbcDatabase(type: DatabaseType): boolean {
     DatabaseType.TDENGINE,
     DatabaseType.DUCKDB,
     DatabaseType.FIREBIRD,
+    DatabaseType.YASHANDB,
+    DatabaseType.KINGBASEES,
   ].includes(type)
 }
 
@@ -253,7 +344,25 @@ export const jdbcDatabaseTypes: DatabaseType[] = [
   DatabaseType.TDENGINE,
   DatabaseType.DUCKDB,
   DatabaseType.FIREBIRD,
+  DatabaseType.YASHANDB,
+  DatabaseType.KINGBASEES,
 ]
+
+export type ConnectionStrategyType = 'native' | 'jdbc-bridge' | 'http-bridge'
+
+export function getConnectionStrategy(type: DatabaseType): ConnectionStrategyType {
+  if (isJdbcDatabase(type))
+    return 'jdbc-bridge'
+  const httpBridgeTypes: DatabaseType[] = [
+    DatabaseType.TRINO,
+    DatabaseType.PRESTO,
+    DatabaseType.RQLITE,
+    DatabaseType.TURSO,
+  ]
+  if (httpBridgeTypes.includes(type))
+    return 'http-bridge'
+  return 'native'
+}
 
 export enum ConnectionStatus {
   DISCONNECTED = 'disconnected',
@@ -301,6 +410,7 @@ export type ServerConnection = {
   queryTimeoutSecs?: number
   isConnected?: boolean
   lastUsed?: Date
+  serverVersion?: string
 }
 
 type ConnectionStoreState = {
@@ -504,9 +614,10 @@ export const useConnectionStore = defineStore('connectionStore', {
         const result = await connectionApi.list()
         // The backend doesn't track runtime connection state, so we preserve
         // `isConnected` from the existing store entries.
-        const existing = new Map(this.connections.map(c => [c.id, c.isConnected]))
+        const existing = new Map(this.connections.map(c => [c.id, { isConnected: c.isConnected, serverVersion: c.serverVersion }]))
         this.connections = result.map((item: Record<string, unknown>) => {
           const id = item.id as string
+          const prev = existing.get(id)
           return {
             id,
             name: item.name as string,
@@ -525,8 +636,9 @@ export const useConnectionStore = defineStore('connectionStore', {
             },
             sshTunnel: extractSshTunnelFromTransport(item.transport_layers),
             oracleOptions: extractOracleOptions(item.oracle_options),
-            isConnected: existing.has(id) ? existing.get(id) : (item.is_connected as boolean | undefined),
+            isConnected: prev?.isConnected ?? (item.is_connected as boolean | undefined),
             lastUsed: item.last_used ? new Date(item.last_used as string) : undefined,
+            serverVersion: prev?.serverVersion,
           }
         })
       }
@@ -609,6 +721,9 @@ export const useConnectionStore = defineStore('connectionStore', {
         }
 
         const result = await connectionApi.test(serverConfig)
+        if (result.server_version) {
+          connection.serverVersion = result.server_version
+        }
         return result.is_connected
       }
       catch (error) {
@@ -650,6 +765,9 @@ export const useConnectionStore = defineStore('connectionStore', {
 
         const result = await connectionApi.connect(serverConfig)
 
+        if (result.server_version) {
+          connection.serverVersion = result.server_version
+        }
         connection.isConnected = true
         connection.lastUsed = new Date()
         this.connectionStatus[connectionId] = ConnectionStatus.CONNECTED
