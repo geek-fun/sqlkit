@@ -13,6 +13,12 @@ export type JreUpdateStatus = {
   update_available: boolean
 }
 
+export type DriverUpdateStatus = {
+  current_version: string | null
+  latest_version: string | null
+  update_available: boolean
+}
+
 export type DriverInfo = {
   db_type: string
   name: string
@@ -37,6 +43,8 @@ export const jdbcApi = {
   removeJre: () => invoke<void>('remove_jre'),
 
   checkJreUpdate: () => invoke<JreUpdateStatus>('check_jre_update'),
+
+  checkDriverUpdate: (dbType: string) => invoke<DriverUpdateStatus>('check_driver_update', { dbType }),
 
   checkBridgeStatus: () => invoke<BridgeStatus>('check_bridge_status'),
 
