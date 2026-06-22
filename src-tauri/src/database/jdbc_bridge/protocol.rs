@@ -78,6 +78,8 @@ pub struct ConnectParams {
     pub pool_max: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub oracle_options: Option<OracleConnectionOptions>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credentials_in_url: Option<bool>,
 }
 
 fn default_pool_min() -> u32 {
@@ -112,6 +114,8 @@ pub struct ResolveDriverParams {
     pub version_cap: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub maven_classifier: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub download_url: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

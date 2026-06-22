@@ -55,6 +55,15 @@ pub struct DatabaseDriverConfig {
     /// When set, the download URL becomes: {artifact}-{version}-{classifier}.jar
     #[serde(default)]
     pub maven_classifier: Option<String>,
+    /// Direct download URL for drivers NOT on Maven Central (e.g. GBase 8a).
+    /// When present, the bridge downloads the JAR directly from this URL
+    /// instead of resolving via Maven metadata.
+    #[serde(default)]
+    pub download_url: Option<String>,
+    /// When true, append `?user=...&password=...` to the JDBC URL instead of
+    /// passing credentials via Properties. Some drivers (e.g. XuguDB) require this.
+    #[serde(default)]
+    pub credentials_in_url: Option<bool>,
 }
 
 // ---------------------------------------------------------------------------
@@ -190,6 +199,8 @@ fn db_type_to_registry_key(db: DatabaseType) -> Option<&'static str> {
         DatabaseType::Cassandra => Some("cassandra"),
         DatabaseType::Iris => Some("iris"),
         DatabaseType::Access => Some("access"),
+        DatabaseType::YashanDB => Some("yashandb"),
+        DatabaseType::KingbaseES => Some("kingbase"),
         _ => None,
     }
 }
@@ -275,6 +286,8 @@ mod tests {
             version_error_signatures: vec![],
             version_cap: None,
             maven_classifier: None,
+            download_url: None,
+            credentials_in_url: None,
         };
         let url = build_jdbc_url(&config, "localhost", 9092, Some("testdb"));
         assert_eq!(url, "jdbc:h2:tcp://localhost:9092/testdb");
@@ -294,6 +307,8 @@ mod tests {
             version_error_signatures: vec![],
             version_cap: None,
             maven_classifier: None,
+            download_url: None,
+            credentials_in_url: None,
         };
         let url = build_jdbc_url(&config, "localhost", 1521, Some("XEPDB1"));
         assert_eq!(url, "jdbc:oracle:thin:@localhost:1521:XEPDB1");
@@ -314,6 +329,8 @@ mod tests {
             version_error_signatures: vec![],
             version_cap: None,
             maven_classifier: None,
+            download_url: None,
+            credentials_in_url: None,
         };
         let url = build_jdbc_url(&config, "localhost", 9092, None);
         assert_eq!(url, "jdbc:h2:tcp://localhost:9092/");
@@ -334,6 +351,8 @@ mod tests {
             version_error_signatures: vec![],
             version_cap: None,
             maven_classifier: None,
+            download_url: None,
+            credentials_in_url: None,
         };
         let url = build_jdbc_url(&config, "10.0.0.1", 5236, None);
         assert_eq!(url, "jdbc:dm://10.0.0.1:5236");
@@ -397,6 +416,8 @@ mod tests {
                 version_error_signatures: vec![],
                 version_cap: None,
                 maven_classifier: None,
+                download_url: None,
+                credentials_in_url: None,
             };
             let url = build_jdbc_url(&config, "localhost", port, None);
             assert_eq!(
@@ -473,6 +494,14 @@ mod tests {
             DriverRegistry::registry_key(DatabaseType::Access),
             Some("access")
         );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::YashanDB),
+            Some("yashandb")
+        );
+        assert_eq!(
+            DriverRegistry::registry_key(DatabaseType::KingbaseES),
+            Some("kingbase")
+        );
     }
 
     #[test]
@@ -490,6 +519,8 @@ mod tests {
         assert!(keys.contains(&"oracle"), "oracle should be in the list");
         assert!(keys.contains(&"db2"), "db2 should be in the list");
         assert!(keys.contains(&"h2"), "h2 should be in the list");
+        assert!(keys.contains(&"yashandb"), "yashandb should be in the list");
+        assert!(keys.contains(&"kingbase"), "kingbase should be in the list");
     }
 
     #[test]

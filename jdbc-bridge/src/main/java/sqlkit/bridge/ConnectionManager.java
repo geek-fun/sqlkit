@@ -29,10 +29,22 @@ public class ConnectionManager {
     public void connect(String connId, String url, String username,
                         String password, String driverClass,
                         List<String> driverJars,
-                        int minPool, int maxPool) throws ClassifiedException, Exception {
+                        int minPool, int maxPool,
+                        boolean credentialsInUrl) throws ClassifiedException, Exception {
         if (pools.containsKey(connId)) {
             throw new Exception("Connection already exists: " + connId);
         }
+
+        if (credentialsInUrl) {
+            StringBuilder sb = new StringBuilder(url);
+            sb.append(url.contains("?") ? "&" : "?");
+            sb.append("user=").append(username);
+            if (password != null && !password.isEmpty()) {
+                sb.append("&password=").append(password);
+            }
+            url = sb.toString();
+        }
+        final String jdbcUrl = url;
 
         DriverClassLoader loader = new DriverClassLoader(driverJars);
         Class<?> driverCls = Class.forName(driverClass, true, loader);
@@ -48,13 +60,13 @@ public class ConnectionManager {
                 java.util.Properties info = new java.util.Properties();
                 if (username != null) info.setProperty("user", username);
                 if (password != null) info.setProperty("password", password);
-                return driver.connect(url, info);
+                return driver.connect(jdbcUrl, info);
             }
             public java.sql.Connection getConnection(String u, String p) throws java.sql.SQLException {
                 java.util.Properties info = new java.util.Properties();
-                info.setProperty("user", u);
-                info.setProperty("password", p);
-                return driver.connect(url, info);
+                if (u != null) info.setProperty("user", u);
+                if (p != null) info.setProperty("password", p);
+                return driver.connect(jdbcUrl, info);
             }
             public java.io.PrintWriter getLogWriter() { return null; }
             public void setLogWriter(java.io.PrintWriter out) {}

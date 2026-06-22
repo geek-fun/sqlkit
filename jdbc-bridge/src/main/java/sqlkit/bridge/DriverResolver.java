@@ -40,10 +40,43 @@ public class DriverResolver {
      * @param mavenArtifact  e.g. "h2"
      * @param versionCap     Optional max version to cap against. Null means resolve LATEST.
      * @param classifier     Optional Maven classifier (e.g. "standalone"). Null means no classifier.
+     * @param downloadUrl    Direct download URL for drivers NOT on Maven Central. Null means use Maven.
      * @return DriverResult with path to the cached JAR and resolved version
      */
-    public static DriverResult resolve(String mavenGroup, String mavenArtifact, 
-                                        String versionCap, String classifier) throws Exception {
+    public static DriverResult resolve(String mavenGroup, String mavenArtifact,
+                                        String versionCap, String classifier,
+                                        String downloadUrl) throws Exception {
+        if (downloadUrl != null && !downloadUrl.isEmpty()) {
+            return resolveDirect(mavenArtifact, versionCap, downloadUrl);
+        }
+        return resolveFromMaven(mavenGroup, mavenArtifact, versionCap, classifier);
+    }
+
+    private static DriverResult resolveDirect(String mavenArtifact, String versionCap, String downloadUrl) throws Exception {
+        String version = (versionCap != null && !versionCap.isEmpty()) ? versionCap : "1.0.0";
+        String jarFilename = mavenArtifact + "-" + version + ".jar";
+        Path destPath = Paths.get(DRIVERS_CACHE, mavenArtifact, jarFilename);
+
+        if (!Files.exists(destPath)) {
+            Files.createDirectories(destPath.getParent());
+            Request request = new Request.Builder()
+                .url(downloadUrl)
+                .addHeader("User-Agent", "SQLKit/1.0")
+                .build();
+            Response response = HTTP_CLIENT.newCall(request).execute();
+            if (!response.isSuccessful()) {
+                throw new Exception("Failed to download JAR: HTTP " + response.code() + " for " + downloadUrl);
+            }
+            byte[] jarBytes = response.body() != null ? response.body().bytes() : new byte[0];
+            response.close();
+            Files.write(destPath, jarBytes);
+        }
+
+        return new DriverResult(destPath.toAbsolutePath().toString(), version);
+    }
+
+    private static DriverResult resolveFromMaven(String mavenGroup, String mavenArtifact,
+                                                   String versionCap, String classifier) throws Exception {
         // 1. Fetch maven-metadata.xml
         String metadataUrl = String.format("%s/%s/%s/maven-metadata.xml",
             MAVEN_CENTRAL, mavenGroup.replace('.', '/'), mavenArtifact);

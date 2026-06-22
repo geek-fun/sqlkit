@@ -121,6 +121,8 @@ public class ProtocolHandler {
         String driverClass = requiredString(params, "driver_class", null);
         int poolMin = params.has("pool_min") ? params.get("pool_min").asInt(1) : 1;
         int poolMax = params.has("pool_max") ? params.get("pool_max").asInt(5) : 5;
+        boolean credentialsInUrl = params.has("credentials_in_url") && !params.get("credentials_in_url").isNull()
+                && params.get("credentials_in_url").asBoolean(false);
 
         List<String> driverJars = new ArrayList<>();
         if (params.has("driver_jars") && params.get("driver_jars").isArray()) {
@@ -132,7 +134,7 @@ public class ProtocolHandler {
         // Extract Oracle-specific connection options
         String tnsAdminDir = null;
         String walletPassword = null;
-        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax);
+        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax, credentialsInUrl);
         response.put("result", connId);
     }
 
@@ -214,8 +216,10 @@ public class ProtocolHandler {
                 ? params.get("version_cap").asText() : null;
         String classifier = params.has("maven_classifier") && !params.get("maven_classifier").isNull()
                 ? params.get("maven_classifier").asText() : null;
-        
-        DriverResolver.DriverResult result = DriverResolver.resolve(mavenGroup, mavenArtifact, versionCap, classifier);
+        String downloadUrl = params.has("download_url") && !params.get("download_url").isNull()
+                ? params.get("download_url").asText() : null;
+
+        DriverResolver.DriverResult result = DriverResolver.resolve(mavenGroup, mavenArtifact, versionCap, classifier, downloadUrl);
         
         ObjectNode resultNode = MAPPER.createObjectNode();
         resultNode.put("jar_path", result.getJarPath());

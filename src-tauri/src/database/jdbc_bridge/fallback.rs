@@ -123,6 +123,7 @@ pub async fn try_driver(
         "maven_artifact": config.maven_artifact,
         "version_cap": effective_cap,
         "maven_classifier": config.maven_classifier,
+        "download_url": config.download_url,
     });
     let resolve_req = JdbcRequest::new(JdbcMethod::ResolveDriver, resolve_params);
 
@@ -182,6 +183,7 @@ pub async fn try_driver(
         pool_min: 1,
         pool_max: 5,
         oracle_options: oracle_options.cloned(),
+        credentials_in_url: config.credentials_in_url,
     }) {
         Ok(v) => v,
         Err(e) => {
