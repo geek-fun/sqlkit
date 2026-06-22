@@ -69,6 +69,7 @@ const defaultPorts: Record<string, number> = {
   [DatabaseType.YASHANDB]: 1688,
   [DatabaseType.TIDB]: 4000,
   [DatabaseType.OCEANBASE]: 2883,
+  [DatabaseType.OCEANBASE_ORACLE]: 2881,
   [DatabaseType.TDSQL]: 3306,
   [DatabaseType.POLARDB]: 3306,
   [DatabaseType.DAMENG]: 5236,
