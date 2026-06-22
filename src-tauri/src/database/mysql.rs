@@ -334,10 +334,13 @@ impl DatabaseAdapter for MySQLAdapter {
     async fn connect(&mut self) -> DbResult<()> {
         let opts = self.build_connection_opts()?;
         let pool = Pool::new(opts);
+        let conn_timeout = Duration::from_secs(self.config.connect_timeout_secs);
 
-        let mut conn = match pool.get_conn().await {
-            Ok(conn) => conn,
-            Err(e) if self.config.ssl_mode == SslMode::Prefer && is_ssl_error(&e) => {
+        // mysql_async removed tcp_connect_timeout in v0.34, so we wrap the
+        // connection ourselves to prevent hanging on unresponsive hosts
+        let mut conn = match tokio::time::timeout(conn_timeout, pool.get_conn()).await {
+            Ok(Ok(conn)) => conn,
+            Ok(Err(e)) if self.config.ssl_mode == SslMode::Prefer && is_ssl_error(&e) => {
                 log::warn!(
                     "SSL handshake failed with Prefer mode, retrying without SSL: {}",
                     e
@@ -348,15 +351,30 @@ impl DatabaseAdapter for MySQLAdapter {
                 self.config.ssl_mode = SslMode::Prefer;
 
                 let fallback_pool = Pool::new(fallback_opts);
-                let mut conn = fallback_pool.get_conn().await.map_err(|retry_err| {
-                    DbError::Connection(format!(
-                        "Connection failed even without SSL: {}",
-                        retry_err
-                    ))
-                })?;
+                let mut conn =
+                    tokio::time::timeout(conn_timeout, fallback_pool.get_conn())
+                        .await
+                        .map_err(|_| {
+                            DbError::Connection(format!(
+                                "Connection timed out after {} seconds",
+                                self.config.connect_timeout_secs
+                            ))
+                        })?
+                        .map_err(|retry_err| {
+                            DbError::Connection(format!(
+                                "Connection failed even without SSL: {}",
+                                retry_err
+                            ))
+                        })?;
 
-                conn.query_drop("SELECT 1")
+                tokio::time::timeout(conn_timeout, conn.query_drop("SELECT 1"))
                     .await
+                    .map_err(|_| {
+                        DbError::Connection(format!(
+                            "Connection verification timed out after {} seconds",
+                            self.config.connect_timeout_secs
+                        ))
+                    })?
                     .map_err(mysql_connection_error_to_db_error)?;
 
                 drop(conn);
@@ -368,11 +386,23 @@ impl DatabaseAdapter for MySQLAdapter {
 
                 return Ok(());
             }
-            Err(e) => return Err(mysql_connection_error_to_db_error(e)),
+            Ok(Err(e)) => return Err(mysql_connection_error_to_db_error(e)),
+            Err(_) => {
+                return Err(DbError::Connection(format!(
+                    "Connection timed out after {} seconds",
+                    self.config.connect_timeout_secs
+                )))
+            }
         };
 
-        conn.query_drop("SELECT 1")
+        tokio::time::timeout(conn_timeout, conn.query_drop("SELECT 1"))
             .await
+            .map_err(|_| {
+                DbError::Connection(format!(
+                    "Connection verification timed out after {} seconds",
+                    self.config.connect_timeout_secs
+                ))
+            })?
             .map_err(mysql_connection_error_to_db_error)?;
 
         drop(conn);
@@ -394,28 +424,47 @@ impl DatabaseAdapter for MySQLAdapter {
     async fn test_connection(&self) -> DbResult<ConnectionStatus> {
         let mut conn = self.get_conn().await?;
 
-        // Get server version
-        let version_row: Row = conn
+        // Get server version — VERSION() is never NULL on standard MySQL
+        // but may be NULL on MySQL-compatible databases like OceanBase
+        let version_row: Option<Row> = conn
             .query_first("SELECT VERSION() as version")
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?
-            .ok_or_else(|| DbError::QueryExecution("Failed to get version".to_string()))?;
-        let server_version: String = version_row.get("version").unwrap();
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+        let server_version = match version_row {
+            Some(ref row) => match row.get_opt::<String, _>("version") {
+                Some(Ok(val)) => Some(val),
+                _ => None,
+            },
+            None => None,
+        };
 
         // Get current database and user
-        let db_row: Row = conn
+        // DATABASE() returns NULL when no database is selected; USER() is
+        // expected to be non-NULL but treat as optional for safety
+        let db_row: Option<Row> = conn
             .query_first("SELECT DATABASE() as db, USER() as user")
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?
-            .ok_or_else(|| DbError::QueryExecution("Failed to get database info".to_string()))?;
-        let current_database: Option<String> = db_row.get("db");
-        let current_user: String = db_row.get("user").unwrap();
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+        let (current_database, current_user) = match db_row {
+            Some(ref row) => {
+                let db = match row.get_opt::<String, _>("db") {
+                    Some(Ok(val)) => Some(val),
+                    _ => None,
+                };
+                let user = match row.get_opt::<String, _>("user") {
+                    Some(Ok(val)) => Some(val),
+                    _ => None,
+                };
+                (db, user)
+            }
+            None => (None, None),
+        };
 
         Ok(ConnectionStatus {
             is_connected: true,
-            server_version: Some(server_version),
+            server_version,
             current_database,
-            current_user: Some(current_user),
+            current_user,
             metadata: HashMap::new(),
         })
     }
