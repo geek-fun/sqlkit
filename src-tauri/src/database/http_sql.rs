@@ -1,6 +1,6 @@
 use crate::database::{
     adapter::DatabaseAdapter,
-    config::ConnectionConfig,
+    config::{ConnectionConfig, SslMode},
     error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{ConnectionStatus, QueryResult, QueryRow, QueryValue},
@@ -79,7 +79,8 @@ impl HttpSqlAdapter {
     }
 
     fn base_url(&self) -> String {
-        format!("http://{}:{}", self.config.host, self.config.port)
+        let scheme = if self.config.ssl_mode == SslMode::Disable { "http" } else { "https" };
+        format!("{}://{}:{}", scheme, self.config.host, self.config.port)
     }
 }
 
@@ -88,9 +89,39 @@ impl DatabaseAdapter for HttpSqlAdapter {
     type Pool = HttpSqlPool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        let client = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
-            .build()
+        let mut builder = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(30));
+
+        builder = match self.config.ssl_mode {
+            SslMode::Disable => builder,
+            SslMode::Prefer | SslMode::Require => builder.danger_accept_invalid_certs(true),
+            SslMode::VerifyCA | SslMode::VerifyFull => {
+                if let Some(ref ca_cert) = self.config.ssl_ca_cert {
+                    let pem = std::fs::read(ca_cert)
+                        .map_err(|e| DbError::Connection(format!("Failed to read CA certificate: {}", e)))?;
+                    let cert = reqwest::Certificate::from_pem(&pem)
+                        .map_err(|e| DbError::Connection(format!("Failed to parse CA certificate: {}", e)))?;
+                    builder = builder.add_root_certificate(cert);
+                }
+                builder
+            }
+        };
+
+        if let (Some(ref cert_path), Some(ref key_path)) =
+            (&self.config.ssl_client_cert, &self.config.ssl_client_key)
+        {
+            let cert_pem = std::fs::read(cert_path)
+                .map_err(|e| DbError::Connection(format!("Failed to read client certificate: {}", e)))?;
+            let key_pem = std::fs::read(key_path)
+                .map_err(|e| DbError::Connection(format!("Failed to read client key: {}", e)))?;
+            let mut combined = cert_pem;
+            combined.extend_from_slice(&key_pem);
+            let identity = reqwest::Identity::from_pem(&combined)
+                .map_err(|e| DbError::Connection(format!("Failed to parse client identity: {}", e)))?;
+            builder = builder.identity(identity);
+        }
+
+        let client = builder.build()
             .map_err(|e| DbError::Connection(e.to_string()))?;
 
         let resp = client
