@@ -14,7 +14,7 @@ import JreDriverSection from '@/views/setting/jre-driver-section.vue'
 
 const appStore = useAppStore()
 const { t, locale: _locale } = useI18n()
-const { checkForUpdates, downloadAndInstall: _dl, isChecking, isDownloading, isInstalling, updateAvailable } = useAppUpdater()
+const { checkForUpdates, downloadAndInstall, isChecking, isDownloading, isInstalling, updateAvailable, updateInfo, downloadProgress } = useAppUpdater()
 
 // --- Theme ---
 const currentTheme = computed(() => appStore.themeType)
@@ -132,8 +132,15 @@ const autoSave = computed(() => appStore.queryConfig.autoSave)
 const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave)
 
 async function handleCheckUpdates() {
+  if (updateAvailable.value) {
+    await downloadAndInstall()
+    return
+  }
   await checkForUpdates(true)
-  // The composable handles showing notifications and update info
+  // If an update was found, automatically start downloading
+  if (updateAvailable.value && updateInfo.value) {
+    await downloadAndInstall()
+  }
 }
 </script>
 
@@ -278,31 +285,32 @@ async function handleCheckUpdates() {
                     <Button
                       variant="outline"
                       size="sm"
-                      :disabled="isChecking || isDownloading || isInstalling"
+                      :disabled="isChecking || isInstalling"
                       @click="handleCheckUpdates"
                     >
+                      <!-- Spinning circle while checking or installing -->
+                      <span
+                        v-if="isChecking || isInstalling"
+                        class="i-carbon-circle-dash mr-2 shrink-0 h-4 w-4 animate-spin"
+                      />
+                      <!-- Circular progress ring while downloading -->
                       <svg
-                        v-if="isChecking || isDownloading || isInstalling"
-                        class="mr-2 h-4 w-4 animate-spin"
-                        xmlns="http://www.w3.org/2000/svg"
-                        fill="none"
-                        viewBox="0 0 24 24"
+                        v-else-if="isDownloading && downloadProgress !== null"
+                        class="mr-2 shrink-0 h-4 w-4 -rotate-90"
+                        viewBox="0 0 16 16"
                       >
+                        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" opacity="0.15" />
                         <circle
-                          class="opacity-25"
-                          cx="12"
-                          cy="12"
-                          r="10"
+                          cx="8" cy="8" r="6"
+                          fill="none"
                           stroke="currentColor"
-                          stroke-width="4"
-                        />
-                        <path
-                          class="opacity-75"
-                          fill="currentColor"
-                          d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          stroke-width="2"
+                          stroke-dasharray="37.6991"
+                          :stroke-dashoffset="37.6991 * (1 - downloadProgress / 100)"
+                          stroke-linecap="round"
                         />
                       </svg>
-                      {{ isChecking ? t('pages.settings.updates.checking') : isDownloading ? t('pages.settings.updates.downloading') : isInstalling ? t('pages.settings.updates.installing') : updateAvailable ? t('pages.settings.updates.updateAvailable') : t('pages.settings.updates.check') }}
+                      {{ isChecking ? t('pages.settings.updates.checking') : isDownloading && downloadProgress !== null ? `${t('pages.settings.updates.downloading')} ${downloadProgress}%` : isInstalling ? t('pages.settings.updates.installing') : updateAvailable ? t('pages.settings.updates.updateAvailable') : t('pages.settings.updates.check') }}
                     </Button>
                   </div>
                 </div>
