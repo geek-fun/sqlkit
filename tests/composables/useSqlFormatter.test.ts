@@ -40,11 +40,14 @@ describe('resolveDialect', () => {
       DatabaseType.GBASE8C,
       DatabaseType.QUESTDB,
       DatabaseType.VASTBASE,
-      DatabaseType.YASHANDB,
     ]
     for (const variant of pgVariants) {
       expect(resolveDialect(variant)).toBe('postgresql')
     }
+  })
+
+  it('maps YashanDB to oracle dialect', () => {
+    expect(resolveDialect(DatabaseType.YASHANDB)).toBe('oracle')
   })
 
   it('maps MariaDB to mariadb', () => {
