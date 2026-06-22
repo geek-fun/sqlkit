@@ -53,7 +53,18 @@ pub async fn check_jre_status() -> Result<JreStatus, String> {
 
 #[tauri::command]
 pub async fn download_jre() -> Result<(), String> {
-    jre::download_managed_jre().await.map_err(|e| e.to_string())
+    let result = jre::download_managed_jre().await;
+    match result {
+        Ok(()) => {
+            crate::download::emit_complete("jre", crate::download::DownloadKind::Jre);
+            Ok(())
+        }
+        Err(e) => {
+            let err = e.to_string();
+            crate::download::emit_error("jre", crate::download::DownloadKind::Jre, &err);
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]
@@ -90,10 +101,16 @@ pub async fn download_driver(db_type: String) -> Result<(), String> {
         .get_config(dt)
         .ok_or_else(|| format!("No registry entry for {}", db_type))?;
 
+    crate::download::emit_progress(&db_type, crate::download::DownloadKind::Driver, 0, 1);
+
     // Start a temporary Java bridge process to resolve the driver
     let bridge_jar = download::bridge_jar_path();
     let mut launcher = JdbcBridgeLauncher::new(bridge_jar);
-    launcher.start(&[]).map_err(|e| e.to_string())?;
+    if let Err(e) = launcher.start(&[]) {
+        let err = e.to_string();
+        crate::download::emit_error(&db_type, crate::download::DownloadKind::Driver, &err);
+        return Err(err);
+    }
 
     let req = JdbcRequest::new(
         JdbcMethod::ResolveDriver,
@@ -104,14 +121,22 @@ pub async fn download_driver(db_type: String) -> Result<(), String> {
             "maven_classifier": config.maven_classifier,
         }),
     );
-    let resp = launcher.send_request(&req).map_err(|e| e.to_string())?;
+    let resp = launcher.send_request_with_progress(&req, |downloaded, total| {
+        crate::download::emit_progress(&db_type, crate::download::DownloadKind::Driver, downloaded, total);
+    }).map_err(|e| {
+        let err = e.to_string();
+        crate::download::emit_error(&db_type, crate::download::DownloadKind::Driver, &err);
+        err
+    })?;
     if let Some(err) = resp.error {
         launcher.shutdown();
+        crate::download::emit_error(&db_type, crate::download::DownloadKind::Driver, &err);
         return Err(err);
     }
 
     // Driver is now cached on disk by the Java bridge
     launcher.shutdown();
+    crate::download::emit_complete(&db_type, crate::download::DownloadKind::Driver);
     Ok(())
 }
 
@@ -218,9 +243,18 @@ pub async fn list_tns_aliases(tns_admin_dir: String) -> Result<Vec<String>, Stri
 /// Does NOT require Java — purely HTTP download, parallel-safe.
 #[tauri::command]
 pub async fn download_jdbc_driver_direct(db_type: String) -> Result<(), String> {
-    download::download_jdbc_driver_direct(&db_type)
-        .await
-        .map_err(|e| e.to_string())
+    let result = download::download_jdbc_driver_direct(&db_type).await;
+    match result {
+        Ok(()) => {
+            crate::download::emit_complete(&db_type, crate::download::DownloadKind::Driver);
+            Ok(())
+        }
+        Err(e) => {
+            let err = e.to_string();
+            crate::download::emit_error(&db_type, crate::download::DownloadKind::Driver, &err);
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]
@@ -245,9 +279,18 @@ pub async fn check_bridge_status() -> Result<BridgeStatus, String> {
 
 #[tauri::command]
 pub async fn download_bridge_jar() -> Result<(), String> {
-    download::download_bridge_plugin()
-        .await
-        .map_err(|e| e.to_string())
+    let result = download::download_bridge_plugin().await;
+    match result {
+        Ok(()) => {
+            crate::download::emit_complete("bridge", crate::download::DownloadKind::Bridge);
+            Ok(())
+        }
+        Err(e) => {
+            let err = e.to_string();
+            crate::download::emit_error("bridge", crate::download::DownloadKind::Bridge, &err);
+            Err(err)
+        }
+    }
 }
 
 #[tauri::command]

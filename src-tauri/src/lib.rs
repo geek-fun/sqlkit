@@ -1,5 +1,6 @@
 pub mod api_response;
 pub mod database;
+pub mod download;
 pub mod ssh;
 pub mod transfer;
 
