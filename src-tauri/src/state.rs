@@ -66,7 +66,7 @@ pub struct ServerConfig {
     pub ssl_client_cert: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssl_client_key: Option<String>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    #[serde(default, skip_serializing_if = "std::ops::Not::not", deserialize_with = "deserialize_bool_or_null")]
     pub trust_server_certificate: bool,
     /// Additional metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -90,6 +90,13 @@ fn default_timeout_10() -> u64 {
 }
 fn default_timeout_30() -> u64 {
     30
+}
+
+fn deserialize_bool_or_null<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<bool>::deserialize(deserializer).map(|v| v.unwrap_or(false))
 }
 
 impl ServerConfig {
