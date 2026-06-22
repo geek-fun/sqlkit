@@ -40,10 +40,12 @@ public class DriverResolver {
      * @param mavenArtifact  e.g. "h2"
      * @param versionCap     Optional max version to cap against. Null means resolve LATEST.
      * @param classifier     Optional Maven classifier (e.g. "standalone"). Null means no classifier.
+     * @param progressCb     Callback invoked with (downloaded, total) during JAR download, or null.
      * @return DriverResult with path to the cached JAR and resolved version
      */
     public static DriverResult resolve(String mavenGroup, String mavenArtifact, 
-                                        String versionCap, String classifier) throws Exception {
+                                        String versionCap, String classifier,
+                                        ProgressCallback progressCb) throws Exception {
         // 1. Fetch maven-metadata.xml
         String metadataUrl = String.format("%s/%s/%s/maven-metadata.xml",
             MAVEN_CENTRAL, mavenGroup.replace('.', '/'), mavenArtifact);
@@ -102,11 +104,26 @@ public class DriverResolver {
             if (!response.isSuccessful()) {
                 throw new Exception("Failed to download JAR: HTTP " + response.code() + " for " + downloadUrl);
             }
+            if (response.body() == null) {
+                throw new Exception("Empty response body when downloading JAR from " + downloadUrl);
+            }
             
-            byte[] jarBytes = response.body() != null ? response.body().bytes() : new byte[0];
-            response.close();
+            long contentLength = response.body().contentLength();
+            long totalBytes = contentLength > 0 ? contentLength : 5_000_000L;
+            long downloadedBytes = 0L;
             
-            Files.write(destPath, jarBytes);
+            try (InputStream in = new BufferedInputStream(response.body().byteStream());
+                 OutputStream out = Files.newOutputStream(destPath)) {
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = in.read(buffer)) != -1) {
+                    out.write(buffer, 0, bytesRead);
+                    downloadedBytes += bytesRead;
+                    if (progressCb != null) {
+                        progressCb.onProgress(downloadedBytes, totalBytes);
+                    }
+                }
+            }
         }
         
         return new DriverResult(destPath.toAbsolutePath().toString(), latestVersion);
@@ -161,6 +178,13 @@ public class DriverResolver {
         }
     }
     
+    /**
+     * Callback interface for tracking JAR download progress.
+     */
+    public interface ProgressCallback {
+        void onProgress(long downloaded, long total);
+    }
+
     /**
      * Result of a driver resolution.
      */

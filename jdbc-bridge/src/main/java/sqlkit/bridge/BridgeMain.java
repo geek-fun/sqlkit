@@ -15,7 +15,10 @@ import java.io.*;
 public class BridgeMain {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final ProtocolHandler HANDLER = new ProtocolHandler(new ConnectionManager());
+    private static final ProtocolHandler HANDLER = new ProtocolHandler(
+        new ConnectionManager(),
+        progressJson -> System.out.println(progressJson)
+    );
 
     public static void main(String[] args) throws Exception {
         if (args.length > 0 && "--version".equals(args[0])) {

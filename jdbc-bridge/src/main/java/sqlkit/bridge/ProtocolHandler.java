@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 /**
  * Dispatches JSON-RPC requests to the appropriate handler.
@@ -19,9 +20,11 @@ public class ProtocolHandler {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final ConnectionManager connectionManager;
+    private final Consumer<String> progressConsumer;
 
-    public ProtocolHandler(ConnectionManager connectionManager) {
+    public ProtocolHandler(ConnectionManager connectionManager, Consumer<String> progressConsumer) {
         this.connectionManager = connectionManager;
+        this.progressConsumer = progressConsumer;
     }
 
     /**
@@ -215,7 +218,20 @@ public class ProtocolHandler {
         String classifier = params.has("maven_classifier") && !params.get("maven_classifier").isNull()
                 ? params.get("maven_classifier").asText() : null;
         
-        DriverResolver.DriverResult result = DriverResolver.resolve(mavenGroup, mavenArtifact, versionCap, classifier);
+        DriverResolver.ProgressCallback progressCb = (downloaded, total) -> {
+            try {
+                ObjectNode progressNode = MAPPER.createObjectNode();
+                progressNode.put("phase", "progress");
+                progressNode.put("downloaded", downloaded);
+                progressNode.put("total", total);
+                progressConsumer.accept(MAPPER.writeValueAsString(progressNode));
+            } catch (Exception e) {
+                // Ignore progress reporting errors
+            }
+        };
+        
+        DriverResolver.DriverResult result = DriverResolver.resolve(
+            mavenGroup, mavenArtifact, versionCap, classifier, progressCb);
         
         ObjectNode resultNode = MAPPER.createObjectNode();
         resultNode.put("jar_path", result.getJarPath());
