@@ -484,5 +484,10 @@ pub fn recover_stuck_sessions(agent_db: State<'_, AgentDb>) -> Result<(), String
         [],
     )
     .map_err(|e| format!("Failed to recover: {}", e))?;
+    conn.execute(
+        "UPDATE agent_tool_calls SET status = 'failed' WHERE status IN ('pending', 'approved')",
+        [],
+    )
+    .map_err(|e| format!("Failed to recover tool calls: {}", e))?;
     Ok(())
 }
