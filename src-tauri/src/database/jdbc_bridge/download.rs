@@ -30,7 +30,10 @@ fn bridge_dir() -> PathBuf {
 
 /// Get the path to the current version's bridge JAR (`~/.sqlkit/jdbc-bridge/jdbc-bridge-{ver}.jar`).
 pub fn bridge_jar_path() -> PathBuf {
-    bridge_dir().join(format!("{}{}{}", BRIDGE_JAR_PREFIX, APP_VERSION, BRIDGE_JAR_SUFFIX))
+    bridge_dir().join(format!(
+        "{}{}{}",
+        BRIDGE_JAR_PREFIX, APP_VERSION, BRIDGE_JAR_SUFFIX
+    ))
 }
 
 /// Check if the current version's bridge JAR is installed.
@@ -40,7 +43,13 @@ pub fn is_bridge_installed() -> bool {
 
 /// Download a file from URL to a temporary path, then atomically rename to final.
 /// Emits Tauri progress events if the global APP_HANDLE is set.
-pub async fn download_to_path(url: &str, dest: &Path, id: &str, kind: DownloadKind, expected_size_hint: u64) -> DbResult<()> {
+pub async fn download_to_path(
+    url: &str,
+    dest: &Path,
+    id: &str,
+    kind: DownloadKind,
+    expected_size_hint: u64,
+) -> DbResult<()> {
     let tmp_path = dest.with_extension("tmp");
     let response = reqwest::get(url)
         .await
@@ -53,7 +62,10 @@ pub async fn download_to_path(url: &str, dest: &Path, id: &str, kind: DownloadKi
         )));
     }
 
-    let total = response.content_length().unwrap_or(expected_size_hint).max(1);
+    let total = response
+        .content_length()
+        .unwrap_or(expected_size_hint)
+        .max(1);
     let mut downloaded: u64 = 0;
 
     if let Some(parent) = dest.parent() {
@@ -69,7 +81,8 @@ pub async fn download_to_path(url: &str, dest: &Path, id: &str, kind: DownloadKi
 
     let mut stream = response.bytes_stream();
     while let Some(chunk) = stream.next().await {
-        let chunk = chunk.map_err(|e| DbError::Connection(format!("Download stream error: {}", e)))?;
+        let chunk =
+            chunk.map_err(|e| DbError::Connection(format!("Download stream error: {}", e)))?;
         downloaded += chunk.len() as u64;
         use tokio::io::AsyncWriteExt;
         file.write_all(&chunk)
@@ -112,14 +125,15 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
         if attempt > 0 {
             crate::download::emit_progress("bridge", DownloadKind::Bridge, 0, 1);
         }
-        if let Err(e) = download_to_path(&url, &jar_path, "bridge", DownloadKind::Bridge, 10_000_000).await {
+        if let Err(e) =
+            download_to_path(&url, &jar_path, "bridge", DownloadKind::Bridge, 10_000_000).await
+        {
             last_err = Some(e.to_string());
             continue;
         }
 
-        let meta = std::fs::metadata(&jar_path).map_err(|e| {
-            DbError::Connection(format!("Failed to check JAR file size: {}", e))
-        })?;
+        let meta = std::fs::metadata(&jar_path)
+            .map_err(|e| DbError::Connection(format!("Failed to check JAR file size: {}", e)))?;
         if meta.len() < 1_000_000 {
             let _ = std::fs::remove_file(&jar_path);
             last_err = Some(format!(
@@ -185,34 +199,85 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
     Ok(())
 }
 
-/// Download a JDBC driver JAR directly from Maven Central via HTTP.
-/// Uses the driver registry config (version_cap, maven coordinates) to
-/// construct the download URL. Stores the JAR in the driver cache directory.
+/// Download a JDBC driver JAR directly from Maven Central via HTTP (or from
+/// a direct URL if `download_url` is set in the registry).
+///
+/// Version resolution:
+/// - `download_url` → download directly (no version resolution needed)
+/// - `version_cap`  → pinned version (skip network)
+/// - Neither        → fetch `maven-metadata.xml` to resolve the latest version
+///
 /// Does NOT require Java — purely HTTP.
 pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
     use super::registry::{resolve_maven_url, DriverRegistry};
 
     let registry = DriverRegistry::load();
-    let config = registry
-        .get_config_by_name(db_type)
-        .ok_or_else(|| {
-            DbError::Connection(format!("No driver registry entry for '{}'", db_type))
-        })?;
-
-    let version = config.version_cap.as_deref().unwrap_or("latest");
-    let classifier = config.maven_classifier.as_deref();
-    let url = resolve_maven_url(&config.maven_group, &config.maven_artifact, version, classifier);
+    let config = registry.get_config_by_name(db_type).ok_or_else(|| {
+        DbError::Connection(format!("No driver registry entry for '{}'", db_type))
+    })?;
 
     let dest_dir = super::jre::home_dir()
         .join(".sqlkit")
         .join("jdbc-bridge")
         .join("drivers")
         .join(&config.maven_artifact);
+
+    // Drivers with a direct download URL (non-Maven, e.g. GBase 8a)
+    if let Some(download_url) = &config.download_url {
+        let jar_name = config.maven_artifact.clone() + ".jar";
+        let dest = dest_dir.join(&jar_name);
+        if dest.exists() {
+            return Ok(());
+        }
+        return download_to_path(download_url, &dest, db_type, DownloadKind::Driver, 5_000_000).await;
+    }
+
+    // Resolve the version to download
+    let version: String = if let Some(cap) = &config.version_cap {
+        cap.clone()
+    } else {
+        let group_path = config.maven_group.replace('.', "/");
+        let metadata_url = format!(
+            "https://repo1.maven.org/maven2/{}/{}/maven-metadata.xml",
+            group_path, config.maven_artifact
+        );
+        let resp = reqwest::get(&metadata_url)
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to fetch Maven metadata: {}", e)))?;
+        if !resp.status().is_success() {
+            return Err(DbError::Connection(format!(
+                "Maven metadata not found (HTTP {}) from {}",
+                resp.status(),
+                metadata_url
+            )));
+        }
+        let xml = resp
+            .text()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to read Maven metadata: {}", e)))?;
+        let start = xml.find("<latest>").ok_or_else(|| {
+            DbError::Connection("No <latest> tag found in Maven metadata".to_string())
+        })?;
+        let value_start = start + "<latest>".len();
+        let end = xml[value_start..].find("</latest>").ok_or_else(|| {
+            DbError::Connection("Malformed <latest> tag in Maven metadata".to_string())
+        })?;
+        xml[value_start..value_start + end].to_string()
+    };
+
+    let classifier = config.maven_classifier.as_deref();
+    let url = resolve_maven_url(
+        &config.maven_group,
+        &config.maven_artifact,
+        &version,
+        classifier,
+    );
+
     let jar_name = format!("{}-{}.jar", config.maven_artifact, version);
     let dest = dest_dir.join(&jar_name);
 
     if dest.exists() {
-        return Ok(()); // Already cached
+        return Ok(());
     }
 
     download_to_path(&url, &dest, db_type, DownloadKind::Driver, 5_000_000).await
@@ -244,9 +309,9 @@ async fn cleanup_old_bridge_versions() -> DbResult<()> {
         if path.is_dir() && fname != "drivers" {
             let old_jar = path.join("jdbc-bridge.jar");
             if old_jar.exists() {
-                tokio::fs::remove_dir_all(&path)
-                    .await
-                    .map_err(|e| DbError::Connection(format!("Failed to remove old bridge dir: {}", e)))?;
+                tokio::fs::remove_dir_all(&path).await.map_err(|e| {
+                    DbError::Connection(format!("Failed to remove old bridge dir: {}", e))
+                })?;
             }
             continue;
         }
@@ -255,13 +320,11 @@ async fn cleanup_old_bridge_versions() -> DbResult<()> {
         if fname.starts_with(BRIDGE_JAR_PREFIX) && fname.ends_with(BRIDGE_JAR_SUFFIX) {
             let ver = &fname[BRIDGE_JAR_PREFIX.len()..fname.len() - BRIDGE_JAR_SUFFIX.len()];
             if ver != APP_VERSION {
-                tokio::fs::remove_file(&path)
-                    .await
-                    .map_err(|e| DbError::Connection(format!("Failed to remove old bridge JAR: {}", e)))?;
+                tokio::fs::remove_file(&path).await.map_err(|e| {
+                    DbError::Connection(format!("Failed to remove old bridge JAR: {}", e))
+                })?;
             }
         }
     }
     Ok(())
 }
-
-
