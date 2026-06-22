@@ -188,8 +188,9 @@ impl RqliteAdapter {
 
     /// Create the `reqwest::Client` used for all HTTP calls.
     fn build_client(&self) -> DbResult<reqwest::Client> {
+        let timeout = std::time::Duration::from_secs(self.config.connect_timeout_secs);
         let mut builder = reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(60))
+            .timeout(timeout)
             .user_agent("sqlkit-rqlite-adapter/0.1");
 
         builder = self.apply_ssl_to_builder(builder)?;
