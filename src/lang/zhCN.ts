@@ -419,6 +419,7 @@ export const zhCN = {
             system: '系统',
             versionUnknown: '未知',
             systemWarning: '系统 Java 版本未知或不兼容。建议下载托管 JRE 以确保兼容性。',
+            systemInvalid: '无有效 JRE',
             managedRecommended: '使用托管 JRE',
           },
           actions: {

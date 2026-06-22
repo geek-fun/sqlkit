@@ -7,11 +7,15 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
+import { useDownloadEvents } from '@/composables/useDownloadEvents'
+import { toast } from '@/composables/useNotifications'
 import { jdbcApi } from '@/datasources'
 import { dbTypeFromBackend } from '@/store'
 
 const { t } = useI18n()
 const { getDatabaseIcon } = useDatabaseIcon()
+
+const dl = useDownloadEvents()
 
 function getDriverIcon(dbType: string): string {
   const dbTypeEnum = dbTypeFromBackend[dbType]
@@ -24,25 +28,25 @@ const jreStatus = ref<JreStatus | null>(null)
 const jreUpdate = ref<JreUpdateStatus | null>(null)
 const jreLoading = ref(false)
 
-const jreWarning = computed(() => {
+const jreDownloading = computed(() => dl.isDownloading('jre'))
+const jreDownloadProgress = computed(() => dl.getProgress('jre'))
+
+const systemJreValid = computed(() => {
   const status = jreStatus.value
-  if (!status || status.source !== 'system')
-    return ''
-  const ver = status.version
-  if (!ver || ver === 'system')
-    return t('pages.settings.jre.jreCard.status.systemWarning')
-  const major = Number.parseInt(ver, 10)
-  if (!Number.isNaN(major) && major < 25)
-    return t('pages.settings.jre.jreCard.status.systemWarning')
-  return ''
+  if (!status || status.source !== 'system' || !status.version)
+    return false
+  const major = Number.parseInt(status.version, 10)
+  return !Number.isNaN(major) && major >= 25
 })
 
 const bridgeStatus = ref<BridgeStatus | null>(null)
 const bridgeLoading = ref(false)
 
+const bridgeDownloading = computed(() => dl.isDownloading('bridge'))
+const bridgeDownloadProgress = computed(() => dl.getProgress('bridge'))
+
 const drivers = ref<DriverInfo[]>([])
 const driversLoading = ref(false)
-const downloadingDriver = ref<string | null>(null)
 const removingDriver = ref<string | null>(null)
 
 // --- Computed sort: installed first, then alphabetical by name ---
@@ -97,6 +101,11 @@ async function handleCheckJreUpdates() {
   try {
     jreUpdate.value = await jdbcApi.checkJreUpdate()
   }
+  catch (error) {
+    toast.error(t('pages.settings.jre.jreCard.errors.checkUpdatesFailed'), {
+      description: error instanceof Error ? error.message : String(error),
+    })
+  }
   finally {
     jreLoading.value = false
   }
@@ -104,13 +113,14 @@ async function handleCheckJreUpdates() {
 
 async function handleDownloadJre() {
   jreLoading.value = true
-  try {
-    await jdbcApi.downloadJre()
+  dl.reset('jre')
+  const ok = await dl.startDownload('jre', 'jre', () => jdbcApi.downloadJre())
+  if (!ok)
+    toast.error(t('pages.settings.jre.jreCard.errors.downloadFailed'), { description: dl.getError('jre') ?? '' })
+  else
     await loadJreStatus()
-  }
-  finally {
-    jreLoading.value = false
-  }
+  jreLoading.value = false
+  dl.reset('jre')
 }
 
 async function handleRemoveJre() {
@@ -120,6 +130,11 @@ async function handleRemoveJre() {
     jreStatus.value = null
     jreUpdate.value = null
     await loadJreStatus()
+  }
+  catch (error) {
+    toast.error(t('pages.settings.jre.jreCard.errors.removeFailed'), {
+      description: error instanceof Error ? error.message : String(error),
+    })
   }
   finally {
     jreLoading.value = false
@@ -142,13 +157,14 @@ async function loadBridgeStatus() {
 
 async function handleDownloadBridge() {
   bridgeLoading.value = true
-  try {
-    await jdbcApi.downloadBridgeJar()
+  dl.reset('bridge')
+  const ok = await dl.startDownload('bridge', 'bridge', () => jdbcApi.downloadBridgeJar())
+  if (!ok)
+    toast.error(t('pages.settings.jre.bridgeCard.errors.downloadFailed'), { description: dl.getError('bridge') ?? '' })
+  else
     await loadBridgeStatus()
-  }
-  finally {
-    bridgeLoading.value = false
-  }
+  bridgeLoading.value = false
+  dl.reset('bridge')
 }
 
 async function handleRemoveBridge() {
@@ -157,6 +173,11 @@ async function handleRemoveBridge() {
     await jdbcApi.removeBridgeJar()
     bridgeStatus.value = null
     await loadBridgeStatus()
+  }
+  catch (error) {
+    toast.error(t('pages.settings.jre.bridgeCard.errors.removeFailed'), {
+      description: error instanceof Error ? error.message : String(error),
+    })
   }
   finally {
     bridgeLoading.value = false
@@ -179,14 +200,13 @@ async function loadDrivers() {
 }
 
 async function handleDownloadDriver(dbType: string) {
-  downloadingDriver.value = dbType
-  try {
-    await jdbcApi.downloadDriver(dbType)
+  dl.reset(dbType)
+  const ok = await dl.startDownload('driver', dbType, () => jdbcApi.downloadDriver(dbType))
+  if (!ok)
+    toast.error(t('pages.settings.jre.driversCard.errors.downloadFailed'), { description: dl.getError(dbType) ?? '' })
+  else
     await loadDrivers()
-  }
-  finally {
-    downloadingDriver.value = null
-  }
+  dl.reset(dbType)
 }
 
 async function handleRemoveDriver(dbType: string) {
@@ -194,6 +214,11 @@ async function handleRemoveDriver(dbType: string) {
   try {
     await jdbcApi.removeDriver(dbType)
     await loadDrivers()
+  }
+  catch (error) {
+    toast.error(t('pages.settings.jre.driversCard.errors.removeFailed'), {
+      description: error instanceof Error ? error.message : String(error),
+    })
   }
   finally {
     removingDriver.value = null
@@ -254,6 +279,21 @@ onMounted(() => {
                 {{ t('pages.settings.jre.jreCard.status.notInstalled') }}
               </p>
             </div>
+            <!-- Download progress indicator (before badge) -->
+            <div v-if="jreDownloadProgress" class="flex flex-shrink-0 items-center">
+              <svg class="h-5 w-5 -rotate-90" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" opacity="0.15" />
+                <circle
+                  cx="8" cy="8" r="6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-dasharray="37.6991"
+                  :stroke-dashoffset="37.6991 * (1 - (jreDownloadProgress?.downloaded ?? 0) / (jreDownloadProgress?.total ?? 1))"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </div>
             <div class="flex-shrink-0">
               <Badge :variant="jreStatus?.source === 'managed' ? 'success' : 'secondary'">
                 {{ jreStatus?.source === 'managed' ? t('pages.settings.jre.jreCard.status.installed') : t('pages.settings.jre.jreCard.status.notInstalled') }}
@@ -264,7 +304,7 @@ onMounted(() => {
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button size="icon" variant="ghost" class="h-7 w-7" :disabled="jreLoading" @click="handleCheckJreUpdates">
-                      <span class="i-carbon-search h-3.5 w-3.5" />
+                      <span class="i-carbon-update-now h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent><p>{{ t('pages.settings.jre.jreCard.actions.checkUpdates') }}</p></TooltipContent>
@@ -273,8 +313,9 @@ onMounted(() => {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger as-child>
-                    <Button v-if="jreStatus?.source !== 'managed' || jreUpdate?.update_available" size="icon" variant="ghost" class="h-7 w-7" :disabled="jreLoading" @click="handleDownloadJre">
-                      <span class="i-carbon-download h-3.5 w-3.5" />
+                    <Button v-if="jreStatus?.source !== 'managed' || jreUpdate?.update_available" size="icon" variant="ghost" class="h-7 w-7" :disabled="jreDownloading || jreLoading" @click="handleDownloadJre">
+                      <span v-if="jreDownloading" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin" />
+                      <span v-else class="i-carbon-download h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent><p>{{ jreStatus?.source !== 'managed' ? t('pages.settings.jre.jreCard.actions.download') : t('pages.settings.jre.jreCard.actions.redownload') }}</p></TooltipContent>
@@ -294,33 +335,42 @@ onMounted(() => {
           </div>
 
           <!-- System JRE row -->
-          <div v-if="jreStatus && jreStatus.source !== 'none'" class="px-4 py-3 flex gap-3 items-center">
+          <div class="px-4 py-3 flex gap-3 items-center">
             <span class="i-carbon-laptop text-muted-foreground flex-shrink-0 h-5 w-5" />
-            <div class="flex-1 min-w-0">
-              <p class="text-sm font-medium truncate">
-                {{ t('pages.settings.jre.jreCard.status.system') }}
-              </p>
-              <p class="text-xs text-muted-foreground mt-0.5 truncate">
-                {{ jreStatus.path || t('pages.settings.jre.jreCard.status.notInstalled') }}
-                <template v-if="jreStatus.version">
-                  · v{{ jreStatus.version }}
-                </template>
-                <template v-else>
-                  · {{ t('pages.settings.jre.jreCard.status.versionUnknown') }}
-                </template>
-              </p>
-            </div>
-            <div class="flex-shrink-0">
-              <Badge :variant="jreStatus.installed ? 'success' : 'secondary'">
-                {{ jreStatus.installed ? t('pages.settings.jre.jreCard.status.installed') : t('pages.settings.jre.jreCard.status.notInstalled') }}
-              </Badge>
-            </div>
+            <template v-if="systemJreValid">
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">
+                  {{ t('pages.settings.jre.jreCard.status.system') }}
+                </p>
+                <p class="text-xs text-muted-foreground mt-0.5 truncate">
+                  {{ jreStatus?.path || t('pages.settings.jre.jreCard.status.notInstalled') }}
+                  · v{{ jreStatus!.version }}
+                </p>
+              </div>
+              <div class="flex-shrink-0">
+                <Badge variant="success">
+                  {{ t('pages.settings.jre.jreCard.status.installed') }}
+                </Badge>
+              </div>
+            </template>
+            <template v-else>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium truncate">
+                  {{ t('pages.settings.jre.jreCard.status.system') }}
+                </p>
+                <p class="text-xs text-muted-foreground mt-0.5">
+                  <template v-if="jreStatus?.path">
+                    {{ jreStatus.path }} ·
+                  </template>{{ t('pages.settings.jre.jreCard.status.systemInvalid') }}
+                </p>
+              </div>
+              <div class="flex-shrink-0">
+                <Badge variant="secondary">
+                  {{ t('pages.settings.jre.jreCard.status.notInstalled') }}
+                </Badge>
+              </div>
+            </template>
           </div>
-        </div>
-
-        <div v-if="jreWarning" class="bg-warning/10 text-warning text-xs px-3 py-2 rounded-md flex gap-2 items-start">
-          <span class="i-carbon-warning mt-0.5 flex-shrink-0 h-4 w-4" />
-          <span>{{ jreWarning }}</span>
         </div>
       </div>
 
@@ -337,13 +387,30 @@ onMounted(() => {
 
         <div class="flex flex-wrap gap-2 min-h-8 items-center">
           <!-- Loading state -->
-          <span v-if="bridgeLoading && !bridgeStatus" class="text-sm text-muted-foreground">
-            <span class="i-carbon-loading align-middle h-3.5 w-3.5 inline-block animate-spin" />
+          <span v-if="bridgeLoading && !bridgeStatus && !bridgeDownloading" class="text-sm text-muted-foreground">
+            <span class="i-carbon-circle-dash align-middle h-3.5 w-3.5 inline-block animate-spin" />
             {{ t('pages.settings.jre.bridgeCard.status.checking') }}
           </span>
 
           <!-- Bridge status loaded -->
           <template v-else-if="bridgeStatus">
+            <!-- Download progress indicator (before badge) -->
+            <template v-if="bridgeDownloadProgress">
+              <svg class="h-5 w-5 -rotate-90" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" opacity="0.15" />
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-dasharray="37.6991"
+                  :stroke-dashoffset="37.6991 * (1 - (bridgeDownloadProgress?.downloaded ?? 0) / (bridgeDownloadProgress?.total ?? 1))"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </template>
             <Badge
               :variant="bridgeStatus.installed ? 'success' : 'secondary'"
             >
@@ -376,10 +443,11 @@ onMounted(() => {
                     size="icon"
                     variant="ghost"
                     class="h-7 w-7"
-                    :disabled="bridgeLoading"
+                    :disabled="bridgeDownloading || bridgeLoading"
                     @click="handleDownloadBridge"
                   >
-                    <span class="i-carbon-download h-3.5 w-3.5" />
+                    <span v-if="bridgeDownloading" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin" />
+                    <span v-else class="i-carbon-download h-3.5 w-3.5" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
@@ -491,6 +559,23 @@ onMounted(() => {
                 </template>
               </p>
             </div>
+            <!-- Download progress indicator (before badge) -->
+            <div v-if="dl.isDownloading(driver.db_type) || dl.getProgress(driver.db_type)" class="flex flex-shrink-0 items-center">
+              <svg class="h-5 w-5 -rotate-90" viewBox="0 0 16 16">
+                <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" opacity="0.15" />
+                <circle
+                  cx="8"
+                  cy="8"
+                  r="6"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-dasharray="37.6991"
+                  :stroke-dashoffset="37.6991 * (1 - (dl.getProgress(driver.db_type)?.downloaded ?? 0) / (dl.getProgress(driver.db_type)?.total ?? 1))"
+                  stroke-linecap="round"
+                />
+              </svg>
+            </div>
             <div class="flex-shrink-0">
               <Badge
                 :variant="driver.installed ? 'success' : 'secondary'"
@@ -509,10 +594,11 @@ onMounted(() => {
                       size="icon"
                       variant="ghost"
                       class="h-7 w-7"
-                      :disabled="downloadingDriver === driver.db_type"
+                      :disabled="dl.isDownloading(driver.db_type)"
                       @click="handleDownloadDriver(driver.db_type)"
                     >
-                      <span class="i-carbon-download h-3.5 w-3.5" />
+                      <span v-if="dl.isDownloading(driver.db_type)" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin" />
+                      <span v-else class="i-carbon-download h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>

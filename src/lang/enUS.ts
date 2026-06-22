@@ -419,6 +419,7 @@ export const enUS = {
             system: 'System',
             versionUnknown: 'Unknown',
             systemWarning: 'System Java version is unknown or incompatible. Download managed JRE for guaranteed compatibility.',
+            systemInvalid: 'No valid JRE',
             managedRecommended: 'Use managed JRE',
           },
           actions: {
