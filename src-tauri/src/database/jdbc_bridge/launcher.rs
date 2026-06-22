@@ -39,9 +39,7 @@ impl JdbcBridgeLauncher {
     }
 
     fn read_stderr_buffer(buf: &Arc<Mutex<Vec<String>>>) -> String {
-        buf.lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .join("\n")
+        buf.lock().unwrap_or_else(|e| e.into_inner()).join("\n")
     }
 
     fn drain_stderr(&self) -> String {
@@ -89,8 +87,7 @@ impl JdbcBridgeLauncher {
         for arg in jvm_args {
             cmd.arg(arg);
         }
-        cmd.arg("-jar")
-            .arg(self.jar_path.to_str().unwrap_or(""));
+        cmd.arg("-jar").arg(self.jar_path.to_str().unwrap_or(""));
         let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -200,7 +197,9 @@ impl JdbcBridgeLauncher {
 
         // Check if the process is still alive before trying to communicate
         if let Ok(Some(status)) = process.try_wait() {
-            let stderr = self.stderr_buffer.as_ref()
+            let stderr = self
+                .stderr_buffer
+                .as_ref()
                 .map(Self::read_stderr_buffer)
                 .unwrap_or_default();
             return if stderr.is_empty() {
@@ -230,29 +229,27 @@ impl JdbcBridgeLauncher {
             .map_err(|e| DbError::Connection(format!("Failed to serialize request: {}", e)))?;
 
         writeln!(stdin, "{}", json).map_err(|e| {
-            let stderr = self.stderr_buffer.as_ref()
+            let stderr = self
+                .stderr_buffer
+                .as_ref()
                 .map(Self::read_stderr_buffer)
                 .unwrap_or_default();
             if stderr.is_empty() {
                 DbError::Connection(format!("Failed to write to bridge stdin: {}", e))
             } else {
-                DbError::Connection(format!(
-                    "Bridge write error: {}. stderr: {}",
-                    e, stderr
-                ))
+                DbError::Connection(format!("Bridge write error: {}. stderr: {}", e, stderr))
             }
         })?;
         stdin.flush().map_err(|e| {
-            let stderr = self.stderr_buffer.as_ref()
+            let stderr = self
+                .stderr_buffer
+                .as_ref()
                 .map(Self::read_stderr_buffer)
                 .unwrap_or_default();
             if stderr.is_empty() {
                 DbError::Connection(format!("Failed to flush bridge stdin: {}", e))
             } else {
-                DbError::Connection(format!(
-                    "Bridge write error: {}. stderr: {}",
-                    e, stderr
-                ))
+                DbError::Connection(format!("Bridge write error: {}. stderr: {}", e, stderr))
             }
         })?;
 
@@ -265,16 +262,15 @@ impl JdbcBridgeLauncher {
         loop {
             line.clear();
             reader.read_line(&mut line).map_err(|e| {
-                let stderr = self.stderr_buffer.as_ref()
+                let stderr = self
+                    .stderr_buffer
+                    .as_ref()
                     .map(Self::read_stderr_buffer)
                     .unwrap_or_default();
                 if stderr.is_empty() {
                     DbError::Connection(format!("Failed to read bridge response: {}", e))
                 } else {
-                    DbError::Connection(format!(
-                        "Bridge read error: {}. stderr: {}",
-                        e, stderr
-                    ))
+                    DbError::Connection(format!("Bridge read error: {}. stderr: {}", e, stderr))
                 }
             })?;
 
@@ -286,7 +282,9 @@ impl JdbcBridgeLauncher {
                     std::thread::sleep(std::time::Duration::from_millis(1000));
                     continue;
                 }
-                let stderr = self.stderr_buffer.as_ref()
+                let stderr = self
+                    .stderr_buffer
+                    .as_ref()
                     .map(Self::read_stderr_buffer)
                     .unwrap_or_default();
                 return if stderr.is_empty() {
@@ -341,7 +339,9 @@ impl JdbcBridgeLauncher {
 
         // Check if the process is still alive before trying to communicate
         if let Ok(Some(status)) = process.try_wait() {
-            let stderr = self.stderr_buffer.as_ref()
+            let stderr = self
+                .stderr_buffer
+                .as_ref()
                 .map(Self::read_stderr_buffer)
                 .unwrap_or_default();
             return if stderr.is_empty() {
@@ -371,29 +371,27 @@ impl JdbcBridgeLauncher {
             .map_err(|e| DbError::Connection(format!("Failed to serialize request: {}", e)))?;
 
         writeln!(stdin, "{}", json).map_err(|e| {
-            let stderr = self.stderr_buffer.as_ref()
+            let stderr = self
+                .stderr_buffer
+                .as_ref()
                 .map(Self::read_stderr_buffer)
                 .unwrap_or_default();
             if stderr.is_empty() {
                 DbError::Connection(format!("Failed to write to bridge stdin: {}", e))
             } else {
-                DbError::Connection(format!(
-                    "Bridge write error: {}. stderr: {}",
-                    e, stderr
-                ))
+                DbError::Connection(format!("Bridge write error: {}. stderr: {}", e, stderr))
             }
         })?;
         stdin.flush().map_err(|e| {
-            let stderr = self.stderr_buffer.as_ref()
+            let stderr = self
+                .stderr_buffer
+                .as_ref()
                 .map(Self::read_stderr_buffer)
                 .unwrap_or_default();
             if stderr.is_empty() {
                 DbError::Connection(format!("Failed to flush bridge stdin: {}", e))
             } else {
-                DbError::Connection(format!(
-                    "Bridge write error: {}. stderr: {}",
-                    e, stderr
-                ))
+                DbError::Connection(format!("Bridge write error: {}. stderr: {}", e, stderr))
             }
         })?;
 
@@ -407,16 +405,15 @@ impl JdbcBridgeLauncher {
         loop {
             line.clear();
             reader.read_line(&mut line).map_err(|e| {
-                let stderr = self.stderr_buffer.as_ref()
+                let stderr = self
+                    .stderr_buffer
+                    .as_ref()
                     .map(Self::read_stderr_buffer)
                     .unwrap_or_default();
                 if stderr.is_empty() {
                     DbError::Connection(format!("Failed to read bridge response: {}", e))
                 } else {
-                    DbError::Connection(format!(
-                        "Bridge read error: {}. stderr: {}",
-                        e, stderr
-                    ))
+                    DbError::Connection(format!("Bridge read error: {}. stderr: {}", e, stderr))
                 }
             })?;
 
@@ -428,7 +425,9 @@ impl JdbcBridgeLauncher {
                     std::thread::sleep(std::time::Duration::from_millis(1000));
                     continue;
                 }
-                let stderr = self.stderr_buffer.as_ref()
+                let stderr = self
+                    .stderr_buffer
+                    .as_ref()
                     .map(Self::read_stderr_buffer)
                     .unwrap_or_default();
                 return if stderr.is_empty() {

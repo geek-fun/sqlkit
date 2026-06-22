@@ -15,9 +15,7 @@ use tokio::sync::Mutex;
 
 use super::launcher::JdbcBridgeLauncher;
 use super::pool::JdbcBridgePool;
-use super::protocol::{
-    ConnectionStatusData, JdbcMethod, JdbcRequest, QueryResultData,
-};
+use super::protocol::{ConnectionStatusData, JdbcMethod, JdbcRequest, QueryResultData};
 
 /// JDBC bridge adapter.
 ///
@@ -531,15 +529,11 @@ mod tests {
 
     #[test]
     fn test_split_comment_statement() {
-        let stmts = split_sql_statements(
-            "CREATE TABLE t (id INT);\nCOMMENT ON TABLE t IS 'hello';",
-        );
+        let stmts =
+            split_sql_statements("CREATE TABLE t (id INT);\nCOMMENT ON TABLE t IS 'hello';");
         assert_eq!(
             stmts,
-            vec![
-                "CREATE TABLE t (id INT)",
-                "COMMENT ON TABLE t IS 'hello'",
-            ]
+            vec!["CREATE TABLE t (id INT)", "COMMENT ON TABLE t IS 'hello'",]
         );
     }
 
