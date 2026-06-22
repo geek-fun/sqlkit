@@ -80,6 +80,8 @@ pub enum DatabaseType {
     TiDB,
     ///  OceanBase (MySQL mode) — MySQL wire protocol.
     OceanBase,
+    ///  OceanBase Oracle mode — JDBC bridge (enterprise edition).
+    OceanbaseOracle,
     /// 腾讯 TDSQL — MySQL wire protocol.
     TDSQL,
     /// 阿里云 PolarDB (MySQL mode) — MySQL wire protocol.
@@ -310,6 +312,23 @@ impl ConnectionConfig {
     /// Set the SSL mode.
     pub fn with_ssl_mode(mut self, ssl_mode: SslMode) -> Self {
         self.ssl_mode = ssl_mode;
+        self
+    }
+
+    pub fn with_ssl_ca_cert(mut self, ca_cert: Option<String>) -> Self {
+        self.ssl_ca_cert = ca_cert;
+        self
+    }
+    pub fn with_ssl_client_cert(mut self, client_cert: Option<String>) -> Self {
+        self.ssl_client_cert = client_cert;
+        self
+    }
+    pub fn with_ssl_client_key(mut self, client_key: Option<String>) -> Self {
+        self.ssl_client_key = client_key;
+        self
+    }
+    pub fn with_trust_server_certificate(mut self, trust: bool) -> Self {
+        self.trust_server_certificate = trust;
         self
     }
 

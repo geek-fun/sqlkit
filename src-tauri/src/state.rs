@@ -60,6 +60,14 @@ pub struct ServerConfig {
     /// SSL mode configuration.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ssl_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssl_ca_cert: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssl_client_cert: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ssl_client_key: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub trust_server_certificate: bool,
     /// Additional metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub metadata: Option<HashMap<String, String>>,
@@ -93,6 +101,10 @@ impl ServerConfig {
             password: None,
             database: None,
             ssl_mode: None,
+            ssl_ca_cert: None,
+            ssl_client_cert: None,
+            ssl_client_key: None,
+            trust_server_certificate: false,
             metadata: None,
             oracle_options: None,
             connect_timeout_secs: default_timeout_10(),
@@ -127,6 +139,7 @@ impl ServerConfig {
             "mariadb" => Ok(DatabaseType::MariaDB),
             "tidb" => Ok(DatabaseType::TiDB),
             "oceanbase" => Ok(DatabaseType::OceanBase),
+            "oceanbase-oracle" | "oceanbase_oracle" => Ok(DatabaseType::OceanbaseOracle),
             "tdsql" => Ok(DatabaseType::TDSQL),
             "polardb" => Ok(DatabaseType::PolarDB),
             "kingbasees" | "kingbase" => Ok(DatabaseType::KingbaseES),
@@ -197,17 +210,29 @@ impl ServerConfig {
                 "disable" => crate::database::SslMode::Disable,
                 "prefer" => crate::database::SslMode::Prefer,
                 "require" => crate::database::SslMode::Require,
+                "verify-ca" | "verify_ca" => crate::database::SslMode::VerifyCA,
+                "verify-full" | "verify_full" => crate::database::SslMode::VerifyFull,
                 _ => crate::database::SslMode::Prefer,
             };
             config = config.with_ssl_mode(ssl);
+        } else {
+            config = config.with_ssl_mode(crate::database::SslMode::Disable);
         }
+
+        config = config
+            .with_ssl_ca_cert(self.ssl_ca_cert.clone())
+            .with_ssl_client_cert(self.ssl_client_cert.clone())
+            .with_ssl_client_key(self.ssl_client_key.clone())
+            .with_trust_server_certificate(self.trust_server_certificate);
 
         if let Some(ref layers) = self.transport_layers {
             config = config.with_transport_layers(layers.clone());
         }
 
         if let Some(ref oracle_opts) = self.oracle_options {
-            if db_type == crate::database::DatabaseType::Oracle {
+            if db_type == crate::database::DatabaseType::Oracle
+                || db_type == crate::database::DatabaseType::OceanbaseOracle
+            {
                 config = config.with_oracle_options(oracle_opts.clone());
             }
         }
