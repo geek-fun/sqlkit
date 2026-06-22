@@ -15,8 +15,10 @@ use crate::database::{
 };
 use async_trait::async_trait;
 use mysql_async::{
-    prelude::*, Conn, OptsBuilder, Pool, PoolConstraints, PoolOpts, Row, SslOpts, Value,
+    prelude::*, ClientIdentity, Conn, OptsBuilder, Pool, PoolConstraints, PoolOpts, Row,
+    SslOpts, Value,
 };
+use log;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -164,15 +166,55 @@ impl MySQLAdapter {
                 opts = opts.ssl_opts(None);
             }
             SslMode::Prefer | SslMode::Require => {
-                let ssl_opts = SslOpts::default();
+                let mut ssl_opts = SslOpts::default()
+                    .with_danger_accept_invalid_certs(true);
+
+                if let (Some(ref cert), Some(ref key)) =
+                    (&self.config.ssl_client_cert, &self.config.ssl_client_key)
+                {
+                    ssl_opts = ssl_opts.with_client_identity(Some(ClientIdentity::new(
+                        std::path::PathBuf::from(cert).into(),
+                        std::path::PathBuf::from(key).into(),
+                    )));
+                }
+
                 opts = opts.ssl_opts(Some(ssl_opts));
             }
-            SslMode::VerifyCA | SslMode::VerifyFull => {
+            SslMode::VerifyCA => {
+                let mut ssl_opts = SslOpts::default()
+                    .with_danger_skip_domain_validation(true);
+
+                if let Some(ref ca_cert) = self.config.ssl_ca_cert {
+                    let ca_path: std::path::PathBuf = ca_cert.into();
+                    ssl_opts = ssl_opts.with_root_certs(vec![ca_path.into()]);
+                }
+
+                if let (Some(ref cert), Some(ref key)) =
+                    (&self.config.ssl_client_cert, &self.config.ssl_client_key)
+                {
+                    ssl_opts = ssl_opts.with_client_identity(Some(ClientIdentity::new(
+                        std::path::PathBuf::from(cert).into(),
+                        std::path::PathBuf::from(key).into(),
+                    )));
+                }
+
+                opts = opts.ssl_opts(Some(ssl_opts));
+            }
+            SslMode::VerifyFull => {
                 let mut ssl_opts = SslOpts::default();
 
                 if let Some(ref ca_cert) = self.config.ssl_ca_cert {
                     let ca_path: std::path::PathBuf = ca_cert.into();
                     ssl_opts = ssl_opts.with_root_certs(vec![ca_path.into()]);
+                }
+
+                if let (Some(ref cert), Some(ref key)) =
+                    (&self.config.ssl_client_cert, &self.config.ssl_client_key)
+                {
+                    ssl_opts = ssl_opts.with_client_identity(Some(ClientIdentity::new(
+                        std::path::PathBuf::from(cert).into(),
+                        std::path::PathBuf::from(key).into(),
+                    )));
                 }
 
                 opts = opts.ssl_opts(Some(ssl_opts));
@@ -278,6 +320,12 @@ impl MySQLAdapter {
     }
 }
 
+/// Check if a mysql_async error is SSL/TLS related.
+fn is_ssl_error(e: &mysql_async::Error) -> bool {
+    let msg = e.to_string().to_lowercase();
+    msg.contains("ssl") || msg.contains("tls") || msg.contains("certificate") || msg.contains("handshake")
+}
+
 #[async_trait]
 impl DatabaseAdapter for MySQLAdapter {
     type Pool = MySQLPool;
@@ -286,10 +334,39 @@ impl DatabaseAdapter for MySQLAdapter {
         let opts = self.build_connection_opts()?;
         let pool = Pool::new(opts);
 
-        let mut conn = pool
-            .get_conn()
-            .await
-            .map_err(mysql_connection_error_to_db_error)?;
+        let mut conn = match pool.get_conn().await {
+            Ok(conn) => conn,
+            Err(e) if self.config.ssl_mode == SslMode::Prefer && is_ssl_error(&e) => {
+                log::warn!("SSL handshake failed with Prefer mode, retrying without SSL: {}", e);
+
+                self.config.ssl_mode = SslMode::Disable;
+                let fallback_opts = self.build_connection_opts()?;
+                self.config.ssl_mode = SslMode::Prefer;
+
+                let fallback_pool = Pool::new(fallback_opts);
+                let mut conn = fallback_pool
+                    .get_conn()
+                    .await
+                    .map_err(|retry_err| {
+                        DbError::Connection(format!(
+                            "Connection failed even without SSL: {}",
+                            retry_err
+                        ))
+                    })?;
+
+                conn.query_drop("SELECT 1")
+                    .await
+                    .map_err(mysql_connection_error_to_db_error)?;
+
+                drop(conn);
+
+                self.raw_pool = Some(fallback_pool.clone());
+                self.pool = Some(Arc::new(MySQLPool { pool: fallback_pool }));
+
+                return Ok(());
+            }
+            Err(e) => return Err(mysql_connection_error_to_db_error(e)),
+        };
 
         conn.query_drop("SELECT 1")
             .await
