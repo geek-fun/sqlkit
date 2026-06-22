@@ -34,7 +34,7 @@
 
 use crate::database::{
     adapter::DatabaseAdapter,
-    config::ConnectionConfig,
+    config::{ConnectionConfig, SslMode},
     error::{DbError, DbResult},
     pool::ConnectionPool,
     types::{
@@ -176,18 +176,54 @@ impl RqliteAdapter {
         }
     }
 
-    /// Build the base URL (`http://host:port`) from the configuration.
+    /// Build the base URL from the configuration.
     fn build_base_url(&self) -> String {
-        format!("http://{}:{}", self.config.host, self.config.port)
+        let scheme = if self.config.ssl_mode == SslMode::Disable { "http" } else { "https" };
+        format!("{}://{}:{}", scheme, self.config.host, self.config.port)
     }
 
     /// Create the `reqwest::Client` used for all HTTP calls.
-    fn build_client() -> DbResult<reqwest::Client> {
-        reqwest::Client::builder()
+    fn build_client(&self) -> DbResult<reqwest::Client> {
+        let mut builder = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
-            .user_agent("sqlkit-rqlite-adapter/0.1")
-            .build()
+            .user_agent("sqlkit-rqlite-adapter/0.1");
+
+        builder = self.apply_ssl_to_builder(builder)?;
+
+        builder.build()
             .map_err(|e| DbError::Connection(format!("Failed to create HTTP client: {}", e)))
+    }
+
+    fn apply_ssl_to_builder(&self, mut builder: reqwest::ClientBuilder) -> DbResult<reqwest::ClientBuilder> {
+        match self.config.ssl_mode {
+            SslMode::Disable => {}
+            SslMode::Prefer | SslMode::Require => {
+                builder = builder.danger_accept_invalid_certs(true);
+            }
+            SslMode::VerifyCA | SslMode::VerifyFull => {
+                if let Some(ref ca_cert) = self.config.ssl_ca_cert {
+                    let pem = std::fs::read(ca_cert)
+                        .map_err(|e| DbError::Connection(format!("Failed to read CA certificate: {}", e)))?;
+                    let cert = reqwest::Certificate::from_pem(&pem)
+                        .map_err(|e| DbError::Connection(format!("Failed to parse CA certificate: {}", e)))?;
+                    builder = builder.add_root_certificate(cert);
+                }
+            }
+        }
+        if let (Some(ref cert_path), Some(ref key_path)) =
+            (&self.config.ssl_client_cert, &self.config.ssl_client_key)
+        {
+            let cert_pem = std::fs::read(cert_path)
+                .map_err(|e| DbError::Connection(format!("Failed to read client certificate: {}", e)))?;
+            let key_pem = std::fs::read(key_path)
+                .map_err(|e| DbError::Connection(format!("Failed to read client key: {}", e)))?;
+            let mut combined = cert_pem;
+            combined.extend_from_slice(&key_pem);
+            let identity = reqwest::Identity::from_pem(&combined)
+                .map_err(|e| DbError::Connection(format!("Failed to parse client identity: {}", e)))?;
+            builder = builder.identity(identity);
+        }
+        Ok(builder)
     }
 
     /// Build the HTTP headers for a request.
@@ -335,7 +371,7 @@ impl DatabaseAdapter for RqliteAdapter {
     type Pool = RqlitePool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        let client = Self::build_client()?;
+        let client = self.build_client()?;
 
         // Verify connectivity by sending SELECT 1
         let url = format!("{}/db/query", self.build_base_url());
@@ -702,16 +738,34 @@ mod tests {
     #[test]
     fn test_build_base_url() {
         let config =
-            ConnectionConfig::new(DatabaseType::RQLite, "rqlite.example.com", 4001, "default");
+            ConnectionConfig::new(DatabaseType::RQLite, "rqlite.example.com", 4001, "default")
+                .with_ssl_mode(SslMode::Disable);
         let adapter = RqliteAdapter::new(config);
         assert_eq!(adapter.build_base_url(), "http://rqlite.example.com:4001");
     }
 
     #[test]
     fn test_build_base_url_non_default_port() {
-        let config = ConnectionConfig::new(DatabaseType::RQLite, "localhost", 4001, "default");
+        let config = ConnectionConfig::new(DatabaseType::RQLite, "localhost", 4001, "default")
+            .with_ssl_mode(SslMode::Disable);
         let adapter = RqliteAdapter::new(config);
         assert_eq!(adapter.build_base_url(), "http://localhost:4001");
+    }
+
+    #[test]
+    fn test_build_base_url_https() {
+        let config = ConnectionConfig::new(DatabaseType::RQLite, "rqlite.example.com", 4001, "default")
+            .with_ssl_mode(SslMode::Prefer);
+        let adapter = RqliteAdapter::new(config);
+        assert_eq!(adapter.build_base_url(), "https://rqlite.example.com:4001");
+    }
+
+    #[test]
+    fn test_build_base_url_https_require() {
+        let config = ConnectionConfig::new(DatabaseType::RQLite, "rqlite.example.com", 4001, "default")
+            .with_ssl_mode(SslMode::Require);
+        let adapter = RqliteAdapter::new(config);
+        assert_eq!(adapter.build_base_url(), "https://rqlite.example.com:4001");
     }
 
     // ---- Headers ----
