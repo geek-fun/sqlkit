@@ -322,6 +322,159 @@ impl JdbcBridgeLauncher {
         Ok(resp)
     }
 
+    /// Send a request and receive a response, emitting progress events during the read phase.
+    ///
+    /// Same as [`send_request`] but intercepts intermediate JSON lines containing
+    /// `"phase":"progress"` emitted by the Java bridge during long operations
+    /// (e.g. `resolve_driver`).  Such lines are parsed and the `downloaded`/`total`
+    /// fields are forwarded to `progress_cb`.  The read loop continues until the
+    /// actual JSON-RPC response arrives.
+    pub fn send_request_with_progress(
+        &mut self,
+        req: &JdbcRequest,
+        mut progress_cb: impl FnMut(u64, u64),
+    ) -> DbResult<JdbcResponse> {
+        let process = self
+            .process
+            .as_mut()
+            .ok_or_else(|| DbError::Connection("JDBC bridge not started".to_string()))?;
+
+        // Check if the process is still alive before trying to communicate
+        if let Ok(Some(status)) = process.try_wait() {
+            let stderr = self.stderr_buffer.as_ref()
+                .map(Self::read_stderr_buffer)
+                .unwrap_or_default();
+            return if stderr.is_empty() {
+                Err(DbError::Connection(format!(
+                    "JDBC bridge exited before request (code: {}). No stderr output.",
+                    status
+                )))
+            } else {
+                Err(DbError::Connection(format!(
+                    "JDBC bridge exited before request (code: {}). stderr: {}",
+                    status, stderr
+                )))
+            };
+        }
+
+        let stdout = process
+            .stdout
+            .as_mut()
+            .ok_or_else(|| DbError::Connection("JDBC bridge stdout not available".to_string()))?;
+
+        let stdin = self
+            .stdin
+            .as_mut()
+            .ok_or_else(|| DbError::Connection("JDBC bridge stdin not available".to_string()))?;
+
+        let json = serde_json::to_string(req)
+            .map_err(|e| DbError::Connection(format!("Failed to serialize request: {}", e)))?;
+
+        writeln!(stdin, "{}", json).map_err(|e| {
+            let stderr = self.stderr_buffer.as_ref()
+                .map(Self::read_stderr_buffer)
+                .unwrap_or_default();
+            if stderr.is_empty() {
+                DbError::Connection(format!("Failed to write to bridge stdin: {}", e))
+            } else {
+                DbError::Connection(format!(
+                    "Bridge write error: {}. stderr: {}",
+                    e, stderr
+                ))
+            }
+        })?;
+        stdin.flush().map_err(|e| {
+            let stderr = self.stderr_buffer.as_ref()
+                .map(Self::read_stderr_buffer)
+                .unwrap_or_default();
+            if stderr.is_empty() {
+                DbError::Connection(format!("Failed to flush bridge stdin: {}", e))
+            } else {
+                DbError::Connection(format!(
+                    "Bridge write error: {}. stderr: {}",
+                    e, stderr
+                ))
+            }
+        })?;
+
+        let mut reader = BufReader::new(stdout);
+        let mut line = String::new();
+        let mut read_attempts = 0;
+
+        // Skip any non-JSON lines (e.g. JVM prints version info to stdout).
+        // Intercept intermediate progress events from the bridge.
+        // Retry once if first read is empty (JVM may be slow to start).
+        loop {
+            line.clear();
+            reader.read_line(&mut line).map_err(|e| {
+                let stderr = self.stderr_buffer.as_ref()
+                    .map(Self::read_stderr_buffer)
+                    .unwrap_or_default();
+                if stderr.is_empty() {
+                    DbError::Connection(format!("Failed to read bridge response: {}", e))
+                } else {
+                    DbError::Connection(format!(
+                        "Bridge read error: {}. stderr: {}",
+                        e, stderr
+                    ))
+                }
+            })?;
+
+            let trimmed = line.trim();
+            if trimmed.is_empty() {
+                if read_attempts == 0 {
+                    // JVM may be slow to start — wait and retry once
+                    read_attempts += 1;
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
+                    continue;
+                }
+                let stderr = self.stderr_buffer.as_ref()
+                    .map(Self::read_stderr_buffer)
+                    .unwrap_or_default();
+                return if stderr.is_empty() {
+                    Err(DbError::Connection(
+                        "Empty response from JDBC bridge".to_string(),
+                    ))
+                } else {
+                    Err(DbError::Connection(format!(
+                        "Bridge read error. stderr: {}",
+                        stderr
+                    )))
+                };
+            }
+            // Skip lines that don't start with '{' (non-JSON noise from JVM)
+            if !trimmed.starts_with('{') {
+                continue;
+            }
+            // Intercept progress events: {"phase":"progress","downloaded":N,"total":M}
+            if trimmed.contains("\"phase\":\"progress\"") {
+                if let Ok(val) = serde_json::from_str::<serde_json::Value>(trimmed) {
+                    let downloaded = val.get("downloaded").and_then(|v| v.as_u64()).unwrap_or(0);
+                    let total = val.get("total").and_then(|v| v.as_u64()).unwrap_or(0);
+                    progress_cb(downloaded, total);
+                }
+                continue;
+            }
+            // This is the actual JSON-RPC response
+            break;
+        }
+
+        let resp: JdbcResponse = serde_json::from_str(line.trim())
+            .map_err(|e| DbError::Connection(format!("Failed to parse bridge response: {}", e)))?;
+
+        if let Some(ref err) = resp.error {
+            let error_type = resp.error_type.as_deref().unwrap_or("unknown");
+            return Err(match error_type {
+                "version_incompatible" => DbError::DriverVersionIncompatible(err.clone()),
+                "authentication_failed" => DbError::Authentication(err.clone()),
+                "network_error" | "timeout" => DbError::Connection(err.clone()),
+                _ => DbError::Connection(format!("JDBC bridge error: {}", err)),
+            });
+        }
+
+        Ok(resp)
+    }
+
     /// Check if the bridge process is still alive.
     pub fn is_alive(&mut self) -> bool {
         match self.process.as_mut() {

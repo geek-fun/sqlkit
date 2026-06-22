@@ -6,12 +6,10 @@
 //! `release` file, and cleaning it up.
 
 use crate::database::error::{DbError, DbResult};
-use crate::APP_HANDLE;
 use futures::StreamExt;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::OnceLock;
-use tauri::Emitter;
 use tokio::sync::Mutex;
 
 /// Subdirectory under user home for the managed JRE.
@@ -309,16 +307,7 @@ async fn download_jre_stream(
         file.write_all(&chunk)
             .await
             .map_err(|e| DbError::Connection(format!("Failed to write chunk: {}", e)))?;
-        if let Some(handle) = APP_HANDLE.get() {
-            let _ = handle.emit(
-                "connection-progress",
-                serde_json::json!({
-                    "step": "jre_download",
-                    "downloaded": downloaded,
-                    "total": total,
-                }),
-            );
-        }
+        crate::download::emit_progress("jre", crate::download::DownloadKind::Jre, downloaded, total);
     }
     file.flush().await.ok();
     Ok(())

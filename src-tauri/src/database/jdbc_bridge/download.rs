@@ -7,11 +7,10 @@
 //! (fallback if the Java bridge resolution is unavailable).
 
 use crate::database::error::{DbError, DbResult};
-use crate::APP_HANDLE;
+use crate::download::DownloadKind;
 use futures::StreamExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tauri::Emitter;
 
 const APP_VERSION: &str = env!("APP_VERSION");
 
@@ -41,7 +40,7 @@ pub fn is_bridge_installed() -> bool {
 
 /// Download a file from URL to a temporary path, then atomically rename to final.
 /// Emits Tauri progress events if the global APP_HANDLE is set.
-pub async fn download_to_path(url: &str, dest: &Path, event_label: &str, expected_size_hint: u64) -> DbResult<()> {
+pub async fn download_to_path(url: &str, dest: &Path, id: &str, kind: DownloadKind, expected_size_hint: u64) -> DbResult<()> {
     let tmp_path = dest.with_extension("tmp");
     let response = reqwest::get(url)
         .await
@@ -77,17 +76,7 @@ pub async fn download_to_path(url: &str, dest: &Path, event_label: &str, expecte
             .await
             .map_err(|e| DbError::Connection(format!("Failed to write chunk: {}", e)))?;
 
-        // Emit progress event
-        if let Some(handle) = crate::APP_HANDLE.get() {
-            let _ = handle.emit(
-                "connection-progress",
-                serde_json::json!({
-                    "step": event_label,
-                    "downloaded": downloaded,
-                    "total": total,
-                }),
-            );
-        }
+        crate::download::emit_progress(id, kind.clone(), downloaded, total);
     }
 
     tokio::fs::rename(&tmp_path, dest)
@@ -121,20 +110,9 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
     let mut last_err = None::<String>;
     for attempt in 0..2 {
         if attempt > 0 {
-            // Emit retry event
-            if let Some(handle) = APP_HANDLE.get() {
-                let _ = handle.emit(
-                    "connection-progress",
-                    serde_json::json!({
-                        "step": "retry",
-                        "message": format!("Download failed, retrying... ({})", last_err.as_deref().unwrap_or("unknown error")),
-                        "downloaded": 0,
-                        "total": 1,
-                    }),
-                );
-            }
+            crate::download::emit_progress("bridge", DownloadKind::Bridge, 0, 1);
         }
-        if let Err(e) = download_to_path(&url, &jar_path, "bridge_jar", 10_000_000).await {
+        if let Err(e) = download_to_path(&url, &jar_path, "bridge", DownloadKind::Bridge, 10_000_000).await {
             last_err = Some(e.to_string());
             continue;
         }
@@ -237,7 +215,7 @@ pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
         return Ok(()); // Already cached
     }
 
-    download_to_path(&url, &dest, "jdbc_driver", 5_000_000).await
+    download_to_path(&url, &dest, db_type, DownloadKind::Driver, 5_000_000).await
 }
 
 /// Clean up old bridge JARs and stale version directories.
