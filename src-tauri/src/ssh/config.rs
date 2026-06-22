@@ -22,7 +22,7 @@ impl TransportLayerConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SshTunnelConfig {
-    #[serde(default = "default_enabled")]
+    #[serde(default = "default_enabled", deserialize_with = "deserialize_bool_or_null")]
     pub enabled: bool,
     pub host: String,
     #[serde(default = "default_ssh_port")]
@@ -33,7 +33,7 @@ pub struct SshTunnelConfig {
     pub connect_timeout_secs: u64,
     #[serde(default)]
     pub keepalive_interval_secs: u64,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_bool_or_null")]
     pub verify_host_key: bool,
 }
 
@@ -57,6 +57,14 @@ fn default_enabled() -> bool {
 
 fn default_ssh_port() -> u16 {
     22
+}
+
+/// Deserialize a boolean, treating null as false.
+fn deserialize_bool_or_null<'de, D>(deserializer: D) -> Result<bool, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<bool>::deserialize(deserializer).map(|v| v.unwrap_or(false))
 }
 
 pub const fn default_connect_timeout_secs() -> u64 {
