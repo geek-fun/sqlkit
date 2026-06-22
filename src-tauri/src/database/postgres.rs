@@ -18,7 +18,7 @@ use chrono::{DateTime, FixedOffset, NaiveDate, NaiveDateTime, NaiveTime};
 use deadpool_postgres::{
     Config as DeadpoolConfig, Pool, PoolConfig as DeadpoolPoolConfig, Runtime,
 };
-use rustls::pki_types::{CertificateDer, ServerName};
+use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
 use rustls::ClientConfig;
 use std::collections::HashMap;
 use std::fs;
@@ -470,11 +470,53 @@ impl PostgresAdapter {
             }
         }
 
+        let client_auth: Option<(Vec<CertificateDer<'static>>, PrivateKeyDer<'static>)> =
+            if let (Some(ref cert_path), Some(ref key_path)) =
+                (&self.config.ssl_client_cert, &self.config.ssl_client_key)
+            {
+                let cert_data = std::fs::read(cert_path).map_err(|e| {
+                    DbError::Connection(format!("Failed to read client certificate: {}", e))
+                })?;
+                let certs: Vec<CertificateDer<'static>> =
+                    rustls_pemfile::certs(&mut cert_data.as_slice())
+                        .collect::<Result<Vec<_>, _>>()
+                        .map_err(|e| {
+                            DbError::Connection(
+                                format!("Failed to parse client certificate: {}", e),
+                            )
+                        })?;
+
+                let key_data = std::fs::read(key_path).map_err(|e| {
+                    DbError::Connection(format!("Failed to read client key: {}", e))
+                })?;
+                let key = rustls_pemfile::private_key(&mut key_data.as_slice())
+                    .map_err(|e| {
+                        DbError::Connection(format!("Failed to parse client key: {}", e))
+                    })?
+                    .ok_or_else(|| {
+                        DbError::Connection(
+                            "No private key found in client key file".to_string(),
+                        )
+                    })?;
+
+                Some((certs, key))
+            } else {
+                None
+            };
+
         if skip_verification {
-            let config = ClientConfig::builder()
-                .dangerous()
-                .with_custom_certificate_verifier(Arc::new(NoVerification))
-                .with_no_client_auth();
+            let config = if let Some((certs, key)) = client_auth {
+                ClientConfig::builder()
+                    .dangerous()
+                    .with_custom_certificate_verifier(Arc::new(NoVerification))
+                    .with_client_auth_cert(certs, key)
+                    .map_err(|e| DbError::Connection(format!("Failed to set client auth: {}", e)))?
+            } else {
+                ClientConfig::builder()
+                    .dangerous()
+                    .with_custom_certificate_verifier(Arc::new(NoVerification))
+                    .with_no_client_auth()
+            };
             return Ok(config);
         }
 
@@ -509,18 +551,37 @@ impl PostgresAdapter {
         }
 
         if !verify_hostname {
-            let config = ClientConfig::builder()
-                .dangerous()
-                .with_custom_certificate_verifier(Arc::new(ChainOnlyVerifier {
-                    root_store: Arc::new(root_store),
-                }))
-                .with_no_client_auth();
+            let config = if let Some((certs, key)) = client_auth {
+                ClientConfig::builder()
+                    .dangerous()
+                    .with_custom_certificate_verifier(Arc::new(ChainOnlyVerifier {
+                        root_store: Arc::new(root_store),
+                    }))
+                    .with_client_auth_cert(certs, key)
+                    .map_err(|e| {
+                        DbError::Connection(format!("Failed to set client auth: {}", e))
+                    })?
+            } else {
+                ClientConfig::builder()
+                    .dangerous()
+                    .with_custom_certificate_verifier(Arc::new(ChainOnlyVerifier {
+                        root_store: Arc::new(root_store),
+                    }))
+                    .with_no_client_auth()
+            };
             return Ok(config);
         }
 
-        let config = ClientConfig::builder()
-            .with_root_certificates(root_store)
-            .with_no_client_auth();
+        let config = if let Some((certs, key)) = client_auth {
+            ClientConfig::builder()
+                .with_root_certificates(root_store)
+                .with_client_auth_cert(certs, key)
+                .map_err(|e| DbError::Connection(format!("Failed to set client auth: {}", e)))?
+        } else {
+            ClientConfig::builder()
+                .with_root_certificates(root_store)
+                .with_no_client_auth()
+        };
 
         Ok(config)
     }
