@@ -183,28 +183,33 @@ impl TursoAdapter {
             .user_agent("sqlkit-turso-adapter/0.1");
 
         if let Some(ref ca_cert) = self.config.ssl_ca_cert {
-            let pem = std::fs::read(ca_cert)
-                .map_err(|e| DbError::Connection(format!("Failed to read CA certificate: {}", e)))?;
-            let cert = reqwest::Certificate::from_pem(&pem)
-                .map_err(|e| DbError::Connection(format!("Failed to parse CA certificate: {}", e)))?;
+            let pem = std::fs::read(ca_cert).map_err(|e| {
+                DbError::Connection(format!("Failed to read CA certificate: {}", e))
+            })?;
+            let cert = reqwest::Certificate::from_pem(&pem).map_err(|e| {
+                DbError::Connection(format!("Failed to parse CA certificate: {}", e))
+            })?;
             builder = builder.add_root_certificate(cert);
         }
 
         if let (Some(ref cert_path), Some(ref key_path)) =
             (&self.config.ssl_client_cert, &self.config.ssl_client_key)
         {
-            let cert_pem = std::fs::read(cert_path)
-                .map_err(|e| DbError::Connection(format!("Failed to read client certificate: {}", e)))?;
+            let cert_pem = std::fs::read(cert_path).map_err(|e| {
+                DbError::Connection(format!("Failed to read client certificate: {}", e))
+            })?;
             let key_pem = std::fs::read(key_path)
                 .map_err(|e| DbError::Connection(format!("Failed to read client key: {}", e)))?;
             let mut combined = cert_pem;
             combined.extend_from_slice(&key_pem);
-            let identity = reqwest::Identity::from_pem(&combined)
-                .map_err(|e| DbError::Connection(format!("Failed to parse client identity: {}", e)))?;
+            let identity = reqwest::Identity::from_pem(&combined).map_err(|e| {
+                DbError::Connection(format!("Failed to parse client identity: {}", e))
+            })?;
             builder = builder.identity(identity);
         }
 
-        builder.build()
+        builder
+            .build()
             .map_err(|e| DbError::Connection(format!("Failed to create HTTP client: {}", e)))
     }
 

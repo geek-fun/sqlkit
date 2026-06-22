@@ -281,7 +281,10 @@ impl PostgresAdapter {
         parts.push(format!("sslmode={}", ssl_mode));
 
         // Add connection timeout
-        parts.push(format!("connect_timeout={}", self.config.connect_timeout_secs));
+        parts.push(format!(
+            "connect_timeout={}",
+            self.config.connect_timeout_secs
+        ));
 
         // Add additional options
         for (key, value) in &self.config.options {
@@ -296,11 +299,13 @@ impl PostgresAdapter {
         skip_verification: bool,
         verify_hostname: bool,
     ) -> DbResult<ClientConfig> {
-        use rustls::RootCertStore;
-        use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
+        use rustls::client::danger::{
+            HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier,
+        };
         use rustls::pki_types::UnixTime;
-        use rustls::{DigitallySignedStruct, SignatureScheme};
         use rustls::server::ParsedCertificate;
+        use rustls::RootCertStore;
+        use rustls::{DigitallySignedStruct, SignatureScheme};
 
         /// Certificate verifier that skips all verification (accepts any cert).
         #[derive(Debug)]
@@ -386,8 +391,7 @@ impl PostgresAdapter {
                 cert: &CertificateDer<'_>,
                 dss: &DigitallySignedStruct,
             ) -> Result<HandshakeSignatureValid, rustls::Error> {
-                let spki = ParsedCertificate::try_from(cert)?
-                    .subject_public_key_info();
+                let spki = ParsedCertificate::try_from(cert)?.subject_public_key_info();
                 let provider = rustls::crypto::aws_lc_rs::default_provider();
                 let supported = &provider.signature_verification_algorithms;
 
@@ -423,8 +427,7 @@ impl PostgresAdapter {
                 cert: &CertificateDer<'_>,
                 dss: &DigitallySignedStruct,
             ) -> Result<HandshakeSignatureValid, rustls::Error> {
-                let spki = ParsedCertificate::try_from(cert)?
-                    .subject_public_key_info();
+                let spki = ParsedCertificate::try_from(cert)?.subject_public_key_info();
                 let provider = rustls::crypto::aws_lc_rs::default_provider();
                 let supported = &provider.signature_verification_algorithms;
 
@@ -481,22 +484,19 @@ impl PostgresAdapter {
                     rustls_pemfile::certs(&mut cert_data.as_slice())
                         .collect::<Result<Vec<_>, _>>()
                         .map_err(|e| {
-                            DbError::Connection(
-                                format!("Failed to parse client certificate: {}", e),
-                            )
+                            DbError::Connection(format!(
+                                "Failed to parse client certificate: {}",
+                                e
+                            ))
                         })?;
 
                 let key_data = std::fs::read(key_path).map_err(|e| {
                     DbError::Connection(format!("Failed to read client key: {}", e))
                 })?;
                 let key = rustls_pemfile::private_key(&mut key_data.as_slice())
-                    .map_err(|e| {
-                        DbError::Connection(format!("Failed to parse client key: {}", e))
-                    })?
+                    .map_err(|e| DbError::Connection(format!("Failed to parse client key: {}", e)))?
                     .ok_or_else(|| {
-                        DbError::Connection(
-                            "No private key found in client key file".to_string(),
-                        )
+                        DbError::Connection("No private key found in client key file".to_string())
                     })?;
 
                 Some((certs, key))
@@ -558,9 +558,7 @@ impl PostgresAdapter {
                         root_store: Arc::new(root_store),
                     }))
                     .with_client_auth_cert(certs, key)
-                    .map_err(|e| {
-                        DbError::Connection(format!("Failed to set client auth: {}", e))
-                    })?
+                    .map_err(|e| DbError::Connection(format!("Failed to set client auth: {}", e)))?
             } else {
                 ClientConfig::builder()
                     .dangerous()
@@ -2285,9 +2283,8 @@ mod tests {
 
     #[test]
     fn test_pg_compat_without_database_falls_back_to_username() {
-        let config =
-            ConnectionConfig::new(DatabaseType::OpenGauss, "10.84.1.213", 5432, "SYSTEM")
-                .with_password("kingbase@123");
+        let config = ConnectionConfig::new(DatabaseType::OpenGauss, "10.84.1.213", 5432, "SYSTEM")
+            .with_password("kingbase@123");
 
         let adapter = PostgresAdapter::new(config);
         let conn_str = adapter.build_connection_string();

@@ -43,9 +43,8 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         //         Native PG adapter
         PostgreSQL => ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL),
         // PG wire protocol compat
-        CockroachDB | Redshift | YugabyteDB | TimescaleDB | GaussDB | HighGo
-        | UXDB | OpenGauss | GBase8c | QuestDB | Vastbase
-        | Greenplum | EnterpriseDB | CrateDB | Materialize
+        CockroachDB | Redshift | YugabyteDB | TimescaleDB | GaussDB | HighGo | UXDB | OpenGauss
+        | GBase8c | QuestDB | Vastbase | Greenplum | EnterpriseDB | CrateDB | Materialize
         | AlloyDB | CloudSQLPG | FujitsuPG => {
             ConnectionStrategy::Native(CoreDatabaseType::PostgreSQL)
         }
@@ -53,9 +52,8 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
         // Native MySQL adapter
         MySQL => ConnectionStrategy::Native(CoreDatabaseType::MySQL),
         // MySQL wire protocol compat
-        MariaDB | TiDB | OceanBase | TDSQL | PolarDB | Doris | SelectDB | StarRocks
-        | Databend | GoldenDB | ManticoreSearch
-        | SingleStoreMemSQL | CloudSQLMySQL => {
+        MariaDB | TiDB | OceanBase | TDSQL | PolarDB | Doris | SelectDB | StarRocks | Databend
+        | GoldenDB | ManticoreSearch | SingleStoreMemSQL | CloudSQLMySQL => {
             ConnectionStrategy::Native(CoreDatabaseType::MySQL)
         }
 
@@ -120,16 +118,15 @@ pub fn is_pg_family(db: DatabaseType) -> bool {
 pub fn default_port(db: DatabaseType) -> Option<u16> {
     use DatabaseType::*;
     match db {
-        PostgreSQL | CockroachDB | Redshift | YugabyteDB | TimescaleDB | GaussDB
-        | HighGo | UXDB | OpenGauss | GBase8c | Vastbase
-        | Greenplum | EnterpriseDB | CrateDB | Materialize
-        | AlloyDB | CloudSQLPG | FujitsuPG => Some(5432),
+        PostgreSQL | CockroachDB | Redshift | YugabyteDB | TimescaleDB | GaussDB | HighGo
+        | UXDB | OpenGauss | GBase8c | Vastbase | Greenplum | EnterpriseDB | CrateDB
+        | Materialize | AlloyDB | CloudSQLPG | FujitsuPG => Some(5432),
         QuestDB => Some(8812),
         YashanDB => Some(1688),
         KingbaseES => Some(54321),
         OceanbaseOracle => Some(2881),
-        MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | GoldenDB
-        | SingleStoreMemSQL | CloudSQLMySQL => Some(3306),
+        MySQL | MariaDB | TiDB | OceanBase | TDSQL | PolarDB | GoldenDB | SingleStoreMemSQL
+        | CloudSQLMySQL => Some(3306),
         Doris | SelectDB | StarRocks => Some(9030),
         Databend => Some(3307),
         ManticoreSearch => Some(9306),

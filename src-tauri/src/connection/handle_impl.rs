@@ -7,8 +7,8 @@ use crate::database::{
     adapter::DatabaseAdapter,
     error::DbResult,
     types::{
-        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo, QueryResult,
-        TableInfo, TriggerInfo,
+        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+        QueryResult, TableInfo, TriggerInfo,
     },
 };
 use crate::state::ActiveConnection;
@@ -142,7 +142,14 @@ impl ConnectionHandle for ActiveConnection {
         object_name: &str,
         object_type: &str,
     ) -> DbResult<String> {
-        delegate!(self, get_object_ddl, database, schema, object_name, object_type)
+        delegate!(
+            self,
+            get_object_ddl,
+            database,
+            schema,
+            object_name,
+            object_type
+        )
     }
 
     async fn drop_object(
@@ -152,7 +159,14 @@ impl ConnectionHandle for ActiveConnection {
         object_name: &str,
         object_type: &str,
     ) -> DbResult<()> {
-        delegate!(self, drop_object, database, schema, object_name, object_type)
+        delegate!(
+            self,
+            drop_object,
+            database,
+            schema,
+            object_name,
+            object_type
+        )
     }
 
     async fn rename_object(
@@ -163,7 +177,15 @@ impl ConnectionHandle for ActiveConnection {
         object_type: &str,
         new_name: &str,
     ) -> DbResult<()> {
-        delegate!(self, rename_object, database, schema, object_name, object_type, new_name)
+        delegate!(
+            self,
+            rename_object,
+            database,
+            schema,
+            object_name,
+            object_type,
+            new_name
+        )
     }
 
     async fn disconnect(&self) -> DbResult<()> {

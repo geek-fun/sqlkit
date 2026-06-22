@@ -265,8 +265,12 @@ pub struct OracleConnectionOptions {
     pub service_level: Option<String>,
 }
 
-fn default_connect_timeout() -> u64 { 10 }
-fn default_query_timeout() -> u64 { 30 }
+fn default_connect_timeout() -> u64 {
+    10
+}
+fn default_query_timeout() -> u64 {
+    30
+}
 
 impl ConnectionConfig {
     /// Create a new connection configuration.

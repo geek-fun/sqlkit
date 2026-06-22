@@ -358,9 +358,7 @@ impl SQLiteAdapter {
             let columns: Vec<String> = (0..column_count)
                 .map(|i| stmt.column_name(i).unwrap_or("unknown").to_string())
                 .collect();
-            let column_types: Vec<String> = (0..column_count)
-                .map(|_| String::new())
-                .collect();
+            let column_types: Vec<String> = (0..column_count).map(|_| String::new()).collect();
 
             let rows_iter = stmt
                 .query_map([], |row| Ok(Self::row_to_query_row(row)))
