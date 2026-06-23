@@ -89,9 +89,14 @@ watch(() => props.bottomOpen, (open) => {
 
 <template>
   <div ref="containerEl" class="flex flex-col h-full overflow-hidden">
+    <!-- Top slot: takes all remaining space -->
     <div class="flex-1 min-h-0 overflow-auto">
       <slot name="top" />
     </div>
+
+    <!-- Bottom slot: always rendered so the panel header is visible.
+         When bottomOpen is false, height is auto (just header).
+         When bottomOpen is true, height is fixed and resize handle appears. -->
     <template v-if="bottomOpen">
       <div
         class="shrink-0 h-1 cursor-ns-resize transition-colors hover:bg-primary/20"
@@ -102,6 +107,11 @@ watch(() => props.bottomOpen, (open) => {
         class="shrink-0 overflow-auto"
         :style="{ height: `${clampedBottomHeight()}px` }"
       >
+        <slot name="bottom" />
+      </div>
+    </template>
+    <template v-else>
+      <div class="shrink-0">
         <slot name="bottom" />
       </div>
     </template>

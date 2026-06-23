@@ -27,9 +27,9 @@ function toggle() {
 </script>
 
 <template>
-  <div class="border-b">
+  <div>
     <button
-      class="text-xs text-muted-foreground font-semibold px-2 py-1.5 flex gap-2 w-full cursor-pointer uppercase items-center hover:bg-accent/50"
+      class="text-xs text-muted-foreground font-medium px-2 py-1 rounded-none flex gap-1.5 w-full cursor-pointer items-center hover:bg-accent/40"
       @click="toggle"
     >
       <span
@@ -37,15 +37,15 @@ function toggle() {
         :class="{ 'rotate-90': open }"
       />
       <span class="shrink-0 h-3.5 w-3.5" :class="[icon, iconColor]" />
-      <span class="text-left flex-1">{{ label }}</span>
+      <span class="text-left flex-1 truncate">{{ label }}</span>
       <span
         v-if="count !== undefined"
-        class="text-xs text-muted-foreground px-1.5 py-0.5 rounded bg-muted"
+        class="text-xs text-muted-foreground/70 shrink-0"
       >
         {{ count }}
       </span>
     </button>
-    <div v-if="open" class="py-1">
+    <div v-if="open" class="py-0.5">
       <slot />
     </div>
   </div>
