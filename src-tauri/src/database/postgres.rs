@@ -1553,7 +1553,15 @@ impl DatabaseAdapter for PostgresAdapter {
                 view_definition as definition
             FROM information_schema.views
             WHERE table_schema = $1
-            ORDER BY table_name
+            UNION ALL
+            SELECT
+                matviewname as name,
+                'MATERIALIZED VIEW' as object_type,
+                schemaname as schema_name,
+                definition as definition
+            FROM pg_matviews
+            WHERE schemaname = $1
+            ORDER BY name
         "#;
 
         let pool = self
@@ -2022,6 +2030,20 @@ impl DatabaseAdapter for PostgresAdapter {
                     .map(|r| r.get::<_, String>(0))
                     .ok_or_else(|| DbError::DatabaseNotFound(object_name.to_string()))
             }
+            "MATERIALIZED VIEW" => {
+                let query = r#"
+                    SELECT definition
+                    FROM pg_matviews
+                    WHERE schemaname = $1 AND matviewname = $2
+                "#;
+                let rows = client
+                    .query(query, &[&schema_filter, &object_name])
+                    .await
+                    .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+                rows.first()
+                    .map(|r| r.get::<_, String>(0))
+                    .ok_or_else(|| DbError::DatabaseNotFound(object_name.to_string()))
+            }
             "PROCEDURE" | "FUNCTION" => {
                 let query = r#"
                     SELECT pg_get_functiondef(p.oid)
@@ -2082,6 +2104,7 @@ impl DatabaseAdapter for PostgresAdapter {
 
         let sql = match object_type.to_uppercase().as_str() {
             "VIEW" => format!("DROP VIEW IF EXISTS {} CASCADE", qualified),
+            "MATERIALIZED VIEW" => format!("DROP MATERIALIZED VIEW IF EXISTS {} CASCADE", qualified),
             "PROCEDURE" => format!("DROP PROCEDURE IF EXISTS {} CASCADE", qualified),
             "FUNCTION" => format!("DROP FUNCTION IF EXISTS {} CASCADE", qualified),
             "TRIGGER" => {
@@ -2143,6 +2166,7 @@ impl DatabaseAdapter for PostgresAdapter {
         let sql = match object_type.to_uppercase().as_str() {
             "TABLE" => format!("ALTER TABLE {} RENAME TO {}", qualified, new_quoted),
             "VIEW" => format!("ALTER VIEW {} RENAME TO {}", qualified, new_quoted),
+            "MATERIALIZED VIEW" => format!("ALTER MATERIALIZED VIEW {} RENAME TO {}", qualified, new_quoted),
             "PROCEDURE" => format!("ALTER PROCEDURE {} RENAME TO {}", qualified, new_quoted),
             "FUNCTION" => format!("ALTER FUNCTION {} RENAME TO {}", qualified, new_quoted),
             _ => {

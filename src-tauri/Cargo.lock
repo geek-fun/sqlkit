@@ -6423,6 +6423,7 @@ dependencies = [
  "tauri-plugin-store",
  "tauri-plugin-updater",
  "tauri-plugin-window-state",
+ "tempfile",
  "thiserror 1.0.69",
  "tiberius",
  "tokio",

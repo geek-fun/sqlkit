@@ -273,6 +273,8 @@ pub fn run() {
             commands::list_saved_queries,
             commands::delete_query_file,
             commands::write_text_file,
+            commands::read_saved_queries_metadata,
+            commands::write_saved_queries_metadata,
             commands::preview_export_data,
             commands::execute_export_data,
             commands::detect_file_format,
