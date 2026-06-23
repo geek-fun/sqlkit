@@ -35,5 +35,7 @@ jdbc-bridge/target/
 
 .omo/
 .sisyphus/
+.codegraph/
+
 # Java build output
 jdbc-bridge/target/
