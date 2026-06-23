@@ -6,21 +6,15 @@ import { invoke } from '@tauri-apps/api/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { DatabaseBrowser, DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/components/database-browser'
+import { DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/components/database-browser'
 import ListingTab from '@/components/database-browser/ListingTab.vue'
 import ErDiagramView from '@/components/er-diagram/ErDiagramView.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { ConnectionSelector, DatabaseSelectorRow, SavedQueriesPanel, SchemaTree, SidebarSplitView } from '@/components/sidebar'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
@@ -43,7 +37,9 @@ const isResizingSidebar = ref(false)
 const selectedDatabase = ref<string>('')
 const selectedSchema = ref<string>('')
 const queryTabsRef = ref<InstanceType<typeof QueryTabs>>()
-const databaseBrowserRef = ref<InstanceType<typeof DatabaseBrowser>>()
+const schemaTreeRef = ref<InstanceType<typeof SchemaTree>>()
+const savedQueriesRef = ref<InstanceType<typeof SavedQueriesPanel>>()
+const savedQueriesCollapsed = ref(true)
 
 const { formatSql, resolveDialect } = useSqlFormatter()
 
@@ -53,9 +49,6 @@ const destructiveAction = ref<{ type: 'drop' | 'truncate', table: TableInfo, dat
 const isDestructiveActionExecuting = ref(false)
 const showOrphanTabDialog = ref(false)
 const orphanTabToHandle = ref<string | null>(null)
-
-// Available connections
-const availableConnections = computed(() => connectionStore.connections)
 
 // Get active connection ID (can be changed by user)
 const selectedConnectionId = ref<string>('')
@@ -485,7 +478,7 @@ async function handleDestructiveConfirm() {
     toast.success(t('pages.queries.notifications.tableActionSuccess', { action: actionLabel }))
     destructiveDialogOpen.value = false
     destructiveAction.value = null
-    databaseBrowserRef.value?.refreshTree()
+    schemaTreeRef.value?.refresh()
   }
   catch (err) {
     toast.error(t('pages.queries.notifications.tableActionFailed', { action: action.type, error: err instanceof Error ? err.message : String(err) }))
@@ -604,7 +597,7 @@ async function handleSaveQuery() {
     if (result.success && result.file_path) {
       tabStore.markTabSaved(activeTab.value.id, result.file_path)
       toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
-      databaseBrowserRef.value?.fetchSavedQueryFiles()
+      savedQueriesRef.value?.refresh()
     }
     else {
       toast.error(t('pages.queries.notifications.saveFailed'), { description: result.message })
@@ -635,7 +628,7 @@ async function handleDownloadQuery() {
     if (result.success && result.file_path) {
       tabStore.markTabSaved(activeTab.value.id, result.file_path)
       toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
-      databaseBrowserRef.value?.fetchSavedQueryFiles()
+      savedQueriesRef.value?.refresh()
     }
     else {
       toast.error(t('pages.queries.notifications.loadFailed'), { description: result.message })
@@ -644,6 +637,14 @@ async function handleDownloadQuery() {
   catch (error) {
     toast.error(t('pages.queries.notifications.loadFailed'), { description: error instanceof Error ? error.message : String(error) })
   }
+}
+
+function handleDatabaseRefresh() {
+  schemaTreeRef.value?.refresh()
+}
+
+function handleDatabaseAction(_kind: string) {
+  toast.info(t('sidebar.notImplemented'))
 }
 
 function startSidebarResize(_e: MouseEvent) {
@@ -674,49 +675,55 @@ function closeResultPanel() {
   <AppLayout>
     <div class="flex flex-col h-full">
       <div class="flex flex-1 overflow-hidden">
-        <!-- Database Browser Sidebar -->
+        <!-- Sidebar -->
         <div
           class="border-r bg-background flex flex-col"
           :style="{ width: `${sidebarWidth}px` }"
         >
-          <!-- Connection selector -->
-          <div class="p-2 border-b">
-            <Select v-model="selectedConnectionId">
-              <SelectTrigger class="text-xs h-8 min-w-0">
-                <SelectValue :placeholder="t('pages.queries.selectConnection')" class="truncate" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="conn in availableConnections"
-                  :key="conn.id"
-                  :value="conn.id!"
-                >
-                  <span>{{ conn.name }}</span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          <!-- Connection selector with status indicator -->
+          <ConnectionSelector v-model="selectedConnectionId" />
 
-          <!-- Database Browser -->
-          <DatabaseBrowser
-            ref="databaseBrowserRef"
-            v-model:selected-database="selectedDatabase"
-            v-model:selected-schema="selectedSchema"
-            :connection-id="selectedConnectionId"
-            class="flex-1"
-            @select-table="handleSelectTable"
-            @create-script="handleCreateScript"
-            @select-top-n="handleSelectTopN"
-            @view-structure="handleViewStructure"
-            @export-data="handleExportData"
-            @show-er-diagram="handleShowErDiagram"
-            @drop-table="handleDropTable"
-            @truncate-table="handleTruncateTable"
-            @open-saved-query="handleOpenSavedQuery"
-            @create-new-query="handleNewTab"
-            @open-listing-tab="handleOpenListingTab"
-            @open-ddl-tab="handleOpenDdlTab"
+          <!-- Database selector row with refresh + action menu -->
+          <DatabaseSelectorRow
+            v-model="selectedDatabase"
+            :connection-id="getActiveConnectionId()"
+            :loading="databaseStore.loading"
+            @refresh="handleDatabaseRefresh"
+            @action="handleDatabaseAction"
           />
+
+          <!-- Tree + Saved Queries split -->
+          <SidebarSplitView
+            class="flex-1"
+            :bottom-open="!savedQueriesCollapsed"
+          >
+            <template #top>
+              <SchemaTree
+                ref="schemaTreeRef"
+                v-model:selected-database="selectedDatabase"
+                v-model:selected-schema="selectedSchema"
+                :connection-id="getActiveConnectionId()"
+                @select-table="handleSelectTable"
+                @create-script="handleCreateScript"
+                @select-top-n="handleSelectTopN"
+                @view-structure="handleViewStructure"
+                @export-data="handleExportData"
+                @show-er-diagram="handleShowErDiagram"
+                @drop-table="handleDropTable"
+                @truncate-table="handleTruncateTable"
+                @open-listing-tab="handleOpenListingTab"
+                @open-ddl-tab="handleOpenDdlTab"
+              />
+            </template>
+            <template #bottom>
+              <SavedQueriesPanel
+                ref="savedQueriesRef"
+                v-model:collapsed="savedQueriesCollapsed"
+                @open="handleOpenSavedQuery"
+                @new-query="handleNewTab"
+              />
+            </template>
+          </SidebarSplitView>
         </div>
 
         <!-- Resize handle -->

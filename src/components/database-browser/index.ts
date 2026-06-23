@@ -1,4 +1,3 @@
-export { default as DatabaseBrowser } from './DatabaseBrowser.vue'
 export { default as DataTableView } from './DataTableView.vue'
 export { default as DbTypeIcon } from './DbTypeIcon.vue'
 export { default as QueryResultPanel } from './QueryResultPanel.vue'

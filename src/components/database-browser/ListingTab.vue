@@ -75,7 +75,7 @@ async function openDdlModal(obj: ObjectInfo) {
       props.database,
       props.schema,
       obj.name,
-      props.type,
+      obj.object_type,
     )
     ddlContent.value = ddl
   }
@@ -108,7 +108,7 @@ async function executeDrop() {
       props.database,
       props.schema,
       dropTarget.value.name,
-      props.type,
+      dropTarget.value.object_type,
     )
     toast.success(`${dropTarget.value.name} dropped`)
     dropDialogOpen.value = false
@@ -146,7 +146,7 @@ async function executeRename() {
       props.database,
       props.schema,
       renameTarget.value.name,
-      props.type,
+      renameTarget.value.object_type,
       newName.value.trim(),
     )
     toast.success(`${renameTarget.value.name} → ${newName.value.trim()}`)
@@ -203,7 +203,7 @@ async function copyDdlContext() {
       props.database,
       props.schema,
       contextMenuTarget.value.name,
-      props.type,
+      contextMenuTarget.value.object_type,
     )
     await navigator.clipboard.writeText(ddl)
     toast.success(t('common.copied'))

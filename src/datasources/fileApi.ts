@@ -58,3 +58,22 @@ export function deleteQueryFile(filePath: string): Promise<string> {
     filePath,
   })
 }
+
+export type SavedQueryMetadata = {
+  connectionId: string | null
+  connectionName: string | null
+  createdAt: number
+  modifiedAt: number
+}
+
+export type SavedQueriesMetadata = {
+  queries: Record<string, SavedQueryMetadata>
+}
+
+export function readSavedQueriesMetadata(): Promise<SavedQueriesMetadata> {
+  return invoke<SavedQueriesMetadata>('read_saved_queries_metadata')
+}
+
+export function writeSavedQueriesMetadata(metadata: SavedQueriesMetadata): Promise<void> {
+  return invoke<void>('write_saved_queries_metadata', { metadata })
+}

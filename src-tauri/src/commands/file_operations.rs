@@ -38,6 +38,23 @@ pub struct SavedQueryInfo {
     pub size_bytes: u64,
 }
 
+/// Metadata for a saved query entry in the metadata file
+#[derive(Debug, Serialize, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedQueryMetadata {
+    pub connection_id: Option<String>,
+    pub connection_name: Option<String>,
+    pub created_at: u64,
+    pub modified_at: u64,
+}
+
+/// Collection of saved query metadata entries keyed by file path
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SavedQueriesMetadata {
+    pub queries: std::collections::HashMap<String, SavedQueryMetadata>,
+}
+
 /// Get the queries directory path, creating it if necessary
 fn get_queries_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
     let app_data_dir = app_handle
@@ -54,6 +71,11 @@ fn get_queries_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
     }
 
     Ok(queries_dir)
+}
+
+fn get_metadata_file_path(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    let queries_dir = get_queries_dir(app_handle)?;
+    Ok(queries_dir.join("metadata.json"))
 }
 
 /// Save a SQL query to a file.
@@ -244,4 +266,146 @@ pub async fn write_text_file(path: String, content: String) -> Result<(), String
         }
     }
     fs::write(target, content).map_err(|e| format!("Failed to write file: {}", e))
+}
+
+#[tauri::command]
+pub async fn read_saved_queries_metadata(app_handle: AppHandle) -> Result<SavedQueriesMetadata, String> {
+    let path = get_metadata_file_path(&app_handle)?;
+    if !path.exists() {
+        return Ok(SavedQueriesMetadata::default());
+    }
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read metadata file: {}", e))?;
+    match serde_json::from_str::<SavedQueriesMetadata>(&content) {
+        Ok(metadata) => Ok(metadata),
+        Err(e) => {
+            eprintln!("Corrupt metadata file, returning empty: {}", e);
+            Ok(SavedQueriesMetadata::default())
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn write_saved_queries_metadata(
+    app_handle: AppHandle,
+    metadata: SavedQueriesMetadata,
+) -> Result<(), String> {
+    let path = get_metadata_file_path(&app_handle)?;
+    let tmp_path = path.with_extension("json.tmp");
+    let content = serde_json::to_string_pretty(&metadata)
+        .map_err(|e| format!("Failed to serialize metadata: {}", e))?;
+    fs::write(&tmp_path, content)
+        .map_err(|e| format!("Failed to write temp metadata file: {}", e))?;
+    fs::rename(&tmp_path, &path)
+        .map_err(|e| format!("Failed to rename metadata file: {}", e))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn make_test_metadata() -> SavedQueriesMetadata {
+        let mut queries = HashMap::new();
+        queries.insert(
+            "/path/to/query1.sql".to_string(),
+            SavedQueryMetadata {
+                connection_id: Some("conn-uuid-1234".to_string()),
+                connection_name: Some("pg-prod".to_string()),
+                created_at: 1718926200,
+                modified_at: 1719185400,
+            },
+        );
+        queries.insert(
+            "/path/to/query2.sql".to_string(),
+            SavedQueryMetadata {
+                connection_id: None,
+                connection_name: None,
+                created_at: 1718000000,
+                modified_at: 1719000000,
+            },
+        );
+        SavedQueriesMetadata { queries }
+    }
+
+    #[test]
+    fn test_metadata_write_then_read_roundtrip() {
+        let dir = tempfile::tempdir().unwrap();
+        let metadata_path = dir.path().join("metadata.json");
+
+        let original = make_test_metadata();
+
+        let json = serde_json::to_string_pretty(&original).unwrap();
+        std::fs::write(&metadata_path, &json).unwrap();
+
+        let content = std::fs::read_to_string(&metadata_path).unwrap();
+        let read_back: SavedQueriesMetadata = serde_json::from_str(&content).unwrap();
+
+        assert_eq!(read_back.queries.len(), 2);
+        assert!(read_back.queries.contains_key("/path/to/query1.sql"));
+        assert!(read_back.queries.contains_key("/path/to/query2.sql"));
+
+        let q1 = read_back.queries.get("/path/to/query1.sql").unwrap();
+        assert_eq!(q1.connection_id, Some("conn-uuid-1234".to_string()));
+        assert_eq!(q1.connection_name, Some("pg-prod".to_string()));
+        assert_eq!(q1.created_at, 1718926200);
+        assert_eq!(q1.modified_at, 1719185400);
+
+        let q2 = read_back.queries.get("/path/to/query2.sql").unwrap();
+        assert!(q2.connection_id.is_none());
+        assert!(q2.connection_name.is_none());
+    }
+
+    #[test]
+    fn test_metadata_read_missing_file_returns_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let metadata_path = dir.path().join("metadata.json");
+
+        assert!(!metadata_path.exists());
+
+        let result: SavedQueriesMetadata = if !metadata_path.exists() {
+            SavedQueriesMetadata::default()
+        } else {
+            let content = std::fs::read_to_string(&metadata_path).unwrap();
+            serde_json::from_str(&content).unwrap_or_default()
+        };
+
+        assert_eq!(result.queries.len(), 0);
+    }
+
+    #[test]
+    fn test_metadata_read_corrupt_json_returns_empty() {
+        let dir = tempfile::tempdir().unwrap();
+        let metadata_path = dir.path().join("metadata.json");
+
+        std::fs::write(&metadata_path, "not valid json {{{{").unwrap();
+
+        let content = std::fs::read_to_string(&metadata_path).unwrap();
+        let result: SavedQueriesMetadata = match serde_json::from_str(&content) {
+            Ok(m) => m,
+            Err(_) => SavedQueriesMetadata::default(),
+        };
+
+        assert_eq!(result.queries.len(), 0);
+    }
+
+    #[test]
+    fn test_metadata_write_is_atomic() {
+        let dir = tempfile::tempdir().unwrap();
+        let metadata_path = dir.path().join("metadata.json");
+        let tmp_path = metadata_path.with_extension("json.tmp");
+
+        let metadata = make_test_metadata();
+
+        let json = serde_json::to_string_pretty(&metadata).unwrap();
+        std::fs::write(&tmp_path, &json).unwrap();
+        std::fs::rename(&tmp_path, &metadata_path).unwrap();
+
+        assert!(metadata_path.exists());
+        assert!(!tmp_path.exists());
+
+        let content = std::fs::read_to_string(&metadata_path).unwrap();
+        let _: SavedQueriesMetadata = serde_json::from_str(&content).unwrap();
+    }
 }
