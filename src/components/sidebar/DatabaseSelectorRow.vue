@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { DbCapabilities } from './dbCapabilities'
+import type { ComboboxOption } from '@/components/ui/combobox'
 import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
+import { SearchableSelect } from '@/components/ui/combobox'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,16 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { DatabaseType, useConnectionStore, useDatabaseStore } from '@/store'
 import { getDbCapabilities } from './dbCapabilities'
 
@@ -65,6 +57,29 @@ const allDatabases = computed(() => {
 const userDatabases = computed(() => allDatabases.value.filter(db => !db.is_system))
 const systemDatabases = computed(() => allDatabases.value.filter(db => db.is_system))
 
+const options = computed<ComboboxOption[]>(() => {
+  const seen = new Set<string>()
+  const userOpts = userDatabases.value
+    .filter((db) => {
+      if (seen.has(db.name))
+        return false
+      seen.add(db.name)
+      return true
+    })
+    .map(db => ({ label: db.name, value: db.name }))
+
+  const sysOpts = systemDatabases.value
+    .filter((db) => {
+      if (seen.has(db.name))
+        return false
+      seen.add(db.name)
+      return true
+    })
+    .map(db => ({ label: db.name, value: db.name }))
+
+  return [...userOpts, ...sysOpts]
+})
+
 const capabilities = computed<DbCapabilities>(() => {
   if (!activeConnection.value)
     return getDbCapabilities(DatabaseType.POSTGRESQL)
@@ -79,7 +94,7 @@ function handleAction(kind: ActionKind) {
   emit('action', kind)
 }
 
-// Fetch databases when connectionId changes — don't rely on SchemaTree to populate metadata
+// Fetch databases when connectionId changes
 watch(() => props.connectionId, async (connId) => {
   if (!connId)
     return
@@ -94,46 +109,26 @@ watch(() => props.connectionId, async (connId) => {
 
 <template>
   <div v-if="props.connectionId" class="px-2 py-1.5 border-b flex gap-1 items-center">
-    <Select :model-value="props.modelValue ?? ''" class="flex-1" @update:model-value="handleSelect">
-      <SelectTrigger class="text-xs h-8 min-w-0">
-        <SelectValue :placeholder="t('sidebar.database.placeholder')">
-          <template v-if="props.modelValue">
-            <div class="flex gap-1.5 items-center">
-              <span class="i-carbon-data-base text-yellow-500 shrink-0 h-3.5 w-3.5" />
-              <span class="truncate">{{ props.modelValue }}</span>
-            </div>
-          </template>
-          <template v-else>
-            <div class="flex gap-1.5 items-center">
-              <span class="i-carbon-data-base text-yellow-500 shrink-0 h-3.5 w-3.5" />
-              <span class="truncate">{{ t('sidebar.database.placeholder') }}</span>
-            </div>
-          </template>
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent class="w-[var(--radix-select-trigger-width)]">
-        <SelectSeparator v-if="userDatabases.length > 0" />
-        <SelectGroup v-if="userDatabases.length > 0">
-          <SelectLabel class="text-xs text-muted-foreground">
-            {{ t('sidebar.database.selectDatabase') }}
-          </SelectLabel>
-          <SelectItem v-for="db in userDatabases" :key="db.name" :value="db.name" class="text-xs">
-            <div class="flex gap-1.5 items-center">
-              <span class="i-carbon-data-base text-yellow-500 shrink-0 h-3.5 w-3.5" />
-              <span class="truncate">{{ db.name }}</span>
-            </div>
-          </SelectItem>
-        </SelectGroup>
-        <SelectGroup v-if="systemDatabases.length > 0">
-          <SelectLabel class="text-xs text-muted-foreground">
-            {{ t('components.databaseBrowser.systemDatabases') }}
-          </SelectLabel>
-          <SelectItem v-for="db in systemDatabases" :key="db.name" :value="db.name" class="text-xs">
-            {{ db.name }}
-          </SelectItem>
-        </SelectGroup>
-      </SelectContent>
-    </Select>
+    <SearchableSelect
+      :model-value="props.modelValue || ''"
+      :options="options"
+      :search-threshold="1"
+      :placeholder="t('sidebar.database.placeholder')"
+      :search-placeholder="t('sidebar.search')"
+      :loading="props.loading"
+      class="text-xs flex-1 h-8"
+      @update:model-value="handleSelect"
+    >
+      <template #selected-prepend>
+        <span class="i-carbon-data-base text-yellow-500 mr-1.5 shrink-0 h-3.5 w-3.5" />
+      </template>
+      <template #option="{ option }">
+        <div class="flex gap-1.5 w-full items-center">
+          <span class="i-carbon-data-base text-yellow-500 shrink-0 h-3.5 w-3.5" />
+          <span class="text-left flex-1 truncate">{{ option.label }}</span>
+        </div>
+      </template>
+    </SearchableSelect>
 
     <Button
       variant="ghost"
