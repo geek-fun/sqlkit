@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { SavedQueryInfo, SavedQueryMetadata } from '@/datasources/fileApi'
 import { revealItemInDir } from '@tauri-apps/plugin-opener'
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/composables/useNotifications'
@@ -87,6 +87,12 @@ watch(() => props.collapsed, async (collapsed) => {
   if (!collapsed && files.value.length === 0) {
     await fetchFiles()
   }
+})
+
+// Fetch files on mount so the count badge shows immediately
+onMounted(() => {
+  if (files.value.length === 0)
+    fetchFiles()
 })
 
 function handleItemAction(query: SavedQueryInfo, kind: string) {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { DbCapabilities } from './dbCapabilities'
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import {
@@ -56,8 +56,14 @@ const activeConnection = computed(() =>
   props.connectionId ? connectionStore.getConnectionById(props.connectionId) : null,
 )
 
-const userDatabases = computed(() => databaseStore.userDatabases)
-const systemDatabases = computed(() => databaseStore.systemDatabases)
+const allDatabases = computed(() => {
+  if (!props.connectionId)
+    return []
+  return databaseStore.metadata[props.connectionId]?.databases ?? []
+})
+
+const userDatabases = computed(() => allDatabases.value.filter(db => !db.is_system))
+const systemDatabases = computed(() => allDatabases.value.filter(db => db.is_system))
 
 const capabilities = computed<DbCapabilities>(() => {
   if (!activeConnection.value)
@@ -72,6 +78,18 @@ function handleSelect(value: string) {
 function handleAction(kind: ActionKind) {
   emit('action', kind)
 }
+
+// Fetch databases when connectionId changes — don't rely on SchemaTree to populate metadata
+watch(() => props.connectionId, async (connId) => {
+  if (!connId)
+    return
+  const conn = connectionStore.getConnectionById(connId)
+  if (!conn?.isConnected)
+    return
+  const meta = databaseStore.metadata[connId]
+  if (!meta?.databases || meta.databases.length === 0)
+    await databaseStore.fetchDatabases(connId)
+}, { immediate: true })
 </script>
 
 <template>
@@ -93,10 +111,7 @@ function handleAction(kind: ActionKind) {
           </template>
         </SelectValue>
       </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="">
-          {{ t('sidebar.database.placeholder') }}
-        </SelectItem>
+      <SelectContent class="w-[var(--radix-select-trigger-width)]">
         <SelectSeparator v-if="userDatabases.length > 0" />
         <SelectGroup v-if="userDatabases.length > 0">
           <SelectLabel class="text-xs text-muted-foreground">
