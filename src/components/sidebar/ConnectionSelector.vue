@@ -25,9 +25,9 @@ const searchQuery = ref('')
 const connections = computed(() => {
   const seen = new Set<string>()
   const all = connectionStore.connections.filter((conn) => {
-    if (!conn.id || seen.has(conn.id))
+    if (!conn.id || seen.has(conn.name))
       return false
-    seen.add(conn.id)
+    seen.add(conn.name)
     return true
   })
   const query = searchQuery.value.toLowerCase().trim()
