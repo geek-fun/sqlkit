@@ -25,6 +25,8 @@ const emit = defineEmits<{
 const { t, locale } = useI18n()
 
 function relativeTime(timestamp: number): string {
+  if (!timestamp || !Number.isFinite(timestamp))
+    return ''
   const now = Date.now()
   const diff = timestamp * 1000 - now
   const seconds = Math.round(diff / 1000)
@@ -78,7 +80,7 @@ function handleAction(kind: ActionKind) {
 </script>
 
 <template>
-  <div class="group px-2 py-1.5 cursor-pointer hover:bg-accent">
+  <div class="group px-2 py-1 cursor-pointer hover:bg-accent/30">
     <div class="flex gap-1.5 items-center">
       <span class="i-carbon-document text-muted-foreground shrink-0 h-3.5 w-3.5" />
       <span class="text-sm font-medium flex-1 truncate">{{ query.file_name }}</span>
