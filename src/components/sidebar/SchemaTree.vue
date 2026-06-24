@@ -566,52 +566,54 @@ defineExpose({ refresh })
           </template>
           <!-- Non-schema-aware: flat groups directly under database -->
           <template v-else>
-            <TreeGroup :label="t('sidebar.groups.tables')" icon="i-carbon-folder" icon-color="text-green-600" :count="getTablesForDbSchema(db.name).length" :default-open="true">
-              <div
-                v-for="table in getTablesForDbSchema(db.name)"
-                :key="table.name"
-                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                @click="emit('selectTable', table, db.name)"
-                @dblclick="emit('viewStructure', table, db.name)"
-                @contextmenu="(e) => { e.preventDefault(); contextMenuTable = { table, database: db.name, x: e.clientX, y: e.clientY } }"
-              >
-                <span class="i-carbon-table text-green-500 shrink-0 h-3.5 w-3.5" />
-                <span class="text-left truncate">{{ table.name }}</span>
-              </div>
-            </TreeGroup>
-            <TreeGroup :label="t('sidebar.groups.views')" icon="i-carbon-folder" icon-color="text-purple-600" :count="getObjectsForDbSchema(db.name, db.name)?.views.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
-              <div
-                v-for="view in getObjectsForDbSchema(db.name, db.name)?.views ?? []"
-                :key="view.name"
-                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                @click="emit('openDdlTab', view.name, 'VIEW', db.name)"
-              >
-                <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-carbon-view text-indigo-500' : 'i-carbon-view text-purple-500'" />
-                <span class="text-left truncate">{{ view.name }}</span>
-              </div>
-            </TreeGroup>
-            <TreeGroup :label="t('sidebar.groups.procedures')" icon="i-carbon-folder" icon-color="text-blue-600" :count="getObjectsForDbSchema(db.name, db.name)?.procedures.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
-              <div
-                v-for="proc in getObjectsForDbSchema(db.name, db.name)?.procedures ?? []"
-                :key="proc.name"
-                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                @click="emit('openDdlTab', proc.name, 'PROCEDURE', db.name)"
-              >
-                <span class="i-carbon-document text-blue-500 shrink-0 h-3.5 w-3.5" />
-                <span class="text-left truncate">{{ proc.name }}</span>
-              </div>
-            </TreeGroup>
-            <TreeGroup :label="t('sidebar.groups.functions')" icon="i-carbon-folder" icon-color="text-amber-600" :count="getObjectsForDbSchema(db.name, db.name)?.functions.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
-              <div
-                v-for="fn in getObjectsForDbSchema(db.name, db.name)?.functions ?? []"
-                :key="fn.name"
-                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                @click="emit('openDdlTab', fn.name, 'FUNCTION', db.name)"
-              >
-                <span class="i-carbon-function-math text-amber-500 shrink-0 h-3.5 w-3.5" />
-                <span class="text-left truncate">{{ fn.name }}</span>
-              </div>
-            </TreeGroup>
+            <div class="ml-4">
+              <TreeGroup :label="t('sidebar.groups.tables')" icon="i-carbon-folder" icon-color="text-green-600" :count="getTablesForDbSchema(db.name).length" :default-open="true">
+                <div
+                  v-for="table in getTablesForDbSchema(db.name)"
+                  :key="table.name"
+                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  @click="emit('selectTable', table, db.name)"
+                  @dblclick="emit('viewStructure', table, db.name)"
+                  @contextmenu="(e) => { e.preventDefault(); contextMenuTable = { table, database: db.name, x: e.clientX, y: e.clientY } }"
+                >
+                  <span class="i-carbon-table text-green-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="text-left truncate">{{ table.name }}</span>
+                </div>
+              </TreeGroup>
+              <TreeGroup :label="t('sidebar.groups.views')" icon="i-carbon-folder" icon-color="text-purple-600" :count="getObjectsForDbSchema(db.name, db.name)?.views.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
+                <div
+                  v-for="view in getObjectsForDbSchema(db.name, db.name)?.views ?? []"
+                  :key="view.name"
+                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  @click="emit('openDdlTab', view.name, 'VIEW', db.name)"
+                >
+                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-carbon-view text-indigo-500' : 'i-carbon-view text-purple-500'" />
+                  <span class="text-left truncate">{{ view.name }}</span>
+                </div>
+              </TreeGroup>
+              <TreeGroup :label="t('sidebar.groups.procedures')" icon="i-carbon-folder" icon-color="text-blue-600" :count="getObjectsForDbSchema(db.name, db.name)?.procedures.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
+                <div
+                  v-for="proc in getObjectsForDbSchema(db.name, db.name)?.procedures ?? []"
+                  :key="proc.name"
+                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  @click="emit('openDdlTab', proc.name, 'PROCEDURE', db.name)"
+                >
+                  <span class="i-carbon-document text-blue-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="text-left truncate">{{ proc.name }}</span>
+                </div>
+              </TreeGroup>
+              <TreeGroup :label="t('sidebar.groups.functions')" icon="i-carbon-folder" icon-color="text-amber-600" :count="getObjectsForDbSchema(db.name, db.name)?.functions.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
+                <div
+                  v-for="fn in getObjectsForDbSchema(db.name, db.name)?.functions ?? []"
+                  :key="fn.name"
+                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  @click="emit('openDdlTab', fn.name, 'FUNCTION', db.name)"
+                >
+                  <span class="i-carbon-function-math text-amber-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="text-left truncate">{{ fn.name }}</span>
+                </div>
+              </TreeGroup>
+            </div>
           </template>
         </div>
       </div>
