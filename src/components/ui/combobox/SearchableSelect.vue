@@ -253,7 +253,7 @@ watch(searchQuery, () => {
                   ? ''
                   : undefined
               "
-              class="text-sm px-1.5 py-1 outline-none flex cursor-pointer select-none transition-colors items-center relative hover:text-accent-foreground hover:bg-accent" :class="[
+              class="text-sm px-1 py-0.5 outline-none flex cursor-pointer select-none transition-colors items-center relative hover:text-accent-foreground hover:bg-accent" :class="[
                 option.disabled && 'pointer-events-none opacity-50',
                 option.value === modelValue && 'bg-accent text-accent-foreground',
                 navigableItems[highlightedIndex]?.type === 'option'
