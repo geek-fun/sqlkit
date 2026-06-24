@@ -59,25 +59,26 @@ const systemDatabases = computed(() => allDatabases.value.filter(db => db.is_sys
 
 const options = computed<ComboboxOption[]>(() => {
   const seen = new Set<string>()
-  const userOpts = userDatabases.value
-    .filter((db) => {
-      if (seen.has(db.name))
-        return false
-      seen.add(db.name)
-      return true
-    })
-    .map(db => ({ label: db.name, value: db.name }))
-
-  const sysOpts = systemDatabases.value
-    .filter((db) => {
-      if (seen.has(db.name))
-        return false
-      seen.add(db.name)
-      return true
-    })
-    .map(db => ({ label: db.name, value: db.name }))
-
-  return [...userOpts, ...sysOpts]
+  const allDbs = [
+    { label: t('sidebar.database.placeholder'), value: '' },
+    ...userDatabases.value
+      .filter((db) => {
+        if (seen.has(db.name))
+          return false
+        seen.add(db.name)
+        return true
+      })
+      .map(db => ({ label: db.name, value: db.name })),
+    ...systemDatabases.value
+      .filter((db) => {
+        if (seen.has(db.name))
+          return false
+        seen.add(db.name)
+        return true
+      })
+      .map(db => ({ label: db.name, value: db.name, group: t('components.databaseBrowser.systemDatabases') })),
+  ]
+  return allDbs
 })
 
 const capabilities = computed<DbCapabilities>(() => {

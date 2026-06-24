@@ -85,10 +85,8 @@ function handleSelect(value: string) {
           <span class="text-left flex-1 truncate">{{ option.label }}</span>
           <span
             v-if="connectionStore.getConnectionStatus(option.value) === ConnectionStatus.CONNECTED"
-            class="text-[10px] text-green-600 font-medium px-1 rounded bg-green-500/10 shrink-0 uppercase"
-          >
-            {{ t('sidebar.connection.connected') }}
-          </span>
+            class="rounded-full bg-green-500 shrink-0 h-2 w-2"
+          />
         </div>
       </template>
     </SearchableSelect>

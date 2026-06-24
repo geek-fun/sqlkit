@@ -82,11 +82,6 @@ onMounted(async () => {
 
     const isConnected = connectionStore.getConnectionStatus(connId) === ConnectionStatus.CONNECTED
     if (isConnected) {
-      const currentDb = connectionStore.getCurrentDatabase(connId)
-      if (currentDb) {
-        selectedDatabase.value = currentDb
-      }
-
       await databaseStore.fetchDatabases(connId)
     }
   }
@@ -117,10 +112,6 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
 
   if (alreadyConnected) {
     connectionStore.setActiveConnection(newConnId)
-    const currentDb = connectionStore.getCurrentDatabase(newConnId)
-    if (currentDb) {
-      selectedDatabase.value = currentDb
-    }
     await databaseStore.fetchDatabases(newConnId)
     return
   }
@@ -129,11 +120,6 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
     await connectionStore.connect(newConnId)
     connectionStore.setActiveConnection(newConnId)
     await databaseStore.fetchDatabases(newConnId)
-
-    const currentDb = connectionStore.getCurrentDatabase(newConnId)
-    if (currentDb) {
-      selectedDatabase.value = currentDb
-    }
   }
   catch (error) {
     console.error('Failed to connect:', error)
@@ -152,13 +138,6 @@ watch(selectedDatabase, (db) => {
   }
   // Reset schema when database changes
   selectedSchema.value = ''
-})
-
-// When the active tab changes, sync selectedDatabase to reflect that tab's DB
-watch(activeTab, (tab) => {
-  if (tab?.database && tab.database !== selectedDatabase.value) {
-    selectedDatabase.value = tab.database
-  }
 })
 
 const getConnectionId = () => selectedConnectionId.value || connectionStore.activeConnectionId
