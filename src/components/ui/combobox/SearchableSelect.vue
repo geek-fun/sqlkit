@@ -185,7 +185,7 @@ watch(searchQuery, () => {
         :disabled="disabled"
         :class="
           cn(
-            'justify-between font-normal focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+            'w-full min-w-0 overflow-hidden justify-between font-normal focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
             props.class,
           )
         "
@@ -197,7 +197,7 @@ watch(searchQuery, () => {
             ref="searchInputRef"
             v-model="searchQuery"
             :placeholder="searchPlaceholder || placeholder"
-            class="text-sm text-foreground outline-none border-0 bg-transparent flex-1 placeholder:text-muted-foreground"
+            class="text-sm text-foreground outline-none border-0 bg-transparent flex-1 min-w-0 placeholder:text-muted-foreground"
             autocomplete="off"
             autocorrect="off"
             autocapitalize="off"
@@ -221,10 +221,10 @@ watch(searchQuery, () => {
 
     <PopoverContent
       align="start"
-      class="p-1 w-[unset]"
+      class="p-0 w-[unset]"
       style="width: var(--radix-popover-trigger-width); min-width: var(--radix-popover-trigger-width)"
     >
-      <div :id="listboxId" ref="listRef" role="listbox" class="p-1 max-h-[280px] overflow-y-auto">
+      <div :id="listboxId" ref="listRef" role="listbox" class="py-1 pl-1 pr-0 max-h-[280px] overflow-y-auto">
         <div
           v-if="loading"
           class="text-sm text-muted-foreground py-4 flex gap-2 items-center justify-center"
@@ -234,33 +234,40 @@ watch(searchQuery, () => {
         </div>
 
         <template v-else>
-          <div
-            v-for="option in filteredOptions"
-            :id="`${listboxId}-opt-${option.value}`"
-            :key="option.value"
-            role="option"
-            :aria-selected="option.value === modelValue"
-            :aria-disabled="option.disabled || undefined"
-            :data-highlighted="
-              navigableItems[highlightedIndex]?.type === 'option'
-                && navigableItems[highlightedIndex]?.value === option.value
-                ? ''
-                : undefined
-            "
-            class="text-sm px-2 py-1.5 outline-none rounded-sm flex cursor-pointer select-none transition-colors items-center relative hover:text-accent-foreground hover:bg-accent" :class="[
-              option.disabled && 'pointer-events-none opacity-50',
-              option.value === modelValue && 'bg-accent text-accent-foreground',
-              navigableItems[highlightedIndex]?.type === 'option'
-                && navigableItems[highlightedIndex]?.value === option.value
-                && 'bg-accent text-accent-foreground',
-            ]"
-            @click="!option.disabled && selectOption(option.value)"
-            @mouseenter="highlightedIndex = findOptionIndex(option.value)"
-          >
-            <slot name="option" :option="option">
-              {{ option.label }}
-            </slot>
-          </div>
+          <template v-for="(option, index) in filteredOptions" :key="option.value">
+            <!-- Group header -->
+            <div
+              v-if="option.group && (index === 0 || filteredOptions[index - 1]?.group !== option.group)"
+              class="text-xs text-muted-foreground font-medium px-2 py-1 pt-2 select-none"
+            >
+              {{ option.group }}
+            </div>
+            <div
+              :id="`${listboxId}-opt-${option.value}`"
+              role="option"
+              :aria-selected="option.value === modelValue"
+              :aria-disabled="option.disabled || undefined"
+              :data-highlighted="
+                navigableItems[highlightedIndex]?.type === 'option'
+                  && navigableItems[highlightedIndex]?.value === option.value
+                  ? ''
+                  : undefined
+              "
+              class="text-sm px-2 py-1.5 outline-none rounded-sm flex cursor-pointer select-none transition-colors items-center relative hover:text-accent-foreground hover:bg-accent" :class="[
+                option.disabled && 'pointer-events-none opacity-50',
+                option.value === modelValue && 'bg-accent text-accent-foreground',
+                navigableItems[highlightedIndex]?.type === 'option'
+                  && navigableItems[highlightedIndex]?.value === option.value
+                  && 'bg-accent text-accent-foreground',
+              ]"
+              @click="!option.disabled && selectOption(option.value)"
+              @mouseenter="highlightedIndex = findOptionIndex(option.value)"
+            >
+              <slot name="option" :option="option">
+                {{ option.label }}
+              </slot>
+            </div>
+          </template>
 
           <div
             v-if="filteredOptions.length === 0 && searchQuery && !showCreateNew"

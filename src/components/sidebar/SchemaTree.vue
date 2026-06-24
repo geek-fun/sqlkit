@@ -200,6 +200,15 @@ function getDbSchemas(dbName: string): string[] {
   return meta.schemas[dbName] || []
 }
 
+// For MySQL-like databases, schemas = database names → skip schema layer
+function hasRealSchemas(dbName: string): boolean {
+  const schemas = getDbSchemas(dbName)
+  if (schemas.length === 0)
+    return false
+  // If the only schema is the db name itself, it's not a real schema hierarchy
+  return schemas.some(s => s !== dbName)
+}
+
 function getTablesForDbSchema(dbName: string, schema?: string): TableInfo[] {
   if (!props.connectionId)
     return []
@@ -208,6 +217,17 @@ function getTablesForDbSchema(dbName: string, schema?: string): TableInfo[] {
     return []
   const key = schema ? `${dbName}.${schema}` : dbName
   return meta.tables[key] || []
+}
+
+function getObjectsForDbSchema(dbName: string, schema: string) {
+  if (!props.connectionId)
+    return null
+  return databaseStore.getSchemaObjects(props.connectionId, dbName, schema)
+}
+
+async function handleGroupToggleForDb(open: boolean, dbName: string, schema?: string) {
+  if (open && props.connectionId && schema)
+    await databaseStore.fetchSchemaObjects(props.connectionId, dbName, schema)
 }
 
 // Mode B: expand/collapse database node (ONLY expand/collapse, do NOT select database)
@@ -235,7 +255,7 @@ async function toggleDatabaseNode(dbName: string) {
   }
 }
 
-// Watchers
+// Watchers — fetch databases but do NOT auto-select; user picks from selector
 watch(() => props.connectionId, async (newId) => {
   if (!newId)
     return
@@ -243,20 +263,12 @@ watch(() => props.connectionId, async (newId) => {
   if (!conn?.isConnected)
     return
   await databaseStore.fetchDatabases(newId)
-  const connDb = conn.database || connectionStore.getCurrentDatabase(newId)
-  if (connDb && !props.selectedDatabase)
-    emit('update:selectedDatabase', connDb)
 }, { immediate: true })
 
 watch(() => activeConnection.value?.isConnected, async (isConnected) => {
   if (!isConnected || !props.connectionId)
     return
   await databaseStore.fetchDatabases(props.connectionId)
-  const meta = databaseStore.metadata[props.connectionId]
-  const firstDb = meta?.databases.find(db => !db.is_system)?.name
-  const connDb = activeConnection.value?.database || connectionStore.getCurrentDatabase(props.connectionId) || firstDb
-  if (connDb && !props.selectedDatabase)
-    emit('update:selectedDatabase', connDb)
 })
 
 watch(() => props.selectedDatabase, async (newDb, oldDb) => {
@@ -494,7 +506,8 @@ defineExpose({ refresh })
           <span v-if="loadingDatabases.has(db.name)" class="i-carbon-loading h-3 w-3 animate-spin" />
         </button>
         <div v-if="expandedDatabases.has(db.name)" class="py-0.5">
-          <template v-if="getDbSchemas(db.name).length > 0">
+          <!-- Schema-aware: show schema nodes with groups under each -->
+          <template v-if="hasRealSchemas(db.name)">
             <div v-for="schema in getDbSchemas(db.name)" :key="schema" class="ml-4">
               <div class="text-xs text-muted-foreground font-medium px-2 py-1 flex gap-1.5 items-center">
                 <span class="i-carbon-folder-open text-sky-400 shrink-0 h-3.5 w-3.5" />
@@ -513,8 +526,42 @@ defineExpose({ refresh })
                   <span class="text-left truncate">{{ table.name }}</span>
                 </div>
               </TreeGroup>
+              <TreeGroup :label="t('sidebar.groups.views')" icon="i-carbon-folder" icon-color="text-purple-600" :count="getObjectsForDbSchema(db.name, schema)?.views.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, schema)">
+                <div
+                  v-for="view in getObjectsForDbSchema(db.name, schema)?.views ?? []"
+                  :key="view.name"
+                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  @click="emit('openDdlTab', view.name, 'VIEW', db.name, schema)"
+                >
+                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-carbon-view text-indigo-500' : 'i-carbon-view text-purple-500'" />
+                  <span class="text-left truncate">{{ view.name }}</span>
+                </div>
+              </TreeGroup>
+              <TreeGroup :label="t('sidebar.groups.procedures')" icon="i-carbon-folder" icon-color="text-blue-600" :count="getObjectsForDbSchema(db.name, schema)?.procedures.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, schema)">
+                <div
+                  v-for="proc in getObjectsForDbSchema(db.name, schema)?.procedures ?? []"
+                  :key="proc.name"
+                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  @click="emit('openDdlTab', proc.name, 'PROCEDURE', db.name, schema)"
+                >
+                  <span class="i-carbon-document text-blue-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="text-left truncate">{{ proc.name }}</span>
+                </div>
+              </TreeGroup>
+              <TreeGroup :label="t('sidebar.groups.functions')" icon="i-carbon-folder" icon-color="text-amber-600" :count="getObjectsForDbSchema(db.name, schema)?.functions.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, schema)">
+                <div
+                  v-for="fn in getObjectsForDbSchema(db.name, schema)?.functions ?? []"
+                  :key="fn.name"
+                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  @click="emit('openDdlTab', fn.name, 'FUNCTION', db.name, schema)"
+                >
+                  <span class="i-carbon-function-math text-amber-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="text-left truncate">{{ fn.name }}</span>
+                </div>
+              </TreeGroup>
             </div>
           </template>
+          <!-- Non-schema-aware: flat groups directly under database -->
           <template v-else>
             <TreeGroup :label="t('sidebar.groups.tables')" icon="i-carbon-folder" icon-color="text-green-600" :count="getTablesForDbSchema(db.name).length" :default-open="true">
               <div
@@ -527,6 +574,39 @@ defineExpose({ refresh })
               >
                 <span class="i-carbon-table text-green-500 shrink-0 h-3.5 w-3.5" />
                 <span class="text-left truncate">{{ table.name }}</span>
+              </div>
+            </TreeGroup>
+            <TreeGroup :label="t('sidebar.groups.views')" icon="i-carbon-folder" icon-color="text-purple-600" :count="getObjectsForDbSchema(db.name, db.name)?.views.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
+              <div
+                v-for="view in getObjectsForDbSchema(db.name, db.name)?.views ?? []"
+                :key="view.name"
+                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                @click="emit('openDdlTab', view.name, 'VIEW', db.name)"
+              >
+                <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-carbon-view text-indigo-500' : 'i-carbon-view text-purple-500'" />
+                <span class="text-left truncate">{{ view.name }}</span>
+              </div>
+            </TreeGroup>
+            <TreeGroup :label="t('sidebar.groups.procedures')" icon="i-carbon-folder" icon-color="text-blue-600" :count="getObjectsForDbSchema(db.name, db.name)?.procedures.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
+              <div
+                v-for="proc in getObjectsForDbSchema(db.name, db.name)?.procedures ?? []"
+                :key="proc.name"
+                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                @click="emit('openDdlTab', proc.name, 'PROCEDURE', db.name)"
+              >
+                <span class="i-carbon-document text-blue-500 shrink-0 h-3.5 w-3.5" />
+                <span class="text-left truncate">{{ proc.name }}</span>
+              </div>
+            </TreeGroup>
+            <TreeGroup :label="t('sidebar.groups.functions')" icon="i-carbon-folder" icon-color="text-amber-600" :count="getObjectsForDbSchema(db.name, db.name)?.functions.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
+              <div
+                v-for="fn in getObjectsForDbSchema(db.name, db.name)?.functions ?? []"
+                :key="fn.name"
+                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                @click="emit('openDdlTab', fn.name, 'FUNCTION', db.name)"
+              >
+                <span class="i-carbon-function-math text-amber-500 shrink-0 h-3.5 w-3.5" />
+                <span class="text-left truncate">{{ fn.name }}</span>
               </div>
             </TreeGroup>
           </template>
