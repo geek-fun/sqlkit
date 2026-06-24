@@ -148,7 +148,7 @@ const isTableViewConnectionValid = computed(() => {
   if (activeTab.value.orphanFromConnectionId)
     return false
 
-  const connId = getConnectionId()
+  const connId = activeTab.value.connectionId
   if (!connId)
     return false
 
@@ -752,11 +752,11 @@ function closeResultPanel() {
             @new="handleNewTab"
           />
 
-          <!-- Data Table View (shown when the active tab is a table-view tab AND connection matches) -->
+          <!-- Data Table View — uses tab's own connectionId so it works regardless of sidebar selection -->
           <DataTableView
             v-if="activeTab?.tableView && !activeTab.orphanFromConnectionId && isTableViewConnectionValid"
-            :key="`${getConnectionId()}-${activeTab.id}-${activeTab.tableView.database}-${activeTab.tableView.tableName}`"
-            :connection-id="getConnectionId() || ''"
+            :key="`${activeTab.connectionId}-${activeTab.id}-${activeTab.tableView.database}-${activeTab.tableView.tableName}`"
+            :connection-id="activeTab.connectionId || ''"
             :database="activeTab.tableView.database"
             :schema="activeTab.tableView.schema"
             :table-name="activeTab.tableView.tableName"
