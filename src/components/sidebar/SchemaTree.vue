@@ -245,7 +245,10 @@ async function toggleDatabaseNode(dbName: string) {
     await databaseStore.fetchSchemas(connId, dbName)
     const meta = databaseStore.metadata[connId]
     const schemas = meta?.schemas[dbName] || []
-    if (schemas.length > 0)
+    // For MySQL-like DBs, schemas mirror db names — fetch tables without schema
+    // so they're stored at meta.tables[dbName] and match the v-else template read.
+    const hasReal = schemas.some(s => s !== dbName)
+    if (hasReal)
       await Promise.all(schemas.map(s => databaseStore.fetchTables(connId, dbName, s)))
     else
       await databaseStore.fetchTables(connId, dbName)

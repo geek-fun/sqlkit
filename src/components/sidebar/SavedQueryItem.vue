@@ -25,7 +25,7 @@ const emit = defineEmits<{
 const { t, locale } = useI18n()
 
 function relativeTime(timestamp: number): string {
-  if (!timestamp || !Number.isFinite(timestamp))
+  if (timestamp == null || !Number.isFinite(timestamp))
     return ''
   const now = Date.now()
   const diff = timestamp * 1000 - now

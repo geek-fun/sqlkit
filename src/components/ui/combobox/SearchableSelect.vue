@@ -221,8 +221,8 @@ watch(searchQuery, () => {
 
     <PopoverContent
       align="start"
-      class="p-0 w-[unset]"
-      style="width: var(--radix-popover-trigger-width); min-width: var(--radix-popover-trigger-width)"
+      class="w-[unset]"
+      style="padding: 0; width: var(--radix-popover-trigger-width); min-width: var(--radix-popover-trigger-width)"
     >
       <div :id="listboxId" ref="listRef" role="listbox" class="py-1 pl-1 pr-0 max-h-[280px] overflow-y-auto">
         <div
