@@ -364,7 +364,7 @@ defineExpose({ refresh })
           </button>
 
           <!-- Schema content (when expanded) -->
-          <div v-if="expandedSchemas.has(schema)" class="ml-3">
+          <div v-if="expandedSchemas.has(schema)" class="ml-4">
             <!-- TABLES group (open by default) -->
             <TreeGroup
               :label="t('sidebar.groups.tables')"
@@ -376,7 +376,7 @@ defineExpose({ refresh })
               <div
                 v-for="table in getTablesForSchema(schema)"
                 :key="table.name"
-                class="text-sm ml-2 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
                 @click="handleTableClick(table, schema)"
                 @dblclick="handleDoubleClick(table, schema)"
                 @contextmenu="handleContextMenu($event, table, schema)"
@@ -401,7 +401,7 @@ defineExpose({ refresh })
               <div
                 v-for="view in getObjectsForSchema(schema)?.views ?? []"
                 :key="view.name"
-                class="text-sm ml-2 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
                 @click="handleViewClick(view, schema)"
                 @dblclick="handleOpenListingTab('VIEW', schema)"
               >
@@ -430,7 +430,7 @@ defineExpose({ refresh })
               <div
                 v-for="proc in getObjectsForSchema(schema)?.procedures ?? []"
                 :key="proc.name"
-                class="text-sm ml-2 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
                 @click="handleProcedureClick(proc, schema)"
                 @dblclick="handleOpenListingTab('PROCEDURE', schema)"
               >
@@ -454,7 +454,7 @@ defineExpose({ refresh })
               <div
                 v-for="fn in getObjectsForSchema(schema)?.functions ?? []"
                 :key="fn.name"
-                class="text-sm ml-2 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
                 @click="handleFunctionClick(fn, schema)"
                 @dblclick="handleOpenListingTab('FUNCTION', schema)"
               >
@@ -481,7 +481,7 @@ defineExpose({ refresh })
           <div
             v-for="table in flatTables"
             :key="table.name"
-            class="text-sm ml-2 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+            class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
             @click="handleTableClick(table, undefined)"
             @dblclick="handleDoubleClick(table, undefined)"
             @contextmenu="handleContextMenu($event, table, undefined)"
