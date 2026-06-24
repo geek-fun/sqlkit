@@ -471,9 +471,12 @@ function handleSelectTable(table: TableInfo, database: string, schema?: string) 
   const connId = getActiveConnectionId()
   if (!connId)
     return
-  // Set the connection's current database so the backend has context for queries,
-  // but do NOT change selectedDatabase (user doesn't want the selector to auto-change).
-  connectionStore.setCurrentDatabase(connId, database)
+  // Execute USE database to set the backend connection's database context.
+  // The Rust get_table_data MySQL branch ignores query.database, requiring
+  // the connection to already have a database selected.
+  invoke('execute_query', { connectionId: connId, sql: `USE \`${database}\`` }).catch(() => {
+    // Best-effort: some databases don't support USE (e.g. SQLite)
+  })
   tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
