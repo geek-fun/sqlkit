@@ -22,48 +22,22 @@ const emit = defineEmits<{
   (e: 'action', kind: string): void
 }>()
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
-function relativeTime(timestamp: number): string {
-  if (timestamp == null || !Number.isFinite(timestamp))
-    return ''
-  const now = Date.now()
-  const diff = timestamp * 1000 - now
-  const seconds = Math.round(diff / 1000)
-  const minutes = Math.round(seconds / 60)
-  const hours = Math.round(minutes / 60)
-  const days = Math.round(hours / 24)
-  const weeks = Math.round(days / 7)
-  const months = Math.round(days / 30)
-  const years = Math.round(days / 365)
-
-  // Intl API requires BCP 47 tags (en-US, zh-CN), but vue-i18n locale uses enUS, zhCN
-  const localeTag = `${locale.value.slice(0, 2)}-${locale.value.slice(2)}`
-  const rtf = new Intl.RelativeTimeFormat(localeTag, { style: 'narrow' })
-  if (Math.abs(years) >= 1)
-    return rtf.format(years, 'year')
-  if (Math.abs(months) >= 1)
-    return rtf.format(months, 'month')
-  if (Math.abs(weeks) >= 1)
-    return rtf.format(weeks, 'week')
-  if (Math.abs(days) >= 1)
-    return rtf.format(days, 'day')
-  if (Math.abs(hours) >= 1)
-    return rtf.format(hours, 'hour')
-  if (Math.abs(minutes) >= 1)
-    return rtf.format(minutes, 'minute')
-  return rtf.format(seconds, 'second')
+function formatDate(ts: number): string {
+  return new Date(ts * 1000).toLocaleDateString()
 }
 
 const createdAtText = computed(() => {
   if (!props.metadata?.createdAt)
     return null
-  return relativeTime(props.metadata.createdAt)
+  return formatDate(props.metadata.createdAt)
 })
 
 const modifiedAtText = computed(() => {
-  const ts = props.metadata?.modifiedAt ?? props.query.modified_at
-  return relativeTime(ts)
+  if (!props.metadata?.modifiedAt)
+    return null
+  return formatDate(props.metadata.modifiedAt)
 })
 
 const connectionName = computed(() => {

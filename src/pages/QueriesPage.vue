@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
 import { useSqlFormatter } from '@/composables/useSqlFormatter'
-import { loadQueryFile, saveQueryFile, saveQueryFileAs } from '@/datasources'
+import { loadQueryFile, readSavedQueriesMetadata, saveQueryFile, saveQueryFileAs, writeSavedQueriesMetadata } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
 const { t } = useI18n()
@@ -555,6 +555,25 @@ function sanitizeFileName(name: string): string {
     .slice(0, 30) || 'query'
 }
 
+async function saveMetadataEntry(filePath: string) {
+  const now = Math.floor(Date.now() / 1000)
+  const connId = getConnectionId()
+  const conn = connId ? connectionStore.getConnectionById(connId) : undefined
+  try {
+    const existing = await readSavedQueriesMetadata()
+    existing.queries[filePath] = {
+      connectionId: connId ?? null,
+      connectionName: conn?.name ?? null,
+      createdAt: now,
+      modifiedAt: now,
+    }
+    await writeSavedQueriesMetadata(existing)
+  }
+  catch (error) {
+    console.error('Failed to save metadata:', error)
+  }
+}
+
 async function handleSaveQuery() {
   if (!activeTab.value || !activeTab.value.content.trim()) {
     return
@@ -575,6 +594,7 @@ async function handleSaveQuery() {
 
     if (result.success && result.file_path) {
       tabStore.markTabSaved(activeTab.value.id, result.file_path)
+      await saveMetadataEntry(result.file_path)
       toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
       savedQueriesRef.value?.refresh()
     }
@@ -606,6 +626,7 @@ async function handleDownloadQuery() {
     }
     if (result.success && result.file_path) {
       tabStore.markTabSaved(activeTab.value.id, result.file_path)
+      await saveMetadataEntry(result.file_path)
       toast.success(t('pages.queries.notifications.querySaved'), { description: result.file_path })
       savedQueriesRef.value?.refresh()
     }

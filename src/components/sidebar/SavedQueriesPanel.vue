@@ -43,7 +43,9 @@ const isCollapsed = computed({
 })
 
 const sortedFiles = computed(() =>
-  [...files.value].sort((a, b) => b.modified_at - a.modified_at),
+  files.value
+    .filter(f => metadataMap.value[f.file_path])
+    .sort((a, b) => (metadataMap.value[b.file_path]?.modifiedAt ?? 0) - (metadataMap.value[a.file_path]?.modifiedAt ?? 0)),
 )
 
 async function fetchFiles() {
