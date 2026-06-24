@@ -481,7 +481,7 @@ defineExpose({ refresh })
           <div
             v-for="table in flatTables"
             :key="table.name"
-            class="text-sm px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+            class="text-sm ml-2 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
             @click="handleTableClick(table, undefined)"
             @dblclick="handleDoubleClick(table, undefined)"
             @contextmenu="handleContextMenu($event, table, undefined)"
