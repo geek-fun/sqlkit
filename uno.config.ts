@@ -15,6 +15,7 @@ export default defineConfig({
       scale: 1.2,
       collections: {
         carbon: () => import('@iconify-json/carbon/icons.json').then(i => i.default as Record<string, unknown>),
+        lucide: () => import('@iconify-json/lucide/icons.json').then(i => i.default as Record<string, unknown>),
       },
     }),
     presetAnimations(),

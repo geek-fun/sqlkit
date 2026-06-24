@@ -5,10 +5,41 @@
 
 use crate::connection::handle::ConnectionHandle;
 use crate::database::{
-    search, ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo, IndexInfo, MySQLAdapter,
-    ObjectInfo, PostgresAdapter, QueryResult, SqlServerAdapter, TableInfo, TriggerInfo,
+    search, ClickHouseAdapter, ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo,
+    HttpSqlAdapter, IndexInfo, JdbcBridgeAdapter, MySQLAdapter, ObjectInfo, PostgresAdapter,
+    QueryResult, RqliteAdapter, SqlServerAdapter, TableInfo, TriggerInfo, TursoAdapter,
 };
 use crate::state::{ActiveConnection, AppState};
+
+/// Switch to a different database by creating a temporary connection and executing the query.
+/// Falls back to the original connection if no database switch is needed.
+macro_rules! with_db_switch {
+    ($adapter:expr, $adapter_type:ty, $sql:expr, $database:expr, $connection:expr, $error_msg:expr) => {{
+        let __adapter = $adapter;
+        if let Some(ref __db) = $database {
+            let __guard = __adapter.lock().await;
+            let db_str: &str = __db;
+            if Some(db_str) != __guard.config.database.as_deref() {
+                let mut __temp_config = __guard.config.clone();
+                drop(__guard);
+                __temp_config.database = Some(db_str.to_string());
+                let mut __temp = <$adapter_type>::new(__temp_config);
+                __temp
+                    .connect()
+                    .await
+                    .map_err(|e| format!("Failed to connect to database '{}': {}", db_str, e))?;
+                return __temp
+                    .execute_query(&$sql)
+                    .await
+                    .map_err(|e| format!("{}: {}", $error_msg, e));
+            }
+        }
+        $connection
+            .execute_query(&$sql)
+            .await
+            .map_err(|e| format!("{}: {}", $error_msg, e))
+    }};
+}
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -360,61 +391,35 @@ pub async fn get_table_data(
     let db_type = get_db_type_string(&connection);
 
     // Execute query based on connection type with proper identifier quoting
-    let result = match &connection {
-        ActiveConnection::Postgres(adapter) => {
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, db_type);
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
-            if let Some(ref db) = query.database {
-                let guard = adapter.lock().await;
-                if Some(db.as_str()) != guard.config.database.as_deref() {
-                    let mut temp_config = guard.config.clone();
-                    drop(guard);
-                    temp_config.database = Some(db.clone());
-                    let mut temp = PostgresAdapter::new(temp_config);
-                    temp.connect()
-                        .await
-                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp
-                        .execute_query(&sql)
-                        .await
-                        .map_err(|e| format!("Failed to get table data: {}", e));
-                }
-            }
-            connection.execute_query(&sql).await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, db_type);
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
-            if let Some(ref db) = query.database {
-                let guard = adapter.lock().await;
-                if Some(db.as_str()) != guard.config.database.as_deref() {
-                    let mut temp_config = guard.config.clone();
-                    drop(guard);
-                    temp_config.database = Some(db.clone());
-                    let mut temp = SqlServerAdapter::new(temp_config);
-                    temp.connect()
-                        .await
-                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    return temp
-                        .execute_query(&sql)
-                        .await
-                        .map_err(|e| format!("Failed to get table data: {}", e));
-                }
-            }
-            connection.execute_query(&sql).await
-        }
-        _ => {
-            let qualified = build_qualified_table(query.schema.as_deref(), &query.table, db_type);
-            let sql =
-                build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
-            connection.execute_query(&sql).await
-        }
-    }
-    .map_err(|e| format!("Failed to get table data: {}", e))?;
+    let result = self::get_table_data_inner(&connection, &query, filter_ref, limit_val, offset_val, db_type)
+        .await
+        .map_err(|e| format!("Failed to get table data: {}", e))?;
 
     Ok(result)
+}
+
+async fn get_table_data_inner(
+    connection: &ActiveConnection,
+    query: &TableDataQuery,
+    filter_ref: Option<&str>,
+    limit_val: u32,
+    offset_val: u32,
+    db_type: &str,
+) -> Result<QueryResult, String> {
+    let qualified = build_qualified_table(query.schema.as_deref(), &query.table, db_type);
+    let sql = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
+
+    match connection {
+        ActiveConnection::Postgres(a) => with_db_switch!(a, PostgresAdapter, sql, query.database, connection, "Failed to get table data"),
+        ActiveConnection::MySQL(a) => with_db_switch!(a, MySQLAdapter, sql, query.database, connection, "Failed to get table data"),
+        ActiveConnection::SQLServer(a) => with_db_switch!(a, SqlServerAdapter, sql, query.database, connection, "Failed to get table data"),
+        ActiveConnection::ClickHouse(a) => with_db_switch!(a, ClickHouseAdapter, sql, query.database, connection, "Failed to get table data"),
+        ActiveConnection::JdbcBridge(a) => with_db_switch!(a, JdbcBridgeAdapter, sql, query.database, connection, "Failed to get table data"),
+        ActiveConnection::Rqlite(a) => with_db_switch!(a, RqliteAdapter, sql, query.database, connection, "Failed to get table data"),
+        ActiveConnection::Turso(a) => with_db_switch!(a, TursoAdapter, sql, query.database, connection, "Failed to get table data"),
+        ActiveConnection::HttpSql(a) => with_db_switch!(a, HttpSqlAdapter, sql, query.database, connection, "Failed to get table data"),
+        ActiveConnection::SQLite(_) => connection.execute_query(&sql).await.map_err(|e| format!("Failed to get table data: {}", e)),
+    }
 }
 
 /// Get the total row count for a table, optionally filtered by a WHERE clause.
@@ -450,60 +455,35 @@ pub async fn get_table_count(
     let filter_ref = filter.as_deref();
     let db_type = get_db_type_string(&connection);
 
-    let result = match &connection {
-        ActiveConnection::Postgres(adapter) => {
-            let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
-            let query = build_count_query(&qualified, filter_ref);
-            if let Some(ref db) = database {
-                let guard = adapter.lock().await;
-                if Some(db.as_str()) != guard.config.database.as_deref() {
-                    let mut temp_config = guard.config.clone();
-                    drop(guard);
-                    temp_config.database = Some(db.clone());
-                    let mut temp = PostgresAdapter::new(temp_config);
-                    temp.connect()
-                        .await
-                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    let r = temp
-                        .execute_query(&query)
-                        .await
-                        .map_err(|e| format!("Failed to get table count: {}", e))?;
-                    return extract_count(r);
-                }
-            }
-            connection.execute_query(&query).await
-        }
-        ActiveConnection::SQLServer(adapter) => {
-            let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
-            let query = build_count_query(&qualified, filter_ref);
-            if let Some(ref db) = database {
-                let guard = adapter.lock().await;
-                if Some(db.as_str()) != guard.config.database.as_deref() {
-                    let mut temp_config = guard.config.clone();
-                    drop(guard);
-                    temp_config.database = Some(db.clone());
-                    let mut temp = SqlServerAdapter::new(temp_config);
-                    temp.connect()
-                        .await
-                        .map_err(|e| format!("Failed to connect to database '{}': {}", db, e))?;
-                    let r = temp
-                        .execute_query(&query)
-                        .await
-                        .map_err(|e| format!("Failed to get table count: {}", e))?;
-                    return extract_count(r);
-                }
-            }
-            connection.execute_query(&query).await
-        }
-        _ => {
-            let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
-            let query = build_count_query(&qualified, filter_ref);
-            connection.execute_query(&query).await
-        }
-    }
-    .map_err(|e| format!("Failed to get table count: {}", e))?;
+    let result = get_table_count_inner(&connection, &table, schema.as_deref(), database.as_deref(), filter_ref, db_type)
+        .await
+        .map_err(|e| format!("Failed to get table count: {}", e))?;
 
     extract_count(result)
+}
+
+async fn get_table_count_inner(
+    connection: &ActiveConnection,
+    table: &str,
+    schema: Option<&str>,
+    database: Option<&str>,
+    filter_ref: Option<&str>,
+    db_type: &str,
+) -> Result<QueryResult, String> {
+    let qualified = build_qualified_table(schema, table, db_type);
+    let query = build_count_query(&qualified, filter_ref);
+
+    match connection {
+        ActiveConnection::Postgres(a) => with_db_switch!(a, PostgresAdapter, query, database, connection, "Failed to get table count"),
+        ActiveConnection::MySQL(a) => with_db_switch!(a, MySQLAdapter, query, database, connection, "Failed to get table count"),
+        ActiveConnection::SQLServer(a) => with_db_switch!(a, SqlServerAdapter, query, database, connection, "Failed to get table count"),
+        ActiveConnection::ClickHouse(a) => with_db_switch!(a, ClickHouseAdapter, query, database, connection, "Failed to get table count"),
+        ActiveConnection::JdbcBridge(a) => with_db_switch!(a, JdbcBridgeAdapter, query, database, connection, "Failed to get table count"),
+        ActiveConnection::Rqlite(a) => with_db_switch!(a, RqliteAdapter, query, database, connection, "Failed to get table count"),
+        ActiveConnection::Turso(a) => with_db_switch!(a, TursoAdapter, query, database, connection, "Failed to get table count"),
+        ActiveConnection::HttpSql(a) => with_db_switch!(a, HttpSqlAdapter, query, database, connection, "Failed to get table count"),
+        ActiveConnection::SQLite(_) => connection.execute_query(&query).await.map_err(|e| format!("Failed to get table count: {}", e)),
+    }
 }
 
 /// Convert a JSON value to a SQL literal for safe embedding in UPDATE/DELETE queries.

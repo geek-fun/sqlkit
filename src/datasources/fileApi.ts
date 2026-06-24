@@ -77,3 +77,7 @@ export function readSavedQueriesMetadata(): Promise<SavedQueriesMetadata> {
 export function writeSavedQueriesMetadata(metadata: SavedQueriesMetadata): Promise<void> {
   return invoke<void>('write_saved_queries_metadata', { metadata })
 }
+
+export function saveQueryMetadata(filePath: string, metadata: SavedQueryMetadata): Promise<void> {
+  return invoke<void>('save_query_metadata', { filePath, metadata })
+}

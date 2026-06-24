@@ -1545,25 +1545,6 @@ impl DatabaseAdapter for PostgresAdapter {
 
         let schema_filter = schema.unwrap_or("public");
 
-        let query = r#"
-            SELECT
-                table_name as name,
-                'VIEW' as object_type,
-                table_schema as schema_name,
-                view_definition as definition
-            FROM information_schema.views
-            WHERE table_schema = $1
-            UNION ALL
-            SELECT
-                matviewname as name,
-                'MATERIALIZED VIEW' as object_type,
-                schemaname as schema_name,
-                definition as definition
-            FROM pg_matviews
-            WHERE schemaname = $1
-            ORDER BY name
-        "#;
-
         let pool = self
             .pool
             .as_ref()
@@ -1575,12 +1556,23 @@ impl DatabaseAdapter for PostgresAdapter {
             .await
             .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
 
+        // Query regular views from information_schema.views — works on all PG-wire databases.
+        let views_query = r#"
+            SELECT
+                table_name as name,
+                'VIEW' as object_type,
+                table_schema as schema_name,
+                view_definition as definition
+            FROM information_schema.views
+            WHERE table_schema = $1
+        "#;
+
         let rows = client
-            .query(query, &[&schema_filter])
+            .query(views_query, &[&schema_filter])
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
 
-        let views = rows
+        let mut views: Vec<ObjectInfo> = rows
             .iter()
             .map(|row| {
                 let name: String = row.get(0);
@@ -1602,6 +1594,44 @@ impl DatabaseAdapter for PostgresAdapter {
                 }
             })
             .collect();
+
+        // Query materialized views from pg_matviews separately.
+        // pg_matviews is PostgreSQL-specific and may not exist on PG-wire-compat
+        // databases (CockroachDB, CrateDB, QuestDB, Redshift). If the query fails,
+        // we simply skip materialized views rather than breaking view listing entirely.
+        let matviews_query = r#"
+            SELECT
+                matviewname as name,
+                'MATERIALIZED VIEW' as object_type,
+                schemaname as schema_name,
+                definition as definition
+            FROM pg_matviews
+            WHERE schemaname = $1
+        "#;
+
+        if let Ok(matview_rows) = client.query(matviews_query, &[&schema_filter]).await {
+            views.extend(matview_rows.iter().map(|row| {
+                let name: String = row.get(0);
+                let object_type: String = row.get(1);
+                let schema_name: String = row.get(2);
+                let definition: Option<String> = row.get(3);
+                let detail = definition.map(|def| {
+                    if def.len() > 100 {
+                        format!("{}...", &def[..100])
+                    } else {
+                        def
+                    }
+                });
+                ObjectInfo {
+                    name,
+                    object_type,
+                    schema: Some(schema_name),
+                    detail,
+                }
+            }));
+        }
+
+        views.sort_by(|a, b| a.name.cmp(&b.name));
 
         Ok(views)
     }

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { DbCapabilities } from './dbCapabilities'
 import type { ComboboxOption } from '@/components/ui/combobox'
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
@@ -95,6 +95,25 @@ function handleAction(kind: ActionKind) {
   emit('action', kind)
 }
 
+// Spin state with minimum duration — prevents icon from flickering
+// when loading toggles faster than the animation can play out
+const isSpinning = ref(false)
+let spinTimer: ReturnType<typeof setTimeout> | null = null
+
+watch(() => props.loading, (val) => {
+  if (val) {
+    if (spinTimer)
+      clearTimeout(spinTimer)
+    isSpinning.value = true
+  }
+  else {
+    spinTimer = setTimeout(() => {
+      isSpinning.value = false
+      spinTimer = null
+    }, 500)
+  }
+})
+
 // Fetch databases when connectionId changes
 watch(() => props.connectionId, async (connId) => {
   if (!connId)
@@ -139,7 +158,7 @@ watch(() => props.connectionId, async (connId) => {
       :title="t('sidebar.database.refreshTooltip')"
       @click="emit('refresh')"
     >
-      <span class="i-carbon-renew h-3.5 w-3.5" :class="{ 'animate-spin': props.loading }" />
+      <span class="i-carbon-renew h-3.5 w-3.5" :class="{ 'animate-spin': isSpinning }" />
     </Button>
 
     <DropdownMenu>
