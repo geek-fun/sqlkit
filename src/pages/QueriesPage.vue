@@ -471,6 +471,9 @@ function handleSelectTable(table: TableInfo, database: string, schema?: string) 
   const connId = getActiveConnectionId()
   if (!connId)
     return
+  // Set the connection's current database so the backend has context for queries,
+  // but do NOT change selectedDatabase (user doesn't want the selector to auto-change).
+  connectionStore.setCurrentDatabase(connId, database)
   tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
