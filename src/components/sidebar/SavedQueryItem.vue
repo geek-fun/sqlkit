@@ -35,7 +35,9 @@ function relativeTime(timestamp: number): string {
   const months = Math.round(days / 30)
   const years = Math.round(days / 365)
 
-  const rtf = new Intl.RelativeTimeFormat(locale.value, { style: 'narrow' })
+  // Intl API requires BCP 47 tags (en-US, zh-CN), but vue-i18n locale uses enUS, zhCN
+  const localeTag = locale.value.replace(/^([a-z]+)([A-Z][a-z]+)$/, '$1-$2')
+  const rtf = new Intl.RelativeTimeFormat(localeTag, { style: 'narrow' })
   if (Math.abs(years) >= 1)
     return rtf.format(years, 'year')
   if (Math.abs(months) >= 1)

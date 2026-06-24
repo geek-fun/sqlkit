@@ -253,7 +253,7 @@ watch(searchQuery, () => {
                   ? ''
                   : undefined
               "
-              class="text-sm px-2 py-1.5 outline-none rounded-sm flex cursor-pointer select-none transition-colors items-center relative hover:text-accent-foreground hover:bg-accent" :class="[
+              class="text-sm px-1.5 py-1 outline-none flex cursor-pointer select-none transition-colors items-center relative hover:text-accent-foreground hover:bg-accent" :class="[
                 option.disabled && 'pointer-events-none opacity-50',
                 option.value === modelValue && 'bg-accent text-accent-foreground',
                 navigableItems[highlightedIndex]?.type === 'option'
@@ -298,7 +298,7 @@ watch(searchQuery, () => {
             :id="`${listboxId}-create`"
             role="option"
             :data-highlighted="navigableItems[highlightedIndex]?.type === 'create' ? '' : undefined"
-            class="text-sm text-green-600 px-2 py-1.5 outline-none rounded-sm flex gap-2 cursor-pointer select-none italic transition-colors items-center relative hover:bg-accent" :class="[
+            class="text-sm text-green-600 px-1.5 py-1 outline-none flex gap-2 cursor-pointer select-none italic transition-colors items-center relative hover:bg-accent" :class="[
               navigableItems[highlightedIndex]?.type === 'create' && 'bg-accent',
             ]"
             @click="selectOption(searchQuery.trim())"
