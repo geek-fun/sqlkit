@@ -41,7 +41,7 @@ const NONE: DbCapabilities = {
 
 const PG_COMPAT: DbCapabilities = { ...ALL, backup: false }
 
-const MYSQL_COMPAT: DbCapabilities = { ...ALL, schemas: false, materializedViews: false, backup: false }
+const MYSQL_COMPAT: DbCapabilities = { ...ALL, schemas: false, materializedViews: false, backup: false, newSchema: false, newDatabase: true, dropDatabase: true }
 
 const SQLITE_LIKE: DbCapabilities = { ...NONE, views: true, export: true }
 
@@ -89,20 +89,20 @@ const CAPABILITY_MAP: Partial<Record<DatabaseType, DbCapabilities>> = {
   [DatabaseType.TURSO]: SQLITE_LIKE,
 
   [DatabaseType.SQLSERVER]: { ...ALL, materializedViews: false },
-  [DatabaseType.ORACLE]: { ...ALL, materializedViews: false },
+  [DatabaseType.ORACLE]: { ...ALL, materializedViews: true },
   [DatabaseType.DAMENG]: { ...ALL, materializedViews: false },
   [DatabaseType.OCEANBASE_ORACLE]: { ...ALL, materializedViews: false },
   [DatabaseType.XUGUDB]: { ...ALL, materializedViews: false },
   [DatabaseType.GBASE8A]: { ...ALL, materializedViews: false },
 
-  [DatabaseType.CLICKHOUSE]: { ...ALL, procedures: false, functions: false, materializedViews: true, schemas: false },
+  [DatabaseType.CLICKHOUSE]: { ...ALL, procedures: false, functions: false, materializedViews: true, schemas: false, newSchema: false },
   [DatabaseType.DB2]: { ...ALL, materializedViews: false },
   [DatabaseType.H2]: { ...ALL, materializedViews: false },
   [DatabaseType.SNOWFLAKE]: ALL,
   [DatabaseType.TRINO]: { ...ALL, newDatabase: false, newSchema: false, dropDatabase: false, procedures: false },
   [DatabaseType.PRESTO]: { ...ALL, newDatabase: false, newSchema: false, dropDatabase: false, procedures: false },
   [DatabaseType.DERBY]: { ...ALL, materializedViews: false },
-  [DatabaseType.HIVE]: { ...ALL, newDatabase: false, newSchema: false, dropDatabase: false, procedures: false, functions: false },
+  [DatabaseType.HIVE]: { ...ALL, newSchema: false, procedures: false, functions: false },
   [DatabaseType.DATABRICKS]: { ...ALL, newDatabase: false, newSchema: false, dropDatabase: false, procedures: false },
   [DatabaseType.HANA]: { ...ALL, materializedViews: false },
   [DatabaseType.TERADATA]: { ...ALL, materializedViews: false },

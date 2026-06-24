@@ -275,6 +275,7 @@ pub fn run() {
             commands::write_text_file,
             commands::read_saved_queries_metadata,
             commands::write_saved_queries_metadata,
+            commands::save_query_metadata,
             commands::preview_export_data,
             commands::execute_export_data,
             commands::detect_file_format,

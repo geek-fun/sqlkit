@@ -301,6 +301,18 @@ pub async fn write_saved_queries_metadata(
     Ok(())
 }
 
+#[tauri::command]
+pub async fn save_query_metadata(
+    app_handle: AppHandle,
+    file_path: String,
+    metadata: SavedQueryMetadata,
+) -> Result<(), String> {
+    let existing = read_saved_queries_metadata(app_handle.clone()).await?;
+    let mut updated = existing;
+    updated.queries.insert(file_path, metadata);
+    write_saved_queries_metadata(app_handle, updated).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

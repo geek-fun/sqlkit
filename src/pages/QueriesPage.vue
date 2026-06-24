@@ -19,7 +19,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
 import { useSqlFormatter } from '@/composables/useSqlFormatter'
-import { loadQueryFile, readSavedQueriesMetadata, saveQueryFile, saveQueryFileAs, writeSavedQueriesMetadata } from '@/datasources'
+import { browseApi, loadQueryFile, saveQueryFile, saveQueryFileAs, saveQueryMetadata } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 
 const { t } = useI18n()
@@ -474,7 +474,8 @@ function handleSelectTable(table: TableInfo, database: string, schema?: string) 
   // Execute USE database to set the backend connection's database context.
   // The Rust get_table_data MySQL branch ignores query.database, requiring
   // the connection to already have a database selected.
-  invoke('execute_query', { connectionId: connId, sql: `USE \`${database}\`` }).catch(() => {
+  const escapedDb = database.replace(/`/g, '``')
+  invoke('execute_query', { connectionId: connId, sql: `USE \`${escapedDb}\`` }).catch(() => {
     // Best-effort: some databases don't support USE (e.g. SQLite)
   })
   tabStore.openTableViewTab(connId, database, table.name, schema)
@@ -487,19 +488,28 @@ function handleOpenListingTab(type: 'VIEW' | 'PROCEDURE' | 'FUNCTION', database:
   tabStore.openListingTab(connId, database, type, schema)
 }
 
-function handleOpenDdlTab(name: string, type: string, database: string, schema?: string) {
-  if (type === 'VIEW') {
-    const connId = getActiveConnectionId()
-    if (!connId)
-      return
-    tabStore.openTableViewTab(connId, database, name, schema)
-    return
-  }
+async function handleOpenDdlTab(name: string, type: string, database: string, schema?: string) {
   const connId = getActiveConnectionId()
   if (!connId)
     return
-  const listingType = type === 'PROCEDURE' ? 'PROCEDURE' : 'FUNCTION'
-  tabStore.openListingTab(connId, database, listingType, schema)
+
+  if (type === 'VIEW') {
+    tabStore.openTableViewTab(connId, database, name, schema)
+    return
+  }
+
+  // For PROCEDURE / FUNCTION: fetch DDL and open in a query tab
+  const tab = tabStore.createTab(connId, database, schema)
+  const objectType = type === 'PROCEDURE' ? 'PROCEDURE' : 'FUNCTION'
+  tabStore.updateTabName(tab.id, `${name}.sql`)
+  try {
+    const ddl = await browseApi.getObjectDdl(connId, database, schema ?? null, name, objectType)
+    const header = `-- ${objectType}: ${schema ? `${schema}.` : ''}${name}\n\n`
+    tabStore.updateTabContent(tab.id, header + ddl)
+  }
+  catch (err) {
+    tabStore.updateTabContent(tab.id, `-- Failed to load DDL for ${name}:\n-- ${String(err)}`)
+  }
 }
 
 function handleOpenFromListing(info: { name: string, type: string, schema?: string }, database: string) {
@@ -566,14 +576,12 @@ async function saveMetadataEntry(filePath: string) {
   const connId = getConnectionId()
   const conn = connId ? connectionStore.getConnectionById(connId) : undefined
   try {
-    const existing = await readSavedQueriesMetadata()
-    existing.queries[filePath] = {
+    await saveQueryMetadata(filePath, {
       connectionId: connId ?? null,
       connectionName: conn?.name ?? null,
       createdAt: now,
       modifiedAt: now,
-    }
-    await writeSavedQueriesMetadata(existing)
+    })
   }
   catch (error) {
     console.error('Failed to save metadata:', error)

@@ -821,13 +821,13 @@ watch(
 </script>
 
 <template>
-  <div class="data-table-view flex flex-col h-full" @click="showColumnMenu = false">
+  <div class="data-table-view flex flex-col min-h-0" @click="showColumnMenu = false">
     <!-- Sub-page navigation bar -->
-    <div class="border-b bg-muted/30 flex">
+    <div class="border-b bg-muted/30 flex shrink-0">
       <button
         v-for="page in subPages"
         :key="page.id"
-        class="text-xs font-medium px-3 py-1.5 border-b-2 transition-colors"
+        class="text-xs font-medium px-3 py-1.5 border-b-2 shrink-0 transition-colors"
         :class="activeSubPage === page.id
           ? 'border-primary text-foreground'
           : 'border-transparent text-muted-foreground hover:text-foreground'"
@@ -839,7 +839,7 @@ watch(
 
     <!-- Data sub-page: Toolbar bar (search + filter + actions) -->
     <template v-if="activeSubPage === 'data'">
-      <div class="px-3 py-1.5 border-b bg-muted/20 flex gap-1.5 items-center">
+      <div class="px-3 py-1.5 border-b bg-muted/20 flex shrink-0 gap-1.5 items-center">
         <span class="i-carbon-search text-muted-foreground flex-shrink-0 h-3.5 w-3.5" />
 
         <!-- Search input — searches across all columns -->
@@ -980,7 +980,7 @@ watch(
       </div>
 
       <!-- Table area -->
-      <div class="flex-1 relative overflow-auto">
+      <div class="flex-1 min-h-0 relative overflow-auto">
         <!-- Connection error state -->
         <div v-if="connectionError" class="p-4 flex h-full items-center justify-center">
           <div class="text-center max-w-md">
@@ -1151,7 +1151,7 @@ watch(
       </div>
 
       <!-- Status bar + pagination -->
-      <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex flex-wrap gap-3 items-center">
+      <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex shrink-0 gap-3 items-center overflow-hidden">
         <!-- Left: stats -->
         <div class="flex flex-shrink-0 gap-3 items-center">
           <span v-if="totalCount > 0" class="tabular-nums">
@@ -1160,12 +1160,12 @@ watch(
           <span v-if="formattedTime" class="text-muted-foreground/70">{{ formattedTime }}</span>
         </div>
 
-        <div class="flex-1" />
+        <div class="flex-1 min-w-0" />
 
         <!-- Right: pagination + rows per page grouped -->
-        <div class="flex flex-shrink-0 gap-2 items-center">
+        <div class="flex flex-shrink-0 gap-2 max-w-[70%] items-center overflow-x-auto">
           <!-- Page navigation -->
-          <div v-if="data" class="flex gap-0.5 items-center">
+          <div v-if="data" class="flex flex-nowrap gap-0.5 items-center">
             <!-- Prev -->
             <button
               class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"

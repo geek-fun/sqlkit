@@ -5,7 +5,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/composables/useNotifications'
-import { deleteQueryFile, listSavedQueryFiles, loadQueryFile, readSavedQueriesMetadata, saveQueryFile, writeSavedQueriesMetadata } from '@/datasources'
+import { deleteQueryFile, listSavedQueryFiles, loadQueryFile, readSavedQueriesMetadata, saveQueryFile, saveQueryMetadata, writeSavedQueriesMetadata } from '@/datasources'
 import ChangeConnectionDialog from './ChangeConnectionDialog.vue'
 import DeleteQueryDialog from './DeleteQueryDialog.vue'
 import RenameQueryDialog from './RenameQueryDialog.vue'
@@ -190,12 +190,15 @@ async function handleChangeConnectionConfirm(connectionId: string | null, connec
     createdAt: changeConnTarget.value.modified_at,
     modifiedAt: changeConnTarget.value.modified_at,
   }
-  metadataMap.value[filePath] = {
+  const now = Math.floor(Date.now() / 1000)
+  const updatedMetadata = {
     ...existing,
     connectionId,
     connectionName,
+    modifiedAt: now,
   }
-  await writeMetadata()
+  metadataMap.value[filePath] = updatedMetadata
+  await saveQueryMetadata(filePath, updatedMetadata)
   showChangeConnDialog.value = false
   changeConnTarget.value = null
 }

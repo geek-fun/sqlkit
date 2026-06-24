@@ -69,6 +69,7 @@
     "test:ci": "jest --runInBand --ci --coverage --coverageReporters json-summary text html lcov"
   },
   "dependencies": {
+    "@iconify-json/lucide": "^1.2.114",
     "@monaco-editor/loader": "^1.7.0",
     "@tanstack/vue-virtual": "^3.13.28",
     "@tauri-apps/api": "^2.11.0",

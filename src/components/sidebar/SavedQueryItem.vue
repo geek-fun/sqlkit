@@ -51,13 +51,21 @@ type ActionKind = 'open' | 'rename' | 'changeConnection' | 'reveal' | 'delete'
 function handleAction(kind: ActionKind) {
   emit('action', kind)
 }
+
+function handleDblClick() {
+  emit('action', 'open')
+}
 </script>
 
 <template>
-  <div class="group px-2 py-1 cursor-pointer hover:bg-accent/30">
-    <div class="flex gap-1.5 items-center">
+  <div
+    class="group px-2 py-0.5 cursor-pointer hover:bg-accent/30"
+    @dblclick="handleDblClick"
+  >
+    <!-- Row 1: icon + filename + menu -->
+    <div class="flex gap-1.5 min-w-0 items-center">
       <span class="i-carbon-document text-muted-foreground shrink-0 h-3.5 w-3.5" />
-      <span class="text-sm font-medium flex-1 truncate">{{ query.file_name }}</span>
+      <span class="text-sm font-medium flex-1 min-w-0 truncate" :title="query.file_name">{{ query.file_name }}</span>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button
@@ -88,19 +96,22 @@ function handleAction(kind: ActionKind) {
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
-    <div class="mt-0.5 pl-[calc(14px+6px)] space-y-0.5">
-      <div class="text-xs text-muted-foreground truncate">
-        <span v-if="createdAtText">{{ t('sidebar.savedQueries.created') }} {{ createdAtText }}</span>
-        <span v-if="createdAtText && modifiedAtText"> · </span>
-        <span v-if="modifiedAtText">{{ t('sidebar.savedQueries.modified') }} {{ modifiedAtText }}</span>
-      </div>
-      <div v-if="connectionName" class="text-xs text-muted-foreground flex gap-1 truncate items-center">
+
+    <!-- Row 2: dates + connection name, all truncated -->
+    <div class="text-xs text-muted-foreground/60 pl-[22px] flex gap-2 min-w-0 items-center">
+      <span v-if="createdAtText" class="flex gap-0.5 whitespace-nowrap items-center" :title="t('sidebar.savedQueries.created')">
+        <span class="i-carbon-time shrink-0 h-3 w-3" />
+        <span>{{ createdAtText }}</span>
+      </span>
+      <span v-if="modifiedAtText && modifiedAtText !== createdAtText" class="flex gap-0.5 whitespace-nowrap items-center" :title="t('sidebar.savedQueries.modified')">
+        <span class="i-carbon-edit shrink-0 h-3 w-3" />
+        <span>{{ modifiedAtText }}</span>
+      </span>
+      <span v-if="connectionName" class="flex gap-0.5 min-w-0 truncate items-center" :title="connectionName">
         <span class="i-carbon-arrow-right shrink-0 h-2.5 w-2.5" />
         <span class="truncate">{{ connectionName }}</span>
-      </div>
-      <div v-else class="text-xs text-muted-foreground/60 truncate italic">
-        {{ t('sidebar.savedQueries.connectionNone') }}
-      </div>
+      </span>
+      <span v-else class="text-muted-foreground/40 truncate italic">{{ t('sidebar.savedQueries.connectionNone') }}</span>
     </div>
   </div>
 </template>
