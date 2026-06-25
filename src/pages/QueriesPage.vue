@@ -10,7 +10,7 @@ import { DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/compon
 import ListingTab from '@/components/database-browser/ListingTab.vue'
 import ErDiagramView from '@/components/er-diagram/ErDiagramView.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { ConnectionSelector, DatabaseSelectorRow, SavedQueriesPanel, SchemaTree, SidebarSplitView } from '@/components/sidebar'
+import { ConnectionSelector, CreateObjectDialog, CreateTableDialog, DatabaseSelectorRow, DropDatabaseDialog, SavedQueriesPanel, SchemaTree, SidebarSplitView } from '@/components/sidebar'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -49,6 +49,13 @@ const destructiveAction = ref<{ type: 'drop' | 'truncate', table: TableInfo, dat
 const isDestructiveActionExecuting = ref(false)
 const showOrphanTabDialog = ref(false)
 const orphanTabToHandle = ref<string | null>(null)
+
+// ── Database action dialog state ──
+const createDatabaseDialogOpen = ref(false)
+const createSchemaDialogOpen = ref(false)
+const dropDatabaseDialogOpen = ref(false)
+const createTableDialogOpen = ref(false)
+const isDatabaseActionExecuting = ref(false)
 
 // Get active connection ID (can be changed by user)
 const selectedConnectionId = ref<string>('')
@@ -657,8 +664,182 @@ function handleDatabaseRefresh() {
   schemaTreeRef.value?.refresh()
 }
 
-function handleDatabaseAction(_kind: string) {
-  toast.info(t('sidebar.notImplemented'))
+function handleDatabaseAction(kind: string) {
+  switch (kind) {
+    case 'newDatabase':
+      createDatabaseDialogOpen.value = true
+      break
+    case 'newSchema':
+      createSchemaDialogOpen.value = true
+      break
+    case 'dropDatabase':
+      dropDatabaseDialogOpen.value = true
+      break
+    case 'newTable':
+      createTableDialogOpen.value = true
+      break
+    case 'newView':
+    case 'newFunction':
+    case 'newProcedure':
+      openTemplateTab(kind)
+      break
+    case 'backupDatabase':
+    case 'exportDatabase':
+      router.push('/transfer')
+      break
+    default:
+      toast.info(t('sidebar.notImplemented'))
+  }
+}
+
+// ── Database CRUD handlers ──
+
+async function handleCreateDatabase(name: string) {
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+  isDatabaseActionExecuting.value = true
+  try {
+    const result = await invoke('execute_query', {
+      connectionId: connId,
+      sql: `CREATE DATABASE ${name}`,
+    })
+    if ((result as any)?.success === false)
+      throw new Error((result as any)?.error?.message || 'Unknown error')
+    toast.success(t('sidebar.databases.actions.createObject.created', { type: t('sidebar.databases.actions.createObject.types.database'), name }))
+    createDatabaseDialogOpen.value = false
+    schemaTreeRef.value?.refresh()
+  }
+  catch (err) {
+    toast.error(t('sidebar.databases.actions.createObject.error', { error: String(err) }))
+  }
+  finally {
+    isDatabaseActionExecuting.value = false
+  }
+}
+
+async function handleCreateSchema(name: string) {
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+  isDatabaseActionExecuting.value = true
+  try {
+    const result = await invoke('execute_query', {
+      connectionId: connId,
+      sql: `CREATE SCHEMA ${name}`,
+    })
+    if ((result as any)?.success === false)
+      throw new Error((result as any)?.error?.message || 'Unknown error')
+    toast.success(t('sidebar.databases.actions.createObject.created', { type: t('sidebar.databases.actions.createObject.types.schema'), name }))
+    createSchemaDialogOpen.value = false
+    schemaTreeRef.value?.refresh()
+  }
+  catch (err) {
+    toast.error(t('sidebar.databases.actions.createObject.error', { error: String(err) }))
+  }
+  finally {
+    isDatabaseActionExecuting.value = false
+  }
+}
+
+async function handleDropDatabase() {
+  const connId = getActiveConnectionId()
+  const dbName = selectedDatabase.value
+  if (!connId || !dbName)
+    return
+  isDatabaseActionExecuting.value = true
+  try {
+    const result = await invoke('execute_query', {
+      connectionId: connId,
+      sql: `DROP DATABASE ${dbName}`,
+    })
+    if ((result as any)?.success === false)
+      throw new Error((result as any)?.error?.message || 'Unknown error')
+    toast.success(t('sidebar.databases.actions.dropDatabase.success', { name: dbName }))
+    dropDatabaseDialogOpen.value = false
+    selectedDatabase.value = ''
+    schemaTreeRef.value?.refresh()
+  }
+  catch (err) {
+    toast.error(t('sidebar.databases.actions.dropDatabase.error', { error: String(err) }))
+  }
+  finally {
+    isDatabaseActionExecuting.value = false
+  }
+}
+
+function handleCreateTable(tableName: string, sql: string) {
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+
+  const tab = tabStore.createTab(connId, selectedDatabase.value, selectedSchema.value)
+  tabStore.updateTabName(tab.id, `${tableName}.sql`)
+  tabStore.updateTabContent(tab.id, sql)
+  createTableDialogOpen.value = false
+  toast.success(t('sidebar.databases.actions.createTable.opened'))
+}
+
+function openTemplateTab(kind: string) {
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+
+  const typeLabel = kind.replace('new', '').toUpperCase()
+  const tab = tabStore.createTab(connId, selectedDatabase.value, selectedSchema.value)
+  tabStore.updateTabName(tab.id, `new_${kind.replace('new', '').toLowerCase()}.sql`)
+  tabStore.updateTabContent(tab.id, getTemplateSQL(kind))
+  toast.info(t('sidebar.databases.actions.templateOpened', { type: typeLabel }))
+}
+
+function getTemplateSQL(kind: string): string {
+  const qualified = selectedSchema.value ? `${selectedSchema.value}.` : ''
+
+  switch (kind) {
+    case 'newView':
+      return [
+        `CREATE VIEW ${qualified}your_view_name AS`,
+        'SELECT',
+        '  *',
+        `FROM ${qualified}your_table`,
+        'WHERE',
+        '  your_condition;',
+        '',
+        `-- Note: Replace placeholders above before executing.`,
+      ].join('\n')
+
+    case 'newFunction':
+      return [
+        `CREATE OR REPLACE FUNCTION ${qualified}your_function_name()`,
+        'RETURNS void',
+        'LANGUAGE plpgsql',
+        'AS $$',
+        'BEGIN',
+        '  -- TODO: Implement function body',
+        '  -- E.g.: INSERT INTO audit_log (action) VALUES (\'your_action\');',
+        'END;',
+        '$$;',
+        '',
+        `-- Note: Replace placeholders above before executing.`,
+      ].join('\n')
+
+    case 'newProcedure':
+      return [
+        `CREATE OR REPLACE PROCEDURE ${qualified}your_procedure_name()`,
+        'LANGUAGE plpgsql',
+        'AS $$',
+        'BEGIN',
+        '  -- TODO: Implement procedure body',
+        '  -- E.g.: UPDATE your_table SET updated_at = NOW() WHERE id = 1;',
+        'END;',
+        '$$;',
+        '',
+        `-- Note: Replace placeholders above before executing.`,
+      ].join('\n')
+
+    default:
+      return '-- Select SQL to execute'
+  }
 }
 
 function startSidebarResize(_e: MouseEvent) {
@@ -822,7 +1003,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="text-foreground p-0 h-9 w-9 hover:bg-muted"
+                      class="text-green-600 p-0 h-9 w-9 dark:text-green-400 hover:bg-accent disabled:opacity-40"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="executeQuery"
                     >
@@ -841,12 +1022,12 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="text-foreground p-0 h-9 w-9 hover:bg-muted"
-                      :class="{ '!text-violet-600': !explainAnalyzeMode, '!text-green-600': explainAnalyzeMode }"
+                      class="p-0 h-9 w-9 hover:bg-accent"
+                      :class="{ '!text-amber-500': !explainAnalyzeMode, '!text-emerald-500': explainAnalyzeMode }"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="handleExplainQuery(explainAnalyzeMode)"
                     >
-                      <span class="i-carbon-wand h-5 w-5" />
+                      <span class="i-carbon-diagram h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -860,8 +1041,8 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="text-foreground p-0 h-9 w-9 hover:bg-muted"
-                      :class="explainAnalyzeMode ? '!text-green-600 bg-green-100 dark:text-green-300 dark:bg-green-900/30' : ''"
+                      class="p-0 h-9 w-9 hover:bg-accent"
+                      :class="explainAnalyzeMode ? '!text-violet-600 bg-violet-100 dark:text-violet-300 dark:bg-violet-900/30' : ''"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="toggleExplainMode"
                     >
@@ -880,7 +1061,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="text-foreground p-0 h-9 w-9 hover:bg-muted"
+                      class="text-blue-600 p-0 h-9 w-9 dark:text-blue-400 hover:bg-accent disabled:opacity-40"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="handleToolbarFormat"
                     >
@@ -902,11 +1083,11 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      class="p-0 h-7 w-7"
+                      class="p-0 h-9 w-9 hover:bg-accent"
                       :disabled="!activeTab || !activeTab.content.trim()"
                       @click="handleDownloadQuery"
                     >
-                      <span class="i-carbon-download h-3.5 w-3.5" />
+                      <span class="i-carbon-download text-muted-foreground h-5 w-5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1068,5 +1249,38 @@ function closeResultPanel() {
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    <!-- Create Database dialog -->
+    <CreateObjectDialog
+      :open="createDatabaseDialogOpen"
+      object-type="database"
+      @update:open="(v: boolean) => createDatabaseDialogOpen = v"
+      @confirm="handleCreateDatabase"
+    />
+
+    <!-- Create Schema dialog -->
+    <CreateObjectDialog
+      :open="createSchemaDialogOpen"
+      object-type="schema"
+      @update:open="(v: boolean) => createSchemaDialogOpen = v"
+      @confirm="handleCreateSchema"
+    />
+
+    <!-- Drop Database dialog -->
+    <DropDatabaseDialog
+      :open="dropDatabaseDialogOpen"
+      :database-name="selectedDatabase"
+      @update:open="(v: boolean) => dropDatabaseDialogOpen = v"
+      @confirm="handleDropDatabase"
+    />
+
+    <!-- Create Table dialog -->
+    <CreateTableDialog
+      :open="createTableDialogOpen"
+      :database="selectedDatabase"
+      :schema="selectedSchema || null"
+      @update:open="(v: boolean) => createTableDialogOpen = v"
+      @create="handleCreateTable"
+    />
   </AppLayout>
 </template>

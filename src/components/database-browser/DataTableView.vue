@@ -183,12 +183,16 @@ const pkColumns = computed(() =>
 )
 
 function extractPkValues(row: Record<string, unknown>): Record<string, unknown> {
-  return Object.fromEntries(pkColumns.value.map((col: string) => [col, row[col] ?? null]))
+  const cols = pkColumns.value.length > 0 ? pkColumns.value : (data.value?.columns ?? [])
+  return Object.fromEntries(cols.map((col: string) => [col, row[col] ?? null]))
 }
 
 function formatPkSummary(row: Record<string, unknown>): string {
-  return pkColumns.value.length > 0
-    ? pkColumns.value.map((col: string) => `${col}: ${formatTableValue(row[col])}`).join(', ')
+  const cols = pkColumns.value.length > 0
+    ? pkColumns.value
+    : (data.value?.columns ?? []).slice(0, 3)
+  return cols.length > 0
+    ? cols.map((col: string) => `${col}: ${formatTableValue(row[col])}`).join(', ')
     : Object.entries(row).slice(0, 2).map(([k, v]) => `${k}: ${formatTableValue(v)}`).join(', ')
 }
 
@@ -512,9 +516,8 @@ async function exportCSV() {
 function openDeleteDialog(row: Record<string, unknown>) {
   if (pkColumns.value.length === 0) {
     toast.warning(t('components.dataTableView.notifications.noPrimaryKey'), {
-      description: t('components.dataTableView.notifications.noPrimaryKeyDesc'),
+      description: t('components.dataTableView.notifications.fallbackAllColumns'),
     })
-    return
   }
   deletingRow.value = row
   deleteDialogOpen.value = true
@@ -603,9 +606,8 @@ function rawValueToString(v: unknown): string {
 function openEditDialog(row: Record<string, unknown>) {
   if (pkColumns.value.length === 0) {
     toast.warning(t('components.dataTableView.notifications.noPrimaryKey'), {
-      description: t('components.dataTableView.notifications.noPrimaryKeyDesc'),
+      description: t('components.dataTableView.notifications.fallbackAllColumns'),
     })
-    return
   }
   editingRow.value = row
   editErrors.value = {}
@@ -946,7 +948,7 @@ watch(
 
         <!-- Delete Selected button -->
         <Button
-          v-if="selectedRows.size > 0 && pkColumns.length > 0"
+          v-if="selectedRows.size > 0"
           variant="destructive"
           size="sm"
           class="text-xs flex-shrink-0 h-7"
@@ -1045,7 +1047,7 @@ watch(
         >
           <thead>
             <tr class="border-b">
-              <th v-if="pkColumns.length > 0" class="data-table-header text-center w-10">
+              <th class="data-table-header text-center w-10">
                 <input
                   type="checkbox"
                   class="h-3 w-3 cursor-pointer"
@@ -1080,7 +1082,7 @@ watch(
               class="border-b hover:bg-muted/50"
               :class="{ 'bg-muted/30': selectedRows.has(i) }"
             >
-              <td v-if="pkColumns.length > 0" class="text-xs px-3 py-1.5 text-center w-10">
+              <td class="text-xs px-3 py-1.5 text-center w-10">
                 <input
                   type="checkbox"
                   class="h-3 w-3 cursor-pointer"
@@ -1107,7 +1109,7 @@ watch(
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="text-foreground h-6 w-6"
+                    class="text-blue-600 h-6 w-6 dark:text-blue-400"
                     :title="t('components.dataTableView.editRow')"
                     @click.stop="openEditDialog(row)"
                   >
@@ -1117,7 +1119,7 @@ watch(
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="text-foreground h-6 w-6 hover:text-destructive"
+                    class="text-rose-500 h-6 w-6 dark:text-rose-400 hover:text-red-600 dark:hover:text-red-400"
                     :title="t('components.dataTableView.deleteRow')"
                     @click.stop="openDeleteDialog(row)"
                   >
