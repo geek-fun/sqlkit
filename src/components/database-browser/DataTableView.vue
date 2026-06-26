@@ -334,14 +334,8 @@ async function fetchColumnInfo() {
       tableName: props.tableName,
     })
     columnInfoList.value = result
-    // Check if PK detection succeeded
-    const hasPk = result.some(c => c.is_primary_key)
-    if (!hasPk && result.length > 0) {
-      console.warn('[DataTableView] No primary key detected in columns:', result)
-    }
   }
-  catch (err) {
-    console.error('[DataTableView] Failed to fetch column info:', err)
+  catch {
     columnInfoList.value = []
   }
 }
