@@ -682,7 +682,11 @@ impl DatabaseAdapter for MySQLAdapter {
                 let max_length: Option<u32> = row.get_opt(4).and_then(|r| r.ok()).flatten();
                 let precision: Option<u32> = row.get_opt(5).and_then(|r| r.ok()).flatten();
                 let scale: Option<u32> = row.get_opt(6).and_then(|r| r.ok()).flatten();
-                let column_key: String = row.get_opt(7).and_then(|r| r.ok()).unwrap_or_default();
+                // Use name-based access for COLUMN_KEY to avoid index ordering issues
+                let column_key: String = row
+                    .get_opt("COLUMN_KEY")
+                    .and_then(|r| r.ok())
+                    .unwrap_or_default();
                 let extra: String = row.get_opt(8).and_then(|r| r.ok()).unwrap_or_default();
                 let description: Option<String> = row.get_opt(9).and_then(|r| r.ok()).flatten();
 
