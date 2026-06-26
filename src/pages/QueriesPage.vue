@@ -2,6 +2,7 @@
 import type { StatementToExecute } from '@/composables/useSqlStatements'
 import type { DatabaseType } from '@/store/connectionStore'
 import type { TableInfo } from '@/store/databaseStore'
+import type { ApiResponse } from '@/types/api'
 import { invoke } from '@tauri-apps/api/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -21,6 +22,7 @@ import { usePlatform } from '@/composables/usePlatform'
 import { useSqlFormatter } from '@/composables/useSqlFormatter'
 import { browseApi, loadQueryFile, saveQueryFile, saveQueryFileAs, saveQueryMetadata } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
+import { isApiSuccess } from '@/types/api'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -710,15 +712,16 @@ async function handleCreateDatabase(name: string, options: { charset?: string, c
     if (options.locale)
       sql += ` LC_COLLATE '${options.locale}'`
 
-    const result = await invoke('execute_query', {
+    const result: ApiResponse<unknown> = await invoke('execute_query', {
       connectionId: connId,
       sql,
     })
-    if ((result as any)?.success === false)
-      throw new Error((result as any)?.error?.message || 'Unknown error')
+    if (!isApiSuccess(result))
+      throw new Error(result.error?.message || 'Unknown error')
     toast.success(t('sidebar.databases.actions.createObject.created', { type: t('sidebar.databases.actions.createObject.types.database'), name }))
     createDatabaseDialogOpen.value = false
-    schemaTreeRef.value?.refresh()
+    // Refresh database list without switching to Mode A
+    await databaseStore.fetchDatabases(connId)
   }
   catch (err) {
     toast.error(t('sidebar.databases.actions.createObject.error', { error: String(err) }))
@@ -734,12 +737,12 @@ async function handleCreateSchema(name: string) {
     return
   isDatabaseActionExecuting.value = true
   try {
-    const result = await invoke('execute_query', {
+    const result: ApiResponse<unknown> = await invoke('execute_query', {
       connectionId: connId,
       sql: `CREATE SCHEMA ${name}`,
     })
-    if ((result as any)?.success === false)
-      throw new Error((result as any)?.error?.message || 'Unknown error')
+    if (!isApiSuccess(result))
+      throw new Error(result.error?.message || 'Unknown error')
     toast.success(t('sidebar.databases.actions.createObject.created', { type: t('sidebar.databases.actions.createObject.types.schema'), name }))
     createSchemaDialogOpen.value = false
     schemaTreeRef.value?.refresh()
@@ -759,16 +762,17 @@ async function handleDropDatabase() {
     return
   isDatabaseActionExecuting.value = true
   try {
-    const result = await invoke('execute_query', {
+    const result: ApiResponse<unknown> = await invoke('execute_query', {
       connectionId: connId,
       sql: `DROP DATABASE ${dbName}`,
     })
-    if ((result as any)?.success === false)
-      throw new Error((result as any)?.error?.message || 'Unknown error')
+    if (!isApiSuccess(result))
+      throw new Error(result.error?.message || 'Unknown error')
     toast.success(t('sidebar.databases.actions.dropDatabase.success', { name: dbName }))
     dropDatabaseDialogOpen.value = false
     selectedDatabase.value = ''
-    schemaTreeRef.value?.refresh()
+    // Refresh database list after dropping
+    await databaseStore.fetchDatabases(connId)
   }
   catch (err) {
     toast.error(t('sidebar.databases.actions.dropDatabase.error', { error: String(err) }))
