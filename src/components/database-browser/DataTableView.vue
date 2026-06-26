@@ -1047,16 +1047,16 @@ watch(
         >
           <thead>
             <tr class="border-b">
-              <th class="data-table-header text-center w-10">
-                <input
-                  type="checkbox"
-                  class="h-3 w-3 cursor-pointer"
-                  :checked="allRowsSelected"
-                  @change="toggleSelectAll"
-                >
-              </th>
-              <th class="data-table-header text-center w-10">
-                #
+              <th class="data-table-header text-center w-16">
+                <div class="flex gap-1 items-center justify-center">
+                  <input
+                    type="checkbox"
+                    class="h-3 w-3 cursor-pointer"
+                    :checked="allRowsSelected"
+                    @change="toggleSelectAll"
+                  >
+                  <span class="text-xs text-muted-foreground font-normal">#</span>
+                </div>
               </th>
               <th
                 v-for="col in visibleColumns"
@@ -1082,16 +1082,16 @@ watch(
               class="border-b hover:bg-muted/50"
               :class="{ 'bg-muted/30': selectedRows.has(i) }"
             >
-              <td class="text-xs px-3 py-1.5 text-center w-10">
-                <input
-                  type="checkbox"
-                  class="h-3 w-3 cursor-pointer"
-                  :checked="selectedRows.has(i)"
-                  @change="toggleRowSelection(i)"
-                >
-              </td>
-              <td class="text-xs text-muted-foreground px-3 py-1.5 text-center w-10">
-                {{ offset + i + 1 }}
+              <td class="text-xs px-2 py-1.5 text-center w-16">
+                <div class="flex gap-1 items-center justify-center">
+                  <input
+                    type="checkbox"
+                    class="h-3 w-3 cursor-pointer"
+                    :checked="selectedRows.has(i)"
+                    @change="toggleRowSelection(i)"
+                  >
+                  <span class="text-muted-foreground tabular-nums">{{ offset + i + 1 }}</span>
+                </div>
               </td>
               <td
                 v-for="col in visibleColumns"
@@ -1402,7 +1402,7 @@ watch(
 
 /* In body rows the actions cell background should match the row hover state */
 tr:hover .data-table-actions-col {
-  background-color: hsl(var(--muted) / 0.5);
+  background-color: hsl(var(--muted));
 }
 
 .col-header-cell {

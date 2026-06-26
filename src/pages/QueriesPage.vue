@@ -10,7 +10,7 @@ import { DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/compon
 import ListingTab from '@/components/database-browser/ListingTab.vue'
 import ErDiagramView from '@/components/er-diagram/ErDiagramView.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { ConnectionSelector, CreateObjectDialog, CreateTableDialog, DatabaseSelectorRow, DropDatabaseDialog, SavedQueriesPanel, SchemaTree, SidebarSplitView } from '@/components/sidebar'
+import { ConnectionSelector, CreateDatabaseDialog, CreateObjectDialog, CreateTableDialog, DatabaseSelectorRow, DropDatabaseDialog, SavedQueriesPanel, SchemaTree, SidebarSplitView } from '@/components/sidebar'
 import SQLEditor from '@/components/SQLEditor.vue'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
@@ -694,15 +694,25 @@ function handleDatabaseAction(kind: string) {
 
 // ── Database CRUD handlers ──
 
-async function handleCreateDatabase(name: string) {
+async function handleCreateDatabase(name: string, options: { charset?: string, collation?: string, encoding?: string, locale?: string }) {
   const connId = getActiveConnectionId()
   if (!connId)
     return
   isDatabaseActionExecuting.value = true
   try {
+    let sql = `CREATE DATABASE ${name}`
+    if (options.charset)
+      sql += ` CHARACTER SET ${options.charset}`
+    if (options.collation)
+      sql += ` COLLATE ${options.collation}`
+    if (options.encoding)
+      sql += ` ENCODING '${options.encoding}'`
+    if (options.locale)
+      sql += ` LC_COLLATE '${options.locale}'`
+
     const result = await invoke('execute_query', {
       connectionId: connId,
-      sql: `CREATE DATABASE ${name}`,
+      sql,
     })
     if ((result as any)?.success === false)
       throw new Error((result as any)?.error?.message || 'Unknown error')
@@ -1251,9 +1261,9 @@ function closeResultPanel() {
     </AlertDialog>
 
     <!-- Create Database dialog -->
-    <CreateObjectDialog
+    <CreateDatabaseDialog
       :open="createDatabaseDialogOpen"
-      object-type="database"
+      :database-type="activeConnection?.type"
       @update:open="(v: boolean) => createDatabaseDialogOpen = v"
       @confirm="handleCreateDatabase"
     />
@@ -1279,6 +1289,7 @@ function closeResultPanel() {
       :open="createTableDialogOpen"
       :database="selectedDatabase"
       :schema="selectedSchema || null"
+      :database-type="activeConnection?.type"
       @update:open="(v: boolean) => createTableDialogOpen = v"
       @create="handleCreateTable"
     />

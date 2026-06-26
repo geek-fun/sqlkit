@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { DatabaseType } from '@/store/connectionStore'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
@@ -29,10 +30,13 @@ type Props = {
   database: string | null
   /** Optional schema context */
   schema?: string | null
+  /** Database type for engine/options */
+  databaseType?: DatabaseType
 }
 
 const props = withDefaults(defineProps<Props>(), {
   schema: null,
+  databaseType: undefined,
 })
 
 const emit = defineEmits<{
@@ -41,6 +45,27 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+
+const MYSQL_COMPAT = new Set<DatabaseType>([
+  DatabaseType.MYSQL,
+  DatabaseType.MARIADB,
+  DatabaseType.TIDB,
+  DatabaseType.OCEANBASE,
+  DatabaseType.TDSQL,
+  DatabaseType.POLARDB,
+  DatabaseType.DORIS,
+  DatabaseType.SELECTDB,
+  DatabaseType.STARROCKS,
+  DatabaseType.DATABEND,
+  DatabaseType.GOLDENDB,
+  DatabaseType.MANTICORESEARCH,
+  DatabaseType.SINGLESTOREMEMSQL,
+  DatabaseType.CLOUDSQLMYSQL,
+])
+
+const MYSQL_ENGINES = ['InnoDB', 'MyISAM', 'MEMORY', 'CSV', 'ARCHIVE', 'BLACKHOLE']
+
+const isMySQL = computed(() => props.databaseType && MYSQL_COMPAT.has(props.databaseType))
 
 const COMMON_TYPES = [
   'INTEGER',
@@ -73,12 +98,14 @@ const COMMON_TYPES = [
 ]
 
 const tableName = ref('')
+const tableEngine = ref('InnoDB')
 const columns = ref<ColumnDef[]>([])
 let nextColId = 1
 
 watch(() => props.open, (open) => {
   if (open) {
     tableName.value = ''
+    tableEngine.value = 'InnoDB'
     columns.value = []
     nextColId = 1
     addColumn()
@@ -134,7 +161,12 @@ const ddlPreview = computed(() => {
   if (pkCols.length > 0)
     colLines.push(`  PRIMARY KEY (${pkCols.join(', ')})`)
 
-  return `CREATE TABLE ${fullName} (\n${colLines.join(',\n')}\n);`
+  let ddl = `CREATE TABLE ${fullName} (\n${colLines.join(',\n')}\n)`
+  if (isMySQL.value)
+    ddl += ` ENGINE=${tableEngine.value}`
+  ddl += ';'
+
+  return ddl
 })
 
 function handleCreate() {
@@ -152,10 +184,21 @@ function handleCreate() {
       </DialogHeader>
 
       <div class="space-y-4">
-        <!-- Table name -->
+        <!-- Table name + Engine for MySQL -->
         <div class="flex gap-2 items-center">
           <Label class="text-xs shrink-0 w-24">{{ t('sidebar.databases.actions.createTable.tableName') }}</Label>
           <Input v-model="tableName" :placeholder="t('sidebar.databases.actions.createTable.tableNamePlaceholder')" class="text-xs flex-1" />
+          <template v-if="isMySQL">
+            <Label class="text-xs shrink-0">{{ t('sidebar.databases.actions.createTable.engine') }}</Label>
+            <select
+              v-model="tableEngine"
+              class="text-xs px-2 border border-input rounded-md bg-background h-7 w-24"
+            >
+              <option v-for="eng in MYSQL_ENGINES" :key="eng" :value="eng">
+                {{ eng }}
+              </option>
+            </select>
+          </template>
         </div>
 
         <!-- Column grid -->
