@@ -127,6 +127,43 @@ impl ConnectionPool for MySQLPool {
     }
 }
 
+/// Try to read a column value as String, falling back to UTF-8 decoded bytes
+/// if the direct String conversion fails. This handles cases where mysql_async's
+/// `FromValue<String>` fails on certain INFORMATION_SCHEMA virtual table columns
+/// due to charset/collation differences between the virtual table encoding
+/// and the connection's character set.
+fn get_str(row: &Row, idx: usize) -> String {
+    row.get_opt::<String, _>(idx)
+        .and_then(|r| r.ok())
+        .or_else(|| {
+            row.get_opt::<Vec<u8>, _>(idx)
+                .and_then(|r| r.ok())
+                .map(|b| String::from_utf8_lossy(&b).to_string())
+        })
+        .unwrap_or_default()
+}
+
+fn get_str_by_name(row: &Row, name: &str) -> String {
+    row.get_opt::<String, _>(name)
+        .and_then(|r| r.ok())
+        .or_else(|| {
+            row.get_opt::<Vec<u8>, _>(name)
+                .and_then(|r| r.ok())
+                .map(|b| String::from_utf8_lossy(&b).to_string())
+        })
+        .unwrap_or_default()
+}
+
+fn get_opt_str(row: &Row, idx: usize) -> Option<String> {
+    row.get_opt::<String, _>(idx)
+        .and_then(|r| r.ok())
+        .or_else(|| {
+            row.get_opt::<Vec<u8>, _>(idx)
+                .and_then(|r| r.ok())
+                .map(|b| String::from_utf8_lossy(&b).to_string())
+        })
+}
+
 /// MySQL database adapter.
 pub struct MySQLAdapter {
     pub(crate) config: ConnectionConfig,
@@ -669,46 +706,21 @@ impl DatabaseAdapter for MySQLAdapter {
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
 
-        // Fetch primary key columns using a dedicated query that bypasses
-        // charset/collation conversion quirks of INFORMATION_SCHEMA.COLUMNS.
-        // This is more reliable than COLUMN_KEY which can silently fail
-        // to convert in mysql_async depending on charset.
-        let pk_columns: std::collections::HashSet<String> = {
-            let pk_query = "SELECT COLUMN_NAME
-                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
-                WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
-                    AND CONSTRAINT_NAME = 'PRIMARY'";
-            conn.exec(pk_query, (db_name, table))
-                .await
-                .map(|pk_rows: Vec<Row>| {
-                    pk_rows
-                        .into_iter()
-                        .filter_map(|r| r.get_opt::<String, _>(0).and_then(|v| v.ok()))
-                        .collect()
-                })
-                .unwrap_or_default()
-        };
-
         let columns = rows
             .into_iter()
             .map(|row| {
-                let name: String = row.get_opt(0).and_then(|r| r.ok()).unwrap_or_default();
-                let data_type: String = row.get_opt(1).and_then(|r| r.ok()).unwrap_or_default();
-                let is_nullable: String = row
-                    .get_opt(2)
-                    .and_then(|r| r.ok())
-                    .unwrap_or_else(|| "YES".to_string());
-                let default_value: Option<String> = row.get_opt(3).and_then(|r| r.ok()).flatten();
+                let name: String = get_str(&row, 0);
+                let data_type: String = get_str(&row, 1);
+                let is_nullable: String = get_str(&row, 2);
+                let default_value: Option<String> = get_opt_str(&row, 3);
                 let max_length: Option<u32> = row.get_opt(4).and_then(|r| r.ok()).flatten();
                 let precision: Option<u32> = row.get_opt(5).and_then(|r| r.ok()).flatten();
                 let scale: Option<u32> = row.get_opt(6).and_then(|r| r.ok()).flatten();
-                // COLUMN_KEY extraction removed — use pk_columns HashSet instead.
-                // Note: COLUMN_KEY is still in the SELECT (index 7) for column ordering,
-                // but its value is not read.
-                let extra: String = row.get_opt(8).and_then(|r| r.ok()).unwrap_or_default();
-                let description: Option<String> = row.get_opt(9).and_then(|r| r.ok()).flatten();
+                let column_key: String = get_str_by_name(&row, "COLUMN_KEY");
+                let extra: String = get_str(&row, 8);
+                let description: Option<String> = get_opt_str(&row, 9);
 
-                let is_primary_key = pk_columns.contains(&name);
+                let is_primary_key = column_key.eq_ignore_ascii_case("PRI");
                 let is_auto_increment = extra.to_uppercase().contains("AUTO_INCREMENT");
 
                 ColumnInfo {
