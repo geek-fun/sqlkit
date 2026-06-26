@@ -1510,6 +1510,7 @@ export const zhCN = {
           encoding: '编码',
           locale: '区域设置',
           localePlaceholder: '例如 en_US.UTF-8',
+          optional: '可选',
           cancel: '取消',
           confirm: '创建',
         },

@@ -137,7 +137,7 @@ function handleConfirm() {
 
       <div class="space-y-3">
         <div class="space-y-1.5">
-          <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.name') }}</Label>
+          <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.name') }} <span class="text-destructive">*</span></Label>
           <Input
             v-model="objectName"
             :placeholder="t('sidebar.databases.actions.createDatabase.namePlaceholder')"
@@ -149,7 +149,7 @@ function handleConfirm() {
         <!-- MySQL options -->
         <template v-if="hasCharset">
           <div class="space-y-1.5">
-            <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.charset') }}</Label>
+            <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.charset') }} <span class="text-muted-foreground font-normal">({{ t('sidebar.databases.actions.createDatabase.optional') }})</span></Label>
             <Select v-model="charset">
               <SelectTrigger class="text-xs h-8">
                 <SelectValue />
@@ -162,7 +162,7 @@ function handleConfirm() {
             </Select>
           </div>
           <div class="space-y-1.5">
-            <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.collation') }}</Label>
+            <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.collation') }} <span class="text-muted-foreground font-normal">({{ t('sidebar.databases.actions.createDatabase.optional') }})</span></Label>
             <Input
               v-model="collation"
               :placeholder="t('sidebar.databases.actions.createDatabase.collationPlaceholder')"
@@ -175,7 +175,7 @@ function handleConfirm() {
         <!-- PostgreSQL options -->
         <template v-if="hasEncoding">
           <div class="space-y-1.5">
-            <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.encoding') }}</Label>
+            <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.encoding') }} <span class="text-muted-foreground font-normal">({{ t('sidebar.databases.actions.createDatabase.optional') }})</span></Label>
             <Select v-model="encoding">
               <SelectTrigger class="text-xs h-8">
                 <SelectValue />
@@ -188,7 +188,7 @@ function handleConfirm() {
             </Select>
           </div>
           <div class="space-y-1.5">
-            <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.locale') }}</Label>
+            <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.locale') }} <span class="text-muted-foreground font-normal">({{ t('sidebar.databases.actions.createDatabase.optional') }})</span></Label>
             <Input
               v-model="locale"
               :placeholder="t('sidebar.databases.actions.createDatabase.localePlaceholder')"
