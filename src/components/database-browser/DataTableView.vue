@@ -327,15 +327,21 @@ async function fetchColumnInfo() {
     return
   }
   try {
-    columnInfoList.value = await invoke<ColumnTypeInfo[]>('list_columns', {
+    const result = await invoke<ColumnTypeInfo[]>('list_columns', {
       connectionId: props.connectionId,
       database: props.database,
       schema: props.schema ?? null,
       tableName: props.tableName,
     })
+    columnInfoList.value = result
+    // Check if PK detection succeeded
+    const hasPk = result.some(c => c.is_primary_key)
+    if (!hasPk && result.length > 0) {
+      console.warn('[DataTableView] No primary key detected in columns:', result)
+    }
   }
   catch (err) {
-    console.error('Failed to fetch column info:', err)
+    console.error('[DataTableView] Failed to fetch column info:', err)
     columnInfoList.value = []
   }
 }
