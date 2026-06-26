@@ -1,5 +1,6 @@
 export { default as ChangeConnectionDialog } from './ChangeConnectionDialog.vue'
 export { default as ConnectionSelector } from './ConnectionSelector.vue'
+export { default as CreateDatabaseDialog } from './CreateDatabaseDialog.vue'
 export { default as CreateObjectDialog } from './CreateObjectDialog.vue'
 export { default as CreateTableDialog } from './CreateTableDialog.vue'
 export { default as DatabaseSelectorRow } from './DatabaseSelectorRow.vue'
