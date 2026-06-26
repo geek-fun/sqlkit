@@ -1510,6 +1510,7 @@ export const enUS = {
           encoding: 'Encoding',
           locale: 'Locale / LC_COLLATE',
           localePlaceholder: 'e.g. en_US.UTF-8',
+          optional: 'optional',
           cancel: 'Cancel',
           confirm: 'Create',
         },
