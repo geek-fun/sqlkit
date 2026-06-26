@@ -669,6 +669,26 @@ impl DatabaseAdapter for MySQLAdapter {
             .await
             .map_err(|e| DbError::QueryExecution(e.to_string()))?;
 
+        // Fetch primary key columns using a dedicated query that bypasses
+        // charset/collation conversion quirks of INFORMATION_SCHEMA.COLUMNS.
+        // This is more reliable than COLUMN_KEY which can silently fail
+        // to convert in mysql_async depending on charset.
+        let pk_columns: std::collections::HashSet<String> = {
+            let pk_query = "SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE
+                WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?
+                    AND CONSTRAINT_NAME = 'PRIMARY'";
+            conn.exec(pk_query, (db_name, table))
+                .await
+                .map(|pk_rows: Vec<Row>| {
+                    pk_rows
+                        .into_iter()
+                        .filter_map(|r| r.get_opt::<String, _>(0).and_then(|v| v.ok()))
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+
         let columns = rows
             .into_iter()
             .map(|row| {
@@ -682,15 +702,13 @@ impl DatabaseAdapter for MySQLAdapter {
                 let max_length: Option<u32> = row.get_opt(4).and_then(|r| r.ok()).flatten();
                 let precision: Option<u32> = row.get_opt(5).and_then(|r| r.ok()).flatten();
                 let scale: Option<u32> = row.get_opt(6).and_then(|r| r.ok()).flatten();
-                // Use name-based access for COLUMN_KEY to avoid index ordering issues
-                let column_key: String = row
-                    .get_opt("COLUMN_KEY")
-                    .and_then(|r| r.ok())
-                    .unwrap_or_default();
+                // COLUMN_KEY extraction removed — use pk_columns HashSet instead.
+                // Note: COLUMN_KEY is still in the SELECT (index 7) for column ordering,
+                // but its value is not read.
                 let extra: String = row.get_opt(8).and_then(|r| r.ok()).unwrap_or_default();
                 let description: Option<String> = row.get_opt(9).and_then(|r| r.ok()).flatten();
 
-                let is_primary_key = column_key.to_uppercase().contains("PRI");
+                let is_primary_key = pk_columns.contains(&name);
                 let is_auto_increment = extra.to_uppercase().contains("AUTO_INCREMENT");
 
                 ColumnInfo {
