@@ -702,15 +702,34 @@ async function handleCreateDatabase(name: string, options: { charset?: string, c
     return
   isDatabaseActionExecuting.value = true
   try {
-    let sql = `CREATE DATABASE ${name}`
-    if (options.charset)
-      sql += ` CHARACTER SET ${options.charset}`
-    if (options.collation)
-      sql += ` COLLATE ${options.collation}`
-    if (options.encoding)
-      sql += ` ENCODING '${options.encoding}'`
-    if (options.locale)
-      sql += ` LC_COLLATE '${options.locale}'`
+    const dbType = activeConnection.value?.type
+
+    // Build database-specific CREATE DATABASE SQL
+    const MYSQL_SET = new Set(['MYSQL', 'MARIADB', 'TIDB', 'OCEANBASE', 'TDSQL', 'POLARDB', 'DORIS', 'SELECTDB', 'STARROCKS', 'DATABEND', 'GOLDENDB', 'MANTICORESEARCH', 'SINGLESTOREMEMSQL', 'CLOUDSQLMYSQL'])
+    const PG_SET = new Set(['POSTGRESQL', 'COCKROACHDB', 'REDSHIFT', 'YUGABYTEDB', 'TIMESCALEDB', 'KINGBASEES', 'GAUSSDB', 'HIGHGO', 'UXDB', 'OPENGAUSS', 'GBASE8C', 'QUESTDB', 'VASTBASE', 'YASHANDB', 'GREENPLUM', 'ENTERPRISEDB', 'CRATEDB', 'MATERIALIZE', 'ALLOYDB', 'CLOUDSQLPG', 'FUJITSUPG'])
+    const MSSQL_SET = new Set(['SQLSERVER', 'HANA'])
+
+    let sql: string
+    if (dbType && MYSQL_SET.has(dbType)) {
+      sql = `CREATE DATABASE \`${name}\``
+      if (options.charset)
+        sql += ` CHARACTER SET ${options.charset}`
+      if (options.collation)
+        sql += ` COLLATE ${options.collation}`
+    }
+    else if (dbType && PG_SET.has(dbType)) {
+      sql = `CREATE DATABASE "${name}"`
+      if (options.encoding)
+        sql += ` ENCODING '${options.encoding}'`
+      if (options.locale)
+        sql += ` LC_COLLATE '${options.locale}'`
+    }
+    else if (dbType && MSSQL_SET.has(dbType)) {
+      sql = `CREATE DATABASE [${name}]`
+    }
+    else {
+      sql = `CREATE DATABASE ${name}`
+    }
 
     const result: ApiResponse<unknown> = await invoke('execute_query', {
       connectionId: connId,
@@ -762,9 +781,24 @@ async function handleDropDatabase() {
     return
   isDatabaseActionExecuting.value = true
   try {
+    const dbType = activeConnection.value?.type
+    const MYSQL_SET = new Set(['MYSQL', 'MARIADB', 'TIDB', 'OCEANBASE', 'TDSQL', 'POLARDB', 'DORIS', 'SELECTDB', 'STARROCKS', 'DATABEND', 'GOLDENDB', 'MANTICORESEARCH', 'SINGLESTOREMEMSQL', 'CLOUDSQLMYSQL'])
+    const PG_SET = new Set(['POSTGRESQL', 'COCKROACHDB', 'REDSHIFT', 'YUGABYTEDB', 'TIMESCALEDB', 'KINGBASEES', 'GAUSSDB', 'HIGHGO', 'UXDB', 'OPENGAUSS', 'GBASE8C', 'QUESTDB', 'VASTBASE', 'YASHANDB', 'GREENPLUM', 'ENTERPRISEDB', 'CRATEDB', 'MATERIALIZE', 'ALLOYDB', 'CLOUDSQLPG', 'FUJITSUPG'])
+    const MSSQL_SET = new Set(['SQLSERVER', 'HANA'])
+
+    let sql: string
+    if (dbType && MYSQL_SET.has(dbType))
+      sql = `DROP DATABASE \`${dbName}\``
+    else if (dbType && PG_SET.has(dbType))
+      sql = `DROP DATABASE "${dbName}"`
+    else if (dbType && MSSQL_SET.has(dbType))
+      sql = `DROP DATABASE [${dbName}]`
+    else
+      sql = `DROP DATABASE ${dbName}`
+
     const result: ApiResponse<unknown> = await invoke('execute_query', {
       connectionId: connId,
-      sql: `DROP DATABASE ${dbName}`,
+      sql,
     })
     if (!isApiSuccess(result))
       throw new Error(result.error?.message || 'Unknown error')
