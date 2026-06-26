@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { DatabaseType } from '@/store/connectionStore'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
@@ -19,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { DatabaseType } from '@/store/connectionStore'
 
 const props = withDefaults(defineProps<Props>(), {
   databaseType: undefined,
@@ -46,46 +46,46 @@ const MYSQL_CHARSETS = [
 
 const PG_ENCODINGS = ['UTF8', 'LATIN1', 'LATIN2', 'LATIN3', 'LATIN4', 'SQL_ASCII', 'BIG5', 'EUC_JP', 'EUC_KR', 'GB18030', 'GBK', 'ISO_8859_5', 'ISO_8859_13', 'ISO_8859_15', 'KOI8R', 'KOI8U', 'UNICODE', 'WIN1250', 'WIN1251', 'WIN1252', 'WIN866']
 
- const MYSQL_COMPAT = new Set<DatabaseType>([
-   DatabaseType.MYSQL,
-   DatabaseType.MARIADB,
-   DatabaseType.TIDB,
-   DatabaseType.OCEANBASE,
-   DatabaseType.TDSQL,
-   DatabaseType.POLARDB,
-   DatabaseType.DORIS,
-   DatabaseType.SELECTDB,
-   DatabaseType.STARROCKS,
-   DatabaseType.DATABEND,
-   DatabaseType.GOLDENDB,
-   DatabaseType.MANTICORESEARCH,
-   DatabaseType.SINGLESTOREMEMSQL,
-   DatabaseType.CLOUDSQLMYSQL,
- ])
+const MYSQL_COMPAT = new Set<DatabaseType>([
+  DatabaseType.MYSQL,
+  DatabaseType.MARIADB,
+  DatabaseType.TIDB,
+  DatabaseType.OCEANBASE,
+  DatabaseType.TDSQL,
+  DatabaseType.POLARDB,
+  DatabaseType.DORIS,
+  DatabaseType.SELECTDB,
+  DatabaseType.STARROCKS,
+  DatabaseType.DATABEND,
+  DatabaseType.GOLDENDB,
+  DatabaseType.MANTICORESEARCH,
+  DatabaseType.SINGLESTOREMEMSQL,
+  DatabaseType.CLOUDSQLMYSQL,
+])
 
- const PG_COMPAT = new Set<DatabaseType>([
-   DatabaseType.POSTGRESQL,
-   DatabaseType.COCKROACHDB,
-   DatabaseType.REDSHIFT,
-   DatabaseType.YUGABYTEDB,
-   DatabaseType.TIMESCALEDB,
-   DatabaseType.KINGBASEES,
-   DatabaseType.GAUSSDB,
-   DatabaseType.HIGHGO,
-   DatabaseType.UXDB,
-   DatabaseType.OPENGAUSS,
-   DatabaseType.GBASE8C,
-   DatabaseType.QUESTDB,
-   DatabaseType.VASTBASE,
-   DatabaseType.YASHANDB,
-   DatabaseType.GREENPLUM,
-   DatabaseType.ENTERPRISEDB,
-   DatabaseType.CRATEDB,
-   DatabaseType.MATERIALIZE,
-   DatabaseType.ALLOYDB,
-   DatabaseType.CLOUDSQLPG,
-   DatabaseType.FUJITSUPG,
- ])
+const PG_COMPAT = new Set<DatabaseType>([
+  DatabaseType.POSTGRESQL,
+  DatabaseType.COCKROACHDB,
+  DatabaseType.REDSHIFT,
+  DatabaseType.YUGABYTEDB,
+  DatabaseType.TIMESCALEDB,
+  DatabaseType.KINGBASEES,
+  DatabaseType.GAUSSDB,
+  DatabaseType.HIGHGO,
+  DatabaseType.UXDB,
+  DatabaseType.OPENGAUSS,
+  DatabaseType.GBASE8C,
+  DatabaseType.QUESTDB,
+  DatabaseType.VASTBASE,
+  DatabaseType.YASHANDB,
+  DatabaseType.GREENPLUM,
+  DatabaseType.ENTERPRISEDB,
+  DatabaseType.CRATEDB,
+  DatabaseType.MATERIALIZE,
+  DatabaseType.ALLOYDB,
+  DatabaseType.CLOUDSQLPG,
+  DatabaseType.FUJITSUPG,
+])
 
 type Props = {
   open: boolean

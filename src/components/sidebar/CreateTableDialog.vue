@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { DatabaseType } from '@/store/connectionStore'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
@@ -12,6 +11,7 @@ import {
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { DatabaseType } from '@/store/connectionStore'
 
 type ColumnDef = {
   id: number
@@ -232,14 +232,14 @@ function handleCreate() {
             <!-- Move buttons -->
             <div class="flex gap-0.5 col-span-1">
               <button
-                class="text-muted-foreground flex h-4 w-4 items-center justify-center hover:text-foreground disabled:opacity-20"
+                class="text-muted-foreground flex h-4 w-4 cursor-pointer items-center justify-center hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
                 :disabled="index === 0"
                 @click="moveColumn(index, -1)"
               >
                 <span class="i-lucide-chevron-up h-3 w-3" />
               </button>
               <button
-                class="text-muted-foreground flex h-4 w-4 items-center justify-center hover:text-foreground disabled:opacity-20"
+                class="text-muted-foreground flex h-4 w-4 cursor-pointer items-center justify-center hover:text-foreground disabled:opacity-20 disabled:cursor-not-allowed"
                 :disabled="index === columns.length - 1"
                 @click="moveColumn(index, 1)"
               >
@@ -306,7 +306,7 @@ function handleCreate() {
             <!-- Remove -->
             <div class="flex col-span-1 justify-center">
               <button
-                class="text-muted-foreground flex h-5 w-5 items-center justify-center hover:text-destructive disabled:opacity-20"
+                class="text-muted-foreground flex h-5 w-5 cursor-pointer items-center justify-center hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed"
                 :disabled="columns.length <= 1"
                 @click="removeColumn(col.id)"
               >
