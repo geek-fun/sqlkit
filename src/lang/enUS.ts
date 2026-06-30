@@ -1407,7 +1407,6 @@ export const enUS = {
     checkFailed: 'Failed to check for updates',
     downloading: 'Downloading update...',
     installing: 'Installing update...',
-    installed: 'Update installed. Restarting...',
     installFailed: 'Failed to install update',
     skip: 'Skip This Version',
     later: 'Later',

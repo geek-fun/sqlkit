@@ -1407,7 +1407,6 @@ export const zhCN = {
     checkFailed: '检查更新失败',
     downloading: '正在下载更新...',
     installing: '正在安装更新...',
-    installed: '更新已安装，正在重启...',
     installFailed: '安装更新失败',
     skip: '跳过此版本',
     later: '稍后',
