@@ -1409,6 +1409,11 @@ export const zhCN = {
     installing: '正在安装更新...',
     installed: '更新已安装，正在重启...',
     installFailed: '安装更新失败',
+    skip: '跳过此版本',
+    later: '稍后',
+    updateNow: '立即更新',
+    restarting: '正在重启...',
+    downloadingPercent: '下载中 {percent}%',
   },
   errors: {
     unexpected: '意外错误：{error}',

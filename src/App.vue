@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted, watch } from 'vue'
 import { RouterView } from 'vue-router'
 import AppNotifications from '@/components/ui/notification/AppNotifications.vue'
+import UpdateNotification from '@/components/UpdateNotification.vue'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { useAccountStore } from '@/store/accountStore'
 import { useAppStore } from '@/store/appStore'
@@ -41,4 +42,5 @@ onUnmounted(() => {
 <template>
   <RouterView />
   <AppNotifications />
+  <UpdateNotification />
 </template>

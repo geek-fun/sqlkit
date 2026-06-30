@@ -1,9 +1,12 @@
 import type { DownloadEvent, Update } from '@tauri-apps/plugin-updater'
 import { relaunch } from '@tauri-apps/plugin-process'
 import { check } from '@tauri-apps/plugin-updater'
+import { useLocalStorage } from '@vueuse/core'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from './useNotifications'
+
+const skipVersion = useLocalStorage('sqlkit-skip-version', '')
 
 export function useAppUpdater() {
   const { t } = useI18n()
@@ -12,6 +15,7 @@ export function useAppUpdater() {
   const isChecking = ref(false)
   const isDownloading = ref(false)
   const isInstalling = ref(false)
+  const isRestarting = ref(false)
 
   /** Accumulated downloaded bytes for the current update download */
   const downloadedBytes = ref(0)
@@ -32,7 +36,7 @@ export function useAppUpdater() {
       isChecking.value = true
       const update = await check()
 
-      if (update) {
+      if (update && update.version !== skipVersion.value) {
         updateAvailable.value = true
         updateInfo.value = update
 
@@ -73,9 +77,16 @@ export function useAppUpdater() {
       isDownloading.value = true
       downloadedBytes.value = 0
       contentLength.value = 0
-      toast.info(t('updater.downloading'))
 
-      await updateInfo.value.downloadAndInstall((event: DownloadEvent) => {
+      // Re-check to get a fresh download URL
+      const freshUpdate = await check()
+      if (!freshUpdate) {
+        isDownloading.value = false
+        return
+      }
+      updateInfo.value = freshUpdate
+
+      await freshUpdate.downloadAndInstall((event: DownloadEvent) => {
         if (event.event === 'Started') {
           contentLength.value = event.data.contentLength ?? 0
         }
@@ -85,30 +96,46 @@ export function useAppUpdater() {
         else if (event.event === 'Finished') {
           isDownloading.value = false
           isInstalling.value = true
-          toast.info(t('updater.installing'))
         }
       })
-
-      toast.success(t('updater.installed'))
-
-      setTimeout(async () => {
-        await relaunch()
-      }, 1500)
     }
     catch (error) {
       console.error('Failed to install update:', error)
       toast.error(t('updater.installFailed'), {
         description: error instanceof Error ? error.message : String(error),
       })
-    }
-    finally {
       isDownloading.value = false
       isInstalling.value = false
-      updateAvailable.value = false
-      updateInfo.value = null
       downloadedBytes.value = 0
       contentLength.value = 0
+      return
     }
+
+    isRestarting.value = true
+    isInstalling.value = false
+
+    const relaunchTimeout = setTimeout(() => {
+      isRestarting.value = false
+    }, 30000)
+
+    try {
+      await relaunch()
+    }
+    catch {
+      clearTimeout(relaunchTimeout)
+      isRestarting.value = false
+      toast.error(t('updater.installFailed'))
+    }
+  }
+
+  const skipUpdate = () => {
+    if (updateInfo.value) {
+      skipVersion.value = updateInfo.value.version
+    }
+    updateAvailable.value = false
+    updateInfo.value = null
+    downloadedBytes.value = 0
+    contentLength.value = 0
   }
 
   const dismissUpdate = () => {
@@ -124,9 +151,11 @@ export function useAppUpdater() {
     isChecking,
     isDownloading,
     isInstalling,
+    isRestarting,
     downloadProgress,
     checkForUpdates,
     downloadAndInstall,
+    skipUpdate,
     dismissUpdate,
   }
 }
