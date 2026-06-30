@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.4] - 2026-07-01
+
+### Added
+
+- Add floating update notification card with skip version support
+- Add success color tokens to CSS design system
+
+### Changed
+
+- Refactor update notification to use CSS variables and module-scoped composable state
+
 ## [0.7.3] - 2026-06-25
 
 ### Added
