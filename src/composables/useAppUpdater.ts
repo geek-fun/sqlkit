@@ -6,27 +6,30 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { toast } from './useNotifications'
 
+// Module-scope state ensures `useAppUpdater()` behaves as a shared composable:
+// every call site reads from and writes to the same refs (App.vue triggers the
+// check, UpdateNotification.vue renders the result, SettingsPage.vue inspects it).
 const skipVersion = useLocalStorage('sqlkit-skip-version', '')
+const updateAvailable = ref(false)
+const updateInfo = ref<Update | null>(null)
+const isChecking = ref(false)
+const isDownloading = ref(false)
+const isInstalling = ref(false)
+const isRestarting = ref(false)
+
+/** Accumulated downloaded bytes for the current update download */
+const downloadedBytes = ref(0)
+/** Total content length (from Started event) */
+const contentLength = ref(0)
+/** Download progress as percentage 0–100, null when not downloading */
+const downloadProgress = computed(() => {
+  if (!isDownloading.value || contentLength.value <= 0)
+    return null
+  return Math.round((downloadedBytes.value / contentLength.value) * 100)
+})
 
 export function useAppUpdater() {
   const { t } = useI18n()
-  const updateAvailable = ref(false)
-  const updateInfo = ref<Update | null>(null)
-  const isChecking = ref(false)
-  const isDownloading = ref(false)
-  const isInstalling = ref(false)
-  const isRestarting = ref(false)
-
-  /** Accumulated downloaded bytes for the current update download */
-  const downloadedBytes = ref(0)
-  /** Total content length (from Started event) */
-  const contentLength = ref(0)
-  /** Download progress as percentage 0–100, null when not downloading */
-  const downloadProgress = computed(() => {
-    if (!isDownloading.value || contentLength.value <= 0)
-      return null
-    return Math.round((downloadedBytes.value / contentLength.value) * 100)
-  })
 
   const checkForUpdates = async (showToast = false): Promise<Update | null> => {
     if (isChecking.value)
