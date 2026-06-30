@@ -1409,6 +1409,11 @@ export const enUS = {
     installing: 'Installing update...',
     installed: 'Update installed. Restarting...',
     installFailed: 'Failed to install update',
+    skip: 'Skip This Version',
+    later: 'Later',
+    updateNow: 'Update Now',
+    restarting: 'Restarting...',
+    downloadingPercent: 'Downloading {percent}%',
   },
   errors: {
     unexpected: 'Unexpected error: {error}',
