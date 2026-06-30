@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-06-25
+
+### Added
+
+- Add sidebar redesign with modular components (ConnectionSelector, DatabaseSelectorRow, SchemaTree, SavedQueriesPanel, SidebarSplitView, TreeGroup)
+- Add PostgreSQL materialized view support across backend and frontend
+- Add 9 database CRUD actions: Create Database/Schema/Table/View/Function/Procedure, Drop Database, Backup, Export
+- Add Create Database dialog with MySQL charset/collation and PostgreSQL encoding/locale options
+- Add Create Table visual designer with column grid, type selector, MySQL ENGINE option, SQL preview
+- Add MySQL PK detection using INFORMATION_SCHEMA.KEY_COLUMN_USAGE as fallback for charset-safe column reads
+- Add Lucide icons, category-specific tree group icons (DBeaver-style)
+- Add global thin scrollbar styles
+- Add SSL/TLS support across all adapter types including mTLS, self-healing, and bridge forwarding (#113)
+- Add OceanBase Oracle as separate JDBC bridge database type
+- Add connection resilience layer — health guardian, trait dispatch, LRU cache
+- Add SearchableSelect component integrated in connection form
+- Add custom window controls with draggable regions
+
+### Fixed
+
+- Fix treeview loading flicker — absolute positioned overlay only during initial fetch
+- Fix table view edit/delete on tables without primary key — falls back to all-column identification
+- Fix MySQL `list_columns` PK detection — silent `FromValue<String>` failure on INFORMATION_SCHEMA virtual tables
+- Fix editor toolbar icons — explain icon now renders (was non-existent `carbon-wand`), each button has distinct color
+- Fix DataTableView pagination overflow — min-h-0 + shrink-0
+- Fix saved queries layout — compact two-row layout with icon dates, double-click to open
+- Fix database switching for MySQL, ClickHouse, JDBC bridge, Rqlite, Turso in get_table_data/get_table_count
+- Fix procedure/function DDL display — async fetch via getObjectDdl
+- Fix ApiResponse error checking — was silently swallowing all SQL errors (tagged enum, not `success` field)
+- Fix CREATE/DROP DATABASE quoting per database type (backticks, double quotes, square brackets)
+- Fix crash on NULL values and hanging connections with OceanBase
+- Fix http-adapters to respect connect_timeout_secs config
+- Fix MySQL list_schemas regression — return only requested database
+- Fix connection P0 connect timeout and P1 evict_idle logic bug
+- Fix agent single-tool hang, JDBC bridge timeouts, connection loss during long queries
+- Fix SSL blacklist after review — three-tier approach with exhaustive type mapping
+- Fix connection store types, i18n, tests, and YashanDB formatter
+
+### Changed
+
+- Refactor sidebar from monolithic DatabaseBrowser.vue to 11 focused, composable components
+- Replace Carbon icons with Lucide in treeview
+- Upgrade to Tauri v2 with enhanced IPC and window management
+- Consolidate DM8 and DM8Oracle into single Dameng database type
+- Enhance Oracle connection form with 3 connection methods and JRE download
+- Enrich ServerCard with version badges, strategy icons, Oracle URL
+
 ## [0.7.2] - 2026-06-21
 
 ### Added
