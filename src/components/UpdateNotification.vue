@@ -48,19 +48,15 @@ const buttonsDisabled = computed(() =>
 </script>
 
 <template>
-  <div v-if="updateAvailable" class="fixed bottom-6 right-6 z-50">
+  <div v-if="updateAvailable" class="bottom-6 right-6 fixed z-50">
     <div
-      class="w-[420px] rounded-2xl border bg-background shadow-lg overflow-hidden"
-      style="box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12)"
+      class="border rounded-2xl bg-background w-[420px] shadow-xl overflow-hidden"
     >
       <!-- Header -->
-      <div class="flex items-start gap-3 p-5 pb-4">
-        <div class="shrink-0 inline-flex items-center justify-center w-[42px] h-[42px] rounded-xl"
-          style="background: #eaf7ee; border: 1px solid #cfead7"
-        >
+      <div class="p-5 pb-4 flex gap-3 items-start">
+        <div class="border border-success-border rounded-xl bg-success-muted inline-flex shrink-0 h-[42px] w-[42px] items-center justify-center">
           <svg
-            class="h-5 w-5"
-            style="color: #22a559"
+            class="text-success h-5 w-5"
             viewBox="0 0 24 24"
             fill="none"
             xmlns="http://www.w3.org/2000/svg"
@@ -76,7 +72,7 @@ const buttonsDisabled = computed(() =>
         </div>
 
         <div class="flex-1 min-w-0">
-          <div class="font-bold text-[16px] text-foreground mb-0.5">
+          <div class="text-[16px] text-foreground font-bold mb-0.5">
             {{ t('updater.updateAvailable') }}
           </div>
           <div class="text-sm text-muted-foreground">
@@ -85,7 +81,7 @@ const buttonsDisabled = computed(() =>
         </div>
 
         <button
-          class="shrink-0 w-7 h-7 inline-flex items-center justify-center rounded-lg border-none bg-transparent text-muted-foreground hover:bg-accent hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          class="text-muted-foreground rounded-lg border-none bg-transparent inline-flex shrink-0 h-7 w-7 transition-colors items-center justify-center hover:text-foreground hover:bg-accent disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="buttonsDisabled"
           @click="dismissUpdate"
         >
@@ -97,31 +93,30 @@ const buttonsDisabled = computed(() =>
 
       <!-- Progress bar -->
       <div v-if="isProgressActive" class="px-5 pb-3 space-y-1.5">
-        <div class="flex justify-between items-center">
+        <div class="flex items-center justify-between">
           <span class="text-xs text-muted-foreground font-medium">{{ progressLabel }}</span>
           <span
             v-if="isDownloading && downloadProgress !== null"
-            class="text-xs font-semibold"
-            style="color: #27ae60"
+            class="text-xs text-success font-semibold"
           >
             {{ downloadProgress }}%
           </span>
         </div>
-        <div class="w-full h-[5px] rounded-full bg-secondary overflow-hidden">
+        <div class="rounded-full bg-secondary h-[5px] w-full overflow-hidden">
           <div
-            class="h-full rounded-full transition-all duration-300"
+            class="rounded-full bg-success h-full transition-all duration-300"
             :class="{
               'w-[40%] animate-progress-slide': isInstalling || isRestarting || (isDownloading && downloadProgress === null),
             }"
-            :style="isDownloading && downloadProgress !== null ? { width: `${downloadProgress}%`, background: '#27ae60' } : { background: '#27ae60' }"
+            :style="isDownloading && downloadProgress !== null ? { width: `${downloadProgress}%` } : {}"
           />
         </div>
       </div>
 
       <!-- Footer -->
-      <div class="flex items-center justify-between px-4 py-3 border-t">
+      <div class="px-4 py-3 border-t flex items-center justify-between">
         <button
-          class="text-sm font-medium bg-transparent border-none text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          class="text-sm text-muted-foreground font-medium border-none bg-transparent transition-colors hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed"
           :disabled="buttonsDisabled"
           @click="skipUpdate"
         >
@@ -141,7 +136,7 @@ const buttonsDisabled = computed(() =>
           <Button
             variant="default"
             size="sm"
-            class="font-semibold min-w-[96px] text-white"
+            class="text-white font-semibold min-w-[96px]"
             :class="{
               'opacity-50 cursor-not-allowed': buttonsDisabled,
             }"
