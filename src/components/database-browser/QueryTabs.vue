@@ -105,17 +105,17 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
 </script>
 
 <template>
-  <div class="query-tabs border-b bg-muted/30 flex items-center overflow-x-auto">
+  <div class="query-tabs flex items-stretch overflow-x-auto border-b border-border">
     <!-- Tabs -->
-    <div class="flex flex-1 min-w-0 items-center">
+    <div class="flex flex-1 min-w-0 items-stretch">
       <div
         v-for="tab in tabs"
         :key="tab.id"
-        class="tab-item group px-3 py-1.5 border-r flex gap-1 cursor-pointer transition-colors items-center"
+        class="tab-item group flex items-center gap-1 px-3 cursor-pointer transition-colors select-none text-xs border-r border-border"
         :class="{
-          'bg-background': isActiveTab(tab.id),
-          'hover:bg-accent/50': !isActiveTab(tab.id),
-          'opacity-60 border-l-2 border-l-orange-500': isOrphanTab(tab),
+          'bg-background text-foreground font-medium': isActiveTab(tab.id),
+          'bg-muted/30 text-muted-foreground hover:bg-background/50 hover:text-foreground': !isActiveTab(tab.id),
+          'opacity-60': isOrphanTab(tab),
         }"
         @click="handleTabClick(tab.id)"
       >
@@ -204,7 +204,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
         </svg>
 
         <!-- Tab title -->
-        <span class="text-sm max-w-32 truncate" :title="getTabTitle(tab)">
+        <span class="max-w-32 truncate" :title="getTabTitle(tab)">
           {{ getTabTitle(tab) }}
         </span>
 
@@ -229,11 +229,11 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
 
         <!-- Close button -->
         <button
-          class="rounded opacity-0 flex flex-shrink-0 h-4 w-4 transition-opacity items-center justify-center hover:bg-accent group-hover:opacity-100"
+          class="rounded flex flex-shrink-0 h-4 w-4 transition-colors items-center justify-center hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100"
           :class="{ 'opacity-100': isActiveTab(tab.id) }"
           @click="handleCloseClick($event, tab)"
         >
-          <span class="i-carbon-close h-3 w-3" />
+          <span class="i-lucide-x h-3 w-3 shrink-0" />
         </button>
       </div>
     </div>
@@ -242,11 +242,11 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
     <Button
       variant="ghost"
       size="icon"
-      class="mx-1 flex-shrink-0 h-7 w-7"
+      class="shrink-0 h-7 w-7 text-muted-foreground hover:text-foreground"
       :title="t('components.queryTabs.new')"
       @click="handleNewTab"
     >
-      <span class="i-carbon-add h-3.5 w-3.5" />
+      <span class="i-lucide-plus h-3.5 w-3.5 shrink-0" />
     </Button>
 
     <!-- Unsaved changes dialog -->
@@ -275,7 +275,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
 
 <style scoped>
 .query-tabs {
-  min-height: 32px;
+  height: 35px;
 }
 
 .tab-item {

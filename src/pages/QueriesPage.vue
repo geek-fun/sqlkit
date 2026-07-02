@@ -122,6 +122,7 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
   if (alreadyConnected) {
     connectionStore.setActiveConnection(newConnId)
     await databaseStore.fetchDatabases(newConnId)
+    selectedDatabase.value = connectionStore.getCurrentDatabase(newConnId) || ''
     return
   }
 
@@ -129,6 +130,7 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
     await connectionStore.connect(newConnId)
     connectionStore.setActiveConnection(newConnId)
     await databaseStore.fetchDatabases(newConnId)
+    selectedDatabase.value = connectionStore.getCurrentDatabase(newConnId) || ''
   }
   catch (error) {
     console.error('Failed to connect:', error)
@@ -1043,19 +1045,19 @@ function closeResultPanel() {
 
           <!-- Query editor area (shown for normal query tabs) -->
           <template v-else>
-            <!-- Toolbar -->
-            <div class="px-2 py-1 border-b bg-muted/30 flex gap-2 items-center">
+            <!-- Toolbar (DBX-style: compact h-9, colored icons, no constant bg) -->
+            <div class="h-9 shrink-0 border-b border-border bg-background/80 px-2 flex items-center gap-0.5 text-xs text-muted-foreground">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      class="text-green-600 p-0 h-9 w-9 dark:text-green-400 hover:bg-accent disabled:opacity-40"
+                      size="icon"
+                      class="h-7 w-7 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20 disabled:opacity-40"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="executeQuery"
                     >
-                      <span class="i-carbon-play h-5 w-5" />
+                      <span class="i-lucide-play h-3.5 w-3.5 shrink-0" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1069,13 +1071,13 @@ function closeResultPanel() {
                   <TooltipTrigger as-child>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      class="p-0 h-9 w-9 hover:bg-accent"
-                      :class="{ '!text-amber-500': !explainAnalyzeMode, '!text-emerald-500': explainAnalyzeMode }"
+                      size="icon"
+                      class="h-7 w-7 text-violet-600 hover:bg-violet-500/10 dark:text-violet-400 dark:hover:bg-violet-500/20 disabled:opacity-40"
+                      :class="{ '!text-emerald-600 !bg-emerald-500/10 !dark:bg-emerald-500/20': explainAnalyzeMode }"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="handleExplainQuery(explainAnalyzeMode)"
                     >
-                      <span class="i-carbon-diagram h-5 w-5" />
+                      <span class="i-lucide-line-chart h-3.5 w-3.5 shrink-0" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1088,13 +1090,13 @@ function closeResultPanel() {
                   <TooltipTrigger as-child>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      class="p-0 h-9 w-9 hover:bg-accent"
-                      :class="explainAnalyzeMode ? '!text-violet-600 bg-violet-100 dark:text-violet-300 dark:bg-violet-900/30' : ''"
+                      size="icon"
+                      class="h-7 w-7 text-muted-foreground hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-400 dark:hover:bg-violet-500/20 disabled:opacity-40"
+                      :class="explainAnalyzeMode ? '!text-violet-600 !bg-violet-100 dark:!text-violet-300 dark:!bg-violet-900/30' : ''"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="toggleExplainMode"
                     >
-                      <span class="i-carbon-analytics h-5 w-5" />
+                      <span class="i-lucide-activity h-3.5 w-3.5 shrink-0" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1103,17 +1105,19 @@ function closeResultPanel() {
                 </Tooltip>
               </TooltipProvider>
 
+              <div class="w-px h-4 bg-border mx-0.5" />
+
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      class="text-blue-600 p-0 h-9 w-9 dark:text-blue-400 hover:bg-accent disabled:opacity-40"
+                      size="icon"
+                      class="h-7 w-7 text-amber-600 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/20 disabled:opacity-40"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="handleToolbarFormat"
                     >
-                      <span class="i-carbon-text-align-left h-5 w-5" />
+                      <span class="i-lucide-align-left h-3.5 w-3.5 shrink-0" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1130,12 +1134,12 @@ function closeResultPanel() {
                   <TooltipTrigger as-child>
                     <Button
                       variant="ghost"
-                      size="sm"
-                      class="p-0 h-9 w-9 hover:bg-accent"
+                      size="icon"
+                      class="h-7 w-7 text-sky-600 hover:bg-sky-500/10 dark:text-sky-400 dark:hover:bg-sky-500/20 disabled:opacity-40"
                       :disabled="!activeTab || !activeTab.content.trim()"
                       @click="handleDownloadQuery"
                     >
-                      <span class="i-carbon-download text-muted-foreground h-5 w-5" />
+                      <span class="i-lucide-download h-3.5 w-3.5 shrink-0" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1146,7 +1150,7 @@ function closeResultPanel() {
 
               <!-- Status info -->
               <div v-if="activeTab" class="text-xs text-muted-foreground flex gap-2 items-center">
-                <span v-if="activeConnection">{{ activeConnection.name }}</span>
+                <span v-if="activeConnection" class="font-medium">{{ activeConnection.name }}</span>
                 <span v-if="activeConnection?.database">/ {{ activeConnection.database }}</span>
               </div>
             </div>
