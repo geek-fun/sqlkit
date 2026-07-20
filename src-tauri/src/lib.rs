@@ -243,6 +243,7 @@ pub fn run() {
             commands::get_connection_quality,
             // Query execution commands
             commands::execute_query,
+            commands::execute_sorted_query,
             commands::cancel_query,
             commands::explain_query,
             // Database browsing commands

@@ -18,114 +18,217 @@ export type StatementToExecute = {
   found: boolean
 }
 
-// Matches DML/DDL keywords that begin a SQL statement at line start (case-insensitive)
-// Also matches parentheses wrapping keywords (for subqueries like (SELECT...))
-const SQL_STATEMENT_START_REGEX
-  = /^\s*(?:\(\s*)?(?:SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|TRUNCATE|WITH|EXPLAIN|CALL|EXEC|MERGE|REPLACE|SHOW|DESCRIBE|DESC|USE|SET|BEGIN|COMMIT|ROLLBACK|SAVEPOINT|PRAGMA|VACUUM|GRANT|REVOKE|ATTACH|DETACH|ANALYZE|REINDEX|LOAD|UNLOAD|COPY|LOCK|UNLOCK)\b/i
+// ── Character-based SQL statement splitter ──
+// Replaces the old line-based + regex approach that broke on correlated
+// subqueries spanning multiple lines (e.g. (SELECT count(*) ...) as alias).
+// This is the same algorithm dbx uses in Rust: character-by-character,
+// tracking quote/comment context, and splitting only on `;` outside of quotes.
 
-const isStatementStart = (line: string): boolean => SQL_STATEMENT_START_REGEX.test(line)
-
-type LineTokens = {
-  semicolonIndex: number
-  parenDelta: number
+type ScannerState = {
+  inSingleQuote: boolean
+  inDoubleQuote: boolean
+  inBacktick: boolean
+  inLineComment: boolean
+  inBlockComment: boolean
+  prevChar: string | null
+  dollarTag: string | null
 }
 
-function tokenizeLine(line: string): LineTokens {
-  let singleQuote = false
-  let doubleQuote = false
-  let parenDelta = 0
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]
-    if (ch === '\'' && !doubleQuote) {
-      if (singleQuote && line[i + 1] === '\'') {
-        i++
+type StatementRange = {
+  text: string
+  startOffset: number
+  endOffset: number
+  startLine: number
+  endLine: number
+}
+
+const DEFAULT_STATE: ScannerState = {
+  inSingleQuote: false,
+  inDoubleQuote: false,
+  inBacktick: false,
+  inLineComment: false,
+  inBlockComment: false,
+  prevChar: null,
+  dollarTag: null,
+}
+
+function isOutsideString(state: ScannerState): boolean {
+  return !state.inSingleQuote && !state.inDoubleQuote && !state.inBacktick
+}
+
+function scanStatements(content: string): StatementRange[] {
+  const ranges: StatementRange[] = []
+  const state: ScannerState = { ...DEFAULT_STATE }
+  let bufStart = 0
+  let line = 1
+
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i]
+    const next = i + 1 < content.length ? content[i + 1] : null
+
+    // Track lines
+    if (ch === '\n') {
+      line++
+    }
+
+    // Handle dollar-quoting (PostgreSQL $$...$$)
+    if (state.dollarTag) {
+      const tag = state.dollarTag
+      if (content.startsWith(tag, i)) {
+        state.dollarTag = null
+        i += tag.length - 1
+        state.prevChar = tag[tag.length - 1]
         continue
       }
-      singleQuote = !singleQuote
+      state.prevChar = ch
+      continue
     }
-    else if (ch === '"' && !singleQuote) {
-      doubleQuote = !doubleQuote
+
+    if (state.inLineComment) {
+      if (ch === '\n') {
+        state.inLineComment = false
+      }
+      state.prevChar = ch
+      continue
     }
-    else if (ch === '-' && line[i + 1] === '-' && !singleQuote && !doubleQuote) {
-      break
+
+    if (state.inBlockComment) {
+      if (ch === '/' && state.prevChar === '*') {
+        state.inBlockComment = false
+      }
+      state.prevChar = ch
+      continue
     }
-    else if (!singleQuote && !doubleQuote) {
-      if (ch === '(')
-        parenDelta++
-      else if (ch === ')')
-        parenDelta--
-      else if (ch === ';')
-        return { semicolonIndex: i, parenDelta }
+
+    // Start line comment?
+    if (isOutsideString(state) && ch === '-' && next === '-') {
+      state.inLineComment = true
+      state.prevChar = ch
+      continue
     }
-  }
-  return { semicolonIndex: -1, parenDelta }
-}
 
-const WITH_REGEX = /^\s*WITH\b/i
-const UPDATE_REGEX = /^\s*UPDATE\b/i
-const SET_REGEX = /^\s*SET\b/i
+    // Hash comment (MySQL dialect)?
+    if (isOutsideString(state) && ch === '#') {
+      state.inLineComment = true
+      state.prevChar = ch
+      continue
+    }
 
-function isUpdateContinuation(line: string, startKeyword: string): boolean {
-  return UPDATE_REGEX.test(startKeyword) && SET_REGEX.test(line)
-}
+    // Start block comment?
+    if (isOutsideString(state) && ch === '/' && next === '*') {
+      state.inBlockComment = true
+      state.prevChar = ch
+      continue
+    }
 
-function findStatementEnd(lines: string[], startLine: number): number {
-  const isCte = WITH_REGEX.test(lines[startLine])
-  const startKeyword = lines[startLine]
-  let parenDepth = 0
-
-  for (let i = startLine; i < lines.length; i++) {
-    const { semicolonIndex, parenDelta } = tokenizeLine(lines[i])
-    if (semicolonIndex !== -1)
-      return i
-
-    parenDepth += parenDelta
-
-    if (i > startLine && parenDepth === 0 && !isCte && isStatementStart(lines[i].trim())) {
-      if (isUpdateContinuation(lines[i], startKeyword))
+    // Dollar-quote start (PostgreSQL)?
+    if (isOutsideString(state) && ch === '$') {
+      const tagEnd = content.indexOf('$', i + 1)
+      if (tagEnd !== -1) {
+        const tag = content.slice(i, tagEnd + 1)
+        state.dollarTag = tag
+        state.prevChar = ch
         continue
-      return i - 1
+      }
+    }
+
+    // Quote tracking
+    if (ch === '\'' && !state.inDoubleQuote && !state.inBacktick) {
+      if (state.inSingleQuote && next === '\'') {
+        i++ // skip escaped quote
+        state.prevChar = ch
+        continue
+      }
+      state.inSingleQuote = !state.inSingleQuote
+      state.prevChar = ch
+      continue
+    }
+
+    if (ch === '"' && !state.inSingleQuote && !state.inBacktick) {
+      if (state.inDoubleQuote && next === '"') {
+        i++ // skip escaped quote
+        state.prevChar = ch
+        continue
+      }
+      state.inDoubleQuote = !state.inDoubleQuote
+      state.prevChar = ch
+      continue
+    }
+
+    if (ch === '`' && !state.inSingleQuote && !state.inDoubleQuote) {
+      state.inBacktick = !state.inBacktick
+      state.prevChar = ch
+      continue
+    }
+
+    // Statement separator: semicolon outside quotes
+    if (ch === ';' && isOutsideString(state) && !state.inLineComment && !state.inBlockComment) {
+      const text = content.slice(bufStart, i + 1)
+      const textTrimmed = text.trim()
+      if (textTrimmed.length > 0) {
+        ranges.push(buildRange(content, bufStart, i + 1))
+      }
+      bufStart = i + 1
+      state.prevChar = ch
+      continue
+    }
+
+    state.prevChar = ch
+  }
+
+  // Trailing statement (no trailing semicolon)
+  if (bufStart < content.length) {
+    const text = content.slice(bufStart)
+    if (text.trim().length > 0) {
+      ranges.push(buildRange(content, bufStart, content.length))
     }
   }
-  return lines.length - 1
+
+  return ranges
+}
+
+function buildRange(content: string, start: number, end: number): StatementRange {
+  return {
+    text: content.slice(start, end),
+    startOffset: start,
+    endOffset: end,
+    startLine: lineAtOffset(content, start),
+    endLine: lineAtOffset(content, end),
+  }
+}
+
+function lineAtOffset(content: string, offset: number): number {
+  let line = 1
+  for (let i = 0; i < offset && i < content.length; i++) {
+    if (content[i] === '\n') {
+      line++
+    }
+  }
+  return line
 }
 
 export function parseSqlStatements(content: string): SqlStatement[] {
+  const ranges = scanStatements(content)
   const lines = content.split('\n')
-  const statements: SqlStatement[] = []
-  let i = 0
 
-  while (i < lines.length) {
-    const trimmed = lines[i].trim()
-    if (trimmed === '' || trimmed.startsWith('--') || trimmed.startsWith('//')) {
-      i++
-      continue
-    }
-    if (!isStatementStart(trimmed)) {
-      i++
-      continue
-    }
-
-    const startLine = i
-    const endLine = findStatementEnd(lines, startLine)
-    const statement = lines.slice(startLine, endLine + 1).join('\n').trim().replace(/;\s*$/, '')
-
-    if (statement.length > 0) {
-      statements.push({
+  return ranges
+    .filter((r) => {
+      // Remove trailing semicolon for the statement text
+      const t = r.text.trim().replace(/;\s*$/, '').trim()
+      return t.length > 0
+    })
+    .map((r) => {
+      const statement = r.text.trim().replace(/;\s*$/, '').trim()
+      return {
         statement,
         position: {
-          startLineNumber: startLine + 1,
-          endLineNumber: endLine + 1,
+          startLineNumber: r.startLine,
+          endLineNumber: r.endLine,
           startColumn: 1,
-          endColumn: lines[endLine].length + 1,
+          endColumn: (lines[r.endLine - 1]?.length ?? 1) + 1,
         },
-      })
-    }
-
-    i = endLine + 1
-  }
-
-  return statements
+      }
+    })
 }
 
 export function getStatementAtLine(statements: SqlStatement[], lineNumber: number): SqlStatement | undefined {

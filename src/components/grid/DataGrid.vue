@@ -49,6 +49,7 @@ type Props = {
   schema?: string
   connectionId?: string
   hideToolbar?: boolean
+  hideBatchActions?: boolean
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -62,6 +63,7 @@ const props = withDefaults(defineProps<Props>(), {
   schema: undefined,
   connectionId: undefined,
   hideToolbar: false,
+  hideBatchActions: false,
 })
 
 const emit = defineEmits<DataGridEmits>()
@@ -523,7 +525,72 @@ watch(() => [props.rows, props.columns], () => {
 
     <!-- Grid Content -->
     <div v-else class="flex flex-1 flex-col min-h-0">
-      <!-- Scroll container -->
+      <!-- Header (outside scroll container — never overlaps rows) -->
+      <div
+        class="border-b bg-muted flex flex-shrink-0"
+      >
+        <!-- Select-All Checkbox -->
+        <div class="flex flex-shrink-0 h-8 w-10 items-center justify-center">
+          <Checkbox
+            :checked="selection.isAllSelected(rows.length)"
+            @update:checked="selection.toggleAll(rows.length)"
+          />
+        </div>
+        <!-- Column Headers -->
+        <div
+          v-for="col in columns"
+          :key="col"
+          class="group flex flex-shrink-0 items-center relative"
+          :style="{ width: `${getColumnWidth(col)}px` }"
+          @contextmenu.prevent="openHeaderContextMenu($event, col)"
+        >
+          <button
+            class="px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 items-center"
+            :class="sort.getSortDirection(col) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'"
+            @click="sort.toggleSort(col, ($event as MouseEvent).shiftKey); emit('sortChange', sort.sortState.value)"
+          >
+            <span class="text-xs font-medium truncate">{{ col }}</span>
+            <span
+              v-if="sort.getSortDirection(col) === 'ASC'"
+              class="i-carbon-arrow-up flex-shrink-0 h-3 w-3"
+            />
+            <span
+              v-else-if="sort.getSortDirection(col) === 'DESC'"
+              class="i-carbon-arrow-down flex-shrink-0 h-3 w-3"
+            />
+            <span
+              v-else
+              class="i-carbon-chevron-sort opacity-0 flex-shrink-0 h-3 w-3 transition-opacity group-hover:opacity-40"
+            />
+            <!-- Multi-sort priority -->
+            <span
+              v-if="sort.getSortPriority(col)"
+              class="text-[10px] text-primary leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
+            >{{ sort.getSortPriority(col) }}</span>
+            <!-- Filter indicator -->
+            <span
+              v-if="filter.hasFilter(col)"
+              class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
+            />
+          </button>
+          <!-- Resize Handle -->
+          <div
+            class="opacity-0 w-1 cursor-col-resize transition-opacity bottom-0 right-0 top-0 absolute z-10 hover:bg-primary/40 group-hover:opacity-100"
+            @mousedown.stop="startColumnResize($event, col)"
+          />
+        </div>
+        <!-- Actions Column Header -->
+        <div
+          v-if="connectionId"
+          class="bg-muted flex-shrink-0 w-10 right-0 sticky z-10"
+        >
+          <div class="flex h-8 items-center justify-center">
+            <span class="i-carbon-overflow-menu-vertical text-muted-foreground h-3.5 w-3.5" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Scroll container (rows only) -->
       <div
         ref="scrollContainer"
         class="flex-1 relative overflow-auto"
@@ -533,71 +600,6 @@ watch(() => [props.rows, props.columns], () => {
           :style="{ height: `${rowVirtualizer.getTotalSize()}px` }"
           class="relative"
         >
-          <!-- Sticky Header -->
-          <div
-            class="border-b bg-muted flex top-0 sticky z-20"
-          >
-            <!-- Select-All Checkbox -->
-            <div class="flex flex-shrink-0 h-8 w-10 items-center justify-center">
-              <Checkbox
-                :checked="selection.isAllSelected(rows.length)"
-                @update:checked="selection.toggleAll(rows.length)"
-              />
-            </div>
-            <!-- Column Headers -->
-            <div
-              v-for="col in columns"
-              :key="col"
-              class="group flex flex-shrink-0 items-center relative"
-              :style="{ width: `${getColumnWidth(col)}px` }"
-              @contextmenu.prevent="openHeaderContextMenu($event, col)"
-            >
-              <button
-                class="px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 items-center"
-                :class="sort.getSortDirection(col) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'"
-                @click="sort.toggleSort(col, ($event as MouseEvent).shiftKey); emit('sortChange', sort.sortState.value)"
-              >
-                <span class="text-xs font-medium truncate">{{ col }}</span>
-                <span
-                  v-if="sort.getSortDirection(col) === 'ASC'"
-                  class="i-carbon-arrow-up flex-shrink-0 h-3 w-3"
-                />
-                <span
-                  v-else-if="sort.getSortDirection(col) === 'DESC'"
-                  class="i-carbon-arrow-down flex-shrink-0 h-3 w-3"
-                />
-                <span
-                  v-else
-                  class="i-carbon-chevron-sort opacity-0 flex-shrink-0 h-3 w-3 transition-opacity group-hover:opacity-40"
-                />
-                <!-- Multi-sort priority -->
-                <span
-                  v-if="sort.getSortPriority(col)"
-                  class="text-[10px] text-primary leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
-                >{{ sort.getSortPriority(col) }}</span>
-                <!-- Filter indicator -->
-                <span
-                  v-if="filter.hasFilter(col)"
-                  class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
-                />
-              </button>
-              <!-- Resize Handle -->
-              <div
-                class="opacity-0 w-1 cursor-col-resize transition-opacity bottom-0 right-0 top-0 absolute z-10 hover:bg-primary/40 group-hover:opacity-100"
-                @mousedown.stop="startColumnResize($event, col)"
-              />
-            </div>
-            <!-- Actions Column Header -->
-            <div
-              v-if="connectionId"
-              class="bg-muted flex-shrink-0 w-10 right-0 sticky z-10"
-            >
-              <div class="flex h-8 items-center justify-center">
-                <span class="i-carbon-overflow-menu-vertical text-muted-foreground h-3.5 w-3.5" />
-              </div>
-            </div>
-          </div>
-
           <!-- Virtual Rows -->
           <div
             v-for="virtualRow in rowVirtualizer.getVirtualItems()"
@@ -745,6 +747,7 @@ watch(() => [props.rows, props.columns], () => {
 
       <!-- Batch Action Bar -->
       <BatchActionBar
+        v-if="!hideBatchActions"
         :selected-count="selection.selectedCount.value"
         :selected-rows="selection.getSelectedRows(rows)"
         :columns="columns"

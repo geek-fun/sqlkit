@@ -72,6 +72,7 @@ pub mod pool;
 pub mod postgres;
 pub mod rqlite;
 pub mod search;
+pub mod sql_service;
 pub mod sqlite;
 pub mod sqlserver;
 pub mod strategy;
