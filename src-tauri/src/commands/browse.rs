@@ -1030,7 +1030,7 @@ fn extract_count(result: QueryResult) -> Result<u64, String> {
 
 /// Map an [`ActiveConnection`] variant to the db_type string used by
 /// [`quote_identifier`] and [`search::build_table_search_where`].
-fn get_db_type_string(connection: &ActiveConnection) -> &'static str {
+pub fn get_db_type_string(connection: &ActiveConnection) -> &'static str {
     match connection {
         ActiveConnection::Postgres(_) => "postgres",
         ActiveConnection::MySQL(_) => "mysql",

@@ -124,11 +124,12 @@ fn quote_identifier(identifier: &str, db_type: &str) -> String {
 ///
 /// # Search Behavior
 ///
-/// - **Text columns** (`ColumnCategory::Text`): matched with
-///   `LOWER(CAST(col AS type)) LIKE '%term%'`
-/// - **Numeric columns** (`ColumnCategory::Numeric`): matched with
-///   `(col = term OR LOWER(CAST(col AS type)) LIKE '%term%')` — this handles
-///   both exact numeric matches and text representation matches
+/// - **UUID columns**: matched with `col::text` cast (PostgreSQL-compatible) for
+///   both exact matches and LIKE — avoids the fragile `CAST(col AS TEXT)` pattern
+///   which fails on some PG-compatible engines
+/// - **JSON/JSONB columns**: matched with `col::text` LIKE (avoids CAST)
+/// - **Other text columns**: matched with `LOWER(CAST(col AS type)) LIKE '%term%'`
+/// - **Numeric columns**: matched with both exact equality and text LIKE
 /// - **Skip columns** (`ColumnCategory::Skip`): excluded entirely
 /// - The search is **case-insensitive** via `LOWER()`
 ///
@@ -170,14 +171,43 @@ pub fn build_table_search_where(
         .map(|col| {
             let quoted = quote_identifier(&col.name, db_type);
             let category = classify_column(&col.data_type);
-            let text_condition = format!(
-                "LOWER(CAST({} AS {})) LIKE '%{}%'",
-                quoted, cast_type, lower_term
-            );
+            let data_type = col.data_type.to_lowercase();
 
+            // Type-aware search conditions
             match category {
-                ColumnCategory::Text => text_condition,
+                ColumnCategory::Text => {
+                    if data_type == "uuid" {
+                        // UUID columns: use ::text cast (more portable than CAST)
+                        // For exact UUID matches, also include equality for efficiency
+                        let text_cond = format!(
+                            "LOWER({}::text) LIKE '%{}%'",
+                            quoted, lower_term
+                        );
+                        // If the term looks like a UUID, try exact match first
+                        if looks_like_uuid(&escaped_term) {
+                            format!("{}::text = '{}' OR {}", quoted, escaped_term, text_cond)
+                        } else {
+                            text_cond
+                        }
+                    } else if data_type.starts_with("json") {
+                        // JSON/JSONB: use ::text for readability
+                        format!(
+                            "LOWER({}::text) LIKE '%{}%'",
+                            quoted, lower_term
+                        )
+                    } else {
+                        // Standard text columns
+                        format!(
+                            "LOWER(CAST({} AS {})) LIKE '%{}%'",
+                            quoted, cast_type, lower_term
+                        )
+                    }
+                }
                 ColumnCategory::Numeric => {
+                    let text_condition = format!(
+                        "LOWER(CAST({} AS {})) LIKE '%{}%'",
+                        quoted, cast_type, lower_term
+                    );
                     // Try exact numeric match; if term is a valid number, include equality
                     if term.parse::<f64>().is_ok() {
                         format!("{} = {} OR {}", quoted, term, text_condition)
@@ -196,6 +226,12 @@ pub fn build_table_search_where(
     }
 
     Some(format!("({})", conditions.join(" OR ")))
+}
+
+/// Quick check if a string looks like a UUID (hex with dashes).
+fn looks_like_uuid(s: &str) -> bool {
+    let cleaned: String = s.chars().filter(|c| *c != '-').collect();
+    cleaned.len() == 32 && cleaned.chars().all(|c| c.is_ascii_hexdigit())
 }
 
 /// Generate a stable WHERE clause that uniquely identifies a row.

@@ -6,6 +6,7 @@
 use crate::api_response::{db_error_to_api_error, ApiResponse};
 use crate::connection::guardian::HealthState;
 use crate::connection::handle::ConnectionHandle;
+use crate::database::sql_service::{self, WrapQueryOptions};
 use crate::database::{
     ClickHouseAdapter, ConnectionConfig, DatabaseAdapter, DbError, ExplainResult, HttpSqlAdapter,
     JdbcBridgeAdapter, MySQLAdapter, PostgresAdapter, QueryResult, RqliteAdapter, SqlServerAdapter,
@@ -316,6 +317,49 @@ pub async fn execute_query(
             Ok(ApiResponse::error(api_error))
         }
     }
+}
+
+/// Execute a query with structured sort, filter, and pagination.
+///
+/// Unlike `execute_query` which takes raw SQL, this command takes the user's
+/// original SQL plus structured sort/filter/pagination options and builds the
+/// final SQL on the backend. This prevents SQL injection from filter values
+/// and handles trailing semicolons/comments correctly.
+#[tauri::command]
+pub async fn execute_sorted_query(
+    connection_id: String,
+    database: Option<String>,
+    options: WrapQueryOptions,
+    state: State<'_, AppState>,
+) -> Result<ApiResponse<QueryResult>, String> {
+    // Derive database type from the active connection
+    let db_type = {
+        let connections = state.connections.read().await;
+        let connection = connections
+            .get(&connection_id)
+            .ok_or_else(|| "No active connection found".to_string())?;
+        crate::commands::browse::get_db_type_string(connection).to_string()
+    };
+
+    // Inject the database type into options and build the wrapped SQL
+    let build = sql_service::wrap_query(WrapQueryOptions {
+        database_type: db_type,
+        ..options
+    });
+    if !build.ok {
+        return Ok(ApiResponse::error_from(
+            "SORT_FILTER_ERROR",
+            format!(
+                "Cannot sort/filter: {}",
+                build.reason.unwrap_or_else(|| "unknown error".to_string())
+            ),
+        ));
+    }
+
+    let sql = build.sql.unwrap();
+
+    // Execute via the existing execute_query path
+    crate::commands::execute_query(connection_id, sql, database, state).await
 }
 
 /// Cancel a running query.

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { QueryResult } from '@/store/tabStore'
-import type { ApiError } from '@/types/api'
+import type { ApiError, ApiResponse } from '@/types/api'
 import type { ExplainResult } from '@/types/explainPlan'
 import type { ColumnFilter, SortColumn } from '@/types/grid'
 import { invoke } from '@tauri-apps/api/core'
@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDataGridCopy } from '@/composables/useDataGridCopy'
-import { formatApiError } from '@/types/api'
+import { formatApiError, isApiError } from '@/types/api'
 
 type Props = {
   results?: QueryResult | null
@@ -80,7 +80,7 @@ const formattedTime = computed(() => {
     : `${(props.executionTime / 1000).toFixed(2)}s`
 })
 
-// ── Sort/Filter Re-execution ──
+// ── Sort/Filter Re-execution (backend-driven) ──
 const gridLoading = ref(false)
 const gridError = ref<string | null>(null)
 const gridResults = ref<QueryResult | null>(null)
@@ -95,50 +95,6 @@ watch(() => props.results, (r) => {
     gridError.value = null
   }
 }, { immediate: true })
-
-function buildWrappedSql(sort: SortColumn[], filters: ColumnFilter[]): string {
-  if (!props.sql)
-    return props.sql ?? ''
-  let sql = `SELECT * FROM (${props.sql}) AS _sqlkit_grid`
-
-  // Build WHERE clause
-  if (filters.length > 0) {
-    const clauses = filters.map((f) => {
-      const esc = (v: string) => v.replace(/'/g, '\'\'')
-      const col = f.column
-      switch (f.operator) {
-        case 'eq':
-          return `${col} = '${esc(f.value)}'`
-        case 'neq':
-          return `${col} != '${esc(f.value)}'`
-        case 'like':
-          return `${col} LIKE '%${esc(f.value)}%'`
-        case 'gt':
-          return `${col} > '${esc(f.value)}'`
-        case 'lt':
-          return `${col} < '${esc(f.value)}'`
-        case 'gte':
-          return `${col} >= '${esc(f.value)}'`
-        case 'lte':
-          return `${col} <= '${esc(f.value)}'`
-        case 'between':
-          return `${col} >= '${esc(f.value)}' AND ${col} <= '${esc(f.value2 ?? '')}'`
-        default:
-          return ''
-      }
-    }).filter(Boolean)
-    if (clauses.length > 0) {
-      sql += ` WHERE ${clauses.join(' AND ')}`
-    }
-  }
-
-  // Build ORDER BY clause
-  if (sort.length > 0) {
-    sql += ` ORDER BY ${sort.map(s => `${s.column} ${s.direction}`).join(', ')}`
-  }
-
-  return sql
-}
 
 async function handleSortChange(sort: SortColumn[]) {
   activeSort.value = sort
@@ -158,18 +114,35 @@ async function reExecuteWithSortFilter() {
   gridError.value = null
 
   try {
-    const wrappedSql = buildWrappedSql(activeSort.value, activeFilters.value)
     const start = performance.now()
-    const result = await invoke<{ status: string, data: QueryResult }>('execute_query', {
+    const result = await invoke<ApiResponse<QueryResult>>('execute_sorted_query', {
       connectionId: props.connectionId,
-      sql: wrappedSql,
       database: props.database ?? null,
+      options: {
+        originalSql: props.sql,
+        schemaContext: props.schema ?? null,
+        sort: activeSort.value.map(s => ({
+          column: s.column,
+          direction: s.direction === 'ASC' ? 'ASC' : 'DESC',
+        })),
+        filters: activeFilters.value.map(f => ({
+          column: f.column,
+          operator: f.operator.toUpperCase(),
+          value: f.value,
+          value2: f.value2 ?? null,
+        })),
+        limit: null,
+        offset: null,
+      },
     })
     const elapsed = Math.round(performance.now() - start)
 
     if (result.status === 'success') {
       gridResults.value = result.data
       gridExecutionTimeMs.value = elapsed
+    }
+    else if (isApiError(result)) {
+      gridError.value = formatApiError(result.error, t)
     }
     else {
       gridError.value = t('components.queryResult.error')
@@ -395,6 +368,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
           :schema="schema"
           :loading="displayExecuting"
           :hide-toolbar="true"
+          :hide-batch-actions="true"
           :error="displayErrorMessage"
           @sort-change="handleSortChange"
           @filter-change="handleFilterChange"
