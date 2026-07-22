@@ -1117,7 +1117,10 @@ export const enUS = {
       },
       erDiagram: {
         title: 'ER Diagram',
-        zoom: 'Zoom: {percentage}%',
+        zoom: '{percentage}%',
+        zoomIn: 'Zoom In',
+        zoomOut: 'Zoom Out',
+        allSchemas: 'All Schemas',
         fitToScreen: 'Fit to Screen',
         searchPlaceholder: 'Filter tables...',
         largeSchemaWarning: 'This schema has {count} tables. Displaying all may be dense. Continue?',
