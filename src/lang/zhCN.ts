@@ -1117,7 +1117,10 @@ export const zhCN = {
       },
       erDiagram: {
         title: 'ER图表',
-        zoom: '缩放: {percentage}%',
+        zoom: '{percentage}%',
+        zoomIn: '放大',
+        zoomOut: '缩小',
+        allSchemas: '所有模式',
         fitToScreen: '适应屏幕',
         searchPlaceholder: '过滤表...',
         largeSchemaWarning: '此模式包含 {count} 张表，显示全部可能会过于密集，是否继续？',

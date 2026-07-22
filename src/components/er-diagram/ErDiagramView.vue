@@ -17,8 +17,10 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { getForeignKeys } from '@/datasources/erDiagramApi'
+import { useDatabaseStore } from '@/store/databaseStore'
 
 // ─── Props ───────────────────────────────────────────
 const props = defineProps<{
@@ -101,6 +103,20 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const showWarning = ref(false)
 const svgContainerRef = ref<HTMLElement | null>(null)
+
+// ─── Schema selector ──────────────────────────────
+const databaseStore = useDatabaseStore()
+const availableSchemas = ref<string[]>([])
+const localSchema = ref<string>(props.schema ?? '')
+
+const supportsSchemas = computed(() =>
+  availableSchemas.value.length > 0,
+)
+
+watch(() => props.schema, (val) => {
+  if (val !== undefined)
+    localSchema.value = val
+})
 
 // ─── Computed ─────────────────────────────────────────
 const filteredTables = computed(() => {
@@ -252,10 +268,24 @@ function computeLayout() {
 }
 
 // ─── Data Fetching ────────────────────────────────────
+async function fetchAvailableSchemas() {
+  if (!props.connectionId)
+    return
+  try {
+    const meta = databaseStore.metadata[props.connectionId]
+    if (meta?.schemas[props.database]) {
+      availableSchemas.value = meta.schemas[props.database]
+    }
+  }
+  catch {
+    availableSchemas.value = []
+  }
+}
+
 async function fetchSchemaData() {
   loading.value = true
   try {
-    const schema = props.schema ?? null
+    const schema = localSchema.value || null
 
     // Fetch tables and foreign keys in parallel
     const [tableList, fkList] = await Promise.all([
@@ -347,8 +377,8 @@ function endPan() {
 }
 
 function onWheel(e: WheelEvent) {
-  const delta = e.deltaY > 0 ? -0.1 : 0.1
-  zoomLevel.value = Math.max(0.1, Math.min(3, zoomLevel.value + delta))
+  const delta = -e.deltaY / 500
+  zoomLevel.value = Math.max(0.1, Math.min(3, zoomLevel.value * (1 + delta)))
 }
 
 function fitToScreen() {
@@ -385,8 +415,14 @@ useResizeObserver(svgContainerRef, () => {
   // so no re-layout needed on resize.
 })
 
+// ─── Watch for schema change ──────────────────────────
+watch(localSchema, () => {
+  fetchSchemaData()
+})
+
 // ─── Lifecycle ────────────────────────────────────────
-onMounted(() => {
+onMounted(async () => {
+  await fetchAvailableSchemas()
   fetchSchemaData()
 })
 </script>
@@ -395,6 +431,28 @@ onMounted(() => {
   <div class="er-diagram-view bg-background flex flex-col h-full">
     <!-- ── Toolbar ──────────────────────────────────── -->
     <div class="px-3 py-2 border-b bg-muted/30 flex gap-2 items-center">
+      <!-- Schema selector -->
+      <div v-if="supportsSchemas" class="w-44">
+        <Select v-model="localSchema" @update:model-value="localSchema = $event">
+          <SelectTrigger class="text-xs h-8">
+            <SelectValue :placeholder="t('components.databaseBrowser.erDiagram.allSchemas')" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="" class="text-xs">
+              {{ t('components.databaseBrowser.erDiagram.allSchemas') }}
+            </SelectItem>
+            <SelectItem
+              v-for="s in availableSchemas"
+              :key="s"
+              :value="s"
+              class="text-xs font-mono"
+            >
+              {{ s }}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
       <!-- Search -->
       <div class="flex-1 max-w-xs relative">
         <svg
@@ -507,16 +565,38 @@ onMounted(() => {
         </svg>
       </Button>
 
-      <!-- Zoom indicator -->
-      <span
-        class="text-xs text-muted-foreground text-right min-w-[4rem] tabular-nums"
-      >
-        {{
-          t('components.databaseBrowser.erDiagram.zoom', {
-            percentage: Math.round(zoomLevel * 100),
-          })
-        }}
-      </span>
+      <!-- Zoom controls -->
+      <div class="flex gap-0.5 items-center">
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-7 w-7"
+          :disabled="zoomLevel <= 0.1"
+          :title="t('components.databaseBrowser.erDiagram.zoomOut')"
+          @click="zoomLevel = Math.max(0.1, +(zoomLevel / 1.3).toFixed(2))"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </Button>
+        <span
+          class="text-xs text-muted-foreground min-w-[3rem] text-center tabular-nums"
+        >
+          {{
+            t('components.databaseBrowser.erDiagram.zoom', {
+              percentage: Math.round(zoomLevel * 100),
+            })
+          }}
+        </span>
+        <Button
+          variant="ghost"
+          size="icon"
+          class="h-7 w-7"
+          :disabled="zoomLevel >= 3"
+          :title="t('components.databaseBrowser.erDiagram.zoomIn')"
+          @click="zoomLevel = Math.min(3, +(zoomLevel * 1.3).toFixed(2))"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+        </Button>
+      </div>
     </div>
 
     <!-- ── Large Schema Warning ─────────────────────── -->
@@ -672,7 +752,9 @@ onMounted(() => {
                   <span class="er-column-name">{{ col.name }}</span>
                   <span class="er-column-type">{{ col.data_type }}</span>
                   <span class="er-column-markers">
-                    <span v-if="col.is_primary_key" class="er-pk">🔑</span>
+                    <span v-if="col.is_primary_key" class="er-pk">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z"/><circle cx="16.5" cy="7.5" r=".5" fill="currentColor"/></svg>
+                    </span>
                     <span
                       v-if="
                         node.table.foreignKeys.some(
@@ -682,8 +764,12 @@ onMounted(() => {
                         )
                       "
                       class="er-fk"
-                    >🔗</span>
-                    <span v-if="col.nullable === false" class="er-nullable">•</span>
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                    </span>
+                    <span v-if="col.nullable === false" class="er-nullable">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/></svg>
+                    </span>
                   </span>
                 </div>
               </div>
