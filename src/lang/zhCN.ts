@@ -1123,6 +1123,8 @@ export const zhCN = {
         allSchemas: '所有模式',
         fitToScreen: '适应屏幕',
         searchPlaceholder: '过滤表...',
+        tablesCountBadge: '{count} 张表',
+        relationshipsCountBadge: '{count} 个关系',
         largeSchemaWarning: '此模式包含 {count} 张表，显示全部可能会过于密集，是否继续？',
         showAllColumns: '显示所有列 ({count})',
         hideExtraColumns: '显示更少',

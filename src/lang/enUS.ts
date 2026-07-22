@@ -1123,6 +1123,8 @@ export const enUS = {
         allSchemas: 'All Schemas',
         fitToScreen: 'Fit to Screen',
         searchPlaceholder: 'Filter tables...',
+        tablesCountBadge: '{count} tables',
+        relationshipsCountBadge: '{count} relationships',
         largeSchemaWarning: 'This schema has {count} tables. Displaying all may be dense. Continue?',
         showAllColumns: 'Show All Columns ({count})',
         hideExtraColumns: 'Show Less',

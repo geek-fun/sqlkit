@@ -108,10 +108,11 @@ const error = ref<string | null>(null)
 const showWarning = ref(false)
 const svgContainerRef = ref<HTMLElement | null>(null)
 
-// ─── Node drag state ──────────────────────────────
+// ─── Node drag state (delta-offset, no nodePositions update during drag) ───
 const draggingNodeId = ref<string | null>(null)
 const dragStartPos = ref({ x: 0, y: 0 })
 const dragNodeStart = ref({ x: 0, y: 0 })
+const dragDelta = ref({ x: 0, y: 0 })
 
 // ─── Schema selector ──────────────────────────────
 const databaseStore = useDatabaseStore()
@@ -515,7 +516,7 @@ function endPan() {
   isPanning.value = false
 }
 
-// ─── Node Drag Handlers ───────────────────────────
+// ─── Node Drag Handlers (delta-offset: nodePositions only updated on drop) ──
 function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   if (e.button !== 0)
     return
@@ -525,6 +526,7 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
   draggingNodeId.value = nodeId
   dragStartPos.value = { x: e.clientX, y: e.clientY }
   dragNodeStart.value = { x: pos.x, y: pos.y }
+  dragDelta.value = { x: 0, y: 0 }
   document.addEventListener('mousemove', onNodeMouseMove)
   document.addEventListener('mouseup', onNodeMouseUp)
 }
@@ -532,21 +534,22 @@ function onNodeMouseDown(e: MouseEvent, nodeId: string) {
 function onNodeMouseMove(e: MouseEvent) {
   if (!draggingNodeId.value)
     return
-  const dx = (e.clientX - dragStartPos.value.x) / zoomLevel.value
-  const dy = (e.clientY - dragStartPos.value.y) / zoomLevel.value
-  const positions = new Map(nodePositions.value)
-  const current = positions.get(draggingNodeId.value)
-  if (current) {
-    positions.set(draggingNodeId.value, {
-      x: dragNodeStart.value.x + dx,
-      y: dragNodeStart.value.y + dy,
-    })
-    nodePositions.value = positions
+  dragDelta.value = {
+    x: (e.clientX - dragStartPos.value.x) / zoomLevel.value,
+    y: (e.clientY - dragStartPos.value.y) / zoomLevel.value,
   }
 }
 
 function onNodeMouseUp() {
+  if (draggingNodeId.value) {
+    const finalX = dragNodeStart.value.x + dragDelta.value.x
+    const finalY = dragNodeStart.value.y + dragDelta.value.y
+    const positions = new Map(nodePositions.value)
+    positions.set(draggingNodeId.value, { x: finalX, y: finalY })
+    nodePositions.value = positions
+  }
   draggingNodeId.value = null
+  dragDelta.value = { x: 0, y: 0 }
   document.removeEventListener('mousemove', onNodeMouseMove)
   document.removeEventListener('mouseup', onNodeMouseUp)
 }
@@ -689,11 +692,11 @@ onUnmounted(() => {
       </div>
 
       <!-- Info badges -->
-      <Badge variant="secondary" class="text-[11px] shrink-0 gap-1 h-6">
+      <Badge variant="secondary" class="text-[11px] shrink-0 gap-1 h-6" :title="t('components.databaseBrowser.erDiagram.tablesCountBadge', { count: displayedTables.length })">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z" /><path d="M21 9H3" /><path d="M9 21V9" /></svg>
         {{ displayedTables.length }}
       </Badge>
-      <Badge variant="secondary" class="text-[11px] shrink-0 gap-1 h-6">
+      <Badge variant="secondary" class="text-[11px] shrink-0 gap-1 h-6" :title="t('components.databaseBrowser.erDiagram.relationshipsCountBadge', { count: displayedRelationships.length })">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
         {{ displayedRelationships.length }}
       </Badge>
@@ -703,6 +706,7 @@ onUnmounted(() => {
       <Button
         variant="ghost" size="sm"
         class="text-xs gap-1 h-7"
+        :title="t('components.databaseBrowser.erDiagram.layoutDirection')"
         @click="toggleLayout"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
@@ -814,6 +818,7 @@ onUnmounted(() => {
         :style="{
           transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
           transformOrigin: '0 0',
+          overflow: 'visible',
         }"
         @click.self="deselectAll"
         @dblclick="fitToScreen"
@@ -840,7 +845,7 @@ onUnmounted(() => {
         <g
           v-for="node in renderNodes"
           :key="node.id"
-          :transform="`translate(${node.x}, ${node.y})`"
+          :transform="`translate(${node.x + (draggingNodeId === node.id ? dragDelta.x : 0)}, ${node.y + (draggingNodeId === node.id ? dragDelta.y : 0)})`"
           class="er-table-group"
           :class="{ 'er-table-group--dragging': draggingNodeId === node.id }"
           @mousedown.prevent="onNodeMouseDown($event, node.id)"
