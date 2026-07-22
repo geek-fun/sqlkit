@@ -691,6 +691,14 @@ function handleDatabaseAction(kind: string) {
     case 'exportDatabase':
       router.push('/transfer')
       break
+    case 'showErDiagram': {
+      const connId = getActiveConnectionId()
+      const db = selectedDatabase.value
+      if (connId && db) {
+        tabStore.openErDiagramTab(connId, db, selectedSchema.value || undefined)
+      }
+      break
+    }
     default:
       toast.info(t('sidebar.notImplemented'))
   }
