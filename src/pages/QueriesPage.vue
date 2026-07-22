@@ -430,6 +430,14 @@ function handleShowErDiagram(database: string, schema?: string) {
     tabStore.openErDiagramTab(connId, database, schema)
 }
 
+function handleOpenTableFromErDiagram(tableName: string) {
+  const connId = getActiveConnectionId()
+  const tab = activeTab.value
+  if (!connId || !tab?.erDiagram)
+    return
+  tabStore.openTableViewTab(connId, tab.erDiagram.database, tableName, tab.erDiagram.schema)
+}
+
 function handleDropTable(table: TableInfo, database: string, schema?: string) {
   destructiveAction.value = { type: 'drop', table, database, schema }
   destructiveDialogOpen.value = true
@@ -1034,6 +1042,7 @@ function closeResultPanel() {
             :database="activeTab.erDiagram.database"
             :schema="activeTab.erDiagram.schema"
             class="flex-1"
+            @open-table="handleOpenTableFromErDiagram"
           />
 
           <!-- Listing Tab (Views / Procedures / Functions) -->
@@ -1055,18 +1064,18 @@ function closeResultPanel() {
           <!-- Query editor area (shown for normal query tabs) -->
           <template v-else>
             <!-- Toolbar (DBX-style: compact h-9, colored icons, no constant bg) -->
-            <div class="h-9 shrink-0 border-b border-border bg-background/80 px-2 flex items-center gap-0.5 text-xs text-muted-foreground">
+            <div class="text-xs text-muted-foreground px-2 border-b border-border bg-background/80 flex shrink-0 gap-0.5 h-9 items-center">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="h-7 w-7 text-emerald-600 hover:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20 disabled:opacity-40"
+                      class="text-emerald-600 h-7 w-7 dark:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 dark:hover:bg-emerald-500/20"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="executeQuery"
                     >
-                      <span class="i-lucide-play h-3.5 w-3.5 shrink-0" />
+                      <span class="i-lucide-play shrink-0 h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1081,12 +1090,12 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="h-7 w-7 text-violet-600 hover:bg-violet-500/10 dark:text-violet-400 dark:hover:bg-violet-500/20 disabled:opacity-40"
+                      class="text-violet-600 h-7 w-7 dark:text-violet-400 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:bg-violet-500/20"
                       :class="{ '!text-emerald-600 !bg-emerald-500/10 !dark:bg-emerald-500/20': explainAnalyzeMode }"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="handleExplainQuery(explainAnalyzeMode)"
                     >
-                      <span class="i-lucide-line-chart h-3.5 w-3.5 shrink-0" />
+                      <span class="i-lucide-line-chart shrink-0 h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1100,12 +1109,12 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="h-7 w-7 text-muted-foreground hover:text-violet-600 hover:bg-violet-500/10 dark:hover:text-violet-400 dark:hover:bg-violet-500/20 disabled:opacity-40"
+                      class="text-muted-foreground h-7 w-7 hover:text-violet-600 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:text-violet-400 dark:hover:bg-violet-500/20"
                       :class="explainAnalyzeMode ? '!text-violet-600 !bg-violet-100 dark:!text-violet-300 dark:!bg-violet-900/30' : ''"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       @click="toggleExplainMode"
                     >
-                      <span class="i-lucide-activity h-3.5 w-3.5 shrink-0" />
+                      <span class="i-lucide-activity shrink-0 h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1114,7 +1123,7 @@ function closeResultPanel() {
                 </Tooltip>
               </TooltipProvider>
 
-              <div class="w-px h-4 bg-border mx-0.5" />
+              <div class="mx-0.5 bg-border h-4 w-px" />
 
               <TooltipProvider>
                 <Tooltip>
@@ -1122,11 +1131,11 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="h-7 w-7 text-amber-600 hover:bg-amber-500/10 dark:text-amber-400 dark:hover:bg-amber-500/20 disabled:opacity-40"
+                      class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40 dark:hover:bg-amber-500/20"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       @click="handleToolbarFormat"
                     >
-                      <span class="i-lucide-align-left h-3.5 w-3.5 shrink-0" />
+                      <span class="i-lucide-align-left shrink-0 h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -1144,11 +1153,11 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="h-7 w-7 text-sky-600 hover:bg-sky-500/10 dark:text-sky-400 dark:hover:bg-sky-500/20 disabled:opacity-40"
+                      class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 disabled:opacity-40 dark:hover:bg-sky-500/20"
                       :disabled="!activeTab || !activeTab.content.trim()"
                       @click="handleDownloadQuery"
                     >
-                      <span class="i-lucide-download h-3.5 w-3.5 shrink-0" />
+                      <span class="i-lucide-download shrink-0 h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
