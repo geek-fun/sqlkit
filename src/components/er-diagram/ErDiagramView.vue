@@ -95,6 +95,49 @@ const dragStartPos = ref({ x: 0, y: 0 })
 const dragNodeStart = ref({ x: 0, y: 0 })
 const dragDelta = ref({ x: 0, y: 0 })
 
+// ─── Right-drag to pan ──────────────────────────
+const isRightDragging = ref(false)
+const rightDragStart = ref({ mouseX: 0, mouseY: 0, scrollLeft: 0, scrollTop: 0 })
+
+function onViewportMouseDown(e: MouseEvent) {
+  if (e.button !== 2)
+    return
+  e.preventDefault()
+  const vp = viewportRef.value
+  if (!vp)
+    return
+  isRightDragging.value = true
+  rightDragStart.value = {
+    mouseX: e.clientX,
+    mouseY: e.clientY,
+    scrollLeft: vp.scrollLeft,
+    scrollTop: vp.scrollTop,
+  }
+  document.addEventListener('mousemove', onViewportMouseMove)
+  document.addEventListener('mouseup', onViewportMouseUp)
+}
+
+function onViewportMouseMove(e: MouseEvent) {
+  if (!isRightDragging.value)
+    return
+  const vp = viewportRef.value
+  if (!vp)
+    return
+  const { mouseX, mouseY, scrollLeft, scrollTop } = rightDragStart.value
+  vp.scrollLeft = scrollLeft - (e.clientX - mouseX)
+  vp.scrollTop = scrollTop - (e.clientY - mouseY)
+}
+
+function onViewportMouseUp() {
+  isRightDragging.value = false
+  document.removeEventListener('mousemove', onViewportMouseMove)
+  document.removeEventListener('mouseup', onViewportMouseUp)
+}
+
+function onContextMenu(e: MouseEvent) {
+  e.preventDefault() // prevent browser context menu during right-drag
+}
+
 // ─── Schema selector ──────────────────────────────
 const databaseStore = useDatabaseStore()
 const availableSchemas = ref<string[]>([])
@@ -502,6 +545,8 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('mousemove', onHeaderMouseMove)
   document.removeEventListener('mouseup', onHeaderMouseUp)
+  document.removeEventListener('mousemove', onViewportMouseMove)
+  document.removeEventListener('mouseup', onViewportMouseUp)
 })
 </script>
 
@@ -633,6 +678,8 @@ onUnmounted(() => {
       @wheel.prevent="onWheel"
       @gesturestart="onGestureStart"
       @gesturechange="onGestureChange"
+      @mousedown="onViewportMouseDown"
+      @contextmenu="onContextMenu"
       @click.self="deselectAll"
     >
       <!-- Loading -->
