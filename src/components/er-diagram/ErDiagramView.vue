@@ -1,9 +1,9 @@
 <script setup lang="ts">
+import type { RenderEdge, RenderNode, TableData } from './types'
 import type { ForeignKeyInfo } from '@/datasources/erDiagramApi'
 import type { ColumnInfo } from '@/types/connection'
 import { invoke } from '@tauri-apps/api/core'
-import { useResizeObserver } from '@vueuse/core'
-import dagre from 'dagre'
+import { useElementBounding, useResizeObserver } from '@vueuse/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -23,6 +23,25 @@ import { Spinner } from '@/components/ui/spinner'
 import { getForeignKeys } from '@/datasources/erDiagramApi'
 import { useDatabaseStore } from '@/store/databaseStore'
 
+import EngineeringEntity from './EngineeringEntity.vue'
+import {
+  computeBoundingBox,
+  computeCanvasSize,
+  computeDagreLayout,
+  fitToScreen as fitBboxToScreen,
+} from './graph-layout'
+import {
+  buildTableRectMap,
+  computeRelationshipPath,
+} from './graph-routing'
+import TableCard from './TableCard.vue'
+import {
+  calcNodeHeight,
+  CARD_PADDING,
+  HEADER_HEIGHT,
+  NODE_WIDTH,
+} from './types'
+
 // ─── Props ───────────────────────────────────────────
 const props = defineProps<{
   connectionId: string
@@ -30,67 +49,26 @@ const props = defineProps<{
   schema?: string
 }>()
 
+const emit = defineEmits<{
+  openTable: [tableName: string]
+}>()
+
 const { t } = useI18n()
 
-// ─── Types ────────────────────────────────────────────
+// ─── Types (local) ───────────────────────────────────
 type TableInfo = {
   name: string
   schema?: string
   table_type?: string
 }
 
-type TableData = {
-  name: string
-  schema?: string
-  columns: ColumnInfo[]
-  foreignKeys: ForeignKeyInfo[]
-}
-
-type RenderNode = {
-  id: string
-  x: number
-  y: number
-  width: number
-  height: number
-  table: TableData
-  isHighlighted: boolean
-  visibleColumns: ColumnInfo[]
-  showExpandButton: boolean
-  isExpanded: boolean
-}
-
-type RenderEdge = {
-  from: string
-  to: string
-  label: string
-  path: string
-  isHighlighted: boolean
-}
-
-// ─── Layout Constants ─────────────────────────────────
-const NODE_WIDTH = 220
-const COL_HEIGHT = 28
-const HEADER_HEIGHT = 36
-const EXPAND_BTN_HEIGHT = 30
-const CARD_PADDING = 8
-const ROUTE_PADDING = 56
-const ROUTE_BLOCK_MARGIN = 18
-
-function calcNodeHeight(table: TableData, isExpanded: boolean): number {
-  const colCount = isExpanded
-    ? table.columns.length
-    : Math.min(5, table.columns.length)
-  const expandBtn = table.columns.length > 5 ? EXPAND_BTN_HEIGHT : 0
-  return HEADER_HEIGHT + colCount * COL_HEIGHT + expandBtn + CARD_PADDING
-}
+const CANVAS_PADDING = 80
 
 // ─── State ────────────────────────────────────────────
 const tables = ref<TableData[]>([])
 const foreignKeys = ref<ForeignKeyInfo[]>([])
-const nodePositions = ref<Map<string, { x: number, y: number }>>(new Map())
-const edgePaths = ref<
-  Array<{ from: string, to: string, label: string, path: string }>
->([])
+const dagrePositions = ref<Map<string, { x: number, y: number }>>(new Map())
+const manualOverrides = ref<Map<string, { x: number, y: number }>>(new Map())
 
 const selectedTableId = ref<string | null>(null)
 const searchQuery = ref('')
@@ -98,17 +76,20 @@ const expandedTables = ref<Set<string>>(new Set())
 const layoutDirection = ref<'TB' | 'LR'>('TB')
 
 const zoomLevel = ref(1)
-const panOffset = ref({ x: 0, y: 0 })
-const isPanning = ref(false)
-const panStart = ref({ x: 0, y: 0 })
 const gestureStartZoom = ref(1)
 
 const loading = ref(true)
 const error = ref<string | null>(null)
 const showWarning = ref(false)
-const svgContainerRef = ref<HTMLElement | null>(null)
 
-// ─── Node drag state (delta-offset, no nodePositions update during drag) ───
+// Viewport refs
+const viewportRef = ref<HTMLElement | null>(null)
+const viewportBounds = useElementBounding(viewportRef)
+
+// ─── View mode ───────────────────────────────────
+const viewMode = ref<'table' | 'engineering'>('table')
+
+// ─── Node drag state (delta-offset) ──────────────
 const draggingNodeId = ref<string | null>(null)
 const dragStartPos = ref({ x: 0, y: 0 })
 const dragNodeStart = ref({ x: 0, y: 0 })
@@ -119,9 +100,7 @@ const databaseStore = useDatabaseStore()
 const availableSchemas = ref<string[]>([])
 const localSchema = ref<string>(props.schema ?? '__all__')
 
-const supportsSchemas = computed(() =>
-  availableSchemas.value.length > 0,
-)
+const supportsSchemas = computed(() => availableSchemas.value.length > 0)
 
 const schemaParam = computed(() =>
   localSchema.value === '__all__' ? null : localSchema.value,
@@ -139,6 +118,15 @@ const allRelationships = computed(() =>
     targetTable: fk.referenced_table,
   })),
 )
+
+// ─── Combined positions (dagre + manual) ─────────
+const nodePositions = computed(() => {
+  const merged = new Map(dagrePositions.value)
+  for (const [name, pos] of manualOverrides.value) {
+    merged.set(name, pos)
+  }
+  return merged
+})
 
 // ─── Focus mode ───────────────────────────────────
 const focusMode = computed(() => selectedTableId.value !== null)
@@ -187,160 +175,76 @@ const highlightedTables = computed(() => {
   return connected
 })
 
+// ─── Render nodes ─────────────────────────────────
 const renderNodes = computed<RenderNode[]>(() => {
-  return displayedTables.value
-    .map((table) => {
-      const pos = nodePositions.value.get(table.name)
-      if (!pos)
-        return null
+  return displayedTables.value.map((table) => {
+    const pos = nodePositions.value.get(table.name)
+    if (!pos)
+      return null
 
-      const isExpanded = expandedTables.value.has(table.name)
-      const visibleCols = isExpanded
-        ? table.columns
-        : table.columns.slice(0, 5)
-      const height = calcNodeHeight(table, isExpanded)
+    const isExpanded = expandedTables.value.has(table.name)
+    const hasMore = table.columns.length > 5
+    const height = calcNodeHeight(table.columns.length, hasMore, isExpanded)
+    const visibleCols = isExpanded
+      ? table.columns
+      : table.columns.slice(0, 5)
 
-      return {
-        id: table.name,
-        x: pos.x - NODE_WIDTH / 2,
-        y: pos.y - height / 2,
-        width: NODE_WIDTH,
-        height,
-        table,
-        isHighlighted: highlightedTables.value.has(table.name),
-        visibleColumns: visibleCols,
-        showExpandButton: table.columns.length > 5,
-        isExpanded,
-      }
-    })
-    .filter((n): n is RenderNode => n !== null)
+    return {
+      id: table.name,
+      x: pos.x - NODE_WIDTH / 2,
+      y: pos.y - height / 2,
+      width: NODE_WIDTH,
+      height,
+      table,
+      isHighlighted: highlightedTables.value.has(table.name),
+      visibleColumns: visibleCols,
+      showExpandButton: hasMore,
+      isExpanded,
+    }
+  }).filter((n): n is RenderNode => n !== null)
 })
 
-// ─── Orthogonal path routing ──────────────────────
-type TableRect = {
-  name: string
-  x: number
-  y: number
-  width: number
-  height: number
-}
-
-function getTableRect(tableName: string): TableRect | null {
-  const table = tables.value.find(t => t.name === tableName)
-  const pos = nodePositions.value.get(tableName)
-  if (!table || !pos)
-    return null
-  const height = calcNodeHeight(table, expandedTables.value.has(tableName))
-  return {
-    name: tableName,
-    x: pos.x - NODE_WIDTH / 2,
-    y: pos.y - height / 2,
-    width: NODE_WIDTH,
-    height,
+// ─── Canvas size ──────────────────────────────────
+const nodeHeights = computed(() => {
+  const map = new Map<string, number>()
+  for (const node of renderNodes.value) {
+    map.set(node.id, node.height)
   }
-}
+  return map
+})
 
-function rangesOverlap(a1: number, a2: number, b1: number, b2: number): boolean {
-  return Math.max(a1, b1) <= Math.min(a2, b2)
-}
+const canvasSize = computed(() => {
+  if (nodePositions.value.size === 0)
+    return { width: 800, height: 600 }
 
-function routeSideX(rect: TableRect, routeX: number, offset = 0): number {
-  if (routeX < rect.x)
-    return rect.x - offset
-  return rect.x + rect.width + offset
-}
-
-function tableRects(): TableRect[] {
-  return displayedTables.value
-    .map(t => getTableRect(t.name))
-    .filter((r): r is TableRect => r !== null)
-}
-
-function isVerticalRouteBlocked(routeX: number, y1: number, y2: number, ignored: Set<string>): boolean {
-  const top = Math.min(y1, y2)
-  const bottom = Math.max(y1, y2)
-  return tableRects().some(
-    r =>
-      !ignored.has(r.name)
-      && routeX >= r.x - ROUTE_BLOCK_MARGIN
-      && routeX <= r.x + r.width + ROUTE_BLOCK_MARGIN
-      && rangesOverlap(top, bottom, r.y - ROUTE_BLOCK_MARGIN, r.y + r.height + ROUTE_BLOCK_MARGIN),
-  )
-}
-
-function isHorizontalRouteBlocked(y: number, x1: number, x2: number, ignored: Set<string>): boolean {
-  const left = Math.min(x1, x2)
-  const right = Math.max(x1, x2)
-  return tableRects().some(
-    r =>
-      !ignored.has(r.name)
-      && y >= r.y - ROUTE_BLOCK_MARGIN
-      && y <= r.y + r.height + ROUTE_BLOCK_MARGIN
-      && rangesOverlap(left, right, r.x - ROUTE_BLOCK_MARGIN, r.x + r.width + ROUTE_BLOCK_MARGIN),
-  )
-}
-
-function candidateRouteXs(source: TableRect, target: TableRect): number[] {
-  const candidates = new Set<number>()
-  const minLeft = Math.min(source.x, target.x)
-  const maxRight = Math.max(source.x + source.width, target.x + target.width)
-
-  candidates.add(minLeft - ROUTE_PADDING)
-  candidates.add(maxRight + ROUTE_PADDING)
-
-  if (source.x + source.width + ROUTE_PADDING <= target.x)
-    candidates.add((source.x + source.width + target.x) / 2)
-  if (target.x + target.width + ROUTE_PADDING <= source.x)
-    candidates.add((target.x + target.width + source.x) / 2)
-
-  const columns = [...new Set(tableRects().map(r => r.x))].sort((a, b) => a - b)
-  for (let i = 0; i < columns.length - 1; i++) {
-    const gap = columns[i + 1] - (columns[i] + NODE_WIDTH)
-    if (gap >= ROUTE_PADDING)
-      candidates.add((columns[i] + NODE_WIDTH + columns[i + 1]) / 2)
+  const sizes = new Map<string, { width: number, height: number }>()
+  for (const node of renderNodes.value) {
+    sizes.set(node.id, { width: NODE_WIDTH, height: node.height })
   }
 
-  return [...candidates].sort((a, b) => {
-    const sa = routeSideX(source, a)
-    const ta = routeSideX(target, a)
-    const sb = routeSideX(source, b)
-    const tb = routeSideX(target, b)
-    return Math.abs(a - sa) + Math.abs(a - ta) - (Math.abs(b - sb) + Math.abs(b - tb))
-  })
-}
+  const bbox = computeBoundingBox(nodePositions.value, sizes)
+  return computeCanvasSize(bbox, CANVAS_PADDING)
+})
 
-function computeRelationshipPath(sourceTable: string, targetTable: string): string {
-  const source = getTableRect(sourceTable)
-  const target = getTableRect(targetTable)
-  if (!source || !target)
-    return ''
-
-  const y1 = source.y + source.height / 2
-  const y2 = target.y + target.height / 2
-  const ignored = new Set([source.name, target.name])
-  const candidates = candidateRouteXs(source, target)
-
-  const routeX
-    = candidates.find((c) => {
-      const x1 = routeSideX(source, c)
-      const x2 = routeSideX(target, c)
-      return (
-        !isVerticalRouteBlocked(c, y1, y2, ignored)
-        && !isHorizontalRouteBlocked(y1, x1, c, ignored)
-        && !isHorizontalRouteBlocked(y2, c, x2, ignored)
-      )
-    })
-    ?? candidates[0]
-    ?? Math.max(source.x + source.width, target.x + target.width) + ROUTE_PADDING
-
-  const x1 = routeSideX(source, routeX, 2)
-  const x2 = routeSideX(target, routeX, 2)
-  return `M ${x1} ${y1} L ${routeX} ${y1} L ${routeX} ${y2} L ${x2} ${y2}`
-}
+// ─── Render edges (orthogonal routing) ────────────
+const tableRectMap = computed(() => {
+  return buildTableRectMap(
+    displayedTables.value.map(t => t.name),
+    nodePositions.value,
+    (name) => {
+      const h = nodeHeights.value.get(name)
+      return h ?? HEADER_HEIGHT + CARD_PADDING
+    },
+  )
+})
 
 const renderEdges = computed<RenderEdge[]>(() => {
   return displayedRelationships.value.map((rel) => {
-    const path = computeRelationshipPath(rel.sourceTable, rel.targetTable)
+    const path = computeRelationshipPath(
+      rel.sourceTable,
+      rel.targetTable,
+      tableRectMap.value,
+    )
     return {
       from: rel.sourceTable,
       to: rel.targetTable,
@@ -357,45 +261,26 @@ const renderEdges = computed<RenderEdge[]>(() => {
 // ─── Layout Computation ───────────────────────────────
 function computeLayout() {
   if (displayedTables.value.length === 0) {
-    nodePositions.value = new Map()
-    edgePaths.value = []
+    dagrePositions.value = new Map()
+    manualOverrides.value = new Map()
     return
   }
 
-  const g = new dagre.graphlib.Graph()
-  g.setGraph({
-    rankdir: layoutDirection.value,
-    nodesep: 80,
-    ranksep: 120,
-    marginx: 40,
-    marginy: 40,
-  })
-  g.setDefaultEdgeLabel(() => ({}))
-
-  for (const table of displayedTables.value) {
+  const dagreTables = displayedTables.value.map((table) => {
     const isExpanded = expandedTables.value.has(table.name)
-    const height = calcNodeHeight(table, isExpanded)
-    g.setNode(table.name, {
-      label: table.name,
-      width: NODE_WIDTH,
-      height,
-    })
-  }
-
-  for (const rel of displayedRelationships.value) {
-    g.setEdge(rel.sourceTable, rel.targetTable, { label: '' })
-  }
-
-  dagre.layout(g)
-
-  const positions = new Map<string, { x: number, y: number }>()
-  g.nodes().forEach((nodeName: string) => {
-    const node = g.node(nodeName) as { x: number, y: number }
-    positions.set(nodeName, { x: node.x, y: node.y })
+    const hasMore = table.columns.length > 5
+    const h = calcNodeHeight(table.columns.length, hasMore, isExpanded)
+    return { name: table.name, width: NODE_WIDTH, height: h }
   })
 
-  nodePositions.value = positions
-  edgePaths.value = []
+  const dagreRels = displayedRelationships.value.map(rel => ({
+    sourceTable: rel.sourceTable,
+    targetTable: rel.targetTable,
+  }))
+
+  const positions = computeDagreLayout(dagreTables, dagreRels, layoutDirection.value)
+  dagrePositions.value = positions
+  manualOverrides.value = new Map()
 }
 
 // ─── Data Fetching ────────────────────────────────────
@@ -488,119 +373,6 @@ watch(localSchema, () => {
 })
 
 // ─── Interaction Handlers ─────────────────────────────
-function startPan(e: MouseEvent) {
-  const target = e.target as HTMLElement
-  const isCanvasClick
-    = target === svgContainerRef.value
-      || target.tagName === 'svg'
-  if (!isCanvasClick)
-    return
-
-  isPanning.value = true
-  panStart.value = {
-    x: e.clientX - panOffset.value.x,
-    y: e.clientY - panOffset.value.y,
-  }
-}
-
-function onPan(e: MouseEvent) {
-  if (!isPanning.value)
-    return
-  panOffset.value = {
-    x: e.clientX - panStart.value.x,
-    y: e.clientY - panStart.value.y,
-  }
-}
-
-function endPan() {
-  isPanning.value = false
-}
-
-// ─── Node Drag Handlers (delta-offset: nodePositions only updated on drop) ──
-function onNodeMouseDown(e: MouseEvent, nodeId: string) {
-  if (e.button !== 0)
-    return
-  const pos = nodePositions.value.get(nodeId)
-  if (!pos)
-    return
-  draggingNodeId.value = nodeId
-  dragStartPos.value = { x: e.clientX, y: e.clientY }
-  dragNodeStart.value = { x: pos.x, y: pos.y }
-  dragDelta.value = { x: 0, y: 0 }
-  document.addEventListener('mousemove', onNodeMouseMove)
-  document.addEventListener('mouseup', onNodeMouseUp)
-}
-
-function onNodeMouseMove(e: MouseEvent) {
-  if (!draggingNodeId.value)
-    return
-  dragDelta.value = {
-    x: (e.clientX - dragStartPos.value.x) / zoomLevel.value,
-    y: (e.clientY - dragStartPos.value.y) / zoomLevel.value,
-  }
-}
-
-function onNodeMouseUp() {
-  if (draggingNodeId.value) {
-    const finalX = dragNodeStart.value.x + dragDelta.value.x
-    const finalY = dragNodeStart.value.y + dragDelta.value.y
-    const positions = new Map(nodePositions.value)
-    positions.set(draggingNodeId.value, { x: finalX, y: finalY })
-    nodePositions.value = positions
-  }
-  draggingNodeId.value = null
-  dragDelta.value = { x: 0, y: 0 }
-  document.removeEventListener('mousemove', onNodeMouseMove)
-  document.removeEventListener('mouseup', onNodeMouseUp)
-}
-
-// ─── Zoom ─────────────────────────────────────────────
-function onWheel(e: WheelEvent) {
-  if (!e.ctrlKey && !e.metaKey) {
-    // Without ctrl/meta: pan vertically
-    panOffset.value = { ...panOffset.value, y: panOffset.value.y - e.deltaY }
-    return
-  }
-  e.preventDefault()
-  const delta = -e.deltaY / 500
-  const nextZoom = Math.max(0.1, Math.min(3, +(zoomLevel.value * (1 + delta)).toFixed(2)))
-
-  // Zoom centered on mouse position
-  const rect = svgContainerRef.value?.getBoundingClientRect()
-  if (rect) {
-    const originX = e.clientX - rect.left
-    const originY = e.clientY - rect.top
-    const contentX = (originX - panOffset.value.x) / zoomLevel.value
-    const contentY = (originY - panOffset.value.y) / zoomLevel.value
-    zoomLevel.value = nextZoom
-    panOffset.value = {
-      x: originX - contentX * nextZoom,
-      y: originY - contentY * nextZoom,
-    }
-  }
-  else {
-    zoomLevel.value = nextZoom
-  }
-}
-
-function onGestureStart(e: Event) {
-  e.preventDefault()
-  gestureStartZoom.value = zoomLevel.value
-}
-
-function onGestureChange(e: Event) {
-  const ge = e as WheelEvent & { scale?: number }
-  if (typeof ge.scale !== 'number')
-    return
-  e.preventDefault()
-  zoomLevel.value = Math.max(0.1, Math.min(3, +(gestureStartZoom.value * ge.scale).toFixed(2)))
-}
-
-function fitToScreen() {
-  zoomLevel.value = 1
-  panOffset.value = { x: 0, y: 0 }
-}
-
 function selectTable(tableName: string) {
   selectedTableId.value
     = selectedTableId.value === tableName ? null : tableName
@@ -624,17 +396,102 @@ function toggleLayout() {
     = layoutDirection.value === 'TB' ? 'LR' : 'TB'
 }
 
-// ─── Resize Observer ──────────────────────────────────
-useResizeObserver(svgContainerRef, () => {
-  // Dagre layout is independent of container size
-})
-
-// ─── Helpers ──────────────────────────────────────────
-function isFKColumn(table: TableData, colName: string): boolean {
-  return table.foreignKeys.some(
-    fk => fk.columns.includes(colName) || fk.referenced_columns.includes(colName),
-  )
+// ─── Header-only drag handlers ───────────────────
+function onHeaderMousedown(e: MouseEvent, nodeId: string) {
+  if (e.button !== 0)
+    return
+  const pos = nodePositions.value.get(nodeId)
+  if (!pos)
+    return
+  draggingNodeId.value = nodeId
+  dragStartPos.value = { x: e.clientX, y: e.clientY }
+  dragNodeStart.value = { x: pos.x, y: pos.y }
+  dragDelta.value = { x: 0, y: 0 }
+  document.addEventListener('mousemove', onHeaderMouseMove)
+  document.addEventListener('mouseup', onHeaderMouseUp)
 }
+
+function onHeaderMouseMove(e: MouseEvent) {
+  if (!draggingNodeId.value)
+    return
+  dragDelta.value = {
+    x: (e.clientX - dragStartPos.value.x) / zoomLevel.value,
+    y: (e.clientY - dragStartPos.value.y) / zoomLevel.value,
+  }
+}
+
+function onHeaderMouseUp() {
+  if (draggingNodeId.value) {
+    const finalX = dragNodeStart.value.x + dragDelta.value.x
+    const finalY = dragNodeStart.value.y + dragDelta.value.y
+    const overrides = new Map(manualOverrides.value)
+    overrides.set(draggingNodeId.value, { x: finalX, y: finalY })
+    manualOverrides.value = overrides
+  }
+  draggingNodeId.value = null
+  dragDelta.value = { x: 0, y: 0 }
+  document.removeEventListener('mousemove', onHeaderMouseMove)
+  document.removeEventListener('mouseup', onHeaderMouseUp)
+}
+
+// ─── Zoom ─────────────────────────────────────────────
+function onWheel(e: WheelEvent) {
+  if (!e.ctrlKey && !e.metaKey)
+    return // native scroll
+  e.preventDefault()
+  const delta = -e.deltaY / 500
+  const nextZoom = Math.max(0.1, Math.min(3, +(zoomLevel.value * (1 + delta)).toFixed(2)))
+
+  // Zoom centered on mouse position relative to content
+  const vp = viewportRef.value
+  if (vp) {
+    const vpRect = vp.getBoundingClientRect()
+    const originX = e.clientX - vpRect.left
+    const originY = e.clientY - vpRect.top
+    const contentX = (vp.scrollLeft + originX) / zoomLevel.value
+    const contentY = (vp.scrollTop + originY) / zoomLevel.value
+    zoomLevel.value = nextZoom
+    vp.scrollLeft = contentX * nextZoom - originX
+    vp.scrollTop = contentY * nextZoom - originY
+  }
+  else {
+    zoomLevel.value = nextZoom
+  }
+}
+
+function onGestureStart(e: Event) {
+  e.preventDefault()
+  gestureStartZoom.value = zoomLevel.value
+}
+
+function onGestureChange(e: Event) {
+  const ge = e as WheelEvent & { scale?: number }
+  if (typeof ge.scale !== 'number')
+    return
+  e.preventDefault()
+  zoomLevel.value = Math.max(0.1, Math.min(3, +(gestureStartZoom.value * ge.scale).toFixed(2)))
+}
+
+function fitToScreen() {
+  if (!viewportRef.value)
+    return
+  const vpW = viewportBounds.width.value || 800
+  const vpH = viewportBounds.height.value || 600
+  const result = fitBboxToScreen(canvasSize.value, vpW, vpH)
+  zoomLevel.value = result.zoom
+  viewportRef.value.scrollLeft = result.scrollX
+  viewportRef.value.scrollTop = result.scrollY
+}
+
+function resetLayout() {
+  computeLayout()
+  fitToScreen()
+}
+
+// ─── Resize Observer ──────────────────────────────────
+useResizeObserver(viewportRef, () => {
+  // Viewport size changes may affect fit-to-screen but we don't auto-fit
+})
 
 // ─── Lifecycle ────────────────────────────────────────
 onMounted(async () => {
@@ -643,15 +500,15 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  document.removeEventListener('mousemove', onNodeMouseMove)
-  document.removeEventListener('mouseup', onNodeMouseUp)
+  document.removeEventListener('mousemove', onHeaderMouseMove)
+  document.removeEventListener('mouseup', onHeaderMouseUp)
 })
 </script>
 
 <template>
   <div class="er-diagram-view bg-background flex flex-col h-full">
     <!-- ── Toolbar ──────────────────────────────────── -->
-    <div class="px-3 py-2 border-b bg-muted/30 flex gap-2 items-center">
+    <div class="px-3 py-2 border-b bg-muted/30 flex shrink-0 gap-2 items-center">
       <!-- Schema selector -->
       <div v-if="supportsSchemas" class="w-44">
         <Select v-model="localSchema">
@@ -676,19 +533,8 @@ onUnmounted(() => {
 
       <!-- Search -->
       <div class="flex-1 max-w-xs relative">
-        <svg
-          xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24"
-          fill="none" stroke="currentColor" stroke-width="2"
-          stroke-linecap="round" stroke-linejoin="round"
-          class="text-muted-foreground left-2 top-1/2 absolute -translate-y-1/2"
-        >
-          <circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" />
-        </svg>
-        <Input
-          v-model="searchQuery"
-          :placeholder="t('components.databaseBrowser.erDiagram.searchPlaceholder')"
-          class="text-xs pl-7 h-8"
-        />
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground left-2 top-1/2 absolute -translate-y-1/2"><circle cx="11" cy="11" r="8" /><path d="m21 21-4.3-4.3" /></svg>
+        <Input v-model="searchQuery" :placeholder="t('components.databaseBrowser.erDiagram.searchPlaceholder')" class="text-xs pl-7 h-8" />
       </div>
 
       <!-- Info badges -->
@@ -700,39 +546,52 @@ onUnmounted(() => {
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
         {{ displayedRelationships.length }}
       </Badge>
+
+      <div class="border rounded-md flex h-7 items-center overflow-hidden">
+        <button
+          class="text-[11px] leading-none px-2 h-full transition-colors"
+          :class="viewMode === 'table' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'"
+          :title="t('components.databaseBrowser.erDiagram.tableView')"
+          @click="viewMode = 'table'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1 align-text-bottom inline"><path d="M3 3h18v18H3z" /><path d="M21 9H3" /><path d="M9 21V9" /></svg>
+          {{ t('components.databaseBrowser.erDiagram.tableView') }}
+        </button>
+        <button
+          class="text-[11px] leading-none px-2 border-l h-full transition-colors"
+          :class="viewMode === 'engineering' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'"
+          :title="t('components.databaseBrowser.erDiagram.engineeringView')"
+          @click="viewMode = 'engineering'"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1 align-text-bottom inline"><circle cx="12" cy="12" r="3" /><circle cx="19" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><line x1="12" y1="12" x2="13.65" y2="5.87" /><line x1="12" y1="12" x2="6.35" y2="17.13" /><line x1="12" y1="12" x2="17" y2="14" /></svg>
+          {{ t('components.databaseBrowser.erDiagram.engineeringView') }}
+        </button>
+      </div>
+
       <div class="flex-1" />
 
-      <!-- Layout direction toggle -->
+      <!-- Reset Layout -->
       <Button
-        variant="ghost" size="sm"
-        class="text-xs gap-1 h-7"
-        :title="t('components.databaseBrowser.erDiagram.layoutDirection')"
-        @click="toggleLayout"
+        variant="ghost" size="icon" class="h-7 w-7"
+        :title="t('components.databaseBrowser.erDiagram.resetLayout')"
+        @click="resetLayout"
       >
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
+      </Button>
+
+      <!-- Layout direction toggle -->
+      <Button variant="ghost" size="sm" class="text-xs gap-1 h-7" :title="t('components.databaseBrowser.erDiagram.layoutDirection')" @click="toggleLayout">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
-        {{
-          layoutDirection === 'TB'
-            ? t('components.databaseBrowser.erDiagram.layoutLeftRight')
-            : t('components.databaseBrowser.erDiagram.layoutTopBottom')
-        }}
+        {{ layoutDirection === 'TB' ? t('components.databaseBrowser.erDiagram.layoutLeftRight') : t('components.databaseBrowser.erDiagram.layoutTopBottom') }}
       </Button>
 
       <!-- Fit to screen -->
-      <Button
-        variant="ghost" size="icon" class="h-7 w-7"
-        :title="t('components.databaseBrowser.erDiagram.fitToScreen')"
-        @click="fitToScreen"
-      >
+      <Button variant="ghost" size="icon" class="h-7 w-7" :title="t('components.databaseBrowser.erDiagram.fitToScreen')" @click="fitToScreen">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3" /><path d="M21 8V5a2 2 0 0 0-2-2h-3" /><path d="M16 21h3a2 2 0 0 0 2-2v-3" /><path d="M3 16v3a2 2 0 0 0 2 2h3" /></svg>
       </Button>
 
       <!-- Refresh -->
-      <Button
-        variant="ghost" size="icon" class="h-7 w-7"
-        :title="t('common.buttons.refresh')"
-        :disabled="loading"
-        @click="fetchSchemaData"
-      >
+      <Button variant="ghost" size="icon" class="h-7 w-7" :title="t('common.buttons.refresh')" :disabled="loading" @click="fetchSchemaData">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" :class="{ 'animate-spin': loading }"><path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /><path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" /><path d="M8 16H3v5" /></svg>
       </Button>
 
@@ -754,9 +613,7 @@ onUnmounted(() => {
     <AlertDialog v-model:open="showWarning">
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>
-            {{ t('components.databaseBrowser.erDiagram.largeSchemaWarning', { count: tables.length }) }}
-          </AlertDialogTitle>
+          <AlertDialogTitle>{{ t('components.databaseBrowser.erDiagram.largeSchemaWarning', { count: tables.length }) }}</AlertDialogTitle>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel @click="showWarning = false">
@@ -769,17 +626,14 @@ onUnmounted(() => {
       </AlertDialogContent>
     </AlertDialog>
 
-    <!-- ── Canvas Area ──────────────────────────────── -->
+    <!-- ── Canvas Area (pure HTML, no foreignObject) ── -->
     <div
-      ref="svgContainerRef"
-      class="flex-1 cursor-grab relative overflow-hidden"
-      @mousedown="startPan"
-      @mousemove="onPan"
-      @mouseup="endPan"
-      @mouseleave="endPan"
+      ref="viewportRef"
+      class="bg-muted/5 flex-1 relative overflow-auto"
       @wheel.prevent="onWheel"
       @gesturestart="onGestureStart"
       @gesturechange="onGestureChange"
+      @click.self="deselectAll"
     >
       <!-- Loading -->
       <div v-if="loading" class="flex gap-2 items-center inset-0 justify-center absolute">
@@ -811,147 +665,83 @@ onUnmounted(() => {
         </p>
       </div>
 
-      <!-- SVG Canvas -->
-      <svg
+      <!-- Content area (scaled) -->
+      <div
         v-show="!loading && displayedTables.length > 0"
-        class="h-full w-full"
+        class="relative"
         :style="{
-          transform: `scale(${zoomLevel}) translate(${panOffset.x}px, ${panOffset.y}px)`,
-          transformOrigin: '0 0',
-          overflow: 'visible',
+          width: `${canvasSize.width * zoomLevel}px`,
+          height: `${canvasSize.height * zoomLevel}px`,
         }"
-        @click.self="deselectAll"
-        @dblclick="fitToScreen"
       >
-        <defs>
-          <marker id="er-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--muted-foreground))" />
-          </marker>
-        </defs>
-
-        <!-- Relationship lines -->
-        <g v-for="(edge, idx) in renderEdges" :key="`edge-${idx}`">
-          <path
-            :d="edge.path"
-            fill="none"
-            :stroke="edge.isHighlighted ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'"
-            :stroke-width="edge.isHighlighted ? 2 : 1"
-            :stroke-dasharray="edge.label ? '4 3' : 'none'"
-            marker-end="url(#er-arrowhead)"
-          />
-        </g>
-
-        <!-- Table cards -->
-        <g
-          v-for="node in renderNodes"
-          :key="node.id"
-          :transform="`translate(${node.x + (draggingNodeId === node.id ? dragDelta.x : 0)}, ${node.y + (draggingNodeId === node.id ? dragDelta.y : 0)})`"
-          class="er-table-group"
-          :class="{ 'er-table-group--dragging': draggingNodeId === node.id }"
-          @mousedown.prevent="onNodeMouseDown($event, node.id)"
-          @click.stop="selectTable(node.id)"
+        <div
+          class="origin-top-left left-0 top-0 absolute"
+          :style="{
+            width: `${canvasSize.width}px`,
+            height: `${canvasSize.height}px`,
+            transform: `scale(${zoomLevel})`,
+          }"
+          @click.self="deselectAll"
         >
-          <foreignObject :width="node.width" :height="node.height">
-            <div
-              class="er-table-card"
-              :class="{
-                'er-table-card--selected': selectedTableId === node.id,
-              }"
-            >
-              <!-- Table header -->
-              <div class="er-table-header">{{ node.id }}</div>
+          <!-- SVG overlay for relationship lines -->
+          <svg class="h-full w-full pointer-events-none inset-0 absolute overflow-visible" style="z-index: 0;">
+            <defs>
+              <marker id="er-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto" markerUnits="strokeWidth">
+                <polygon points="0 0, 10 3.5, 0 7" fill="hsl(var(--muted-foreground))" />
+              </marker>
+            </defs>
+            <path
+              v-for="(edge, idx) in renderEdges"
+              :key="`edge-${idx}`"
+              :d="edge.path"
+              fill="none"
+              :stroke="edge.isHighlighted ? 'hsl(var(--primary))' : 'hsl(var(--muted-foreground))'"
+              :stroke-width="edge.isHighlighted ? 2 : 1"
+              marker-end="url(#er-arrowhead)"
+            />
+          </svg>
 
-              <!-- Columns -->
-              <div class="er-table-columns">
-                <div
-                  v-for="(col, colIdx) in node.visibleColumns"
-                  :key="colIdx"
-                  class="er-table-column"
-                >
-                  <span class="er-column-markers">
-                    <span v-if="col.is_primary_key" class="er-pk">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z" /><circle cx="16.5" cy="7.5" r=".5" fill="currentColor" /></svg>
-                    </span>
-                    <span v-else-if="isFKColumn(node.table, col.name)" class="er-fk">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
-                    </span>
-                    <span v-else class="er-col-spacer" />
-                  </span>
-                  <span class="er-column-name">{{ col.name }}</span>
-                  <span class="er-column-type">{{ col.data_type }}</span>
-                </div>
-              </div>
-
-              <!-- Show more / less toggle -->
-              <button
-                v-if="node.showExpandButton"
-                class="er-expand-btn whitespace-nowrap"
-                @click.stop="toggleExpand(node.id)"
-              >
-                {{
-                  node.isExpanded
-                    ? t('components.databaseBrowser.erDiagram.hideExtraColumns')
-                    : t('components.databaseBrowser.erDiagram.showAllColumns', { count: node.table.columns.length })
-                }}
-              </button>
-            </div>
-          </foreignObject>
-        </g>
-      </svg>
+          <!-- Table cards / Engineering entities -->
+          <div
+            v-for="node in renderNodes"
+            :key="node.id"
+            :style="{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              transform: `translate(${node.x + (draggingNodeId === node.id ? dragDelta.x : 0)}px, ${node.y + (draggingNodeId === node.id ? dragDelta.y : 0)}px)`,
+            }"
+          >
+            <TableCard
+              v-if="viewMode === 'table'"
+              :node="node"
+              :is-selected="selectedTableId === node.id"
+              :is-highlighted="node.isHighlighted"
+              :header-dragging="draggingNodeId === node.id"
+              @header-mousedown="onHeaderMousedown($event, node.id)"
+              @card-dblclick="emit('openTable', node.id)"
+              @card-click="selectTable(node.id)"
+              @toggle-expand="toggleExpand(node.id)"
+            />
+            <EngineeringEntity
+              v-else
+              :node="node"
+              :is-selected="selectedTableId === node.id"
+              :is-highlighted="node.isHighlighted"
+              :header-dragging="draggingNodeId === node.id"
+              @header-mousedown="onHeaderMousedown($event, node.id)"
+              @card-dblclick="emit('openTable', node.id)"
+              @card-click="selectTable(node.id)"
+              @toggle-expand="toggleExpand(node.id)"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.er-table-group {
-  cursor: grab;
-}
-.er-table-group--dragging {
-  cursor: grabbing;
-}
-.er-table-card {
-  @apply bg-card border border-border rounded-lg shadow-sm;
-  width: 220px;
-  font-size: 12px;
-  user-select: none;
-}
-.er-table-card--selected {
-  @apply border-primary ring-1 ring-primary shadow-md;
-}
-.er-table-header {
-  @apply bg-muted px-3 py-2 font-semibold text-sm border-b border-border;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.er-table-columns {
-  @apply divide-y divide-border/50;
-}
-.er-table-column {
-  @apply px-3 py-1.5 flex gap-1 items-center text-xs;
-}
-.er-column-name {
-  @apply font-mono flex-1 truncate;
-}
-.er-column-type {
-  @apply text-muted-foreground text-[10px] flex-shrink-0;
-  max-width: 80px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.er-column-markers {
-  @apply flex gap-0.5 flex-shrink-0 w-4 items-center justify-center;
-}
-.er-pk {
-  @apply text-amber-500 flex-shrink-0;
-}
-.er-fk {
-  @apply text-blue-500 flex-shrink-0;
-}
-.er-col-spacer {
-  @apply block w-3;
-}
-.er-expand-btn {
-  @apply w-full text-xs text-muted-foreground hover:text-foreground py-1.5 border-t border-border bg-muted/30 hover:bg-muted/50 transition-colors;
-}
+/* Table view styles are in TableCard.vue */
+/* Engineering view styles are in EngineeringEntity.vue */
 </style>
