@@ -281,12 +281,18 @@ async function fetchAvailableSchemas() {
     const cached = meta?.schemas[props.database]
     if (cached && cached.length > 0) {
       availableSchemas.value = cached
+      return
     }
-    else {
-      // Not cached yet — fetch from backend
-      await databaseStore.fetchSchemas(props.connectionId, props.database)
-      const refreshed = databaseStore.metadata[props.connectionId]?.schemas[props.database]
-      availableSchemas.value = refreshed ?? []
+    // Not cached — fetch from backend directly
+    const result = await invoke<string[]>('list_schemas', {
+      connectionId: props.connectionId,
+      database: props.database,
+    })
+    availableSchemas.value = result ?? []
+    // Also cache in store for future use
+    const m = databaseStore.metadata[props.connectionId]
+    if (m && result) {
+      m.schemas[props.database] = result
     }
   }
   catch {
