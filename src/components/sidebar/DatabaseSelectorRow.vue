@@ -155,17 +155,6 @@ watch(() => props.connectionId, async (connId) => {
       variant="ghost"
       size="icon"
       class="shrink-0 h-7 w-7"
-      :disabled="!props.modelValue"
-      :title="t('sidebar.database.erDiagramTooltip')"
-      @click="handleAction('showErDiagram')"
-    >
-      <span class="i-carbon-data-vis-3 h-3.5 w-3.5" />
-    </Button>
-
-    <Button
-      variant="ghost"
-      size="icon"
-      class="shrink-0 h-7 w-7"
       :disabled="props.loading"
       :title="t('sidebar.database.refreshTooltip')"
       @click="emit('refresh')"
@@ -201,6 +190,10 @@ watch(() => props.connectionId, async (connId) => {
         </DropdownMenuItem>
         <DropdownMenuItem v-if="capabilities.procedures" @click="handleAction('newProcedure')">
           <span class="i-carbon-document mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.newProcedure') }}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem :disabled="!props.modelValue" @click="handleAction('showErDiagram')">
+          <span class="i-carbon-data-vis-3 mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.showErDiagram') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator v-if="capabilities.backup || capabilities.export" />
         <DropdownMenuItem v-if="capabilities.backup" @click="handleAction('backupDatabase')">
