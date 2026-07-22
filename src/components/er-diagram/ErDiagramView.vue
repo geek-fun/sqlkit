@@ -107,15 +107,20 @@ const svgContainerRef = ref<HTMLElement | null>(null)
 // ─── Schema selector ──────────────────────────────
 const databaseStore = useDatabaseStore()
 const availableSchemas = ref<string[]>([])
-const localSchema = ref<string>(props.schema ?? '')
+const localSchema = ref<string>(props.schema ?? '__all__')
 
 const supportsSchemas = computed(() =>
   availableSchemas.value.length > 0,
 )
 
+// Map local schema value to API parameter: '__all__' → null (fetch all)
+const schemaParam = computed(() =>
+  localSchema.value === '__all__' ? null : localSchema.value,
+)
+
 watch(() => props.schema, (val) => {
   if (val !== undefined)
-    localSchema.value = val
+    localSchema.value = val ?? '__all__'
 })
 
 // ─── Computed ─────────────────────────────────────────
@@ -292,7 +297,7 @@ async function fetchAvailableSchemas() {
 async function fetchSchemaData() {
   loading.value = true
   try {
-    const schema = localSchema.value || null
+    const schema = schemaParam.value
 
     // Fetch tables and foreign keys in parallel
     const [tableList, fkList] = await Promise.all([
@@ -440,12 +445,12 @@ onMounted(async () => {
     <div class="px-3 py-2 border-b bg-muted/30 flex gap-2 items-center">
       <!-- Schema selector -->
       <div v-if="supportsSchemas" class="w-44">
-        <Select v-model="localSchema" @update:model-value="localSchema = $event">
+        <Select v-model="localSchema">
           <SelectTrigger class="text-xs h-8">
             <SelectValue :placeholder="t('components.databaseBrowser.erDiagram.allSchemas')" />
           </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="" class="text-xs">
+          <SelectContent :side-offset="4" :align="'start'" class="z-[100]">
+            <SelectItem value="__all__" class="text-xs">
               {{ t('components.databaseBrowser.erDiagram.allSchemas') }}
             </SelectItem>
             <SelectItem
@@ -572,7 +577,7 @@ onMounted(async () => {
         </svg>
       </Button>
 
-      <!-- Zoom controls -->
+      <!-- Zoom controls: zoom out, zoom in, percentage -->
       <div class="flex gap-0.5 items-center">
         <Button
           variant="ghost"
@@ -584,15 +589,6 @@ onMounted(async () => {
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
         </Button>
-        <span
-          class="text-xs text-muted-foreground min-w-[3rem] text-center tabular-nums"
-        >
-          {{
-            t('components.databaseBrowser.erDiagram.zoom', {
-              percentage: Math.round(zoomLevel * 100),
-            })
-          }}
-        </span>
         <Button
           variant="ghost"
           size="icon"
@@ -603,6 +599,15 @@ onMounted(async () => {
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
         </Button>
+        <span
+          class="text-xs text-muted-foreground min-w-[3rem] text-center tabular-nums"
+        >
+          {{
+            t('components.databaseBrowser.erDiagram.zoom', {
+              percentage: Math.round(zoomLevel * 100),
+            })
+          }}
+        </span>
       </div>
     </div>
 
