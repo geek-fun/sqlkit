@@ -70,7 +70,7 @@ type RenderEdge = {
 const NODE_WIDTH = 220
 const COL_HEIGHT = 28
 const HEADER_HEIGHT = 36
-const EXPAND_BTN_HEIGHT = 28
+const EXPAND_BTN_HEIGHT = 30
 const CARD_PADDING = 8
 
 function calcNodeHeight(table: TableData, isExpanded: boolean): number {
@@ -103,6 +103,11 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const showWarning = ref(false)
 const svgContainerRef = ref<HTMLElement | null>(null)
+
+// ─── Node drag state ──────────────────────────────
+const draggingNodeId = ref<string | null>(null)
+const dragStartPos = ref({ x: 0, y: 0 })
+const dragNodeStart = ref({ x: 0, y: 0 })
 
 // ─── Schema selector ──────────────────────────────
 const databaseStore = useDatabaseStore()
@@ -392,6 +397,42 @@ function onPan(e: MouseEvent) {
 
 function endPan() {
   isPanning.value = false
+}
+
+// ─── Node Drag Handlers ───────────────────────────
+function onNodeMouseDown(e: MouseEvent, nodeId: string) {
+  if (e.button !== 0)
+    return
+  const pos = nodePositions.value.get(nodeId)
+  if (!pos)
+    return
+  draggingNodeId.value = nodeId
+  dragStartPos.value = { x: e.clientX, y: e.clientY }
+  dragNodeStart.value = { x: pos.x, y: pos.y }
+  document.addEventListener('mousemove', onNodeMouseMove)
+  document.addEventListener('mouseup', onNodeMouseUp)
+}
+
+function onNodeMouseMove(e: MouseEvent) {
+  if (!draggingNodeId.value)
+    return
+  const dx = (e.clientX - dragStartPos.value.x) / zoomLevel.value
+  const dy = (e.clientY - dragStartPos.value.y) / zoomLevel.value
+  const positions = new Map(nodePositions.value)
+  const current = positions.get(draggingNodeId.value)
+  if (current) {
+    positions.set(draggingNodeId.value, {
+      x: dragNodeStart.value.x + dx,
+      y: dragNodeStart.value.y + dy,
+    })
+    nodePositions.value = positions
+  }
+}
+
+function onNodeMouseUp() {
+  draggingNodeId.value = null
+  document.removeEventListener('mousemove', onNodeMouseMove)
+  document.removeEventListener('mouseup', onNodeMouseUp)
 }
 
 function onWheel(e: WheelEvent) {
@@ -733,7 +774,6 @@ onMounted(async () => {
                 : 'hsl(var(--muted-foreground))'
             "
             :stroke-width="edge.isHighlighted ? 2 : 1"
-            :opacity="edge.isHighlighted ? 1 : 0.4"
             marker-end="url(#er-arrowhead)"
           />
         </g>
@@ -743,7 +783,9 @@ onMounted(async () => {
           v-for="node in renderNodes"
           :key="node.id"
           :transform="`translate(${node.x}, ${node.y})`"
-          :opacity="selectedTableId ? (node.isHighlighted ? 1 : 0.3) : 1"
+          class="er-table-group"
+          :class="{ 'er-table-group--dragging': draggingNodeId === node.id }"
+          @mousedown.prevent="onNodeMouseDown($event, node.id)"
           @click.stop="selectTable(node.id)"
         >
           <foreignObject :width="node.width" :height="node.height">
@@ -751,8 +793,6 @@ onMounted(async () => {
               class="er-table-card"
               :class="{
                 'er-table-card--selected': selectedTableId === node.id,
-                'er-table-card--dimmed':
-                  selectedTableId && !node.isHighlighted,
               }"
             >
               <!-- Table header -->
@@ -785,9 +825,7 @@ onMounted(async () => {
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
                     </span>
-                    <span v-if="col.nullable === false" class="er-nullable">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /></svg>
-                    </span>
+
                   </span>
                 </div>
               </div>
@@ -795,7 +833,7 @@ onMounted(async () => {
               <!-- Show more / less toggle -->
               <button
                 v-if="node.showExpandButton"
-                class="er-expand-btn"
+                class="er-expand-btn whitespace-nowrap"
                 @click.stop="toggleExpand(node.id)"
               >
                 {{
@@ -815,8 +853,16 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.er-table-group {
+  cursor: grab;
+}
+
+.er-table-group--dragging {
+  cursor: grabbing;
+}
+
 .er-table-card {
-  @apply bg-card border border-border rounded-lg shadow-sm overflow-hidden;
+  @apply bg-card border border-border rounded-lg shadow-sm;
   width: 220px;
   font-size: 12px;
   user-select: none;
@@ -824,10 +870,6 @@ onMounted(async () => {
 
 .er-table-card--selected {
   @apply border-primary ring-1 ring-primary shadow-md;
-}
-
-.er-table-card--dimmed {
-  opacity: 0.7;
 }
 
 .er-table-header {
@@ -866,10 +908,6 @@ onMounted(async () => {
 
 .er-fk {
   @apply text-blue-500;
-}
-
-.er-nullable {
-  @apply text-muted-foreground;
 }
 
 .er-expand-btn {
