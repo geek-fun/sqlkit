@@ -31,6 +31,7 @@ type ActionKind
     | 'backupDatabase'
     | 'exportDatabase'
     | 'dropDatabase'
+    | 'showErDiagram'
 
 const props = defineProps<Props>()
 
@@ -149,6 +150,17 @@ watch(() => props.connectionId, async (connId) => {
         </div>
       </template>
     </SearchableSelect>
+
+    <Button
+      variant="ghost"
+      size="icon"
+      class="shrink-0 h-7 w-7"
+      :disabled="!props.modelValue"
+      :title="t('sidebar.database.erDiagramTooltip')"
+      @click="handleAction('showErDiagram')"
+    >
+      <span class="i-carbon-data-vis-3 h-3.5 w-3.5" />
+    </Button>
 
     <Button
       variant="ghost"

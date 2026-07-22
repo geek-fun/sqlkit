@@ -1489,6 +1489,7 @@ export const enUS = {
       selectDatabase: 'Select database',
       refresh: 'Refresh',
       refreshTooltip: 'Reload database list',
+      erDiagramTooltip: 'Show ER Diagram',
     },
     databases: {
       actions: {

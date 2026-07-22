@@ -1489,6 +1489,7 @@ export const zhCN = {
       selectDatabase: '选择数据库',
       refresh: '刷新',
       refreshTooltip: '重新加载数据库列表',
+      erDiagramTooltip: '查看 ER 关系图',
     },
     databases: {
       actions: {
