@@ -1489,7 +1489,6 @@ export const enUS = {
       selectDatabase: 'Select database',
       refresh: 'Refresh',
       refreshTooltip: 'Reload database list',
-      erDiagramTooltip: 'Show ER Diagram',
     },
     databases: {
       actions: {
@@ -1558,6 +1557,7 @@ export const enUS = {
       newView: 'New View',
       newFunction: 'New Function',
       newProcedure: 'New Procedure',
+      showErDiagram: 'ER Diagram',
       backupDatabase: 'Backup Database',
       exportDatabase: 'Export Database',
       dropDatabase: 'Drop Database',

@@ -1489,7 +1489,6 @@ export const zhCN = {
       selectDatabase: '选择数据库',
       refresh: '刷新',
       refreshTooltip: '重新加载数据库列表',
-      erDiagramTooltip: '查看 ER 关系图',
     },
     databases: {
       actions: {
@@ -1558,6 +1557,7 @@ export const zhCN = {
       newView: '新建视图',
       newFunction: '新建函数',
       newProcedure: '新建存储过程',
+      showErDiagram: 'ER 关系图',
       backupDatabase: '备份数据库',
       exportDatabase: '导出数据库',
       dropDatabase: '删除数据库',
