@@ -694,8 +694,9 @@ function handleDatabaseAction(kind: string) {
     case 'showErDiagram': {
       const connId = getActiveConnectionId()
       const db = selectedDatabase.value
+      // Database-level ER diagram: omit schema to show all tables across all schemas
       if (connId && db) {
-        tabStore.openErDiagramTab(connId, db, selectedSchema.value || undefined)
+        tabStore.openErDiagramTab(connId, db, undefined)
       }
       break
     }
