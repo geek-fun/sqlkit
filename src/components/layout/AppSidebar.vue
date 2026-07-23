@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const route = useRoute()
@@ -10,6 +11,7 @@ const menuItems = [
   { id: 'queries', label: 'Queries', icon: 'code', path: '/queries' },
   { id: 'data-studio', label: 'Data Studio', icon: 'smart_toy', path: '/data-studio' },
   { id: 'history', label: 'History', icon: 'history', path: '/history' },
+  { id: 'github', label: 'GitHub', icon: 'github', path: '' },
 ]
 
 const isActive = (path: string) => route.path === path
@@ -39,11 +41,13 @@ const { t } = useI18n()
             <TooltipTrigger as-child>
               <button
                 class="mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center relative" :class="[
-                  isActive(item.path)
-                    ? 'bg-secondary text-primary border border-border shadow-sm'
-                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                  item.id === 'github'
+                    ? 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    : isActive(item.path)
+                      ? 'bg-secondary text-primary border border-border shadow-sm'
+                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                 ]"
-                @click="navigate"
+                @click="item.id === 'github' ? openUrl('https://github.com/geek-fun/sqlkit') : navigate"
               >
                 <!-- DNS icon -->
                 <svg
@@ -135,6 +139,9 @@ const { t } = useI18n()
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
 
+                <!-- GitHub icon -->
+                <span v-if="item.icon === 'github'" class="i-lucide-github h-5 w-5" />
+
                 <!-- AI Badge -->
                 <span
                   v-if="false"
@@ -152,8 +159,8 @@ const { t } = useI18n()
       </TooltipProvider>
     </nav>
 
-    <!-- Settings at bottom -->
-    <div class="px-2 py-4 border-t">
+    <!-- Bottom actions -->
+    <div class="px-2 py-3 border-t space-y-2">
       <TooltipProvider>
         <RouterLink to="/settings" custom #="{ navigate }">
           <Tooltip>
