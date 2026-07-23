@@ -1435,6 +1435,7 @@ export const zhCN = {
     updateNow: '立即更新',
     restarting: '正在重启...',
     downloadingPercent: '下载中 {percent}%',
+    relaunchFailed: '更新后重启失败',
   },
   errors: {
     unexpected: '意外错误：{error}',

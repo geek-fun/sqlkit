@@ -1435,6 +1435,7 @@ export const enUS = {
     updateNow: 'Update Now',
     restarting: 'Restarting...',
     downloadingPercent: 'Downloading {percent}%',
+    relaunchFailed: 'Failed to restart after update',
   },
   errors: {
     unexpected: 'Unexpected error: {error}',

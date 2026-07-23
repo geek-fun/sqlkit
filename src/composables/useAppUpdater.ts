@@ -76,26 +76,23 @@ export function useAppUpdater() {
     if (!updateInfo.value)
       return
 
+    isDownloading.value = true
+    downloadedBytes.value = 0
+    contentLength.value = 0
+
+    const freshUpdate = await check()
+    if (!freshUpdate) {
+      isDownloading.value = false
+      return
+    }
+    updateInfo.value = freshUpdate
+
     try {
-      isDownloading.value = true
-      downloadedBytes.value = 0
-      contentLength.value = 0
-
-      // Re-check to get a fresh download URL
-      const freshUpdate = await check()
-      if (!freshUpdate) {
-        isDownloading.value = false
-        return
-      }
-      updateInfo.value = freshUpdate
-
       await freshUpdate.downloadAndInstall((event: DownloadEvent) => {
-        if (event.event === 'Started') {
+        if (event.event === 'Started')
           contentLength.value = event.data.contentLength ?? 0
-        }
-        else if (event.event === 'Progress') {
+        else if (event.event === 'Progress')
           downloadedBytes.value += event.data.chunkLength
-        }
         else if (event.event === 'Finished') {
           isDownloading.value = false
           isInstalling.value = true
@@ -103,10 +100,9 @@ export function useAppUpdater() {
       })
     }
     catch (error) {
-      console.error('Failed to install update:', error)
-      toast.error(t('updater.installFailed'), {
-        description: error instanceof Error ? error.message : String(error),
-      })
+      const message = error instanceof Error ? error.message : String(error)
+      console.error('Update failed:', error)
+      toast.error(t('updater.installFailed'), { description: message })
       isDownloading.value = false
       isInstalling.value = false
       downloadedBytes.value = 0
@@ -119,7 +115,7 @@ export function useAppUpdater() {
 
     const relaunchTimeout = setTimeout(() => {
       isRestarting.value = false
-    }, 30000)
+    }, 30_000)
 
     try {
       await relaunch()
@@ -127,7 +123,9 @@ export function useAppUpdater() {
     catch {
       clearTimeout(relaunchTimeout)
       isRestarting.value = false
-      toast.error(t('updater.installFailed'))
+      toast.error(t('updater.installFailed'), {
+        description: t('updater.relaunchFailed'),
+      })
     }
   }
 
