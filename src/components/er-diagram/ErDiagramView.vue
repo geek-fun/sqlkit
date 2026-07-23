@@ -287,11 +287,10 @@ const renderEdges = computed<RenderEdge[]>(() => {
   })
 })
 
-// ─── Layout Computation ───────────────────────────────
+// ─── Layout Computation (dagre only, does NOT touch manualOverrides) ─
 function computeLayout() {
   if (displayedTables.value.length === 0) {
     dagrePositions.value = {}
-    manualOverrides.value = {}
     return
   }
 
@@ -308,7 +307,6 @@ function computeLayout() {
   }))
 
   dagrePositions.value = computeDagreLayout(dagreTables, dagreRels)
-  manualOverrides.value = {}
 }
 
 // ─── Data Fetching ────────────────────────────────────
@@ -388,13 +386,10 @@ async function fetchSchemaData() {
 }
 
 // ─── Watchers ─────────────────────────────────────────
-watch(
-  [displayedTables, expandedTables],
-  () => {
-    computeLayout()
-  },
-  { immediate: false },
-)
+// Only recompute layout when column visibility (expand) changes — NOT on search/focus (displayedTables)
+watch(expandedTables, () => {
+  computeLayout()
+})
 
 watch(localSchema, () => {
   fetchSchemaData()
@@ -503,6 +498,7 @@ function fitToScreen() {
 }
 
 function resetLayout() {
+  manualOverrides.value = {}
   computeLayout()
   fitToScreen()
 }
