@@ -113,8 +113,6 @@ function onViewportMouseDown(e: MouseEvent) {
     scrollLeft: vp.scrollLeft,
     scrollTop: vp.scrollTop,
   }
-  document.addEventListener('mousemove', onViewportMouseMove)
-  document.addEventListener('mouseup', onViewportMouseUp)
 }
 
 function onViewportMouseMove(e: MouseEvent) {
@@ -130,8 +128,6 @@ function onViewportMouseMove(e: MouseEvent) {
 
 function onViewportMouseUp() {
   isRightDragging.value = false
-  document.removeEventListener('mousemove', onViewportMouseMove)
-  document.removeEventListener('mouseup', onViewportMouseUp)
 }
 
 function onContextMenu(e: MouseEvent) {
@@ -545,8 +541,6 @@ onMounted(async () => {
 onUnmounted(() => {
   document.removeEventListener('mousemove', onHeaderMouseMove)
   document.removeEventListener('mouseup', onHeaderMouseUp)
-  document.removeEventListener('mousemove', onViewportMouseMove)
-  document.removeEventListener('mouseup', onViewportMouseUp)
 })
 </script>
 
@@ -679,6 +673,9 @@ onUnmounted(() => {
       @gesturestart="onGestureStart"
       @gesturechange="onGestureChange"
       @mousedown="onViewportMouseDown"
+      @mousemove="onViewportMouseMove"
+      @mouseup="onViewportMouseUp"
+      @mouseleave="onViewportMouseUp"
       @contextmenu="onContextMenu"
       @click.self="deselectAll"
     >
@@ -720,6 +717,7 @@ onUnmounted(() => {
           width: `${canvasSize.width * zoomLevel}px`,
           height: `${canvasSize.height * zoomLevel}px`,
         }"
+        @mousedown="onViewportMouseDown"
       >
         <div
           class="origin-top-left left-0 top-0 absolute"
@@ -728,6 +726,7 @@ onUnmounted(() => {
             height: `${canvasSize.height}px`,
             transform: `scale(${zoomLevel})`,
           }"
+          @mousedown="onViewportMouseDown"
           @click.self="deselectAll"
         >
           <!-- SVG overlay for relationship lines -->
