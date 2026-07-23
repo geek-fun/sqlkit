@@ -287,6 +287,7 @@ pub fn run() {
             commands::auto_map_migration_columns,
             commands::generate_ddl_for_objects,
             commands::execute_sql_content,
+            commands::get_app_version,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

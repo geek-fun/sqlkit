@@ -8,18 +8,18 @@
 
 **Privacy-first. Your data, your keys. Open source.**
 
-[![Release](https://img.shields.io/github/v/release/geek-fun/sqlkit?color=orange&label=release&style=for-the-badge&logo=github)](https://github.com/geek-fun/sqlkit/releases)
-[![Downloads](https://img.shields.io/github/downloads/geek-fun/sqlkit/total?color=orange&style=for-the-badge&logo=docusign)](https://github.com/geek-fun/sqlkit/releases)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=for-the-badge&logo=apache)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/geek-fun/sqlkit?style=for-the-badge&logo=github)](https://github.com/geek-fun/sqlkit/stargazers)
-[![CI](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml/badge.svg?style=for-the-badge)](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml)
+[![Release](https://img.shields.io/github/v/release/geek-fun/sqlkit?color=orange&label=release&logo=github)](https://github.com/geek-fun/sqlkit/releases)
+[![Downloads](https://img.shields.io/github/downloads/geek-fun/sqlkit/total?color=orange&logo=docusign)](https://github.com/geek-fun/sqlkit/releases)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?logo=apache)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/geek-fun/sqlkit?logo=github)](https://github.com/geek-fun/sqlkit/stargazers)
+[![CI](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml/badge.svg)](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml)
 
 <p>
-  <img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white"/>
+  <img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black"/>
+  <img src="https://img.shields.io/badge/Tauri-FFC131?logo=tauri&logoColor=black"/>
+  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white"/>
 </p>
 
 [Download](https://www.geekfun.club/download) · [Docs](docs/DISTRIBUTION.md) · [Website](https://www.geekfun.club) · [Releases](https://github.com/geek-fun/sqlkit/releases)
@@ -233,7 +233,7 @@ Open an issue on <a href="https://github.com/geek-fun/sqlkit/issues">GitHub Issu
 ## Community
 
 <p align="center">
-  <img src="docs/images/wechat_group.jpg" width="140" alt="WeChat Group">
+  <img src="https://www.geekfun.club/wechat-group.jpg" width="140" alt="WeChat Group">
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="docs/images/wechat_official.png" width="140" alt="WeChat Official Account">
 </p>

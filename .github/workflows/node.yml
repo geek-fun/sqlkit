@@ -44,6 +44,9 @@ jobs:
       - run: npm run lint:check
       - run: npm audit --audit-level=critical
       - run: npm run test:ci
+      - name: run Rust tests
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo test --manifest-path src-tauri/Cargo.toml
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         env:

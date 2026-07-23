@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { invoke } from '@tauri-apps/api/core'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+// Separator is rendered inline as a styled div
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { ThemeType, useAppStore } from '@/store/appStore'
@@ -15,6 +17,17 @@ import JreDriverSection from '@/views/setting/jre-driver-section.vue'
 const appStore = useAppStore()
 const { t, locale: _locale } = useI18n()
 const { checkForUpdates, downloadAndInstall, isChecking, isDownloading, isInstalling, updateAvailable, updateInfo, downloadProgress } = useAppUpdater()
+
+const version = ref('')
+
+onMounted(async () => {
+  try {
+    version.value = await invoke<string>('get_app_version')
+  }
+  catch {
+    version.value = import.meta.env.VITE_APP_VERSION ?? '0.0.0'
+  }
+})
 
 // --- Theme ---
 const currentTheme = computed(() => appStore.themeType)
@@ -179,6 +192,9 @@ async function handleCheckUpdates() {
             </TabsTrigger>
             <TabsTrigger value="jre">
               {{ t('pages.settings.jre.title') }}
+            </TabsTrigger>
+            <TabsTrigger value="about">
+              {{ t('pages.settings.about.title') }}
             </TabsTrigger>
           </TabsList>
 
@@ -574,6 +590,77 @@ async function handleCheckUpdates() {
           <!-- JRE & Drivers Tab -->
           <TabsContent value="jre" class="mt-0">
             <JreDriverSection />
+          </TabsContent>
+
+          <!-- About Tab -->
+          <TabsContent value="about" class="mt-0">
+            <Card>
+              <CardHeader>
+                <CardTitle>{{ t('pages.settings.about.title') }}</CardTitle>
+                <CardDescription>{{ t('pages.settings.about.description') }}</CardDescription>
+              </CardHeader>
+              <CardContent class="space-y-5">
+                <!-- Version -->
+                <div class="flex items-center justify-between">
+                  <Label>{{ t('pages.settings.about.version') }}</Label>
+                  <span class="text-sm font-mono text-muted-foreground">{{ version }}</span>
+                </div>
+
+                <!-- License -->
+                <div class="flex items-center justify-between">
+                  <Label>{{ t('pages.settings.about.license') }}</Label>
+                  <span class="text-sm text-muted-foreground">{{ t('pages.settings.about.licenseName') }}</span>
+                </div>
+
+                <div class="border-t border-border/40" />
+
+                <!-- Repository -->
+                <a
+                  href="https://github.com/geek-fun/sqlkit"
+                  target="_blank"
+                  class="flex items-center justify-between rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors"
+                >
+                  <Label>{{ t('pages.settings.about.repository') }}</Label>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-muted-foreground">geek-fun/sqlkit</span>
+                    <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
+                  </div>
+                </a>
+
+                <!-- Website -->
+                <a
+                  href="https://www.geekfun.club"
+                  target="_blank"
+                  class="flex items-center justify-between rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors"
+                >
+                  <Label>{{ t('pages.settings.about.website') }}</Label>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-muted-foreground">geekfun.club</span>
+                    <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
+                  </div>
+                </a>
+
+                <!-- Discord -->
+                <a
+                  href="https://discord.gg/5NSUyPK2E"
+                  target="_blank"
+                  class="flex items-center justify-between rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors"
+                >
+                  <Label>{{ t('pages.settings.about.community') }}</Label>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-muted-foreground">Discord</span>
+                    <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
+                  </div>
+                </a>
+
+                <div class="border-t border-border/40" />
+
+                <!-- Copyright -->
+                <p class="text-xs text-muted-foreground text-center pt-2">
+                  {{ t('pages.settings.about.copyright', { year: new Date().getFullYear() }) }}
+                </p>
+              </CardContent>
+            </Card>
           </TabsContent>
         </div>
       </Tabs>

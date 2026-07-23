@@ -405,6 +405,18 @@ export const zhCN = {
           auto: '自动（跟随系统）',
         },
       },
+      about: {
+        title: '关于',
+        version: '版本',
+        license: '许可证',
+        licenseName: 'Apache 2.0',
+        repository: '代码仓库',
+        community: '社区',
+        discord: 'Discord',
+        website: '官网',
+        copyright: '© {year} GEEKFUN. 保留所有权利。',
+        description: 'SqlKit 是一款智能跨平台 SQL 数据库图形化客户端。基于 Rust + Tauri 构建。',
+      },
       jre: {
         title: 'JRE 与驱动',
         description: '管理 Java 运行环境和 JDBC 驱动',

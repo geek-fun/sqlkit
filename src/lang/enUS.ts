@@ -405,6 +405,18 @@ export const enUS = {
           auto: 'Auto (Follow System)',
         },
       },
+      about: {
+        title: 'About',
+        version: 'Version',
+        license: 'License',
+        licenseName: 'Apache 2.0',
+        repository: 'Repository',
+        community: 'Community',
+        discord: 'Discord',
+        website: 'Website',
+        copyright: '© {year} GEEKFUN. All rights reserved.',
+        description: 'SqlKit is an agentic cross-platform SQL database GUI client. Built with Rust + Tauri.',
+      },
       jre: {
         title: 'JRE & Drivers',
         description: 'Manage Java Runtime and JDBC drivers for database connections',

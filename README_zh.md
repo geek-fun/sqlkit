@@ -233,7 +233,7 @@ PostgreSQL、MySQL、Oracle、SQL Server、SQLite、DuckDB、ClickHouse、Firebi
 ## 社区
 
 <p align="center">
-  <img src="docs/images/wechat_group.jpg" width="140" alt="微信群">
+  <img src="https://www.geekfun.club/wechat-group.jpg" width="140" alt="微信群">
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="docs/images/wechat_official.png" width="140" alt="微信公众号">
 </p>

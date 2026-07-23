@@ -9,7 +9,6 @@ const menuItems = [
   { id: 'connections', label: 'Connections', icon: 'dns', path: '/connections' },
   { id: 'queries', label: 'Queries', icon: 'code', path: '/queries' },
   { id: 'data-studio', label: 'Data Studio', icon: 'smart_toy', path: '/data-studio' },
-  { id: 'transfer', label: 'Transfer', icon: 'import_export', path: '/transfer' },
   { id: 'history', label: 'History', icon: 'history', path: '/history' },
 ]
 
