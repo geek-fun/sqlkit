@@ -74,10 +74,8 @@ describe('candidateRouteXs', () => {
     expect(candidates).toContain(260)
   })
 
-  it('includes left and right edge padding candidates', () => {
+  it('includes the right edge padding candidate', () => {
     const candidates = candidateRouteXs(rectA, rectB, [rectA, rectB])
-    // minLeft is 0, so 0 - 56 = -56
-    expect(candidates).toContain(-56)
     // maxRight is 300 + 220 = 520, so 520 + 56 = 576
     expect(candidates).toContain(576)
   })
@@ -94,20 +92,22 @@ describe('computeRelationshipPath', () => {
     expect(computeRelationshipPath('A', 'B', rectMap)).toBe('')
   })
 
-  it('returns a cubic bezier SVG path for two side-by-side rects', () => {
+  it('returns an orthogonal SVG path for two side-by-side rects', () => {
     const rectMap: Record<string, TableRect> = { A: rectA, B: rectB }
     const path = computeRelationshipPath('A', 'B', rectMap)
-    expect(path).toMatch(/^M \d.+C \d/)
+    expect(path).toMatch(/^M /)
+    expect(path).toContain(' L ')
   })
 
-  it('returns a bezier path even with a blocker between source and target', () => {
+  it('returns an orthogonal path even with a blocker between source and target', () => {
     const rectMap: Record<string, TableRect> = {
       A: rectA,
       B: rectB,
       Blocker: rectBlocker,
     }
     const path = computeRelationshipPath('A', 'B', rectMap)
-    expect(path).toMatch(/^M \d.+C \d/)
+    expect(path).toMatch(/^M /)
+    expect(path).toContain(' L ')
   })
 })
 
