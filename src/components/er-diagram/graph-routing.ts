@@ -79,38 +79,26 @@ export function candidateRouteXs(source: TableRect, target: TableRect, rects: Ta
 export function computeRelationshipPath(
   sourceTable: string,
   targetTable: string,
-  rectMap: Map<string, TableRect>,
-  direction: 'TB' | 'LR' = 'TB',
+  rects: Record<string, TableRect>,
 ): string {
-  const source = rectMap.get(sourceTable)
-  const target = rectMap.get(targetTable)
+  const source = rects[sourceTable]
+  const target = rects[targetTable]
   if (!source || !target)
     return ''
 
-  // For LR layout, use simple center-to-center bezier (orthogonal looks wrong horizontally)
-  if (direction === 'LR') {
-    const x1 = source.x + source.width / 2
-    const y1 = source.y + source.height / 2
-    const x2 = target.x + target.width / 2
-    const y2 = target.y + target.height / 2
-    const dx = Math.abs(x2 - x1) * 0.4
-    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
-  }
-
-  // TB layout: orthogonal routing via left/right edges
   const y1 = source.y + source.height / 2
   const y2 = target.y + target.height / 2
   const ignored = new Set([source.name, target.name])
-  const rects = [...rectMap.values()]
-  const candidates = candidateRouteXs(source, target, rects)
+  const allRects = Object.values(rects)
+  const candidates = candidateRouteXs(source, target, allRects)
 
   const routeX = candidates.find((c) => {
     const x1 = routeSideX(source, c)
     const x2 = routeSideX(target, c)
     return (
-      !isVerticalRouteBlocked(c, y1, y2, ignored, rects)
-      && !isHorizontalRouteBlocked(y1, x1, c, ignored, rects)
-      && !isHorizontalRouteBlocked(y2, c, x2, ignored, rects)
+      !isVerticalRouteBlocked(c, y1, y2, ignored, allRects)
+      && !isHorizontalRouteBlocked(y1, x1, c, ignored, allRects)
+      && !isHorizontalRouteBlocked(y2, c, x2, ignored, allRects)
     )
   })
   ?? candidates[0]
@@ -123,22 +111,22 @@ export function computeRelationshipPath(
 
 export function buildTableRectMap(
   tableNames: string[],
-  nodePositions: Map<string, { x: number, y: number }>,
+  nodePositions: Record<string, { x: number, y: number }>,
   getHeight: (name: string) => number,
-): Map<string, TableRect> {
-  const map = new Map<string, TableRect>()
+): Record<string, TableRect> {
+  const map: Record<string, TableRect> = {}
   for (const name of tableNames) {
-    const pos = nodePositions.get(name)
+    const pos = nodePositions[name]
     if (!pos)
       continue
     const h = getHeight(name)
-    map.set(name, {
+    map[name] = {
       name,
       x: pos.x - NODE_WIDTH / 2,
       y: pos.y - h / 2,
       width: NODE_WIDTH,
       height: h,
-    })
+    }
   }
   return map
 }

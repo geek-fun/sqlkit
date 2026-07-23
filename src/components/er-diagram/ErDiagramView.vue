@@ -24,7 +24,6 @@ import { getForeignKeys } from '@/datasources/erDiagramApi'
 import { useDatabaseStore } from '@/store/databaseStore'
 
 import {
-  computeBoundingBox,
   computeCanvasSize,
   computeDagreLayout,
   fitToScreen as fitBboxToScreen,
@@ -66,13 +65,12 @@ const CANVAS_PADDING = 80
 // ─── State ────────────────────────────────────────────
 const tables = ref<TableData[]>([])
 const foreignKeys = ref<ForeignKeyInfo[]>([])
-const dagrePositions = ref<Map<string, { x: number, y: number }>>(new Map())
-const manualOverrides = ref<Map<string, { x: number, y: number }>>(new Map())
+const dagrePositions = ref<Record<string, { x: number, y: number }>>({})
+const manualOverrides = ref<Record<string, { x: number, y: number }>>({})
 
 const selectedTableId = ref<string | null>(null)
 const searchQuery = ref('')
 const expandedTables = ref<Set<string>>(new Set())
-const layoutDirection = ref<'TB' | 'LR'>('TB')
 
 const zoomLevel = ref(1)
 const gestureStartZoom = ref(1)
@@ -85,11 +83,10 @@ const showWarning = ref(false)
 const viewportRef = ref<HTMLElement | null>(null)
 const viewportBounds = useElementBounding(viewportRef)
 
-// ─── Node drag state (delta-offset) ──────────────
+// ─── Node drag state ─────────────────────────────
 const draggingNodeId = ref<string | null>(null)
 const dragStartPos = ref({ x: 0, y: 0 })
 const dragNodeStart = ref({ x: 0, y: 0 })
-const dragDelta = ref({ x: 0, y: 0 })
 
 // ─── Drag to pan ────────────────────────────────
 const isPanning = ref(false)
@@ -158,13 +155,10 @@ const allRelationships = computed(() =>
 )
 
 // ─── Combined positions (dagre + manual) ─────────
-const nodePositions = computed(() => {
-  const merged = new Map(dagrePositions.value)
-  for (const [name, pos] of manualOverrides.value) {
-    merged.set(name, pos)
-  }
-  return merged
-})
+const nodePositions = computed(() => ({
+  ...dagrePositions.value,
+  ...manualOverrides.value,
+}))
 
 // ─── Focus mode ───────────────────────────────────
 const focusMode = computed(() => selectedTableId.value !== null)
@@ -216,7 +210,7 @@ const highlightedTables = computed(() => {
 // ─── Render nodes ─────────────────────────────────
 const renderNodes = computed<RenderNode[]>(() => {
   return displayedTables.value.map((table) => {
-    const pos = nodePositions.value.get(table.name)
+    const pos = nodePositions.value[table.name]
     if (!pos)
       return null
 
@@ -244,24 +238,21 @@ const renderNodes = computed<RenderNode[]>(() => {
 
 // ─── Canvas size ──────────────────────────────────
 const nodeHeights = computed(() => {
-  const map = new Map<string, number>()
-  for (const node of renderNodes.value) {
-    map.set(node.id, node.height)
-  }
+  const map: Record<string, number> = {}
+  for (const node of renderNodes.value)
+    map[node.id] = node.height
   return map
 })
 
 const canvasSize = computed(() => {
-  if (nodePositions.value.size === 0)
+  const positions = nodePositions.value
+  if (Object.keys(positions).length === 0)
     return { width: 800, height: 600 }
 
-  const sizes = new Map<string, { width: number, height: number }>()
-  for (const node of renderNodes.value) {
-    sizes.set(node.id, { width: NODE_WIDTH, height: node.height })
-  }
-
-  const bbox = computeBoundingBox(nodePositions.value, sizes)
-  return computeCanvasSize(bbox, CANVAS_PADDING)
+  return computeCanvasSize(positions, NODE_WIDTH, (name) => {
+    const h = nodeHeights.value[name]
+    return h ?? HEADER_HEIGHT + 8
+  }, CANVAS_PADDING)
 })
 
 // ─── Render edges (orthogonal routing) ────────────
@@ -270,7 +261,7 @@ const tableRectMap = computed(() => {
     displayedTables.value.map(t => t.name),
     nodePositions.value,
     (name) => {
-      const h = nodeHeights.value.get(name)
+      const h = nodeHeights.value[name]
       return h ?? HEADER_HEIGHT + CARD_PADDING
     },
   )
@@ -282,7 +273,6 @@ const renderEdges = computed<RenderEdge[]>(() => {
       rel.sourceTable,
       rel.targetTable,
       tableRectMap.value,
-      layoutDirection.value,
     )
     return {
       from: rel.sourceTable,
@@ -300,8 +290,8 @@ const renderEdges = computed<RenderEdge[]>(() => {
 // ─── Layout Computation ───────────────────────────────
 function computeLayout() {
   if (displayedTables.value.length === 0) {
-    dagrePositions.value = new Map()
-    manualOverrides.value = new Map()
+    dagrePositions.value = {}
+    manualOverrides.value = {}
     return
   }
 
@@ -317,9 +307,8 @@ function computeLayout() {
     targetTable: rel.targetTable,
   }))
 
-  const positions = computeDagreLayout(dagreTables, dagreRels, layoutDirection.value)
-  dagrePositions.value = positions
-  manualOverrides.value = new Map()
+  dagrePositions.value = computeDagreLayout(dagreTables, dagreRels)
+  manualOverrides.value = {}
 }
 
 // ─── Data Fetching ────────────────────────────────────
@@ -400,7 +389,7 @@ async function fetchSchemaData() {
 
 // ─── Watchers ─────────────────────────────────────────
 watch(
-  [displayedTables, layoutDirection, expandedTables],
+  [displayedTables, expandedTables],
   () => {
     computeLayout()
   },
@@ -430,22 +419,16 @@ function toggleExpand(tableName: string) {
   expandedTables.value = next
 }
 
-function toggleLayout() {
-  layoutDirection.value
-    = layoutDirection.value === 'TB' ? 'LR' : 'TB'
-}
-
 // ─── Header-only drag handlers ───────────────────
 function onHeaderMousedown(e: MouseEvent, nodeId: string) {
   if (e.button !== 0)
     return
-  const pos = nodePositions.value.get(nodeId)
+  const pos = nodePositions.value[nodeId]
   if (!pos)
     return
   draggingNodeId.value = nodeId
   dragStartPos.value = { x: e.clientX, y: e.clientY }
   dragNodeStart.value = { x: pos.x, y: pos.y }
-  dragDelta.value = { x: 0, y: 0 }
   document.addEventListener('mousemove', onHeaderMouseMove)
   document.addEventListener('mouseup', onHeaderMouseUp)
 }
@@ -453,22 +436,19 @@ function onHeaderMousedown(e: MouseEvent, nodeId: string) {
 function onHeaderMouseMove(e: MouseEvent) {
   if (!draggingNodeId.value)
     return
-  dragDelta.value = {
-    x: (e.clientX - dragStartPos.value.x) / zoomLevel.value,
-    y: (e.clientY - dragStartPos.value.y) / zoomLevel.value,
+  const dx = (e.clientX - dragStartPos.value.x) / zoomLevel.value
+  const dy = (e.clientY - dragStartPos.value.y) / zoomLevel.value
+  manualOverrides.value = {
+    ...manualOverrides.value,
+    [draggingNodeId.value]: {
+      x: Math.max(16, dragNodeStart.value.x + dx),
+      y: Math.max(16, dragNodeStart.value.y + dy),
+    },
   }
 }
 
 function onHeaderMouseUp() {
-  if (draggingNodeId.value) {
-    const finalX = dragNodeStart.value.x + dragDelta.value.x
-    const finalY = dragNodeStart.value.y + dragDelta.value.y
-    const overrides = new Map(manualOverrides.value)
-    overrides.set(draggingNodeId.value, { x: finalX, y: finalY })
-    manualOverrides.value = overrides
-  }
   draggingNodeId.value = null
-  dragDelta.value = { x: 0, y: 0 }
   document.removeEventListener('mousemove', onHeaderMouseMove)
   document.removeEventListener('mouseup', onHeaderMouseUp)
 }
@@ -595,12 +575,6 @@ onUnmounted(() => {
         @click="resetLayout"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10" /><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" /></svg>
-      </Button>
-
-      <!-- Layout direction toggle -->
-      <Button variant="ghost" size="sm" class="text-xs gap-1 h-7" :title="t('components.databaseBrowser.erDiagram.layoutDirection')" @click="toggleLayout">
-        <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
-        {{ layoutDirection === 'TB' ? t('components.databaseBrowser.erDiagram.layoutLeftRight') : t('components.databaseBrowser.erDiagram.layoutTopBottom') }}
       </Button>
 
       <!-- Fit to screen -->
@@ -735,7 +709,7 @@ onUnmounted(() => {
               position: 'absolute',
               left: 0,
               top: 0,
-              transform: `translate(${node.x + (draggingNodeId === node.id ? dragDelta.x : 0)}px, ${node.y + (draggingNodeId === node.id ? dragDelta.y : 0)}px)`,
+              transform: `translate(${node.x}px, ${node.y}px)`,
               willChange: draggingNodeId === node.id ? 'transform' : 'auto',
             }"
           >
