@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { invoke } from '@tauri-apps/api/core'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { invoke } from '@tauri-apps/api/core'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -603,7 +603,7 @@ async function handleCheckUpdates() {
                 <!-- Version -->
                 <div class="flex items-center justify-between">
                   <Label>{{ t('pages.settings.about.version') }}</Label>
-                  <span class="text-sm font-mono text-muted-foreground">{{ version }}</span>
+                  <span class="text-sm text-muted-foreground font-mono">{{ version }}</span>
                 </div>
 
                 <!-- License -->
@@ -618,10 +618,10 @@ async function handleCheckUpdates() {
                 <a
                   href="https://github.com/geek-fun/sqlkit"
                   target="_blank"
-                  class="flex items-center justify-between rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors"
+                  class="p-2 rounded-md flex transition-colors items-center justify-between -mx-2 hover:bg-muted/50"
                 >
                   <Label>{{ t('pages.settings.about.repository') }}</Label>
-                  <div class="flex items-center gap-2">
+                  <div class="flex gap-2 items-center">
                     <span class="text-sm text-muted-foreground">geek-fun/sqlkit</span>
                     <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
                   </div>
@@ -631,10 +631,10 @@ async function handleCheckUpdates() {
                 <a
                   href="https://www.geekfun.club"
                   target="_blank"
-                  class="flex items-center justify-between rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors"
+                  class="p-2 rounded-md flex transition-colors items-center justify-between -mx-2 hover:bg-muted/50"
                 >
                   <Label>{{ t('pages.settings.about.website') }}</Label>
-                  <div class="flex items-center gap-2">
+                  <div class="flex gap-2 items-center">
                     <span class="text-sm text-muted-foreground">geekfun.club</span>
                     <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
                   </div>
@@ -644,10 +644,10 @@ async function handleCheckUpdates() {
                 <a
                   href="https://discord.gg/5NSUyPK2E"
                   target="_blank"
-                  class="flex items-center justify-between rounded-md hover:bg-muted/50 p-2 -mx-2 transition-colors"
+                  class="p-2 rounded-md flex transition-colors items-center justify-between -mx-2 hover:bg-muted/50"
                 >
                   <Label>{{ t('pages.settings.about.community') }}</Label>
-                  <div class="flex items-center gap-2">
+                  <div class="flex gap-2 items-center">
                     <span class="text-sm text-muted-foreground">Discord</span>
                     <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
                   </div>
@@ -656,7 +656,7 @@ async function handleCheckUpdates() {
                 <div class="border-t border-border/40" />
 
                 <!-- Copyright -->
-                <p class="text-xs text-muted-foreground text-center pt-2">
+                <p class="text-xs text-muted-foreground pt-2 text-center">
                   {{ t('pages.settings.about.copyright', { year: new Date().getFullYear() }) }}
                 </p>
               </CardContent>

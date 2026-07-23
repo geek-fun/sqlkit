@@ -60,7 +60,7 @@ function scanStatements(content: string): StatementRange[] {
   const ranges: StatementRange[] = []
   const state: ScannerState = { ...DEFAULT_STATE }
   let bufStart = 0
-  let line = 1
+  let _line = 1
 
   for (let i = 0; i < content.length; i++) {
     const ch = content[i]
@@ -68,7 +68,7 @@ function scanStatements(content: string): StatementRange[] {
 
     // Track lines
     if (ch === '\n') {
-      line++
+      _line++
     }
 
     // Handle dollar-quoting (PostgreSQL $$...$$)
