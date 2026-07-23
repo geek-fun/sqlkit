@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.5] - 2026-07-23
+
+### Added
+
+- Add ER diagram with orthogonal routing, zoom controls, focus mode, and info badges
+- Add ER diagram button to database toolbar and sidebar
+- Wire ER diagram button to open in query tab
+- Add backend SQL construction service for ER diagram queries
+- Add About page to settings with version, license, and community links
+
+### Fixed
+
+- Fix ER diagram routing (orthogonal, bezier), interaction, layout, and pan behavior
+- Fix schema fetching in ER diagram to directly invoke backend
+- Fix ER diagram Select empty value and zoom button ordering
+- Fix ER diagram node dragging and layout issues
+- Restore ER diagram context menu
+- Show all schemas in database-level ER diagram
+- Fix input border contrast for better visibility
+- Fix database selector icon consistency
+
+### Changed
+
+- Refactor ER diagram to single TB layout with Record position tracking
+- Replace ER diagram SVG rendering with pure HTML for better performance
+- Adopt DBX-style compact toolbar layout
+- Refactor sidebar: move ER diagram button to database actions dropdown
+
 ## [0.7.4] - 2026-07-01
 
 ### Added

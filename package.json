@@ -1,7 +1,7 @@
 {
   "name": "sqlkit",
   "type": "module",
-  "version": "0.7.4",
+  "version": "0.7.5",
   "private": true,
   "description": "Agentic SQL database manager for 70+ databases — PostgreSQL, MySQL, SQL Server, SQLite, DuckDB, ClickHouse, Oracle, and more. Privacy-first, AI-powered, cross-platform. Built with Tauri (Rust).",
   "author": "geekfun <support@geekfun.club>",
