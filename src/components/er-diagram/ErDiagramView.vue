@@ -96,8 +96,8 @@ const isPanning = ref(false)
 const panStart = ref({ mouseX: 0, mouseY: 0, scrollLeft: 0, scrollTop: 0 })
 
 function onViewportMouseDown(e: MouseEvent) {
-  // Only left-click (0) or right-click (2) trigger pan
-  if (e.button !== 0 && e.button !== 2)
+  // Only left-click triggers pan
+  if (e.button !== 0)
     return
 
   // Don't start pan if clicking on a table card
@@ -131,11 +131,6 @@ function onViewportMouseMove(e: MouseEvent) {
 
 function onViewportMouseUp() {
   isPanning.value = false
-}
-
-function onContextMenu(e: MouseEvent) {
-  // Prevent browser context menu during right-drag pan
-  e.preventDefault()
 }
 
 // ─── Schema selector ──────────────────────────────
@@ -660,7 +655,6 @@ onUnmounted(() => {
       @mousemove="onViewportMouseMove"
       @mouseup="onViewportMouseUp"
       @mouseleave="onViewportMouseUp"
-      @contextmenu="onContextMenu"
       @click.self="deselectAll"
     >
       <!-- Loading -->
