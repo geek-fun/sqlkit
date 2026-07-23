@@ -92,7 +92,7 @@ export function computeRelationshipPath(
 
   // Pick the closest candidate that isn't blocked; fallback to rightmost + padding
   const defaultRoute = Math.max(source.x + source.width, target.x + target.width) + ROUTE_PADDING
-  const routeX = candidates.find(c => {
+  const routeX = candidates.find((c) => {
     const x1 = routeSideX(source, c)
     const x2 = routeSideX(target, c)
     return (
