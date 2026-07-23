@@ -71,17 +71,17 @@ SqlKit is an **agentic database client** — it doesn't just execute SQL, it und
 
 <a href="https://www.geekfun.club/download">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white">
-    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white" alt="Download">
+    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?logo=download&logoColor=white">
+    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?logo=download&logoColor=white" alt="Download">
   </picture>
 </a>
 &nbsp;
 <a href="https://github.com/geek-fun/sqlkit/releases">
-  <img src="https://img.shields.io/badge/Releases-GitHub-lightgrey?style=for-the-badge&logo=github" alt="Releases">
+  <img src="https://img.shields.io/badge/Releases-GitHub-lightgrey?logo=github" alt="Releases">
 </a>
 &nbsp;
 <a href="https://www.geekfun.club/products/sqlkit/">
-  <img src="https://img.shields.io/badge/Website-geekfun.club-blue?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website">
+  <img src="https://img.shields.io/badge/Website-geekfun.club-blue?logo=google-chrome&logoColor=white" alt="Website">
 </a>
 
 ## Features
@@ -235,17 +235,17 @@ Open an issue on <a href="https://github.com/geek-fun/sqlkit/issues">GitHub Issu
 <p align="center">
   <img src="https://www.geekfun.club/wechat-group.jpg" width="140" alt="WeChat Group">
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="docs/images/wechat_official.png" width="140" alt="WeChat Official Account">
+  <img src="docs/images/wechat_official.png" width="300" alt="WeChat Official Account">
 </p>
 
 <p align="center">
-  <a href="https://discord.gg/5NSUyPK2E"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white&style=for-the-badge" alt="Discord" /></a>
+  <a href="https://discord.gg/5NSUyPK2E"><img src="https://img.shields.io/badge/Discord-Join-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://x.com/geekfun_club"><img src="https://img.shields.io/badge/X-Follow-000000?logo=x&logoColor=white&style=for-the-badge" alt="X / Twitter" /></a>
+  <a href="https://x.com/geekfun_club"><img src="https://img.shields.io/badge/X-Follow-000000?logo=x&logoColor=white" alt="X / Twitter" /></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://www.youtube.com/@geekfun-club"><img src="https://img.shields.io/badge/YouTube-Subscribe-FF0000?logo=youtube&logoColor=white&style=for-the-badge" alt="YouTube" /></a>
+  <a href="https://www.youtube.com/@geekfun-club"><img src="https://img.shields.io/badge/YouTube-Subscribe-FF0000?logo=youtube&logoColor=white" alt="YouTube" /></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/geek-fun"><img src="https://img.shields.io/badge/GitHub-Follow-181717?logo=github&logoColor=white&style=for-the-badge" alt="GitHub" /></a>
+  <a href="https://github.com/geek-fun"><img src="https://img.shields.io/badge/GitHub-Follow-181717?logo=github&logoColor=white" alt="GitHub" /></a>
 </p>
 
 ## Sponsor
@@ -253,7 +253,7 @@ Open an issue on <a href="https://github.com/geek-fun/sqlkit/issues">GitHub Issu
 <p align="center">
   <img src="docs/images/wechat_ponsor.jpg" width="140" alt="WeChat Sponsor QR">
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/sponsors/geek-fun"><img src="https://img.shields.io/badge/GitHub_Sponsors-%E2%9D%A4_Support-EA4AAA?logo=githubsponsors&logoColor=white&style=for-the-badge" alt="GitHub Sponsors" /></a>
+  <a href="https://github.com/sponsors/geek-fun"><img src="https://img.shields.io/badge/GitHub_Sponsors-%E2%9D%A4_Support-EA4AAA?logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" /></a>
 </p>
 
 ## Star History

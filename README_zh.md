@@ -8,18 +8,18 @@
 
 **隐私优先。你的数据，你的密钥。开源。**
 
-[![Release](https://img.shields.io/github/v/release/geek-fun/sqlkit?color=orange&label=release&style=for-the-badge&logo=github)](https://github.com/geek-fun/sqlkit/releases)
-[![Downloads](https://img.shields.io/github/downloads/geek-fun/sqlkit/total?color=orange&style=for-the-badge&logo=docusign)](https://github.com/geek-fun/sqlkit/releases)
-[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?style=for-the-badge&logo=apache)](LICENSE)
-[![Stars](https://img.shields.io/github/stars/geek-fun/sqlkit?style=for-the-badge&logo=github)](https://github.com/geek-fun/sqlkit/stargazers)
-[![CI](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml/badge.svg?style=for-the-badge)](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml)
+[![Release](https://img.shields.io/github/v/release/geek-fun/sqlkit?color=orange&label=release&logo=github)](https://github.com/geek-fun/sqlkit/releases)
+[![Downloads](https://img.shields.io/github/downloads/geek-fun/sqlkit/total?color=orange&logo=docusign)](https://github.com/geek-fun/sqlkit/releases)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?logo=apache)](LICENSE)
+[![Stars](https://img.shields.io/github/stars/geek-fun/sqlkit?logo=github)](https://github.com/geek-fun/sqlkit/stargazers)
+[![CI](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml/badge.svg)](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml)
 
 <p>
-  <img src="https://img.shields.io/badge/macOS-000000?style=for-the-badge&logo=apple&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Tauri-FFC131?style=for-the-badge&logo=tauri&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Rust-000000?style=for-the-badge&logo=rust&logoColor=white"/>
+  <img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white"/>
+  <img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black"/>
+  <img src="https://img.shields.io/badge/Tauri-FFC131?logo=tauri&logoColor=black"/>
+  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white"/>
 </p>
 
 [下载](https://www.geekfun.club/download) · [文档](docs/DISTRIBUTION.md) · [网站](https://www.geekfun.club) · [发布页](https://github.com/geek-fun/sqlkit/releases)
@@ -71,17 +71,17 @@ SqlKit 是一个 **Agentic 数据库客户端** —— 它不仅执行 SQL，还
 
 <a href="https://www.geekfun.club/download">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white">
-    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?style=for-the-badge&logo=download&logoColor=white" alt="下载">
+    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?logo=download&logoColor=white">
+    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?logo=download&logoColor=white" alt="下载">
   </picture>
 </a>
 &nbsp;
 <a href="https://github.com/geek-fun/sqlkit/releases">
-  <img src="https://img.shields.io/badge/Releases-GitHub-lightgrey?style=for-the-badge&logo=github" alt="Releases">
+  <img src="https://img.shields.io/badge/Releases-GitHub-lightgrey?logo=github" alt="Releases">
 </a>
 &nbsp;
 <a href="https://www.geekfun.club/products/sqlkit/">
-  <img src="https://img.shields.io/badge/官网-geekfun.club-blue?style=for-the-badge&logo=google-chrome&logoColor=white" alt="官网">
+  <img src="https://img.shields.io/badge/官网-geekfun.club-blue?logo=google-chrome&logoColor=white" alt="官网">
 </a>
 
 ## 功能特性
@@ -235,17 +235,17 @@ PostgreSQL、MySQL、Oracle、SQL Server、SQLite、DuckDB、ClickHouse、Firebi
 <p align="center">
   <img src="https://www.geekfun.club/wechat-group.jpg" width="140" alt="微信群">
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <img src="docs/images/wechat_official.png" width="140" alt="微信公众号">
+  <img src="docs/images/wechat_official.png" width="300" alt="微信公众号">
 </p>
 
 <p align="center">
-  <a href="https://discord.gg/5NSUyPK2E"><img src="https://img.shields.io/badge/Discord-加入-5865F2?logo=discord&logoColor=white&style=for-the-badge" alt="Discord" /></a>
+  <a href="https://discord.gg/5NSUyPK2E"><img src="https://img.shields.io/badge/Discord-加入-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://x.com/geekfun_club"><img src="https://img.shields.io/badge/X-关注-000000?logo=x&logoColor=white&style=for-the-badge" alt="X / Twitter" /></a>
+  <a href="https://x.com/geekfun_club"><img src="https://img.shields.io/badge/X-关注-000000?logo=x&logoColor=white" alt="X / Twitter" /></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://www.youtube.com/@geekfun-club"><img src="https://img.shields.io/badge/YouTube-订阅-FF0000?logo=youtube&logoColor=white&style=for-the-badge" alt="YouTube" /></a>
+  <a href="https://www.youtube.com/@geekfun-club"><img src="https://img.shields.io/badge/YouTube-订阅-FF0000?logo=youtube&logoColor=white" alt="YouTube" /></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/geek-fun"><img src="https://img.shields.io/badge/GitHub-关注-181717?logo=github&logoColor=white&style=for-the-badge" alt="GitHub" /></a>
+  <a href="https://github.com/geek-fun"><img src="https://img.shields.io/badge/GitHub-关注-181717?logo=github&logoColor=white" alt="GitHub" /></a>
 </p>
 
 ## 赞助
@@ -253,7 +253,7 @@ PostgreSQL、MySQL、Oracle、SQL Server、SQLite、DuckDB、ClickHouse、Firebi
 <p align="center">
   <img src="docs/images/wechat_ponsor.jpg" width="140" alt="微信赞赏码">
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/sponsors/geek-fun"><img src="https://img.shields.io/badge/GitHub_Sponsors-%E2%9D%A4_支持-EA4AAA?logo=githubsponsors&logoColor=white&style=for-the-badge" alt="GitHub Sponsors" /></a>
+  <a href="https://github.com/sponsors/geek-fun"><img src="https://img.shields.io/badge/GitHub_Sponsors-%E2%9D%A4_支持-EA4AAA?logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" /></a>
 </p>
 
 ## Star 历史
