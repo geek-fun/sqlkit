@@ -282,6 +282,7 @@ const renderEdges = computed<RenderEdge[]>(() => {
       rel.sourceTable,
       rel.targetTable,
       tableRectMap.value,
+      layoutDirection.value,
     )
     return {
       from: rel.sourceTable,
@@ -735,6 +736,7 @@ onUnmounted(() => {
               left: 0,
               top: 0,
               transform: `translate(${node.x + (draggingNodeId === node.id ? dragDelta.x : 0)}px, ${node.y + (draggingNodeId === node.id ? dragDelta.y : 0)}px)`,
+              willChange: draggingNodeId === node.id ? 'transform' : 'auto',
             }"
           >
             <TableCard
