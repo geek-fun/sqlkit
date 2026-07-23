@@ -762,5 +762,4 @@ onUnmounted(() => {
 
 <style scoped>
 /* Table view styles are in TableCard.vue */
-/* Engineering view styles are in EngineeringEntity.vue */
 </style>
