@@ -105,13 +105,13 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
 </script>
 
 <template>
-  <div class="query-tabs flex items-stretch overflow-x-auto border-b border-border">
+  <div class="query-tabs border-b border-border flex items-stretch overflow-x-auto">
     <!-- Tabs -->
     <div class="flex flex-1 min-w-0 items-stretch">
       <div
         v-for="tab in tabs"
         :key="tab.id"
-        class="tab-item group flex items-center gap-1 px-3 cursor-pointer transition-colors select-none text-xs border-r border-border"
+        class="tab-item group text-xs px-3 border-r border-border flex gap-1 cursor-pointer select-none transition-colors items-center"
         :class="{
           'bg-background text-foreground font-medium': isActiveTab(tab.id),
           'bg-muted/30 text-muted-foreground hover:bg-background/50 hover:text-foreground': !isActiveTab(tab.id),
@@ -229,11 +229,11 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
 
         <!-- Close button -->
         <button
-          class="rounded flex flex-shrink-0 h-4 w-4 transition-colors items-center justify-center hover:bg-muted-foreground/20 opacity-0 group-hover:opacity-100"
+          class="rounded opacity-0 flex flex-shrink-0 h-4 w-4 transition-colors items-center justify-center hover:bg-muted-foreground/20 group-hover:opacity-100"
           :class="{ 'opacity-100': isActiveTab(tab.id) }"
           @click="handleCloseClick($event, tab)"
         >
-          <span class="i-lucide-x h-3 w-3 shrink-0" />
+          <span class="i-lucide-x shrink-0 h-3 w-3" />
         </button>
       </div>
     </div>
@@ -242,11 +242,11 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
     <Button
       variant="ghost"
       size="icon"
-      class="shrink-0 h-7 w-7 text-muted-foreground hover:text-foreground"
+      class="text-muted-foreground shrink-0 h-7 w-7 hover:text-foreground"
       :title="t('components.queryTabs.new')"
       @click="handleNewTab"
     >
-      <span class="i-lucide-plus h-3.5 w-3.5 shrink-0" />
+      <span class="i-lucide-plus shrink-0 h-3.5 w-3.5" />
     </Button>
 
     <!-- Unsaved changes dialog -->
