@@ -85,28 +85,28 @@ describe('candidateRouteXs', () => {
 
 describe('computeRelationshipPath', () => {
   it('returns empty string when source table is not in rectMap', () => {
-    const rectMap = new Map<string, TableRect>([['B', rectB]])
+    const rectMap: Record<string, TableRect> = { B: rectB }
     expect(computeRelationshipPath('A', 'B', rectMap)).toBe('')
   })
 
   it('returns empty string when target table is not in rectMap', () => {
-    const rectMap = new Map<string, TableRect>([['A', rectA]])
+    const rectMap: Record<string, TableRect> = { A: rectA }
     expect(computeRelationshipPath('A', 'B', rectMap)).toBe('')
   })
 
   it('returns a valid SVG path for two side-by-side rects', () => {
-    const rectMap = new Map<string, TableRect>([['A', rectA], ['B', rectB]])
+    const rectMap: Record<string, TableRect> = { A: rectA, B: rectB }
     const path = computeRelationshipPath('A', 'B', rectMap)
     expect(path).toMatch(/^M /)
     expect(path).toContain(' L ')
   })
 
   it('returns a valid path that avoids a blocker rect between source and target', () => {
-    const rectMap = new Map<string, TableRect>([
-      ['A', rectA],
-      ['B', rectB],
-      ['Blocker', rectBlocker],
-    ])
+    const rectMap: Record<string, TableRect> = {
+      A: rectA,
+      B: rectB,
+      Blocker: rectBlocker,
+    }
     const path = computeRelationshipPath('A', 'B', rectMap)
     expect(path).toMatch(/^M /)
     expect(path).toContain(' L ')
@@ -119,14 +119,17 @@ describe('computeRelationshipPath', () => {
 
 describe('buildTableRectMap', () => {
   it('builds a rect map from table names and positions', () => {
-    const nodePositions = new Map([
-      ['A', { x: 110, y: 50 }],
-      ['B', { x: 410, y: 50 }],
-    ])
+    const nodePositions: Record<string, { x: number, y: number }> = {
+      A: { x: 110, y: 50 },
+      B: { x: 410, y: 50 },
+    }
     const getHeight = (_name: string) => 100
     const rectMap = buildTableRectMap(['A', 'B'], nodePositions, getHeight)
-    expect(rectMap.size).toBe(2)
-    const rectA = rectMap.get('A')!
+    const keys = Object.keys(rectMap)
+    expect(keys).toHaveLength(2)
+    expect(keys).toContain('A')
+    expect(keys).toContain('B')
+    const rectA = rectMap.A
     expect(rectA.x).toBe(0) // 110 - 220/2
     expect(rectA.y).toBe(0) // 50 - 100/2
     expect(rectA.width).toBe(220)
@@ -134,9 +137,11 @@ describe('buildTableRectMap', () => {
   })
 
   it('skips tables not found in nodePositions', () => {
-    const nodePositions = new Map([['A', { x: 110, y: 50 }]])
+    const nodePositions: Record<string, { x: number, y: number }> = {
+      A: { x: 110, y: 50 },
+    }
     const getHeight = (_name: string) => 100
     const rectMap = buildTableRectMap(['A', 'B'], nodePositions, getHeight)
-    expect(rectMap.size).toBe(1)
+    expect(Object.keys(rectMap)).toHaveLength(1)
   })
 })
