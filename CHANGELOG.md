@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.7] - 2026-07-23
+
+### Fixed
+
+- Fix auto-update install failure not visible: enable F12 devtools in release builds, show persistent error in update notification with retry option
+
 ## [0.7.6] - 2026-07-23
 
 ### Added
