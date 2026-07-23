@@ -89,10 +89,12 @@ export function useAppUpdater() {
 
     try {
       await freshUpdate.downloadAndInstall((event: DownloadEvent) => {
-        if (event.event === 'Started')
+        if (event.event === 'Started') {
           contentLength.value = event.data.contentLength ?? 0
-        else if (event.event === 'Progress')
+        }
+        else if (event.event === 'Progress') {
           downloadedBytes.value += event.data.chunkLength
+        }
         else if (event.event === 'Finished') {
           isDownloading.value = false
           isInstalling.value = true

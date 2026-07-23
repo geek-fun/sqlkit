@@ -1,7 +1,7 @@
 <script setup lang="ts">
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 const route = useRoute()
