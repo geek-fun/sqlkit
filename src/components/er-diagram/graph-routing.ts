@@ -80,12 +80,24 @@ export function computeRelationshipPath(
   sourceTable: string,
   targetTable: string,
   rectMap: Map<string, TableRect>,
+  direction: 'TB' | 'LR' = 'TB',
 ): string {
   const source = rectMap.get(sourceTable)
   const target = rectMap.get(targetTable)
   if (!source || !target)
     return ''
 
+  // For LR layout, use simple center-to-center bezier (orthogonal looks wrong horizontally)
+  if (direction === 'LR') {
+    const x1 = source.x + source.width / 2
+    const y1 = source.y + source.height / 2
+    const x2 = target.x + target.width / 2
+    const y2 = target.y + target.height / 2
+    const dx = Math.abs(x2 - x1) * 0.4
+    return `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`
+  }
+
+  // TB layout: orthogonal routing via left/right edges
   const y1 = source.y + source.height / 2
   const y2 = target.y + target.height / 2
   const ignored = new Set([source.name, target.name])

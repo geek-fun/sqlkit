@@ -80,7 +80,7 @@ function isFKColumn(colName: string): boolean {
   user-select: none;
 }
 .er-table-card--selected {
-  @apply border-primary ring-1 ring-primary shadow-md;
+  @apply border-primary/60;
 }
 .er-table-header {
   @apply bg-muted px-3 py-2 font-semibold text-sm border-b border-border;
