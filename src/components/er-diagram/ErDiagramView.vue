@@ -23,7 +23,6 @@ import { Spinner } from '@/components/ui/spinner'
 import { getForeignKeys } from '@/datasources/erDiagramApi'
 import { useDatabaseStore } from '@/store/databaseStore'
 
-import EngineeringEntity from './EngineeringEntity.vue'
 import {
   computeBoundingBox,
   computeCanvasSize,
@@ -86,28 +85,32 @@ const showWarning = ref(false)
 const viewportRef = ref<HTMLElement | null>(null)
 const viewportBounds = useElementBounding(viewportRef)
 
-// ─── View mode ───────────────────────────────────
-const viewMode = ref<'table' | 'engineering'>('table')
-
 // ─── Node drag state (delta-offset) ──────────────
 const draggingNodeId = ref<string | null>(null)
 const dragStartPos = ref({ x: 0, y: 0 })
 const dragNodeStart = ref({ x: 0, y: 0 })
 const dragDelta = ref({ x: 0, y: 0 })
 
-// ─── Right-drag to pan ──────────────────────────
-const isRightDragging = ref(false)
-const rightDragStart = ref({ mouseX: 0, mouseY: 0, scrollLeft: 0, scrollTop: 0 })
+// ─── Drag to pan ────────────────────────────────
+const isPanning = ref(false)
+const panStart = ref({ mouseX: 0, mouseY: 0, scrollLeft: 0, scrollTop: 0 })
 
 function onViewportMouseDown(e: MouseEvent) {
-  if (e.button !== 2)
+  // Only left-click (0) or right-click (2) trigger pan
+  if (e.button !== 0 && e.button !== 2)
     return
+
+  // Don't start pan if clicking on a table card
+  const target = e.target as HTMLElement
+  if (target.closest('.er-table-wrapper'))
+    return
+
   e.preventDefault()
   const vp = viewportRef.value
   if (!vp)
     return
-  isRightDragging.value = true
-  rightDragStart.value = {
+  isPanning.value = true
+  panStart.value = {
     mouseX: e.clientX,
     mouseY: e.clientY,
     scrollLeft: vp.scrollLeft,
@@ -116,22 +119,23 @@ function onViewportMouseDown(e: MouseEvent) {
 }
 
 function onViewportMouseMove(e: MouseEvent) {
-  if (!isRightDragging.value)
+  if (!isPanning.value)
     return
   const vp = viewportRef.value
   if (!vp)
     return
-  const { mouseX, mouseY, scrollLeft, scrollTop } = rightDragStart.value
+  const { mouseX, mouseY, scrollLeft, scrollTop } = panStart.value
   vp.scrollLeft = scrollLeft - (e.clientX - mouseX)
   vp.scrollTop = scrollTop - (e.clientY - mouseY)
 }
 
 function onViewportMouseUp() {
-  isRightDragging.value = false
+  isPanning.value = false
 }
 
 function onContextMenu(e: MouseEvent) {
-  e.preventDefault() // prevent browser context menu during right-drag
+  // Prevent browser context menu during right-drag pan
+  e.preventDefault()
 }
 
 // ─── Schema selector ──────────────────────────────
@@ -586,27 +590,6 @@ onUnmounted(() => {
         {{ displayedRelationships.length }}
       </Badge>
 
-      <div class="border rounded-md flex h-7 items-center overflow-hidden">
-        <button
-          class="text-[11px] leading-none px-2 h-full transition-colors"
-          :class="viewMode === 'table' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'"
-          :title="t('components.databaseBrowser.erDiagram.tableView')"
-          @click="viewMode = 'table'"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1 align-text-bottom inline"><path d="M3 3h18v18H3z" /><path d="M21 9H3" /><path d="M9 21V9" /></svg>
-          {{ t('components.databaseBrowser.erDiagram.tableView') }}
-        </button>
-        <button
-          class="text-[11px] leading-none px-2 border-l h-full transition-colors"
-          :class="viewMode === 'engineering' ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground'"
-          :title="t('components.databaseBrowser.erDiagram.engineeringView')"
-          @click="viewMode = 'engineering'"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="mr-1 align-text-bottom inline"><circle cx="12" cy="12" r="3" /><circle cx="19" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><line x1="12" y1="12" x2="13.65" y2="5.87" /><line x1="12" y1="12" x2="6.35" y2="17.13" /><line x1="12" y1="12" x2="17" y2="14" /></svg>
-          {{ t('components.databaseBrowser.erDiagram.engineeringView') }}
-        </button>
-      </div>
-
       <div class="flex-1" />
 
       <!-- Reset Layout -->
@@ -669,6 +652,7 @@ onUnmounted(() => {
     <div
       ref="viewportRef"
       class="bg-muted/5 flex-1 relative overflow-auto"
+      :class="{ 'cursor-grab': !isPanning && !draggingNodeId, 'cursor-grabbing': isPanning || !!draggingNodeId }"
       @wheel.prevent="onWheel"
       @gesturestart="onGestureStart"
       @gesturechange="onGestureChange"
@@ -747,10 +731,11 @@ onUnmounted(() => {
             />
           </svg>
 
-          <!-- Table cards / Engineering entities -->
+          <!-- Table cards -->
           <div
             v-for="node in renderNodes"
             :key="node.id"
+            class="er-table-wrapper"
             :style="{
               position: 'absolute',
               left: 0,
@@ -759,18 +744,6 @@ onUnmounted(() => {
             }"
           >
             <TableCard
-              v-if="viewMode === 'table'"
-              :node="node"
-              :is-selected="selectedTableId === node.id"
-              :is-highlighted="node.isHighlighted"
-              :header-dragging="draggingNodeId === node.id"
-              @header-mousedown="onHeaderMousedown($event, node.id)"
-              @card-dblclick="emit('openTable', node.id)"
-              @card-click="selectTable(node.id)"
-              @toggle-expand="toggleExpand(node.id)"
-            />
-            <EngineeringEntity
-              v-else
               :node="node"
               :is-selected="selectedTableId === node.id"
               :is-highlighted="node.isHighlighted"
