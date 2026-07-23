@@ -94,26 +94,20 @@ describe('computeRelationshipPath', () => {
     expect(computeRelationshipPath('A', 'B', rectMap)).toBe('')
   })
 
-  it('returns a valid SVG path for two side-by-side rects', () => {
+  it('returns a cubic bezier SVG path for two side-by-side rects', () => {
     const rectMap: Record<string, TableRect> = { A: rectA, B: rectB }
     const path = computeRelationshipPath('A', 'B', rectMap)
-    expect(path).toMatch(/^M /)
-    expect(path).toContain(' L ')
+    expect(path).toMatch(/^M \d.+C \d/)
   })
 
-  it('returns a valid path that avoids a blocker rect between source and target', () => {
+  it('returns a bezier path even with a blocker between source and target', () => {
     const rectMap: Record<string, TableRect> = {
       A: rectA,
       B: rectB,
       Blocker: rectBlocker,
     }
     const path = computeRelationshipPath('A', 'B', rectMap)
-    expect(path).toMatch(/^M /)
-    expect(path).toContain(' L ')
-    // Path should use a routeX that's not through the blocker
-    // Verify it has exactly 3 L segments (orthogonal route: right, down, left)
-    const segments = path.split(' L ')
-    expect(segments.length).toBe(4) // M start + 3 L segments
+    expect(path).toMatch(/^M \d.+C \d/)
   })
 })
 

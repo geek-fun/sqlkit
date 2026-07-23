@@ -86,27 +86,13 @@ export function computeRelationshipPath(
   if (!source || !target)
     return ''
 
+  // Simple center-to-center cubic bezier — no orthogonal routing edge cases
+  const x1 = source.x + source.width / 2
   const y1 = source.y + source.height / 2
+  const x2 = target.x + target.width / 2
   const y2 = target.y + target.height / 2
-  const ignored = new Set([source.name, target.name])
-  const allRects = Object.values(rects)
-  const candidates = candidateRouteXs(source, target, allRects)
-
-  const routeX = candidates.find((c) => {
-    const x1 = routeSideX(source, c)
-    const x2 = routeSideX(target, c)
-    return (
-      !isVerticalRouteBlocked(c, y1, y2, ignored, allRects)
-      && !isHorizontalRouteBlocked(y1, x1, c, ignored, allRects)
-      && !isHorizontalRouteBlocked(y2, c, x2, ignored, allRects)
-    )
-  })
-  ?? candidates[0]
-  ?? Math.max(source.x + source.width, target.x + target.width) + ROUTE_PADDING
-
-  const x1 = routeSideX(source, routeX, 2)
-  const x2 = routeSideX(target, routeX, 2)
-  return `M ${x1} ${y1} L ${routeX} ${y1} L ${routeX} ${y2} L ${x2} ${y2}`
+  const dx = Math.abs(x2 - x1) * 0.4
+  return `M ${x1} ${y1} C ${x1} ${y1 + dx}, ${x2} ${y2 - dx}, ${x2} ${y2}`
 }
 
 export function buildTableRectMap(
