@@ -1436,6 +1436,8 @@ export const enUS = {
     restarting: 'Restarting...',
     downloadingPercent: 'Downloading {percent}%',
     relaunchFailed: 'Failed to restart after update',
+    retry: 'Retry',
+    installFailedHelp: 'Press F12 to open developer tools and check for error details.',
   },
   errors: {
     unexpected: 'Unexpected error: {error}',

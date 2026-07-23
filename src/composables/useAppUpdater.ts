@@ -28,6 +28,9 @@ const downloadProgress = computed(() => {
   return Math.round((downloadedBytes.value / contentLength.value) * 100)
 })
 
+/** Persistent update error message — shown inline in the notification card instead of a fleeting toast */
+const updateError = ref('')
+
 export function useAppUpdater() {
   const { t } = useI18n()
 
@@ -76,6 +79,7 @@ export function useAppUpdater() {
     if (!updateInfo.value)
       return
 
+    updateError.value = ''
     isDownloading.value = true
     downloadedBytes.value = 0
     contentLength.value = 0
@@ -104,7 +108,7 @@ export function useAppUpdater() {
     catch (error) {
       const message = error instanceof Error ? error.message : String(error)
       console.error('Update failed:', error)
-      toast.error(t('updater.installFailed'), { description: message })
+      updateError.value = message
       isDownloading.value = false
       isInstalling.value = false
       downloadedBytes.value = 0
@@ -125,9 +129,7 @@ export function useAppUpdater() {
     catch {
       clearTimeout(relaunchTimeout)
       isRestarting.value = false
-      toast.error(t('updater.installFailed'), {
-        description: t('updater.relaunchFailed'),
-      })
+      updateError.value = t('updater.relaunchFailed')
     }
   }
 
@@ -137,6 +139,7 @@ export function useAppUpdater() {
     }
     updateAvailable.value = false
     updateInfo.value = null
+    updateError.value = ''
     downloadedBytes.value = 0
     contentLength.value = 0
   }
@@ -144,8 +147,13 @@ export function useAppUpdater() {
   const dismissUpdate = () => {
     updateAvailable.value = false
     updateInfo.value = null
+    updateError.value = ''
     downloadedBytes.value = 0
     contentLength.value = 0
+  }
+
+  const clearError = () => {
+    updateError.value = ''
   }
 
   return {
@@ -156,9 +164,11 @@ export function useAppUpdater() {
     isInstalling,
     isRestarting,
     downloadProgress,
+    updateError,
     checkForUpdates,
     downloadAndInstall,
     skipUpdate,
     dismissUpdate,
+    clearError,
   }
 }

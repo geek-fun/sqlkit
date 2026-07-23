@@ -81,7 +81,6 @@ pub fn create_menu(app: &App) -> Result<(), Error> {
                 }
                 "toggle_dev_tools" =>
                 {
-                    #[cfg(debug_assertions)]
                     if window.is_devtools_open() {
                         window.close_devtools();
                     } else {

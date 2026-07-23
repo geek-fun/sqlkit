@@ -1436,6 +1436,8 @@ export const zhCN = {
     restarting: '正在重启...',
     downloadingPercent: '下载中 {percent}%',
     relaunchFailed: '更新后重启失败',
+    retry: '重试',
+    installFailedHelp: '按 F12 打开开发者工具查看错误详情。',
   },
   errors: {
     unexpected: '意外错误：{error}',
