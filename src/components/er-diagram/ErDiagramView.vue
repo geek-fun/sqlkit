@@ -160,26 +160,12 @@ const nodePositions = computed(() => ({
   ...manualOverrides.value,
 }))
 
-// ─── Focus mode ───────────────────────────────────
-const focusMode = computed(() => selectedTableId.value !== null)
-
+// ─── Display (search filter only, no focus mode hiding) ─
 const displayedTables = computed(() => {
-  let result = tables.value
-  if (searchQuery.value.trim()) {
-    const q = searchQuery.value.toLowerCase()
-    result = result.filter(t => t.name.toLowerCase().includes(q))
-  }
-  if (focusMode.value && selectedTableId.value) {
-    const related = new Set<string>([selectedTableId.value])
-    for (const rel of allRelationships.value) {
-      if (rel.sourceTable === selectedTableId.value)
-        related.add(rel.targetTable)
-      if (rel.targetTable === selectedTableId.value)
-        related.add(rel.sourceTable)
-    }
-    result = result.filter(t => related.has(t.name))
-  }
-  return result
+  if (!searchQuery.value.trim())
+    return tables.value
+  const q = searchQuery.value.toLowerCase()
+  return tables.value.filter(t => t.name.toLowerCase().includes(q))
 })
 
 const displayedTableNames = computed(
