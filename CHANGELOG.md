@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-27
+
+### Added
+
+- Add SQLCipher integration — encrypted SQLite variant with passphrase support (#121)
+
 ## [0.7.9] - 2026-07-27
 
 ### Fixed
