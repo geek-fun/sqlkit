@@ -6433,7 +6433,7 @@ dependencies = [
 
 [[package]]
 name = "sqlkit"
-version = "0.7.8"
+version = "0.7.9"
 dependencies = [
  "async-trait",
  "base64 0.22.1",

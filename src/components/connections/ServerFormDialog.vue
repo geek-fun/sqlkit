@@ -52,6 +52,7 @@ const defaultPorts: Record<string, number> = {
   [DatabaseType.MYSQL]: 3306,
   [DatabaseType.MARIADB]: 3306,
   [DatabaseType.SQLITE]: 0,
+  [DatabaseType.SQLCIPHER]: 0,
   [DatabaseType.SQLSERVER]: 1433,
   [DatabaseType.DUCKDB]: 0,
   [DatabaseType.CLICKHOUSE]: 8123,
@@ -314,19 +315,27 @@ function handleDatabaseTypeChange(value: string) {
   else {
     formData.value.oracleOptions = undefined
   }
-  if (type === DatabaseType.SQLITE || type === DatabaseType.DUCKDB) {
+  if (type === DatabaseType.SQLITE || type === DatabaseType.SQLCIPHER || type === DatabaseType.DUCKDB) {
     formData.value.host = ''
     formData.value.port = 0
-    formData.value.username = ''
-    formData.value.password = ''
-    sqliteTab.value = 'file'
+    if (type === DatabaseType.SQLITE || type === DatabaseType.DUCKDB) {
+      formData.value.username = ''
+      formData.value.password = ''
+    }
+    sqliteTab.value = type === DatabaseType.SQLITE ? 'file' : 'file'
     savedFilePath.value = ''
   }
 }
 
 const isFileBased = computed(() =>
   formData.value.type === DatabaseType.SQLITE
+  || formData.value.type === DatabaseType.SQLCIPHER
   || formData.value.type === DatabaseType.DUCKDB,
+)
+
+// SQLCipher is file-based but also needs a password (encryption key)
+const isEncryptedFileDb = computed(() =>
+  formData.value.type === DatabaseType.SQLCIPHER,
 )
 
 const isJdbcDb = computed(() => isJdbcDatabase(formData.value.type))
@@ -507,7 +516,7 @@ async function selectDatabaseFile() {
     const selected = await openDialog({
       multiple: false,
       filters: [
-        { name: 'SQLite', extensions: ['db', 'sqlite', 'sqlite3'] },
+        { name: 'Database', extensions: ['db', 'sqlite', 'sqlite3', 'sqlcipher', 'db3'] },
         { name: 'DuckDB', extensions: ['duckdb', 'db'] },
         { name: 'All Files', extensions: ['*'] },
       ],
@@ -762,8 +771,11 @@ function handleSave() {
     return
   }
 
-  // Save recent database path for SQLite
-  if (formData.value.type === DatabaseType.SQLITE && formData.value.host !== ':memory:') {
+  // Save recent database path for file-based databases
+  if (
+    (formData.value.type === DatabaseType.SQLITE || formData.value.type === DatabaseType.SQLCIPHER)
+    && formData.value.host !== ':memory:'
+  ) {
     saveRecentDatabase(formData.value.host)
   }
 
@@ -1102,83 +1114,174 @@ function handleSave() {
           </div>
         </div>
 
-        <!-- SQLite-specific fields -->
+        <!-- SQLite/SQLCipher-specific fields -->
         <div v-if="isFileBased" class="space-y-4">
-          <!-- SQLite Mode Tabs -->
-          <Tabs
-            v-model="sqliteTab"
-          >
-            <TabsList class="grid grid-cols-2 w-full">
-              <TabsTrigger value="file">
-                {{ t('components.serverForm.sqlite.modes.file') }}
-              </TabsTrigger>
-              <TabsTrigger value="in-memory">
-                {{ t('components.serverForm.sqlite.modes.inMemory') }}
-              </TabsTrigger>
-            </TabsList>
+          <!-- SQLite with file/in-memory tabs -->
+          <template v-if="formData.type === DatabaseType.SQLITE">
+            <Tabs v-model="sqliteTab">
+              <TabsList class="grid grid-cols-2 w-full">
+                <TabsTrigger value="file">
+                  {{ t('components.serverForm.sqlite.modes.file') }}
+                </TabsTrigger>
+                <TabsTrigger value="in-memory">
+                  {{ t('components.serverForm.sqlite.modes.inMemory') }}
+                </TabsTrigger>
+              </TabsList>
 
-            <!-- File Mode -->
-            <TabsContent value="file" class="space-y-4">
-              <!-- Database File Path -->
-              <div class="space-y-2">
-                <Label for="sqlite-path">{{ t('components.serverForm.labels.databaseFilePath') }}<span class="text-destructive ml-0.5">*</span></Label>
-                <div class="flex gap-2 items-center">
-                  <Input
-                    id="sqlite-path"
-                    v-model="formData.host"
-                    :placeholder="t('components.serverForm.placeholders.filePath')"
-                    :class="{ 'border-destructive': formErrors.host }"
-                    readonly
-                    class="flex-1"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    @click="selectDatabaseFile"
-                  >
-                    {{ t('common.buttons.browse') }}
-                  </Button>
+              <!-- File Mode -->
+              <TabsContent value="file" class="space-y-4">
+                <!-- Database File Path -->
+                <div class="space-y-2">
+                  <Label for="sqlite-path">{{ t('components.serverForm.labels.databaseFilePath') }}<span class="text-destructive ml-0.5">*</span></Label>
+                  <div class="flex gap-2 items-center">
+                    <Input
+                      id="sqlite-path"
+                      v-model="formData.host"
+                      :placeholder="t('components.serverForm.placeholders.filePath')"
+                      :class="{ 'border-destructive': formErrors.host }"
+                      readonly
+                      class="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      @click="selectDatabaseFile"
+                    >
+                      {{ t('common.buttons.browse') }}
+                    </Button>
+                  </div>
+                  <p v-if="formErrors.host" class="text-sm text-destructive">
+                    {{ formErrors.host }}
+                  </p>
                 </div>
-                <p v-if="formErrors.host" class="text-sm text-destructive">
-                  {{ formErrors.host }}
-                </p>
-              </div>
 
-              <!-- Recent Databases -->
-              <div v-if="recentDatabases.length > 0" class="space-y-2">
-                <Label>{{ t('components.serverForm.labels.recentDatabases') }}</Label>
-                <div class="p-2 border rounded-md max-h-32 overflow-y-auto space-y-1">
-                  <div
-                    v-for="db in recentDatabases"
-                    :key="db.path"
-                    class="text-sm p-1 rounded flex gap-2 cursor-pointer items-center hover:bg-muted"
-                    @click="selectRecentDatabase(db.path)"
-                  >
-                    <span class="i-carbon-document text-muted-foreground h-4 w-4" />
-                    <span class="flex-1 truncate">{{ db.path }}</span>
-                    <span class="text-xs text-muted-foreground">{{ formatTimeAgo(db.timestamp) }}</span>
+                <!-- Recent Databases -->
+                <div v-if="recentDatabases.length > 0" class="space-y-2">
+                  <Label>{{ t('components.serverForm.labels.recentDatabases') }}</Label>
+                  <div class="p-2 border rounded-md max-h-32 overflow-y-auto space-y-1">
+                    <div
+                      v-for="db in recentDatabases"
+                      :key="db.path"
+                      class="text-sm p-1 rounded flex gap-2 cursor-pointer items-center hover:bg-muted"
+                      @click="selectRecentDatabase(db.path)"
+                    >
+                      <span class="i-carbon-document text-muted-foreground h-4 w-4" />
+                      <span class="flex-1 truncate">{{ db.path }}</span>
+                      <span class="text-xs text-muted-foreground">{{ formatTimeAgo(db.timestamp) }}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              <!-- Empty state for recent databases -->
-              <div v-if="recentDatabases.length === 0" class="text-sm text-muted-foreground">
-                {{ t('components.serverForm.sqlite.recentEmpty') }}
-              </div>
-            </TabsContent>
+                <!-- Empty state for recent databases -->
+                <div v-if="recentDatabases.length === 0" class="text-sm text-muted-foreground">
+                  {{ t('components.serverForm.sqlite.recentEmpty') }}
+                </div>
+              </TabsContent>
 
-            <!-- In-Memory Mode -->
-            <TabsContent value="in-memory">
-              <p class="text-sm text-muted-foreground">
-                {{ t('components.serverForm.sqlite.inMemoryHint') }}
+              <!-- In-Memory Mode -->
+              <TabsContent value="in-memory">
+                <p class="text-sm text-muted-foreground">
+                  {{ t('components.serverForm.sqlite.inMemoryHint') }}
+                </p>
+              </TabsContent>
+            </Tabs>
+          </template>
+
+          <!-- SQLCipher: file picker + encryption key -->
+          <template v-else-if="formData.type === DatabaseType.SQLCIPHER">
+            <div class="space-y-2">
+              <Label for="sqlcipher-path">{{ t('components.serverForm.labels.databaseFilePath') }}<span class="text-destructive ml-0.5">*</span></Label>
+              <div class="flex gap-2 items-center">
+                <Input
+                  id="sqlcipher-path"
+                  v-model="formData.host"
+                  :placeholder="t('components.serverForm.placeholders.filePath')"
+                  :class="{ 'border-destructive': formErrors.host }"
+                  readonly
+                  class="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  @click="selectDatabaseFile"
+                >
+                  {{ t('common.buttons.browse') }}
+                </Button>
+              </div>
+              <p v-if="formErrors.host" class="text-sm text-destructive">
+                {{ formErrors.host }}
               </p>
-            </TabsContent>
-          </Tabs>
+            </div>
+            <!-- Recent Databases -->
+            <div v-if="recentDatabases.length > 0" class="space-y-2">
+              <Label>{{ t('components.serverForm.labels.recentDatabases') }}</Label>
+              <div class="p-2 border rounded-md max-h-32 overflow-y-auto space-y-1">
+                <div
+                  v-for="db in recentDatabases"
+                  :key="db.path"
+                  class="text-sm p-1 rounded flex gap-2 cursor-pointer items-center hover:bg-muted"
+                  @click="selectRecentDatabase(db.path)"
+                >
+                  <span class="i-carbon-document text-muted-foreground h-4 w-4" />
+                  <span class="flex-1 truncate">{{ db.path }}</span>
+                  <span class="text-xs text-muted-foreground">{{ formatTimeAgo(db.timestamp) }}</span>
+                </div>
+              </div>
+            </div>
+            <div v-if="recentDatabases.length === 0" class="text-sm text-muted-foreground">
+              {{ t('components.serverForm.sqlite.recentEmpty') }}
+            </div>
+          </template>
+
+          <!-- DuckDB: file picker only -->
+          <template v-else>
+            <div class="space-y-2">
+              <Label for="duckdb-path">{{ t('components.serverForm.labels.databaseFilePath') }}<span class="text-destructive ml-0.5">*</span></Label>
+              <div class="flex gap-2 items-center">
+                <Input
+                  id="duckdb-path"
+                  v-model="formData.host"
+                  :placeholder="t('components.serverForm.placeholders.filePath')"
+                  :class="{ 'border-destructive': formErrors.host }"
+                  readonly
+                  class="flex-1"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  @click="selectDatabaseFile"
+                >
+                  {{ t('common.buttons.browse') }}
+                </Button>
+              </div>
+              <p v-if="formErrors.host" class="text-sm text-destructive">
+                {{ formErrors.host }}
+              </p>
+            </div>
+          </template>
         </div>
 
-        <!-- Username and Password (not for SQLite) -->
-        <div v-if="!isFileBased" class="gap-4 grid grid-cols-2">
+        <!-- Password (encryption key) for SQLCipher; Username and Password for others -->
+        <div v-if="isEncryptedFileDb" class="space-y-2">
+          <Label for="sqlcipher-key">{{ t('components.serverForm.labels.encryptionKey') }}<span class="text-destructive ml-0.5">*</span></Label>
+          <div class="relative">
+            <Input
+              id="sqlcipher-key"
+              v-model="formData.password"
+              :type="showPasswords.db ? 'text' : 'password'"
+              :placeholder="t('components.serverForm.placeholders.encryptionKey')"
+              autocomplete="new-password"
+              class="pr-8"
+            />
+            <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('db')">
+              <span class="i-carbon-view h-4 w-4 block" />
+            </button>
+          </div>
+        </div>
+        <div v-if="!isFileBased && !isEncryptedFileDb" class="gap-4 grid grid-cols-2">
           <div class="space-y-2">
             <Label for="username">{{ t('components.serverForm.labels.username') }}</Label>
             <Input

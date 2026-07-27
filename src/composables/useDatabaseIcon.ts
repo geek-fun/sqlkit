@@ -46,6 +46,7 @@ import rqliteLogo from '@/assets/images/database-icons/rqlite-logo.svg'
 import selectdbLogo from '@/assets/images/database-icons/selectdb-logo.svg'
 import singlestoreLogo from '@/assets/images/database-icons/singlestorememsql-logo.svg'
 import snowflakeLogo from '@/assets/images/database-icons/snowflake-logo.svg'
+import sqlcipherLogo from '@/assets/images/database-icons/sqlcipher-logo.svg'
 import sqliteLogo from '@/assets/images/database-icons/sqlite-logo.svg'
 import sqlserverLogo from '@/assets/images/database-icons/sqlserver-logo.svg'
 import starrocksLogo from '@/assets/images/database-icons/starrocks-logo.svg'
@@ -73,6 +74,7 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   MYSQL: { icon: mysqlLogo, color: 'bg-orange-100 dark:bg-orange-900/30' },
   MARIADB: { icon: mariadbLogo, color: 'bg-purple-100 dark:bg-purple-900/30' },
   SQLITE: { icon: sqliteLogo, color: 'bg-green-100 dark:bg-green-900/30' },
+  SQLCIPHER: { icon: sqlcipherLogo, color: 'bg-green-100 dark:bg-green-900/30' },
   SQLSERVER: { icon: sqlserverLogo, color: 'bg-red-100 dark:bg-red-900/30' },
   DUCKDB: { icon: duckdbLogo, color: 'bg-yellow-100 dark:bg-yellow-900/30' },
   CLICKHOUSE: { icon: clickhouseLogo, color: 'bg-red-100 dark:bg-red-900/30' },

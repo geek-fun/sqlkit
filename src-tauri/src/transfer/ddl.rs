@@ -15,7 +15,9 @@ pub fn generate_ddl_for_engine(
     match engine {
         DatabaseType::PostgreSQL => generate_postgres_ddl(schema, table, columns, options),
         DatabaseType::MySQL => generate_mysql_ddl(schema, table, columns, options),
-        DatabaseType::SQLite => generate_sqlite_ddl(schema, table, columns, options),
+        DatabaseType::SQLite | DatabaseType::SQLCipher => {
+            generate_sqlite_ddl(schema, table, columns, options)
+        }
         DatabaseType::SqlServer => generate_sqlserver_ddl(schema, table, columns, options),
         _ => generate_generic_ddl(schema, table, columns, options),
     }

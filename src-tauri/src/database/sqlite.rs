@@ -47,19 +47,23 @@ const MEMORY_DB: &str = ":memory:";
 ///
 /// SQLite has limited concurrency support compared to client-server databases.
 /// This pool manages connections with proper synchronization for thread-safety.
+/// For SQLCipher, an encryption key is stored and applied via `PRAGMA key` on
+/// each newly created connection.
 pub struct SQLitePool {
     connections: Arc<Mutex<Vec<Arc<Mutex<Connection>>>>>,
     max_connections: usize,
     db_path: Option<PathBuf>,
+    encryption_key: Option<String>,
 }
 
 impl SQLitePool {
     /// Create a new SQLite connection pool.
-    fn new(max_connections: usize, db_path: Option<PathBuf>) -> Self {
+    fn new(max_connections: usize, db_path: Option<PathBuf>, encryption_key: Option<String>) -> Self {
         Self {
             connections: Arc::new(Mutex::new(Vec::new())),
             max_connections,
             db_path,
+            encryption_key,
         }
     }
 
@@ -110,8 +114,22 @@ impl SQLitePool {
             })?
         };
 
+        // Apply SQLCipher encryption key if provided
+        //
+        // SQLCipher uses `PRAGMA key` to set the passphrase. When compiled with
+        // the `sqlcipher` cargo feature, rusqlite links against SQLCipher instead
+        // of SQLite, and this pragma activates encryption. Without the feature
+        // (default SQLite build), the pragma is silently ignored.
+        if let Some(ref key) = self.encryption_key {
+            conn.execute(&format!("PRAGMA key = '{}'", key.replace('\'', "''")), [])
+                .map_err(|e| {
+                    DbError::Configuration(format!("Failed to set SQLCipher encryption key: {}", e))
+                })?;
+        }
+
         // Enable Write-Ahead Logging (WAL) mode for better concurrency
         // WAL mode allows multiple readers and one writer to proceed concurrently
+        // Note: SQLCipher with WAL requires the same key to be set on each connection.
         if self.db_path.is_some() {
             conn.query_row("PRAGMA journal_mode=WAL", [], |_| Ok(()))
                 .map_err(|e| DbError::Configuration(format!("Failed to enable WAL mode: {}", e)))?;
@@ -201,12 +219,14 @@ impl ConnectionPool for SQLitePool {
 
 /// SQLite database adapter.
 ///
-/// Supports both file-based and in-memory SQLite databases with proper
-/// thread-safety through connection pooling and Write-Ahead Logging (WAL) mode.
+/// Supports both file-based and in-memory SQLite databases (and SQLCipher
+/// encrypted databases) with proper thread-safety through connection pooling
+/// and Write-Ahead Logging (WAL) mode.
 pub struct SQLiteAdapter {
     config: ConnectionConfig,
     pool: Option<Arc<SQLitePool>>,
     db_path: Option<PathBuf>,
+    encryption_key: Option<String>,
 }
 
 impl SQLiteAdapter {
@@ -215,6 +235,8 @@ impl SQLiteAdapter {
     /// The database path can be specified in the config.database field:
     /// - For file-based databases: Use a file path (e.g., "/path/to/db.sqlite")
     /// - For in-memory databases: Use ":memory:" or leave database as None
+    ///
+    /// For SQLCipher, the encryption passphrase can be provided via `config.password`.
     pub fn new(config: ConnectionConfig) -> Self {
         let db_path = config.database.as_ref().and_then(|db| {
             if db == MEMORY_DB {
@@ -224,10 +246,17 @@ impl SQLiteAdapter {
             }
         });
 
+        let encryption_key = if config.db_type == crate::database::config::DatabaseType::SQLCipher {
+            config.password.clone()
+        } else {
+            None
+        };
+
         Self {
             config,
             pool: None,
             db_path,
+            encryption_key,
         }
     }
 
@@ -422,7 +451,11 @@ impl DatabaseAdapter for SQLiteAdapter {
             self.config.pool_config.max_connections as usize
         };
 
-        let pool = SQLitePool::new(max_connections, self.db_path.clone());
+        let pool = SQLitePool::new(
+            max_connections,
+            self.db_path.clone(),
+            self.encryption_key.clone(),
+        );
 
         // Test the connection by creating one
         let conn = pool.get_conn().await?;

@@ -24,6 +24,8 @@ pub enum DatabaseType {
     SqlServer,
     /// SQLite.
     SQLite,
+    /// SQLCipher — encrypted SQLite variant (same adapter, requires encryption key).
+    SQLCipher,
     /// DuckDB — JDBC bridge.
     DuckDb,
     /// ClickHouse (HTTP protocol).

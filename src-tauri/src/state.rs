@@ -132,6 +132,7 @@ impl ServerConfig {
             "mysql" => Ok(DatabaseType::MySQL),
             "sqlserver" | "mssql" => Ok(DatabaseType::SqlServer),
             "sqlite" => Ok(DatabaseType::SQLite),
+            "sqlcipher" => Ok(DatabaseType::SQLCipher),
             "duckdb" | "duck" => Ok(DatabaseType::DuckDb),
             "clickhouse" => Ok(DatabaseType::ClickHouse),
             "firebird" => Ok(DatabaseType::Firebird),
@@ -209,8 +210,8 @@ impl ServerConfig {
         }
 
         let db_lower = self.db_type.to_lowercase();
-        // DuckDB is file-based, uses JDBC bridge with jdbc:duckdb:{filepath}
-        if db_lower == "sqlite" || db_lower == "duckdb" || db_lower == "duck" {
+        // SQLite, SQLCipher, and DuckDB are file-based
+        if db_lower == "sqlite" || db_lower == "sqlcipher" || db_lower == "duckdb" || db_lower == "duck" {
             config = config.with_database(&self.host);
         } else if let Some(ref database) = self.database {
             config = config.with_database(database);

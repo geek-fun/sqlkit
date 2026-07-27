@@ -59,7 +59,7 @@ pub fn resolve_effective_type(db: DatabaseType) -> ConnectionStrategy {
 
         // Other native adapters
         SqlServer => ConnectionStrategy::Native(CoreDatabaseType::SqlServer),
-        SQLite => ConnectionStrategy::Native(CoreDatabaseType::SQLite),
+        SQLite | SQLCipher => ConnectionStrategy::Native(CoreDatabaseType::SQLite),
         ClickHouse => ConnectionStrategy::Native(CoreDatabaseType::ClickHouse),
 
         // JDBC bridge (Java subprocess)
@@ -131,7 +131,7 @@ pub fn default_port(db: DatabaseType) -> Option<u16> {
         Databend => Some(3307),
         ManticoreSearch => Some(9306),
         SqlServer => Some(1433),
-        SQLite => None,
+        SQLite | SQLCipher => None,
         DuckDb => None,
         ClickHouse => Some(8123),
         Firebird => Some(3050),

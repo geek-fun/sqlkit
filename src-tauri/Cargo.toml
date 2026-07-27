@@ -58,10 +58,10 @@ tiberius = { version = "0.12", default-features = false, features = [
   "rust_decimal"
 ] }
 tokio-util = { version = "0.7", features = [ "compat" ] }
-rusqlite = { version = "0.32", features = [
-  "bundled",
-  "chrono"
-] }
+rusqlite = { version = "0.32", default-features = false, features = [ "chrono" ] }
+# C library bundling is selected by cargo features:
+#   default → rusqlite/bundled (SQLite)
+#   sqlcipher → rusqlite/bundled-sqlcipher (SQLCipher, encrypted SQLite)
 uuid = { version = "1", features = [ "v4" ] }
 tauri-plugin-store = "2"
 tauri-plugin-dialog = "2"
@@ -109,5 +109,8 @@ mockall = "0.13"
 tempfile = "3"
 
 [features]
-default = []
+default = [ "rusqlite/bundled" ]
 ohos = []
+# Use SQLCipher (encrypted SQLite) instead of plain SQLite.
+# Build with: cargo build --no-default-features --features sqlcipher
+sqlcipher = [ "rusqlite/bundled-sqlcipher" ]
