@@ -15,6 +15,7 @@
     "core:window:allow-start-dragging",
     "window-state:default",
     "opener:default",
+    "process:default",
     "store:default",
     "dialog:default",
     "dialog:allow-save",
