@@ -1,8 +1,9 @@
 import type { Ref } from 'vue'
 import type { SqlStatement, StatementToExecute } from './useSqlStatements'
-import * as monaco from 'monaco-editor'
+import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { onBeforeUnmount } from 'vue'
+
 import {
   getSqlGutterDecorations,
   getStatementAtLine,
@@ -12,6 +13,12 @@ import {
   SQL_EXECUTE_GUTTER_CLASS,
 } from './useSqlStatements'
 import { useTheme } from './useTheme'
+
+// Import only SQL-related grammars instead of all Monaco languages
+// (Typescript/CSS/HTML/JSON workers alone add ~8MB to the bundle).
+import 'monaco-editor/esm/vs/basic-languages/sql/sql.contribution'
+import 'monaco-editor/esm/vs/basic-languages/mysql/mysql.contribution'
+import 'monaco-editor/esm/vs/basic-languages/pgsql/pgsql.contribution'
 
 export type { ExecuteSource, StatementToExecute } from './useSqlStatements'
 
