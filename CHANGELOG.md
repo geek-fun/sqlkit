@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.8] - 2026-07-27
+
+### Changed
+
+- Reduce frontend bundle by 57% by limiting Monaco Editor to SQL languages only (#97)
+
 ## [0.7.7] - 2026-07-23
 
 ### Fixed
