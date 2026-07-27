@@ -149,6 +149,7 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
         "mysql" => Ok(DatabaseType::MySQL),
         "sqlserver" | "mssql" => Ok(DatabaseType::SqlServer),
         "sqlite" => Ok(DatabaseType::SQLite),
+        "sqlcipher" => Ok(DatabaseType::SQLCipher),
         "duckdb" | "duck_db" | "duck" => Ok(DatabaseType::DuckDb),
         "clickhouse" => Ok(DatabaseType::ClickHouse),
         "firebird" => Ok(DatabaseType::Firebird),
@@ -218,7 +219,9 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
 fn is_file_based_db(db_type: &crate::database::DatabaseType) -> bool {
     matches!(
         db_type,
-        crate::database::DatabaseType::SQLite | crate::database::DatabaseType::DuckDb
+        crate::database::DatabaseType::SQLite
+            | crate::database::DatabaseType::SQLCipher
+            | crate::database::DatabaseType::DuckDb
     )
 }
 

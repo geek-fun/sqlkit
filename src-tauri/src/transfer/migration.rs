@@ -631,7 +631,7 @@ fn map_type_to_engine(source_type: &str, target_engine: DatabaseType) -> String 
             "bytea" => "BLOB".to_string(),
             _ => source_type.to_string(),
         },
-        DatabaseType::SQLite => match source_lower.as_str() {
+        DatabaseType::SQLite | DatabaseType::SQLCipher => match source_lower.as_str() {
             "int" | "integer" | "bigint" | "smallint" | "tinyint" => "INTEGER".to_string(),
             "varchar" | "char" | "text" => "TEXT".to_string(),
             "datetime" | "timestamp" | "date" => "TEXT".to_string(),
