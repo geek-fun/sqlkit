@@ -115,6 +115,53 @@ describe('parseSqlStatements', () => {
     })
   })
 
+  describe('statement positions (gutter icon alignment)', () => {
+    it('records correct startLineNumber for second statement when blank lines separate them', () => {
+      const sql = [
+        'SELECT 1;', // line 1
+        '', // line 2 (blank)
+        '', // line 3 (blank)
+        'SELECT 2;', // line 4
+      ].join('\n')
+
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(2)
+      // First statement starts at line 1
+      expect(result[0].position.startLineNumber).toBe(1)
+      // Second statement should start at line 4 (first non-blank line),
+      // NOT at the line after the ; (line 1)
+      expect(result[1].position.startLineNumber).toBe(4)
+    })
+
+    it('records correct startLineNumber when preceded by blank lines and comment', () => {
+      const sql = [
+        'SELECT 1;', // line 1
+        '', // line 2 (blank)
+        '', // line 3 (blank)
+        '-- comment', // line 4
+        'SELECT 2;', // line 5
+      ].join('\n')
+
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(2)
+      // Icon should be at line 5 (first SQL line), not at the -- comment (line 4)
+      // or the blank after ; (line 1)
+      expect(result[1].position.startLineNumber).toBe(5)
+    })
+
+    it('keeps startLineNumber unchanged when there is no leading blank', () => {
+      const sql = [
+        'SELECT 1;',
+        'SELECT 2;',
+      ].join('\n')
+
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(2)
+      expect(result[0].position.startLineNumber).toBe(1)
+      expect(result[1].position.startLineNumber).toBe(2)
+    })
+  })
+
   describe('nested parens (subqueries)', () => {
     it('does not split on SELECT inside a subquery', () => {
       const sql = [

@@ -207,13 +207,70 @@ function lineAtOffset(content: string, offset: number): number {
   return line
 }
 
+/**
+ * Count leading lines in `text` that are whitespace-only or comment-only
+ * (`--` line comments, `/ * ... * /` block comments). Used to position the
+ * gutter execute icon on the first line with actual SQL content.
+ */
+function skipLeadingComments(text: string): number {
+  const lines = text.split('\n')
+  let inBlockComment = false
+  let skipped = 0
+
+  for (const line of lines) {
+    if (inBlockComment) {
+      const endIdx = line.indexOf('*/')
+      if (endIdx !== -1) {
+        inBlockComment = false
+        if (line.slice(endIdx + 2).trim().length > 0) {
+          // SQL after block comment on same line — stop
+          break
+        }
+      }
+      skipped++
+      continue
+    }
+
+    const trimmed = line.trim()
+
+    if (trimmed.length === 0) {
+      skipped++
+      continue
+    }
+
+    if (trimmed.startsWith('--')) {
+      skipped++
+      continue
+    }
+
+    if (trimmed.startsWith('/*')) {
+      const endIdx = trimmed.indexOf('*/')
+      if (endIdx === -1) {
+        inBlockComment = true
+        skipped++
+        continue
+      }
+      if (trimmed.slice(endIdx + 2).trim().length > 0) {
+        // SQL after inline block comment on same line
+        break
+      }
+      skipped++
+      continue
+    }
+
+    // First line with actual SQL content
+    break
+  }
+
+  return skipped
+}
+
 export function parseSqlStatements(content: string): SqlStatement[] {
   const ranges = scanStatements(content)
   const lines = content.split('\n')
 
   return ranges
     .filter((r) => {
-      // Remove trailing semicolon for the statement text
       const t = r.text.trim().replace(/;\s*$/, '').trim()
       return t.length > 0
     })
@@ -222,7 +279,7 @@ export function parseSqlStatements(content: string): SqlStatement[] {
       return {
         statement,
         position: {
-          startLineNumber: r.startLine,
+          startLineNumber: r.startLine + skipLeadingComments(r.text),
           endLineNumber: r.endLine,
           startColumn: 1,
           endColumn: (lines[r.endLine - 1]?.length ?? 1) + 1,
