@@ -257,8 +257,8 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'csv')">
-                <span class="i-carbon-table-split h-4.5 w-4.5" />
+              <Button variant="ghost" size="icon" class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'csv')">
+                <span class="i-lucide-file-spreadsheet shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('components.dataGrid.export.copyAllCsv') }}</TooltipContent>
@@ -267,8 +267,8 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'json')">
-                <span class="i-carbon-code h-4.5 w-4.5" />
+              <Button variant="ghost" size="icon" class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'json')">
+                <span class="i-lucide-file-json shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('components.dataGrid.export.copyAllJson') }}</TooltipContent>
@@ -277,19 +277,19 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'insert')">
-                <span class="i-carbon-sql h-4.5 w-4.5" />
+              <Button variant="ghost" size="icon" class="text-emerald-600 h-7 w-7 dark:text-emerald-400 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/20" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'insert')">
+                <span class="i-lucide-database shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('components.dataGrid.export.copyAllInsert') }}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
-        <span class="text-xs text-muted-foreground mx-1">|</span>
+        <div class="mx-0.5 bg-border h-4 w-px" />
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'csv')">
-                <span class="i-carbon-document-export h-4.5 w-4.5" />
+              <Button variant="ghost" size="icon" class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'csv')">
+                <span class="i-lucide-file-down shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('components.dataGrid.export.exportCsv') }}</TooltipContent>
@@ -298,8 +298,8 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="sm" class="text-foreground p-0 h-8 w-8 hover:bg-muted" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'json')">
-                <span class="i-carbon-document-export h-4.5 w-4.5" />
+              <Button variant="ghost" size="icon" class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'json')">
+                <span class="i-lucide-file-down shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{{ t('components.dataGrid.export.exportJson') }}</TooltipContent>
@@ -315,11 +315,11 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
       <Button
         variant="ghost"
         size="icon"
-        class="h-6 w-6"
+        class="text-muted-foreground h-7 w-7 hover:text-foreground"
         :title="t('components.queryResult.close')"
         @click="close"
       >
-        <span class="i-carbon-close h-3.5 w-3.5" />
+        <span class="i-lucide-x shrink-0 h-3.5 w-3.5" />
       </Button>
     </div>
 

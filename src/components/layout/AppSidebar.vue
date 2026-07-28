@@ -47,7 +47,7 @@ const { t } = useI18n()
                       ? 'bg-secondary text-primary border border-border shadow-sm'
                       : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                 ]"
-                @click="item.id === 'github' ? openUrl('https://github.com/geek-fun/sqlkit') : navigate"
+                @click="item.id === 'github' ? openUrl('https://github.com/geek-fun/sqlkit') : navigate()"
               >
                 <!-- DNS icon -->
                 <svg
