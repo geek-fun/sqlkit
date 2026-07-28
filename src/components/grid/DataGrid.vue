@@ -634,7 +634,6 @@ watch(() => [props.rows, props.columns], () => {
               :class="getCellClass(columnTypes?.[col])"
               :style="{ width: `${getColumnWidth(col)}px` }"
               :title="getCellTooltip(rows[virtualRow.index][col])"
-              @click="selection.toggleRow(virtualRow.index, false)"
               @contextmenu.prevent="openCellContextMenu($event, virtualRow.index, col)"
             >
               <!-- NULL -->
@@ -695,7 +694,7 @@ watch(() => [props.rows, props.columns], () => {
             <!-- Row Actions -->
             <div
               v-if="connectionId"
-              class="bg-background/80 opacity-0 flex flex-shrink-0 w-10 transition-opacity items-center right-0 justify-center sticky z-10 group-hover:opacity-100"
+              class="bg-background/80 flex flex-shrink-0 w-10 items-center right-0 justify-center sticky z-10"
               @click.stop
             >
               <DropdownMenu>
