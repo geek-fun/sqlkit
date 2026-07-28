@@ -162,6 +162,79 @@ describe('parseSqlStatements', () => {
     })
   })
 
+  describe('soft split at blank lines (missing semicolon)', () => {
+    it('splits two statements separated by 2 blank lines', () => {
+      const sql = [
+        'SELECT 1', // line 1
+        '', // line 2 (blank)
+        '', // line 3 (blank)
+        'SELECT 2', // line 4
+      ].join('\n')
+
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(2)
+      expect(result[0].statement).toBe('SELECT 1')
+      expect(result[1].statement).toBe('SELECT 2')
+    })
+
+    it('does not split on only 1 blank line', () => {
+      const sql = 'SELECT 1\n\nSELECT 2'
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(1)
+      expect(result[0].statement).toContain('SELECT 1')
+      expect(result[0].statement).toContain('SELECT 2')
+    })
+
+    it('splits 3 statements separated by 2 blank lines each', () => {
+      const sql = [
+        'SELECT 1', // line 1
+        '', // line 2
+        '', // line 3
+        'SELECT 2', // line 4
+        '', // line 5
+        '', // line 6
+        'SELECT 3', // line 7
+      ].join('\n')
+
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(3)
+      expect(result[0].statement).toBe('SELECT 1')
+      expect(result[1].statement).toBe('SELECT 2')
+      expect(result[2].statement).toBe('SELECT 3')
+    })
+
+    it('does not split when next line after 2 blanks is not a SQL keyword', () => {
+      const sql = [
+        'SELECT 1', // line 1
+        '', // line 2
+        '', // line 3
+        '  some_column', // line 4 (not a keyword)
+      ].join('\n')
+
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(1)
+    })
+
+    it('sets correct positions for soft-split statements', () => {
+      const sql = 'SELECT 1\n\n\nSELECT 2'
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(2)
+      expect(result[0].position.startLineNumber).toBe(1)
+      expect(result[0].position.endLineNumber).toBe(1)
+      expect(result[1].position.startLineNumber).toBe(4)
+      expect(result[1].position.endLineNumber).toBe(4)
+    })
+
+    it('handles mixed ; and blank-line splits', () => {
+      const sql = 'SELECT 1;\nSELECT 2\n\n\nSELECT 3'
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(3)
+      expect(result[0].statement).toBe('SELECT 1')
+      expect(result[1].statement).toBe('SELECT 2')
+      expect(result[2].statement).toBe('SELECT 3')
+    })
+  })
+
   describe('nested parens (subqueries)', () => {
     it('does not split on SELECT inside a subquery', () => {
       const sql = [
