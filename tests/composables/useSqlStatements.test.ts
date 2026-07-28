@@ -215,6 +215,56 @@ describe('parseSqlStatements', () => {
       expect(result).toHaveLength(1)
     })
 
+    it('splits when 2 blank lines are followed by a comment then SQL keyword', () => {
+      const sql = [
+        'SELECT 1', // line 1
+        '', // line 2
+        '', // line 3
+        '', // line 4
+        '-- comment', // line 5
+        'SELECT 2', // line 6
+      ].join('\n')
+
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(2)
+      expect(result[0].statement).toBe('SELECT 1')
+      expect(result[1].statement).toBe('SELECT 2')
+      expect(result[1].position.startLineNumber).toBe(6)
+    })
+
+    it('does not split CTE with blank lines before main SELECT', () => {
+      const sql = [
+        'WITH cte AS (', // line 1
+        '  SELECT 1', // line 2
+        ')', // line 3
+        '', // line 4
+        '', // line 5
+        'SELECT * FROM cte', // line 6
+      ].join('\n')
+
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(1)
+      expect(result[0].statement).toContain('WITH cte AS')
+      expect(result[0].statement).toContain('SELECT * FROM cte')
+    })
+
+    it('does not split CTE INSERT with blank lines before INSERT', () => {
+      const sql = [
+        'WITH cte AS (', // line 1
+        '  SELECT 1', // line 2
+        ')', // line 3
+        '', // line 4
+        '', // line 5
+        'INSERT INTO t', // line 6
+        'SELECT * FROM cte', // line 7
+      ].join('\n')
+
+      const result = parseSqlStatements(sql)
+      expect(result).toHaveLength(1)
+      expect(result[0].statement).toContain('WITH cte AS')
+      expect(result[0].statement).toContain('INSERT INTO t')
+    })
+
     it('sets correct positions for soft-split statements', () => {
       const sql = 'SELECT 1\n\n\nSELECT 2'
       const result = parseSqlStatements(sql)
