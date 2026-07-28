@@ -322,49 +322,84 @@ function splitRangesAtBlankLines(ranges: StatementRange[], content: string): Sta
 
     let blankRun = 0
     let seenContent = false
-    const splitLineIndices: number[] = []
+    let inBlockComment = false
+    // Track the line index of the last actual SQL content (for split boundaries)
+    let lastContentLine = -1
+    // When the segment starts with `WITH`, suppress soft-split for the next DML
+    // keyword — it's the main query of a CTE, not a new statement.
+    let segmentFirstKeyword: string | null = null
+    const FIRST_DML_KEYWORDS = new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'REPLACE'])
+    // Each split: { sqlLine: the SQL keyword line, prevContentLine: last content before blank run }
+    const splits: { sqlLine: number, prevContentLine: number }[] = []
 
     for (let i = 0; i < lines.length; i++) {
       const trimmed = lines[i].trim()
 
+      // Lines inside a multi-line block comment — skip without resetting blankRun
+      if (inBlockComment) {
+        if (trimmed.endsWith('*/'))
+          inBlockComment = false
+        continue
+      }
+
       if (trimmed.length === 0) {
         if (seenContent)
           blankRun++
+        continue
       }
-      else {
-        if (!seenContent) {
-          seenContent = true
-        }
-        else if (blankRun >= 2) {
-          const firstWord = trimmed.split(/\s+/)[0]?.toUpperCase()
-          if (firstWord && SOFT_STATEMENT_KEYWORDS.has(firstWord))
-            splitLineIndices.push(i)
-        }
-        blankRun = 0
+
+      // Comment-only lines should not reset the blank-run counter,
+      // so that `SELECT ...\n\n\n-- comment\nSELECT ...` still splits.
+      if (trimmed.startsWith('--') || trimmed.startsWith('#')) {
+        continue
       }
+      if (trimmed.startsWith('/*')) {
+        if (!trimmed.endsWith('*/'))
+          inBlockComment = true
+        continue
+      }
+
+      // Actual SQL content
+      const firstWord = trimmed.split(/\s+/)[0]?.toUpperCase()
+      if (!seenContent) {
+        seenContent = true
+        segmentFirstKeyword = firstWord ?? null
+      }
+      else if (blankRun >= 2 && firstWord && SOFT_STATEMENT_KEYWORDS.has(firstWord)) {
+        // When the segment starts with WITH, the next DML keyword is the main
+        // query of the CTE (e.g. `WITH cte AS (...) \n\n\n SELECT ...`).
+        // Splitting there would orphan the CTE definition.
+        const isCteMainQuery = segmentFirstKeyword === 'WITH' && firstWord && FIRST_DML_KEYWORDS.has(firstWord)
+        if (!isCteMainQuery)
+          splits.push({ sqlLine: i, prevContentLine: lastContentLine })
+      }
+      blankRun = 0
+      lastContentLine = i
     }
 
-    if (splitLineIndices.length === 0) {
+    if (splits.length === 0) {
       result.push(range)
       continue
     }
 
-    let prevIdx = 0
-    for (const splitIdx of splitLineIndices) {
-      const segStart = range.startOffset + lineOffsets[prevIdx]
-      const segEnd = range.startOffset + lineOffsets[splitIdx]
-      // Trim trailing whitespace so the preceding range ends at its last content
-      const segText = content.slice(segStart, segEnd).trimEnd()
-      if (segText.length > 0)
-        result.push(buildRange(content, segStart, segStart + segText.length))
-      prevIdx = splitIdx
+    // Build sub-ranges. Each preceding segment ends at its last content line
+    // (excluding trailing blank/comment lines). Each new segment starts at the
+    // SQL keyword line in `splits[].sqlLine`.
+    let segStart = range.startOffset + lineOffsets[0]
+
+    for (const { sqlLine, prevContentLine } of splits) {
+      // End the preceding segment right after `prevContentLine`
+      const segEnd = range.startOffset + lineOffsets[prevContentLine] + lines[prevContentLine].length
+      result.push(buildRange(content, segStart, segEnd))
+      segStart = range.startOffset + lineOffsets[sqlLine]
     }
-    // Trim leading whitespace on the final segment
-    const lastStart = range.startOffset + lineOffsets[prevIdx]
-    const lastText = content.slice(lastStart, range.endOffset).trimStart()
-    if (lastText.length > 0) {
-      const trimmed = lastText.length - lastText.trimStart().length
-      result.push(buildRange(content, lastStart + trimmed, range.endOffset))
+
+    // Final segment (trim leading whitespace)
+    const rawFinal = content.slice(segStart, range.endOffset)
+    const finalTrimmed = rawFinal.trimStart()
+    if (finalTrimmed.length > 0) {
+      const skipped = rawFinal.length - finalTrimmed.length
+      result.push(buildRange(content, segStart + skipped, range.endOffset))
     }
   }
 
