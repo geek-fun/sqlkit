@@ -1,6 +1,6 @@
 [package]
 name = "sqlkit"
-version = "0.8.0"
+version = "0.8.1"
 description = "A Tauri App"
 authors = [ "you" ]
 edition = "2021"

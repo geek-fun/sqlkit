@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-27
+
+### Fixed
+
+- Fix sidebar navigation buttons not responding to clicks (#122)
+- Fix DataGrid row selection triggering on cell click instead of checkbox only (#122)
+- Fix DataGrid row actions hidden until hover, now always visible (#122)
+
+### Changed
+
+- Unify result panel icon styles with editor toolbar — semantic colors, consistent sizing, lucide icons (#122)
+
 ## [0.8.0] - 2026-07-27
 
 ### Added
