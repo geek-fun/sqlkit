@@ -207,13 +207,177 @@ function lineAtOffset(content: string, offset: number): number {
   return line
 }
 
+/**
+ * Count leading lines in `text` that are whitespace-only or comment-only
+ * (`--` line comments, `/ * ... * /` block comments). Used to position the
+ * gutter execute icon on the first line with actual SQL content.
+ */
+function skipLeadingComments(text: string): number {
+  const lines = text.split('\n')
+  let inBlockComment = false
+  let skipped = 0
+
+  for (const line of lines) {
+    if (inBlockComment) {
+      const endIdx = line.indexOf('*/')
+      if (endIdx !== -1) {
+        inBlockComment = false
+        if (line.slice(endIdx + 2).trim().length > 0) {
+          // SQL after block comment on same line — stop
+          break
+        }
+      }
+      skipped++
+      continue
+    }
+
+    const trimmed = line.trim()
+
+    if (trimmed.length === 0) {
+      skipped++
+      continue
+    }
+
+    if (trimmed.startsWith('--')) {
+      skipped++
+      continue
+    }
+
+    if (trimmed.startsWith('/*')) {
+      const endIdx = trimmed.indexOf('*/')
+      if (endIdx === -1) {
+        inBlockComment = true
+        skipped++
+        continue
+      }
+      if (trimmed.slice(endIdx + 2).trim().length > 0) {
+        // SQL after inline block comment on same line
+        break
+      }
+      skipped++
+      continue
+    }
+
+    // First line with actual SQL content
+    break
+  }
+
+  return skipped
+}
+
+// Keywords that can signal a new statement start after 2+ blank lines
+// (when a `;` was forgotten). Covers DML, DDL, TCL, and utility commands.
+const SOFT_STATEMENT_KEYWORDS = new Set([
+  'SELECT',
+  'CREATE',
+  'ALTER',
+  'DROP',
+  'INSERT',
+  'UPDATE',
+  'DELETE',
+  'TRUNCATE',
+  'GRANT',
+  'REVOKE',
+  'EXPLAIN',
+  'SHOW',
+  'DESCRIBE',
+  'USE',
+  'SET',
+  'CALL',
+  'EXEC',
+  'EXECUTE',
+  'BEGIN',
+  'COMMIT',
+  'ROLLBACK',
+  'DECLARE',
+  'ANALYZE',
+  'VACUUM',
+  'PRAGMA',
+  'REFRESH',
+  'COPY',
+  'WITH',
+  'MERGE',
+  'REPLACE',
+])
+
+/**
+ * After splitting by `;`, scan each range for 2+ consecutive blank lines
+ * followed by a SQL keyword. When found, split the range there — this
+ * recovers from missing `;` between statements separated by blank lines.
+ */
+function splitRangesAtBlankLines(ranges: StatementRange[], content: string): StatementRange[] {
+  const result: StatementRange[] = []
+
+  for (const range of ranges) {
+    const text = content.slice(range.startOffset, range.endOffset)
+    const lines = text.split('\n')
+
+    // Pre-compute each line's byte offset within `text`
+    const lineOffsets: number[] = []
+    let off = 0
+    for (const line of lines) {
+      lineOffsets.push(off)
+      off += line.length + 1 // +1 for \n
+    }
+
+    let blankRun = 0
+    let seenContent = false
+    const splitLineIndices: number[] = []
+
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].trim()
+
+      if (trimmed.length === 0) {
+        if (seenContent)
+          blankRun++
+      }
+      else {
+        if (!seenContent) {
+          seenContent = true
+        }
+        else if (blankRun >= 2) {
+          const firstWord = trimmed.split(/\s+/)[0]?.toUpperCase()
+          if (firstWord && SOFT_STATEMENT_KEYWORDS.has(firstWord))
+            splitLineIndices.push(i)
+        }
+        blankRun = 0
+      }
+    }
+
+    if (splitLineIndices.length === 0) {
+      result.push(range)
+      continue
+    }
+
+    let prevIdx = 0
+    for (const splitIdx of splitLineIndices) {
+      const segStart = range.startOffset + lineOffsets[prevIdx]
+      const segEnd = range.startOffset + lineOffsets[splitIdx]
+      // Trim trailing whitespace so the preceding range ends at its last content
+      const segText = content.slice(segStart, segEnd).trimEnd()
+      if (segText.length > 0)
+        result.push(buildRange(content, segStart, segStart + segText.length))
+      prevIdx = splitIdx
+    }
+    // Trim leading whitespace on the final segment
+    const lastStart = range.startOffset + lineOffsets[prevIdx]
+    const lastText = content.slice(lastStart, range.endOffset).trimStart()
+    if (lastText.length > 0) {
+      const trimmed = lastText.length - lastText.trimStart().length
+      result.push(buildRange(content, lastStart + trimmed, range.endOffset))
+    }
+  }
+
+  return result.filter(r => r.text.trim().length > 0)
+}
+
 export function parseSqlStatements(content: string): SqlStatement[] {
-  const ranges = scanStatements(content)
+  const rawRanges = scanStatements(content)
+  const ranges = splitRangesAtBlankLines(rawRanges, content)
   const lines = content.split('\n')
 
   return ranges
     .filter((r) => {
-      // Remove trailing semicolon for the statement text
       const t = r.text.trim().replace(/;\s*$/, '').trim()
       return t.length > 0
     })
@@ -222,7 +386,7 @@ export function parseSqlStatements(content: string): SqlStatement[] {
       return {
         statement,
         position: {
-          startLineNumber: r.startLine,
+          startLineNumber: r.startLine + skipLeadingComments(r.text),
           endLineNumber: r.endLine,
           startColumn: 1,
           endColumn: (lines[r.endLine - 1]?.length ?? 1) + 1,
