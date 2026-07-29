@@ -902,14 +902,15 @@ watch(
 
         <!-- Refresh button -->
         <Button
-          variant="ghost"
-          size="icon"
-          class="flex-shrink-0 h-7 w-7"
+          variant="outline"
+          size="sm"
+          class="flex-shrink-0 h-7 gap-1 px-2"
           :disabled="loading"
           :title="t('components.dataTableView.refresh')"
           @click.stop="refresh"
         >
           <span class="i-carbon-refresh h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
+          <span class="text-xs">{{ t('components.dataTableView.refresh') }}</span>
           <!-- Column visibility dropdown -->
           <div class="flex-shrink-0 relative">
             <Button
