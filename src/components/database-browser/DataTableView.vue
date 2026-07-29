@@ -841,16 +841,15 @@ watch(
 
     <!-- Data sub-page: Toolbar bar (search + filter + actions) -->
     <template v-if="activeSubPage === 'data'">
-      <div class="px-3 py-1.5 border-b bg-muted/20 flex shrink-0 gap-1.5 items-center">
-        <span class="i-carbon-search text-muted-foreground flex-shrink-0 h-3.5 w-3.5" />
-
+      <div class="px-3 py-1.5 border-b bg-muted/20 flex shrink-0 gap-1 items-center">
         <!-- Search input — searches across all columns -->
         <div class="flex-1 min-w-0 relative">
+          <span class="i-carbon-search text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" />
           <Input
             ref="searchInputRef"
             v-model="searchTerm"
             :placeholder="t('components.dataTableView.searchPlaceholder')"
-            class="text-xs pr-7 flex-1 h-7"
+            class="text-xs pl-7 pr-7 h-7"
             @keydown="onSearchKeydown"
             @focus="onSearchFocus"
           />
@@ -861,44 +860,36 @@ watch(
           >
             <span class="i-carbon-loading h-3.5 w-3.5 animate-spin" />
           </div>
+          <!-- Clear search button (inside input, on the right) -->
+          <button
+            v-if="searchTerm"
+            class="text-muted-foreground right-1 top-1/2 absolute -translate-y-1/2 flex items-center justify-center h-5 w-5 rounded hover:bg-accent"
+            :title="t('components.dataTableView.clearSearch')"
+            @click.stop="clearSearch"
+          >
+            <span class="i-carbon-close h-3 w-3" />
+          </button>
         </div>
 
-        <!-- Clear search button -->
-        <Button
-          v-if="searchTerm"
-          variant="ghost"
-          size="icon"
-          class="flex-shrink-0 h-7 w-7"
-          :title="t('components.dataTableView.clearSearch')"
-          @click.stop="clearSearch"
-        >
-          <span class="i-carbon-close h-3.5 w-3.5" />
-        </Button>
-
-        <!-- Visual separator between search and filter sections -->
-        <div class="mx-0.5 bg-border flex-shrink-0 h-5 w-px" />
-
-        <span class="i-carbon-filter text-muted-foreground flex-shrink-0 h-3.5 w-3.5" />
-
         <!-- Filter input -->
-        <Input
-          v-model="filterInput"
-          :placeholder="t('components.dataTableView.filterPlaceholder')"
-          class="text-xs font-mono flex-1 h-7"
-          @keydown.enter="applyFilter"
-        />
-
-        <!-- Clear filter button -->
-        <Button
-          v-if="filterInput || appliedFilter"
-          variant="ghost"
-          size="icon"
-          class="flex-shrink-0 h-7 w-7"
-          :title="t('components.dataTableView.clearFilter')"
-          @click.stop="clearFilter"
-        >
-          <span class="i-carbon-close h-3.5 w-3.5" />
-        </Button>
+        <div class="flex-1 min-w-0 relative">
+          <span class="i-carbon-filter text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" />
+          <Input
+            v-model="filterInput"
+            :placeholder="t('components.dataTableView.filterPlaceholder')"
+            class="text-xs font-mono pl-7 h-7"
+            @keydown.enter="applyFilter"
+          />
+          <!-- Clear filter button (inside input, on the right) -->
+          <button
+            v-if="filterInput || appliedFilter"
+            class="text-muted-foreground right-1 top-1/2 absolute -translate-y-1/2 flex items-center justify-center h-5 w-5 rounded hover:bg-accent"
+            :title="t('components.dataTableView.clearFilter')"
+            @click.stop="clearFilter"
+          >
+            <span class="i-carbon-close h-3 w-3" />
+          </button>
+        </div>
 
         <!-- Refresh button -->
         <Button
