@@ -470,12 +470,24 @@ function toggleColumn(col: string) {
     : new Set([...hiddenColumns.value, col])
 }
 
+function formatTimestamp(): string {
+  const d = new Date()
+  const pad = (n: number) => n.toString().padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}_${pad(d.getHours())}-${pad(d.getMinutes())}-${pad(d.getSeconds())}`
+}
+
 async function exportCSV() {
   if (!data.value)
     return
 
   const csv = rowsToCsv(data.value.rows, visibleColumns.value)
-  const defaultName = `${props.tableName}.csv`
+  const conn = connectionStore.getConnectionById(props.connectionId)
+  const connName = conn?.name || props.connectionId
+  const parts = [connName, props.database]
+  if (props.schema)
+    parts.push(props.schema)
+  parts.push(props.tableName, formatTimestamp())
+  const defaultName = `${parts.join('-')}.csv`
 
   try {
     const selectedPath = await showSaveDialog({
