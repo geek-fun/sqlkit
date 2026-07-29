@@ -902,15 +902,14 @@ watch(
 
         <!-- Refresh button -->
         <Button
-          variant="outline"
-          size="sm"
-          class="flex-shrink-0 h-7 gap-1 px-2"
+          variant="ghost"
+          size="icon"
+          class="flex-shrink-0 h-7 w-7"
           :disabled="loading"
           :title="t('components.dataTableView.refresh')"
           @click.stop="refresh"
         >
-          <span class="i-carbon-refresh h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
-          <span class="text-xs">{{ t('components.dataTableView.refresh') }}</span>
+          <span class="i-carbon-renew h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
           <!-- Column visibility dropdown -->
           <div class="flex-shrink-0 relative">
             <Button
@@ -995,7 +994,7 @@ watch(
               {{ connectionError }}
             </p>
             <Button size="sm" @click="handleRetry">
-              <span class="i-carbon-refresh mr-1.5 h-3.5 w-3.5" />
+              <span class="i-carbon-renew mr-1.5 h-3.5 w-3.5" />
               {{ t('components.dataTableView.reconnect') }}
             </Button>
           </div>
