@@ -910,41 +910,42 @@ watch(
           @click.stop="refresh"
         >
           <span class="i-carbon-renew h-3.5 w-3.5" :class="{ 'animate-spin': loading }" />
-          <!-- Column visibility dropdown -->
-          <div class="flex-shrink-0 relative">
-            <Button
-              variant="ghost"
-              size="icon"
-              class="h-7 w-7"
-              :title="t('components.dataTableView.columns')"
-              @click.stop="showColumnMenu = !showColumnMenu"
-            >
-              <span class="i-carbon-table-split h-3.5 w-3.5" />
-            </Button>
+        </Button>
 
-            <div
-              v-if="showColumnMenu && data && data.columns.length > 0"
-              class="text-popover-foreground mt-1 border rounded-md bg-popover max-h-64 min-w-36 shadow-md right-0 top-full absolute z-50 overflow-auto"
-              @click.stop
-            >
-              <div class="text-xs text-muted-foreground font-semibold p-1 px-2 py-1.5 border-b">
-                {{ t('components.dataTableView.columns') }}
-              </div>
-              <div class="p-1">
-                <button
-                  v-for="col in data.columns"
-                  :key="col"
-                  class="text-sm px-2 py-1 text-left rounded flex gap-2 w-full cursor-pointer items-center hover:bg-accent"
-                  @click="toggleColumn(col)"
-                >
-                  <span v-if="!hiddenColumns.has(col)" class="i-carbon-checkmark text-primary flex-shrink-0 h-3 w-3" />
-                  <span v-else class="flex-shrink-0 w-3 inline-block" />
-                  <span class="truncate">{{ col }}</span>
-                </button>
-              </div>
+        <!-- Column visibility dropdown -->
+        <div class="flex-shrink-0 relative">
+          <Button
+            variant="ghost"
+            size="icon"
+            class="h-7 w-7"
+            :title="t('components.dataTableView.columns')"
+            @click.stop="showColumnMenu = !showColumnMenu"
+          >
+            <span class="i-carbon-table-split h-3.5 w-3.5" />
+          </Button>
+
+          <div
+            v-if="showColumnMenu && data && data.columns.length > 0"
+            class="text-popover-foreground mt-1 border rounded-md bg-popover max-h-64 min-w-36 shadow-md right-0 top-full absolute z-50 overflow-auto"
+            @click.stop
+          >
+            <div class="text-xs text-muted-foreground font-semibold p-1 px-2 py-1.5 border-b">
+              {{ t('components.dataTableView.columns') }}
+            </div>
+            <div class="p-1">
+              <button
+                v-for="col in data.columns"
+                :key="col"
+                class="text-sm px-2 py-1 text-left rounded flex gap-2 w-full cursor-pointer items-center hover:bg-accent"
+                @click="toggleColumn(col)"
+              >
+                <span v-if="!hiddenColumns.has(col)" class="i-carbon-checkmark text-primary flex-shrink-0 h-3 w-3" />
+                <span v-else class="flex-shrink-0 w-3 inline-block" />
+                <span class="truncate">{{ col }}</span>
+              </button>
             </div>
           </div>
-        </Button>
+        </div>
 
         <!-- Delete Selected button -->
         <Button
