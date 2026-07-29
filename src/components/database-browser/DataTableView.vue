@@ -902,7 +902,7 @@ watch(
 
         <!-- Refresh button -->
         <Button
-          variant="ghost"
+          variant="outline"
           size="icon"
           class="flex-shrink-0 h-7 w-7"
           :disabled="loading"
