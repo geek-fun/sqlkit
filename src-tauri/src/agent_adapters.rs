@@ -58,7 +58,7 @@ pub async fn run_agent_loop(
         .unwrap_or(Value::Null);
 
     let is_parallel_ok = |name: &str| -> bool {
-        crate::capabilities::registry::registry()
+        data_studio_agent::capabilities::registry::registry()
             .get(name)
             .map(|c| c.parallel_ok)
             .unwrap_or(false)

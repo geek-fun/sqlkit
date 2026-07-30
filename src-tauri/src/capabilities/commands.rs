@@ -1,8 +1,8 @@
+use data_studio_agent::capabilities::registry;
+use data_studio_agent::capabilities::types::Capability;
 use serde_json::{json, Value};
 use tauri::AppHandle;
 use tauri::Manager;
-
-use super::registry;
 
 #[tauri::command]
 pub async fn invoke_capability(
@@ -38,7 +38,7 @@ pub async fn get_available_tools(source_kinds: Option<Vec<String>>) -> Result<St
     serde_json::to_string(&result).map_err(|e| e.to_string())
 }
 
-fn to_openai_tool(cap: &super::Capability) -> Value {
+fn to_openai_tool(cap: &Capability) -> Value {
     json!({
         "type": "function",
         "function": {
@@ -49,7 +49,7 @@ fn to_openai_tool(cap: &super::Capability) -> Value {
     })
 }
 
-fn to_metadata(cap: &super::Capability) -> Value {
+fn to_metadata(cap: &Capability) -> Value {
     json!({
         "riskLevel": cap.risk_level,
         "requiredPermission": cap.required_permission

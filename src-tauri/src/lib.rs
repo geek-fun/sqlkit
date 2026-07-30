@@ -112,7 +112,10 @@ pub fn run() {
             menu::create_menu(app)?;
 
             // Initialize the capability registry
-            capabilities::registry::init_registry();
+            data_studio_agent::capabilities::registry::init_registry(&[
+                crate::capabilities::sqlkit::register_all,
+                crate::capabilities::sql::register_sql_tools,
+            ]);
 
             // Initialize agent SQLite database
             use tauri::Manager;
