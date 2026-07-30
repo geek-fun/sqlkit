@@ -1,21 +1,14 @@
-//! Embedded HTTP bridge for MCP protocol.
-//!
-//! Exposes the capability system over HTTP so the external TypeScript
-//! MCP server (`data-studio-mcp`) can invoke tools and list capabilities.
-//!
-//! Only binds to 127.0.0.1 — not reachable from other machines.
-
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::Mutex;
 
 use axum::extract::State;
 use axum::routing::{get, post};
 use axum::Json;
 use data_studio_agent::capabilities::registry;
-use data_studio_agent::capabilities::types::Capability;
+use data_studio_agent::capabilities::types::{Capability, RiskLevel};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::sync::Mutex;
 use tauri::{AppHandle, Manager};
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
@@ -55,10 +48,16 @@ fn default_auto_start() -> bool {
 impl McpConfig {
     pub fn load(app_data_dir: &Path) -> Self {
         let path = app_data_dir.join("mcp-config.json");
-        std::fs::read_to_string(path)
-            .ok()
-            .and_then(|s| serde_json::from_str(&s).ok())
-            .unwrap_or_default()
+        match std::fs::read_to_string(&path) {
+            Ok(s) => match serde_json::from_str(&s) {
+                Ok(cfg) => cfg,
+                Err(e) => {
+                    log::warn!("Failed to parse mcp-config.json (corrupt?): {}. Using defaults.", e);
+                    McpConfig::default()
+                }
+            },
+            Err(_) => McpConfig::default(),
+        }
     }
 
     pub fn save(&self, app_data_dir: &Path) -> Result<(), String> {
@@ -122,7 +121,6 @@ impl InvokeResponse {
 struct BridgeState {
     handle: AppHandle,
     app_name: &'static str,
-    app_version: &'static str,
     app_data_dir: PathBuf,
 }
 
@@ -147,16 +145,39 @@ async fn handle_tools(
         "metadata": metadata,
         "connections": [],
     });
-
     Json(result)
 }
 
 async fn handle_invoke(
-    State(state): State<Arc<BridgeState>>,
     Json(payload): Json<InvokeRequest>,
 ) -> Json<InvokeResponse> {
+    // Reject destructive and elevated capabilities on the bridge
+    let cap = match registry::registry().get(&payload.name) {
+        Some(c) => c,
+        None => {
+            return Json(InvokeResponse::error(
+                404,
+                format!("Unknown capability: {}", payload.name),
+            ))
+        }
+    };
+
+    match cap.risk_level {
+        RiskLevel::Safe => {}
+        RiskLevel::Elevated | RiskLevel::Destructive => {
+            let level_str = serde_json::to_string(&cap.risk_level).unwrap_or_default();
+            return Json(InvokeResponse::error(
+                403,
+                format!(
+                    "Capability '{}' requires {} permission and is not allowed through the MCP bridge",
+                    payload.name, level_str
+                ),
+            ));
+        }
+    }
+
     let config = match payload.connection_id {
-        Some(ref id) => match resolve_connection(&state.handle, id).await {
+        Some(ref id) => match resolve_connection(id).await {
             Ok(cfg) => Some(cfg),
             Err(e) => return Json(InvokeResponse::error(400, e)),
         },
@@ -178,7 +199,7 @@ async fn handle_health(
     Json(json!({
         "status": "ok",
         "app": state.app_name,
-        "version": state.app_version,
+        "version": state.handle.package_info().version.to_string(),
         "port": get_actual_port(&state.app_data_dir).unwrap_or(0),
     }))
 }
@@ -191,19 +212,24 @@ fn get_default_port() -> u16 {
     9121
 }
 
-fn port_available(port: u16) -> bool {
-    std::net::TcpListener::bind(std::net::SocketAddrV4::new(
-        std::net::Ipv4Addr::LOCALHOST,
-        port,
-    ))
-    .is_ok()
-}
-
 fn get_actual_port(app_data_dir: &Path) -> Option<u16> {
     let path = app_data_dir.join("mcp-port");
-    std::fs::read_to_string(path)
+    let port = std::fs::read_to_string(&path)
         .ok()
-        .and_then(|s| s.trim().parse::<u16>().ok())
+        .and_then(|s| s.trim().parse::<u16>().ok())?;
+
+    let addr = std::net::SocketAddrV4::new(std::net::Ipv4Addr::LOCALHOST, port);
+    if std::net::TcpStream::connect_timeout(
+        &std::net::SocketAddr::V4(addr),
+        std::time::Duration::from_millis(200),
+    )
+    .is_ok()
+    {
+        Some(port)
+    } else {
+        let _ = std::fs::remove_file(&path);
+        None
+    }
 }
 
 async fn write_port_file(app_data_dir: &Path, port: u16) -> Result<(), String> {
@@ -222,55 +248,97 @@ async fn remove_port_file(app_data_dir: &Path) {
     let _ = tokio::fs::remove_file(path).await;
 }
 
+async fn send_shutdown(handle: &AppHandle) {
+    let server_handle: tauri::State<'_, McpServerHandle> = handle.state();
+    let old_tx = {
+        let mut tx = server_handle.shutdown_tx.lock().unwrap();
+        tx.take()
+    };
+    if let Some(sender) = old_tx {
+        let _ = sender.send(());
+    }
+}
+
 pub async fn start(
     handle: AppHandle,
     app_data_dir: PathBuf,
     preferred_port: u16,
     shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<u16, String> {
-    let port = if port_available(preferred_port) {
-        preferred_port
-    } else {
-        log::warn!(
-            "MCP bridge port {} is in use, picking random port",
-            preferred_port
-        );
-        portpicker::pick_unused_port().ok_or("no port available")?
+    let port = match TcpListener::bind(format!("127.0.0.1:{}", preferred_port)).await {
+        Ok(listener) => {
+            let state = Arc::new(BridgeState {
+                handle: handle.clone(),
+                app_name: "sqlkit",
+                app_data_dir: app_data_dir.clone(),
+            });
+
+            let app = axum::Router::new()
+                .route("/tools", post(handle_tools))
+                .route("/invoke", post(handle_invoke))
+                .route("/health", get(handle_health))
+                .with_state(state);
+
+            write_port_file(&app_data_dir, preferred_port).await?;
+
+            let data_dir = app_data_dir.clone();
+            tokio::spawn(async move {
+                log::info!("MCP bridge listening on 127.0.0.1:{}", preferred_port);
+                axum::serve(listener, app)
+                    .with_graceful_shutdown(async {
+                        shutdown_rx.await.ok();
+                        log::info!("MCP bridge shutting down");
+                    })
+                    .await
+                    .ok();
+                let _ = remove_port_file(&data_dir).await;
+            });
+
+            Ok(preferred_port)
+        }
+        Err(_) => {
+            log::warn!(
+                "MCP bridge port {} is in use, picking random port",
+                preferred_port
+            );
+            let random_port =
+                portpicker::pick_unused_port().ok_or("no port available on localhost")?;
+            let listener = TcpListener::bind(format!("127.0.0.1:{}", random_port))
+                .await
+                .map_err(|e| format!("Failed to bind bridge: {}", e))?;
+
+            let state = Arc::new(BridgeState {
+                handle: handle.clone(),
+                app_name: "sqlkit",
+                app_data_dir: app_data_dir.clone(),
+            });
+
+            let app = axum::Router::new()
+                .route("/tools", post(handle_tools))
+                .route("/invoke", post(handle_invoke))
+                .route("/health", get(handle_health))
+                .with_state(state);
+
+            write_port_file(&app_data_dir, random_port).await?;
+
+            let data_dir = app_data_dir.clone();
+            tokio::spawn(async move {
+                log::info!("MCP bridge listening on 127.0.0.1:{}", random_port);
+                axum::serve(listener, app)
+                    .with_graceful_shutdown(async {
+                        shutdown_rx.await.ok();
+                        log::info!("MCP bridge shutting down");
+                    })
+                    .await
+                    .ok();
+                let _ = remove_port_file(&data_dir).await;
+            });
+
+            Ok(random_port)
+        }
     };
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", port))
-        .await
-        .map_err(|e| format!("Failed to bind bridge: {}", e))?;
-
-    let state = Arc::new(BridgeState {
-        handle: handle.clone(),
-        app_name: "sqlkit",
-        app_version: env!("CARGO_PKG_VERSION"),
-        app_data_dir: app_data_dir.clone(),
-    });
-
-    let app = axum::Router::new()
-        .route("/tools", post(handle_tools))
-        .route("/invoke", post(handle_invoke))
-        .route("/health", get(handle_health))
-        .with_state(state);
-
-    let data_dir = app_data_dir.clone();
-
-    tokio::spawn(async move {
-        log::info!("MCP bridge listening on 127.0.0.1:{}", port);
-        axum::serve(listener, app)
-            .with_graceful_shutdown(async {
-                shutdown_rx.await.ok();
-                log::info!("MCP bridge shutting down");
-            })
-            .await
-            .ok();
-        let _ = remove_port_file(&data_dir).await;
-    });
-
-    write_port_file(&app_data_dir, port).await?;
-    Ok(port)
+    port
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +363,10 @@ fn to_metadata(cap: &Capability) -> Value {
     })
 }
 
-async fn resolve_connection(handle: &AppHandle, connection_id: &str) -> Result<Value, String> {
+async fn resolve_connection(connection_id: &str) -> Result<Value, String> {
+    let handle = crate::APP_HANDLE
+        .get()
+        .ok_or_else(|| "AppHandle not initialized".to_string())?;
     use tauri::State;
     let state: State<'_, crate::state::AppState> = handle.state();
     let conns = state.connections.read().await;
@@ -344,19 +415,14 @@ pub async fn save_mcp_config(
     let config = McpConfig { port, auto_start };
     config.save(&app_data_dir)?;
 
+    send_shutdown(&app).await;
+
     if auto_start {
-        let server_handle: tauri::State<'_, McpServerHandle> = app.state();
-        let old_tx = {
-            let mut tx = server_handle.shutdown_tx.lock().unwrap();
-            tx.take()
-        };
-        if let Some(sender) = old_tx {
-            let _ = sender.send(());
-            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-        }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
         let (new_shutdown_tx, new_shutdown_rx) = oneshot::channel();
         {
+            let server_handle: tauri::State<'_, McpServerHandle> = app.state();
             let mut tx = server_handle.shutdown_tx.lock().unwrap();
             *tx = Some(new_shutdown_tx);
         }
