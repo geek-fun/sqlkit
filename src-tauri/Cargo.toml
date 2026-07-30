@@ -89,7 +89,7 @@ http = "1"
 log = "0.4"
 futures = "0.3"
 rand = "0.8"
-data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", tag = "v0.1.4" }
+data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", branch = "feat/unified-capability-types" }
 
 # Archive extraction (JRE downloads)
 flate2 = "1.0"

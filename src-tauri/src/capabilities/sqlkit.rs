@@ -3,8 +3,8 @@ use std::sync::Arc;
 use serde_json::Value;
 use tauri_plugin_store::StoreExt;
 
-use super::registry::CapabilityRegistry;
-use super::types::{Capability, CapabilityHandler, RiskLevel, SourceKind};
+use data_studio_agent::capabilities::registry::CapabilityRegistry;
+use data_studio_agent::capabilities::types::{Capability, CapabilityHandler, RiskLevel, SourceKind};
 
 // ---------------------------------------------------------------------------
 // Connection store abstraction (testable via mockall)
@@ -124,7 +124,7 @@ pub(crate) fn register_all(reg: &mut CapabilityRegistry) {
         }),
         risk_level: RiskLevel::Safe,
         required_permission: "read",
-        source_kind: SourceKind::SqlKit,
+        source_kind: SourceKind::AppLocal,
         tags: &["agent"],
         parallel_ok: true,
     });
@@ -145,7 +145,7 @@ pub(crate) fn register_all(reg: &mut CapabilityRegistry) {
         }),
         risk_level: RiskLevel::Safe,
         required_permission: "read",
-        source_kind: SourceKind::SqlKit,
+        source_kind: SourceKind::AppLocal,
         tags: &["agent"],
         parallel_ok: true,
     });
