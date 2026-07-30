@@ -33,6 +33,7 @@ coverage/
 # Java build output
 jdbc-bridge/target/
 
+.claude/
 .omo/
 .sisyphus/
 .codegraph/
