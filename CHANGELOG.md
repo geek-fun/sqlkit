@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-07-30
+
+### Added
+
+- Improve default export filename with connection-db-schema-table-timestamp
+- Soft-split SQL statements at 2+ blank lines when `;` is missing
+
+### Fixed
+
+- Match refresh button style to other toolbar icons (ghost)
+- Properly separate refresh button from columns dropdown (was nested)
+- Change refresh button to outline variant so it's visible
+- Use correct icon for refresh button (i-carbon-renew)
+- Make table view refresh button visible with text label
+- Align SQL execute gutter icon to actual statement start line (#123)
+
+### Changed
+
+- Move search/filter icons inside input boxes, remove external icons and separator
+
 ## [0.8.1] - 2026-07-27
 
 ### Fixed
