@@ -22,6 +22,7 @@ pub mod agent_adapters;
 pub mod capabilities;
 pub mod common;
 pub mod db;
+pub mod mcp_bridge;
 
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -140,6 +141,37 @@ pub fn run() {
             app.manage(cancel_map);
             let executor: Arc<dyn lib::ToolExecutor> = Arc::new(SqlKitToolExecutor);
             app.manage(executor);
+            app.manage(crate::mcp_bridge::McpServerHandle::new());
+
+            {
+                let app_data_dir = app.path().app_data_dir().map_err(|e| format!("{}", e))?
+                    .to_path_buf();
+                let config = crate::mcp_bridge::McpConfig::load(&app_data_dir);
+                if config.auto_start {
+                    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
+                    let server_handle: tauri::State<'_, crate::mcp_bridge::McpServerHandle> =
+                        app.state();
+                    {
+                        let mut tx = server_handle.shutdown_tx.lock().unwrap();
+                        *tx = Some(shutdown_tx);
+                    }
+                    let bridge_handle = app.handle().clone();
+                    let data_dir = app_data_dir.clone();
+                    let preferred = config.port.unwrap_or(9121);
+                    tauri::async_runtime::spawn(async move {
+                        if let Err(e) = crate::mcp_bridge::start(
+                            bridge_handle,
+                            data_dir,
+                            preferred,
+                            shutdown_rx,
+                        )
+                        .await
+                        {
+                            log::error!("MCP bridge failed to start: {}", e);
+                        }
+                    });
+                }
+            }
 
             use tauri::{Emitter, Listener};
 
@@ -292,6 +324,8 @@ pub fn run() {
             commands::generate_ddl_for_objects,
             commands::execute_sql_content,
             commands::get_app_version,
+            crate::mcp_bridge::get_mcp_status,
+            crate::mcp_bridge::save_mcp_config,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
