@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::mcp_bridge::McpConfig;
 use data_studio_agent as lib;
 use data_studio_agent::storage;
 use data_studio_agent::traits::{CancelMap, ConfirmMap, EventEmitter};
@@ -64,6 +65,15 @@ pub async fn run_agent_loop(
             .unwrap_or(false)
     };
 
+    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let policy = McpConfig::load(&app_data_dir).policy;
+    let should_deny = move |tool_name: &str, conn_id: Option<&str>| -> bool {
+        match data_studio_agent::capabilities::registry::registry().get(tool_name) {
+            Some(cap) => !policy.allows(cap.risk_level, conn_id),
+            None => false,
+        }
+    };
+
     lib::loop_runner::run_agent_loop(
         &session_id,
         &user_message,
@@ -76,6 +86,7 @@ pub async fn run_agent_loop(
         &confirm_map,
         &cancel_map,
         &is_parallel_ok,
+        &should_deny,
     )
     .await
 }
