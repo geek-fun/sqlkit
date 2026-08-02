@@ -405,6 +405,17 @@ export const enUS = {
           auto: 'Auto (Follow System)',
         },
       },
+      mcp: {
+        title: 'MCP Bridge',
+        status: 'Status',
+        running: 'Running on port {port}',
+        stopped: 'Stopped',
+        port: 'Port',
+        portDesc: 'Port for the MCP bridge server (leave empty for auto)',
+        restart: 'Restart Bridge',
+        autoStart: 'Auto-start',
+        autoStartDesc: 'Start the MCP bridge automatically when app launches',
+      },
       about: {
         title: 'About',
         version: 'Version',
