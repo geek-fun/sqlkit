@@ -856,7 +856,7 @@ watch(
       <div class="px-3 py-1.5 border-b bg-muted/20 flex shrink-0 gap-1 items-center">
         <!-- Search input — searches across all columns -->
         <div class="flex-1 min-w-0 relative">
-          <span class="i-carbon-search text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" />
+          <span class="i-carbon-search text-muted-foreground h-3.5 w-3.5 pointer-events-none left-2 top-1/2 absolute -translate-y-1/2" />
           <Input
             ref="searchInputRef"
             v-model="searchTerm"
@@ -875,7 +875,7 @@ watch(
           <!-- Clear search button (inside input, on the right) -->
           <button
             v-if="searchTerm"
-            class="text-muted-foreground right-1 top-1/2 absolute -translate-y-1/2 flex items-center justify-center h-5 w-5 rounded hover:bg-accent"
+            class="text-muted-foreground rounded flex h-5 w-5 items-center right-1 top-1/2 justify-center absolute hover:bg-accent -translate-y-1/2"
             :title="t('components.dataTableView.clearSearch')"
             @click.stop="clearSearch"
           >
@@ -885,7 +885,7 @@ watch(
 
         <!-- Filter input -->
         <div class="flex-1 min-w-0 relative">
-          <span class="i-carbon-filter text-muted-foreground absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 pointer-events-none" />
+          <span class="i-carbon-filter text-muted-foreground h-3.5 w-3.5 pointer-events-none left-2 top-1/2 absolute -translate-y-1/2" />
           <Input
             v-model="filterInput"
             :placeholder="t('components.dataTableView.filterPlaceholder')"
@@ -895,7 +895,7 @@ watch(
           <!-- Clear filter button (inside input, on the right) -->
           <button
             v-if="filterInput || appliedFilter"
-            class="text-muted-foreground right-1 top-1/2 absolute -translate-y-1/2 flex items-center justify-center h-5 w-5 rounded hover:bg-accent"
+            class="text-muted-foreground rounded flex h-5 w-5 items-center right-1 top-1/2 justify-center absolute hover:bg-accent -translate-y-1/2"
             :title="t('components.dataTableView.clearFilter')"
             @click.stop="clearFilter"
           >

@@ -13,6 +13,7 @@ import { useAppUpdater } from '@/composables/useAppUpdater'
 import { ThemeType, useAppStore } from '@/store/appStore'
 import AiSettings from '@/views/setting/ai-settings.vue'
 import JreDriverSection from '@/views/setting/jre-driver-section.vue'
+import McpBridge from '@/views/setting/mcp-bridge.vue'
 
 const appStore = useAppStore()
 const { t, locale: _locale } = useI18n()
@@ -192,6 +193,9 @@ async function handleCheckUpdates() {
             </TabsTrigger>
             <TabsTrigger value="jre">
               {{ t('pages.settings.jre.title') }}
+            </TabsTrigger>
+            <TabsTrigger value="mcp">
+              {{ t('pages.settings.mcp.title') }}
             </TabsTrigger>
             <TabsTrigger value="about">
               {{ t('pages.settings.about.title') }}
@@ -590,6 +594,11 @@ async function handleCheckUpdates() {
           <!-- JRE & Drivers Tab -->
           <TabsContent value="jre" class="mt-0">
             <JreDriverSection />
+          </TabsContent>
+
+          <!-- MCP Bridge Tab -->
+          <TabsContent value="mcp" class="mt-0">
+            <McpBridge />
           </TabsContent>
 
           <!-- About Tab -->
