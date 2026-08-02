@@ -31,7 +31,7 @@ const autoStart = ref(true)
 const loading = ref(false)
 
 const policyMode = ref<McpPermissionMode>('ReadOnly')
-const confirmDestructive = ref(false)
+const confirmDestructive = ref(true)
 const allowedConnectionIds = ref<string[]>([])
 const connectionOverrides = ref<Record<string, ConnectionOverride>>({})
 
@@ -128,9 +128,6 @@ async function restartBridge() {
 
 async function onModeChange(mode: string) {
   policyMode.value = mode as McpPermissionMode
-  if (mode !== 'FullAccess') {
-    confirmDestructive.value = false
-  }
   await savePolicy()
 }
 
@@ -160,6 +157,15 @@ async function toggleReadOnlyOverride(id: string, checked: boolean) {
 
 const isAllowlistChecked = (id: string) => allowedConnectionIds.value.includes(id)
 const isOverrideChecked = (id: string) => connectionOverrides.value[id]?.read_only ?? false
+
+const allowlistEnabled = computed(() => allowedConnectionIds.value.length > 0)
+
+async function onAllowlistEnableChange(val: boolean) {
+  allowedConnectionIds.value = val
+    ? connections.value.map(c => String(c.id)).filter((id): id is string => id !== 'undefined')
+    : []
+  await savePolicy()
+}
 </script>
 
 <template>
@@ -276,18 +282,24 @@ const isOverrideChecked = (id: string) => connectionOverrides.value[id]?.read_on
 
       <!-- Connection Allowlist -->
       <div class="space-y-2">
-        <div class="space-y-1">
-          <Label>{{ t('pages.settings.mcp.allowlist') }}</Label>
-          <p class="text-xs text-muted-foreground">
-            {{ t('pages.settings.mcp.allowlistDesc') }}
-          </p>
-          <p
-            v-if="allowedConnectionIds.length === 0"
-            class="text-xs text-muted-foreground italic"
-          >
-            {{ t('pages.settings.mcp.allowlistEmpty') }}
-          </p>
+        <div class="flex items-center justify-between">
+          <div class="space-y-1">
+            <Label>{{ t('pages.settings.mcp.allowlist') }}</Label>
+            <p class="text-xs text-muted-foreground">
+              {{ t('pages.settings.mcp.allowlistDesc') }}
+            </p>
+          </div>
+          <Switch
+            :checked="allowlistEnabled"
+            @update:checked="onAllowlistEnableChange"
+          />
         </div>
+        <p
+          v-if="!allowlistEnabled"
+          class="text-xs text-muted-foreground italic"
+        >
+          {{ t('pages.settings.mcp.allowlistEmpty') }}
+        </p>
         <div class="space-y-2">
           <div
             v-for="conn in connections"
@@ -295,7 +307,8 @@ const isOverrideChecked = (id: string) => connectionOverrides.value[id]?.read_on
             class="flex gap-2 items-center"
           >
             <Checkbox
-              :checked="isAllowlistChecked(conn.id!)"
+              :checked="allowlistEnabled && isAllowlistChecked(conn.id!)"
+              :disabled="!allowlistEnabled"
               @update:checked="(val: boolean) => toggleAllowlist(conn.id!, val)"
             />
             <Label class="text-sm font-normal cursor-pointer">
