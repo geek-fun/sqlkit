@@ -31,11 +31,19 @@ pub struct SqlBuildResult {
 
 impl SqlBuildResult {
     fn ok(sql: String) -> Self {
-        Self { ok: true, sql: Some(sql), reason: None }
+        Self {
+            ok: true,
+            sql: Some(sql),
+            reason: None,
+        }
     }
 
     fn err(reason: impl Into<String>) -> Self {
-        Self { ok: false, sql: None, reason: Some(reason.into()) }
+        Self {
+            ok: false,
+            sql: None,
+            reason: Some(reason.into()),
+        }
     }
 }
 
@@ -144,9 +152,7 @@ pub fn wrap_query(options: WrapQueryOptions) -> SqlBuildResult {
 
     // ── Step 3: Validate ──
     if !is_select_statement(&stmt) {
-        return SqlBuildResult::err(
-            "only SELECT queries can be sorted or filtered",
-        );
+        return SqlBuildResult::err("only SELECT queries can be sorted or filtered");
     }
 
     // ── Step 4: Inject schema qualification ──
@@ -183,8 +189,9 @@ pub fn wrap_query(options: WrapQueryOptions) -> SqlBuildResult {
 
     // ── Step 8: Extract SELECT columns for alias resolution ──
     let select_columns = extract_select_columns(&stmt);
-    let has_expression_columns =
-        select_columns.iter().any(|(name, _)| name.contains(' ') || name.contains('('));
+    let has_expression_columns = select_columns
+        .iter()
+        .any(|(name, _)| name.contains(' ') || name.contains('('));
 
     // ── Step 9: Apply sorting ──
     let base = if !options.sort.is_empty() {
@@ -432,7 +439,9 @@ fn inject_schema_in_table_factor(factor: &mut TableFactor, schema: &str, db_type
         TableFactor::Derived { .. } | TableFactor::TableFunction { .. } => {
             // Skip subqueries and table functions — they have their own scope
         }
-        TableFactor::NestedJoin { table_with_joins, .. } => {
+        TableFactor::NestedJoin {
+            table_with_joins, ..
+        } => {
             inject_schema_in_table_factor(&mut table_with_joins.relation, schema, db_type);
             for join in table_with_joins.joins.iter_mut() {
                 inject_schema_in_table_factor(&mut join.relation, schema, db_type);
@@ -490,14 +499,18 @@ fn extract_select_items(items: &[SelectItem]) -> Vec<(String, usize)> {
 fn expr_to_name(expr: &Expr) -> String {
     match expr {
         Expr::Identifier(ident) => ident.value.clone(),
-        Expr::CompoundIdentifier(idents) => {
-            idents.iter().map(|i| i.value.clone()).collect::<Vec<_>>().join(".")
-        }
+        Expr::CompoundIdentifier(idents) => idents
+            .iter()
+            .map(|i| i.value.clone())
+            .collect::<Vec<_>>()
+            .join("."),
         Expr::Function(f) => f.name.to_string(),
         Expr::BinaryOp { left, op, right } => {
             format!("{} {} {}", expr_to_name(left), op, expr_to_name(right))
         }
-        Expr::Cast { expr, data_type, .. } => {
+        Expr::Cast {
+            expr, data_type, ..
+        } => {
             format!("CAST({} AS {})", expr_to_name(expr), data_type)
         }
         Expr::Value(vws) => match &vws.value {
@@ -534,10 +547,7 @@ mod tests {
     fn test_strip_trailing_comment() {
         assert_eq!(strip_trailing("SELECT 1 -- comment"), "SELECT 1");
         assert_eq!(strip_trailing("SELECT 1;-- comment"), "SELECT 1");
-        assert_eq!(
-            strip_trailing("SELECT 1 /* block comment */"),
-            "SELECT 1"
-        );
+        assert_eq!(strip_trailing("SELECT 1 /* block comment */"), "SELECT 1");
     }
 
     #[test]
@@ -578,7 +588,11 @@ mod tests {
             limit: None,
             offset: None,
         });
-        assert!(result.ok, "should handle trailing semicolons: {:?}", result.reason);
+        assert!(
+            result.ok,
+            "should handle trailing semicolons: {:?}",
+            result.reason
+        );
     }
 
     #[test]
@@ -681,7 +695,11 @@ mod tests {
             limit: None,
             offset: None,
         });
-        assert!(result.ok, "schema injection should succeed: {:?}", result.reason);
+        assert!(
+            result.ok,
+            "schema injection should succeed: {:?}",
+            result.reason
+        );
         let sql = result.sql.unwrap();
         // The table should now be qualified as "public"."users"
         assert!(sql.contains("public") && sql.contains("users"));
@@ -693,17 +711,16 @@ mod tests {
             original_sql: "SELECT id, name, email FROM users".to_string(),
             database_type: "postgres".to_string(),
             schema_context: Some("public".to_string()),
-            sort: vec![
-                SortRule { column: "name".to_string(), direction: SortDirection::ASC },
-            ],
-            filters: vec![
-                FilterRule {
-                    column: "email".to_string(),
-                    operator: FilterOperator::Like,
-                    value: "test".to_string(),
-                    value2: None,
-                },
-            ],
+            sort: vec![SortRule {
+                column: "name".to_string(),
+                direction: SortDirection::ASC,
+            }],
+            filters: vec![FilterRule {
+                column: "email".to_string(),
+                operator: FilterOperator::Like,
+                value: "test".to_string(),
+                value2: None,
+            }],
             limit: Some(100),
             offset: Some(0),
         });

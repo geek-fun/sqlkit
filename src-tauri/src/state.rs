@@ -66,7 +66,11 @@ pub struct ServerConfig {
     pub ssl_client_cert: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssl_client_key: Option<String>,
-    #[serde(default, skip_serializing_if = "std::ops::Not::not", deserialize_with = "deserialize_bool_or_null")]
+    #[serde(
+        default,
+        skip_serializing_if = "std::ops::Not::not",
+        deserialize_with = "deserialize_bool_or_null"
+    )]
     pub trust_server_certificate: bool,
     /// Additional metadata.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -211,7 +215,11 @@ impl ServerConfig {
 
         let db_lower = self.db_type.to_lowercase();
         // SQLite, SQLCipher, and DuckDB are file-based
-        if db_lower == "sqlite" || db_lower == "sqlcipher" || db_lower == "duckdb" || db_lower == "duck" {
+        if db_lower == "sqlite"
+            || db_lower == "sqlcipher"
+            || db_lower == "duckdb"
+            || db_lower == "duck"
+        {
             config = config.with_database(&self.host);
         } else if let Some(ref database) = self.database {
             config = config.with_database(database);

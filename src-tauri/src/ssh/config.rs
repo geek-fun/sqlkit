@@ -22,7 +22,10 @@ impl TransportLayerConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct SshTunnelConfig {
-    #[serde(default = "default_enabled", deserialize_with = "deserialize_bool_or_null")]
+    #[serde(
+        default = "default_enabled",
+        deserialize_with = "deserialize_bool_or_null"
+    )]
     pub enabled: bool,
     pub host: String,
     #[serde(default = "default_ssh_port")]

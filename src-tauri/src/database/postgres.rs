@@ -2134,7 +2134,9 @@ impl DatabaseAdapter for PostgresAdapter {
 
         let sql = match object_type.to_uppercase().as_str() {
             "VIEW" => format!("DROP VIEW IF EXISTS {} CASCADE", qualified),
-            "MATERIALIZED VIEW" => format!("DROP MATERIALIZED VIEW IF EXISTS {} CASCADE", qualified),
+            "MATERIALIZED VIEW" => {
+                format!("DROP MATERIALIZED VIEW IF EXISTS {} CASCADE", qualified)
+            }
             "PROCEDURE" => format!("DROP PROCEDURE IF EXISTS {} CASCADE", qualified),
             "FUNCTION" => format!("DROP FUNCTION IF EXISTS {} CASCADE", qualified),
             "TRIGGER" => {
@@ -2196,7 +2198,10 @@ impl DatabaseAdapter for PostgresAdapter {
         let sql = match object_type.to_uppercase().as_str() {
             "TABLE" => format!("ALTER TABLE {} RENAME TO {}", qualified, new_quoted),
             "VIEW" => format!("ALTER VIEW {} RENAME TO {}", qualified, new_quoted),
-            "MATERIALIZED VIEW" => format!("ALTER MATERIALIZED VIEW {} RENAME TO {}", qualified, new_quoted),
+            "MATERIALIZED VIEW" => format!(
+                "ALTER MATERIALIZED VIEW {} RENAME TO {}",
+                qualified, new_quoted
+            ),
             "PROCEDURE" => format!("ALTER PROCEDURE {} RENAME TO {}", qualified, new_quoted),
             "FUNCTION" => format!("ALTER FUNCTION {} RENAME TO {}", qualified, new_quoted),
             _ => {

@@ -144,7 +144,10 @@ pub fn run() {
             app.manage(crate::mcp_bridge::McpServerHandle::new());
 
             {
-                let app_data_dir = app.path().app_data_dir().map_err(|e| format!("{}", e))?
+                let app_data_dir = app
+                    .path()
+                    .app_data_dir()
+                    .map_err(|e| format!("{}", e))?
                     .to_path_buf();
                 let config = crate::mcp_bridge::McpConfig::load(&app_data_dir);
                 if config.auto_start {
