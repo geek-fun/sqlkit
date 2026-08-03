@@ -77,8 +77,6 @@ rust_xlsxwriter = "0.64"
 calamine = "0.22"
 
 # Agent / LLM dependencies
-# data-studio-agent: local checkout for active development.
-# Revert to release when ready: { git = "https://github.com/geek-fun/data-studio-agent.git", tag = "v0.1.2" }
 reqwest = { version = "0.12", default-features = false, features = [
   "json",
   "rustls-tls",
@@ -89,7 +87,8 @@ http = "1"
 log = "0.4"
 futures = "0.3"
 rand = "0.8"
-data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", branch = "feat/unified-capability-types" }
+# data-studio-agent: pinned to latest release tag.
+data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", tag = "v0.1.5" }
 
 # Archive extraction (JRE downloads)
 flate2 = "1.0"

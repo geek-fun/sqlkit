@@ -58,7 +58,11 @@ pub struct SQLitePool {
 
 impl SQLitePool {
     /// Create a new SQLite connection pool.
-    fn new(max_connections: usize, db_path: Option<PathBuf>, encryption_key: Option<String>) -> Self {
+    fn new(
+        max_connections: usize,
+        db_path: Option<PathBuf>,
+        encryption_key: Option<String>,
+    ) -> Self {
         Self {
             connections: Arc::new(Mutex::new(Vec::new())),
             max_connections,

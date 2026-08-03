@@ -269,13 +269,15 @@ pub async fn write_text_file(path: String, content: String) -> Result<(), String
 }
 
 #[tauri::command]
-pub async fn read_saved_queries_metadata(app_handle: AppHandle) -> Result<SavedQueriesMetadata, String> {
+pub async fn read_saved_queries_metadata(
+    app_handle: AppHandle,
+) -> Result<SavedQueriesMetadata, String> {
     let path = get_metadata_file_path(&app_handle)?;
     if !path.exists() {
         return Ok(SavedQueriesMetadata::default());
     }
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("Failed to read metadata file: {}", e))?;
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("Failed to read metadata file: {}", e))?;
     match serde_json::from_str::<SavedQueriesMetadata>(&content) {
         Ok(metadata) => Ok(metadata),
         Err(e) => {
@@ -296,8 +298,7 @@ pub async fn write_saved_queries_metadata(
         .map_err(|e| format!("Failed to serialize metadata: {}", e))?;
     fs::write(&tmp_path, content)
         .map_err(|e| format!("Failed to write temp metadata file: {}", e))?;
-    fs::rename(&tmp_path, &path)
-        .map_err(|e| format!("Failed to rename metadata file: {}", e))?;
+    fs::rename(&tmp_path, &path).map_err(|e| format!("Failed to rename metadata file: {}", e))?;
     Ok(())
 }
 

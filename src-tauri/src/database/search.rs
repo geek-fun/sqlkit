@@ -179,10 +179,7 @@ pub fn build_table_search_where(
                     if data_type == "uuid" {
                         // UUID columns: use ::text cast (more portable than CAST)
                         // For exact UUID matches, also include equality for efficiency
-                        let text_cond = format!(
-                            "LOWER({}::text) LIKE '%{}%'",
-                            quoted, lower_term
-                        );
+                        let text_cond = format!("LOWER({}::text) LIKE '%{}%'", quoted, lower_term);
                         // If the term looks like a UUID, try exact match first
                         if looks_like_uuid(&escaped_term) {
                             format!("{}::text = '{}' OR {}", quoted, escaped_term, text_cond)
@@ -191,10 +188,7 @@ pub fn build_table_search_where(
                         }
                     } else if data_type.starts_with("json") {
                         // JSON/JSONB: use ::text for readability
-                        format!(
-                            "LOWER({}::text) LIKE '%{}%'",
-                            quoted, lower_term
-                        )
+                        format!("LOWER({}::text) LIKE '%{}%'", quoted, lower_term)
                     } else {
                         // Standard text columns
                         format!(

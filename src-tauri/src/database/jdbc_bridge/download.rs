@@ -229,7 +229,14 @@ pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
         if dest.exists() {
             return Ok(());
         }
-        return download_to_path(download_url, &dest, db_type, DownloadKind::Driver, 5_000_000).await;
+        return download_to_path(
+            download_url,
+            &dest,
+            db_type,
+            DownloadKind::Driver,
+            5_000_000,
+        )
+        .await;
     }
 
     // Resolve the version to download

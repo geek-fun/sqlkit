@@ -4,7 +4,9 @@ use serde_json::Value;
 use tauri_plugin_store::StoreExt;
 
 use data_studio_agent::capabilities::registry::CapabilityRegistry;
-use data_studio_agent::capabilities::types::{Capability, CapabilityHandler, RiskLevel, SourceKind};
+use data_studio_agent::capabilities::types::{
+    Capability, CapabilityHandler, RiskLevel, SourceKind,
+};
 
 // ---------------------------------------------------------------------------
 // Connection store abstraction (testable via mockall)

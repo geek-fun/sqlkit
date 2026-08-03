@@ -388,21 +388,20 @@ impl DatabaseAdapter for MySQLAdapter {
                 self.config.ssl_mode = SslMode::Prefer;
 
                 let fallback_pool = Pool::new(fallback_opts);
-                let mut conn =
-                    tokio::time::timeout(conn_timeout, fallback_pool.get_conn())
-                        .await
-                        .map_err(|_| {
-                            DbError::Connection(format!(
-                                "Connection timed out after {} seconds",
-                                self.config.connect_timeout_secs
-                            ))
-                        })?
-                        .map_err(|retry_err| {
-                            DbError::Connection(format!(
-                                "Connection failed even without SSL: {}",
-                                retry_err
-                            ))
-                        })?;
+                let mut conn = tokio::time::timeout(conn_timeout, fallback_pool.get_conn())
+                    .await
+                    .map_err(|_| {
+                        DbError::Connection(format!(
+                            "Connection timed out after {} seconds",
+                            self.config.connect_timeout_secs
+                        ))
+                    })?
+                    .map_err(|retry_err| {
+                        DbError::Connection(format!(
+                            "Connection failed even without SSL: {}",
+                            retry_err
+                        ))
+                    })?;
 
                 tokio::time::timeout(conn_timeout, conn.query_drop("SELECT 1"))
                     .await

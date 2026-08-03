@@ -9,7 +9,9 @@ use crate::database::{DatabaseAdapter, QueryResult};
 use crate::state::{ActiveConnection, ServerConfig};
 
 use data_studio_agent::capabilities::registry::CapabilityRegistry;
-use data_studio_agent::capabilities::types::{Capability, CapabilityHandler, RiskLevel, SourceKind};
+use data_studio_agent::capabilities::types::{
+    Capability, CapabilityHandler, RiskLevel, SourceKind,
+};
 
 fn app_handle() -> AppHandle {
     crate::APP_HANDLE

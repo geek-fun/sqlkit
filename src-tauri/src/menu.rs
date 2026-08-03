@@ -79,8 +79,7 @@ pub fn create_menu(app: &App) -> Result<(), Error> {
                 "reload" => {
                     let _ = window.eval("location.reload()");
                 }
-                "toggle_dev_tools" =>
-                {
+                "toggle_dev_tools" => {
                     if window.is_devtools_open() {
                         window.close_devtools();
                     } else {

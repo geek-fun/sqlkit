@@ -391,9 +391,16 @@ pub async fn get_table_data(
     let db_type = get_db_type_string(&connection);
 
     // Execute query based on connection type with proper identifier quoting
-    let result = self::get_table_data_inner(&connection, &query, filter_ref, limit_val, offset_val, db_type)
-        .await
-        .map_err(|e| format!("Failed to get table data: {}", e))?;
+    let result = self::get_table_data_inner(
+        &connection,
+        &query,
+        filter_ref,
+        limit_val,
+        offset_val,
+        db_type,
+    )
+    .await
+    .map_err(|e| format!("Failed to get table data: {}", e))?;
 
     Ok(result)
 }
@@ -410,15 +417,74 @@ async fn get_table_data_inner(
     let sql = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
 
     match connection {
-        ActiveConnection::Postgres(a) => with_db_switch!(a, PostgresAdapter, sql, query.database, connection, "Failed to get table data"),
-        ActiveConnection::MySQL(a) => with_db_switch!(a, MySQLAdapter, sql, query.database, connection, "Failed to get table data"),
-        ActiveConnection::SQLServer(a) => with_db_switch!(a, SqlServerAdapter, sql, query.database, connection, "Failed to get table data"),
-        ActiveConnection::ClickHouse(a) => with_db_switch!(a, ClickHouseAdapter, sql, query.database, connection, "Failed to get table data"),
-        ActiveConnection::JdbcBridge(a) => with_db_switch!(a, JdbcBridgeAdapter, sql, query.database, connection, "Failed to get table data"),
-        ActiveConnection::Rqlite(a) => with_db_switch!(a, RqliteAdapter, sql, query.database, connection, "Failed to get table data"),
-        ActiveConnection::Turso(a) => with_db_switch!(a, TursoAdapter, sql, query.database, connection, "Failed to get table data"),
-        ActiveConnection::HttpSql(a) => with_db_switch!(a, HttpSqlAdapter, sql, query.database, connection, "Failed to get table data"),
-        ActiveConnection::SQLite(_) => connection.execute_query(&sql).await.map_err(|e| format!("Failed to get table data: {}", e)),
+        ActiveConnection::Postgres(a) => with_db_switch!(
+            a,
+            PostgresAdapter,
+            sql,
+            query.database,
+            connection,
+            "Failed to get table data"
+        ),
+        ActiveConnection::MySQL(a) => with_db_switch!(
+            a,
+            MySQLAdapter,
+            sql,
+            query.database,
+            connection,
+            "Failed to get table data"
+        ),
+        ActiveConnection::SQLServer(a) => with_db_switch!(
+            a,
+            SqlServerAdapter,
+            sql,
+            query.database,
+            connection,
+            "Failed to get table data"
+        ),
+        ActiveConnection::ClickHouse(a) => with_db_switch!(
+            a,
+            ClickHouseAdapter,
+            sql,
+            query.database,
+            connection,
+            "Failed to get table data"
+        ),
+        ActiveConnection::JdbcBridge(a) => with_db_switch!(
+            a,
+            JdbcBridgeAdapter,
+            sql,
+            query.database,
+            connection,
+            "Failed to get table data"
+        ),
+        ActiveConnection::Rqlite(a) => with_db_switch!(
+            a,
+            RqliteAdapter,
+            sql,
+            query.database,
+            connection,
+            "Failed to get table data"
+        ),
+        ActiveConnection::Turso(a) => with_db_switch!(
+            a,
+            TursoAdapter,
+            sql,
+            query.database,
+            connection,
+            "Failed to get table data"
+        ),
+        ActiveConnection::HttpSql(a) => with_db_switch!(
+            a,
+            HttpSqlAdapter,
+            sql,
+            query.database,
+            connection,
+            "Failed to get table data"
+        ),
+        ActiveConnection::SQLite(_) => connection
+            .execute_query(&sql)
+            .await
+            .map_err(|e| format!("Failed to get table data: {}", e)),
     }
 }
 
@@ -455,9 +521,16 @@ pub async fn get_table_count(
     let filter_ref = filter.as_deref();
     let db_type = get_db_type_string(&connection);
 
-    let result = get_table_count_inner(&connection, &table, schema.as_deref(), database.as_deref(), filter_ref, db_type)
-        .await
-        .map_err(|e| format!("Failed to get table count: {}", e))?;
+    let result = get_table_count_inner(
+        &connection,
+        &table,
+        schema.as_deref(),
+        database.as_deref(),
+        filter_ref,
+        db_type,
+    )
+    .await
+    .map_err(|e| format!("Failed to get table count: {}", e))?;
 
     extract_count(result)
 }
@@ -474,15 +547,74 @@ async fn get_table_count_inner(
     let query = build_count_query(&qualified, filter_ref);
 
     match connection {
-        ActiveConnection::Postgres(a) => with_db_switch!(a, PostgresAdapter, query, database, connection, "Failed to get table count"),
-        ActiveConnection::MySQL(a) => with_db_switch!(a, MySQLAdapter, query, database, connection, "Failed to get table count"),
-        ActiveConnection::SQLServer(a) => with_db_switch!(a, SqlServerAdapter, query, database, connection, "Failed to get table count"),
-        ActiveConnection::ClickHouse(a) => with_db_switch!(a, ClickHouseAdapter, query, database, connection, "Failed to get table count"),
-        ActiveConnection::JdbcBridge(a) => with_db_switch!(a, JdbcBridgeAdapter, query, database, connection, "Failed to get table count"),
-        ActiveConnection::Rqlite(a) => with_db_switch!(a, RqliteAdapter, query, database, connection, "Failed to get table count"),
-        ActiveConnection::Turso(a) => with_db_switch!(a, TursoAdapter, query, database, connection, "Failed to get table count"),
-        ActiveConnection::HttpSql(a) => with_db_switch!(a, HttpSqlAdapter, query, database, connection, "Failed to get table count"),
-        ActiveConnection::SQLite(_) => connection.execute_query(&query).await.map_err(|e| format!("Failed to get table count: {}", e)),
+        ActiveConnection::Postgres(a) => with_db_switch!(
+            a,
+            PostgresAdapter,
+            query,
+            database,
+            connection,
+            "Failed to get table count"
+        ),
+        ActiveConnection::MySQL(a) => with_db_switch!(
+            a,
+            MySQLAdapter,
+            query,
+            database,
+            connection,
+            "Failed to get table count"
+        ),
+        ActiveConnection::SQLServer(a) => with_db_switch!(
+            a,
+            SqlServerAdapter,
+            query,
+            database,
+            connection,
+            "Failed to get table count"
+        ),
+        ActiveConnection::ClickHouse(a) => with_db_switch!(
+            a,
+            ClickHouseAdapter,
+            query,
+            database,
+            connection,
+            "Failed to get table count"
+        ),
+        ActiveConnection::JdbcBridge(a) => with_db_switch!(
+            a,
+            JdbcBridgeAdapter,
+            query,
+            database,
+            connection,
+            "Failed to get table count"
+        ),
+        ActiveConnection::Rqlite(a) => with_db_switch!(
+            a,
+            RqliteAdapter,
+            query,
+            database,
+            connection,
+            "Failed to get table count"
+        ),
+        ActiveConnection::Turso(a) => with_db_switch!(
+            a,
+            TursoAdapter,
+            query,
+            database,
+            connection,
+            "Failed to get table count"
+        ),
+        ActiveConnection::HttpSql(a) => with_db_switch!(
+            a,
+            HttpSqlAdapter,
+            query,
+            database,
+            connection,
+            "Failed to get table count"
+        ),
+        ActiveConnection::SQLite(_) => connection
+            .execute_query(&query)
+            .await
+            .map_err(|e| format!("Failed to get table count: {}", e)),
     }
 }
 
