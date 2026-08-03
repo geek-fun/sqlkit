@@ -191,11 +191,11 @@ async function handleCheckUpdates() {
             <TabsTrigger value="ai">
               {{ t('pages.settings.ai.tabLabel') }}
             </TabsTrigger>
-            <TabsTrigger value="jre">
-              {{ t('pages.settings.jre.title') }}
-            </TabsTrigger>
             <TabsTrigger value="mcp">
               {{ t('pages.settings.mcp.title') }}
+            </TabsTrigger>
+            <TabsTrigger value="jre">
+              {{ t('pages.settings.jre.title') }}
             </TabsTrigger>
             <TabsTrigger value="about">
               {{ t('pages.settings.about.title') }}
@@ -591,14 +591,14 @@ async function handleCheckUpdates() {
             <AiSettings />
           </TabsContent>
 
-          <!-- JRE & Drivers Tab -->
-          <TabsContent value="jre" class="mt-0">
-            <JreDriverSection />
-          </TabsContent>
-
           <!-- MCP Bridge Tab -->
           <TabsContent value="mcp" class="mt-0">
             <McpBridge />
+          </TabsContent>
+
+          <!-- JRE & Drivers Tab -->
+          <TabsContent value="jre" class="mt-0">
+            <JreDriverSection />
           </TabsContent>
 
           <!-- About Tab -->

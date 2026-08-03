@@ -29,6 +29,7 @@ type McpPolicy = {
 const { t } = useI18n()
 const connectionStore = useConnectionStore()
 
+const defaultPort = 9121
 const status = ref<{ running: boolean, port: number | null }>({ running: false, port: null })
 const portValue = ref<number | undefined>(undefined)
 const autoStart = ref(true)
@@ -293,6 +294,7 @@ async function onActionToggle(id: string, action: McpAction) {
               <Input
                 type="number"
                 :model-value="portValue"
+                :placeholder="String(defaultPort)"
                 min="1024"
                 max="65535"
                 class="w-28"
