@@ -7,7 +7,7 @@ use axum::routing::{get, post};
 use axum::Json;
 use data_studio_agent::capabilities::permissions::McpPolicy;
 use data_studio_agent::capabilities::registry;
-use data_studio_agent::capabilities::types::Capability;
+use data_studio_agent::capabilities::types::{Capability, SourceKind};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tauri::{AppHandle, Manager};
@@ -22,6 +22,9 @@ use tokio::sync::oneshot;
 pub struct McpServerHandle {
     pub shutdown_tx: Mutex<Option<oneshot::Sender<()>>>,
     pub server_task: Mutex<Option<tokio::task::JoinHandle<()>>>,
+    /// Shared policy published into the running bridge. `save_mcp_policy`
+    /// hot-swaps through this without restarting the server.
+    pub policy: Arc<tokio::sync::RwLock<McpPolicy>>,
 }
 
 impl McpServerHandle {
@@ -29,6 +32,7 @@ impl McpServerHandle {
         Self {
             shutdown_tx: Mutex::new(None),
             server_task: Mutex::new(None),
+            policy: Arc::new(tokio::sync::RwLock::new(McpPolicy::default())),
         }
     }
 }
@@ -132,7 +136,7 @@ struct BridgeState {
     handle: AppHandle,
     app_name: &'static str,
     app_data_dir: PathBuf,
-    policy: McpPolicy,
+    policy: Arc<tokio::sync::RwLock<McpPolicy>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -170,8 +174,9 @@ fn tools_payload(policy: &McpPolicy) -> Value {
 }
 
 async fn handle_tools(State(state): State<Arc<BridgeState>>) -> Json<Value> {
-    let mut result = tools_payload(&state.policy);
-    result["connections"] = list_connections();
+    let policy = state.policy.read().await;
+    let mut result = tools_payload(&policy);
+    result["connections"] = list_allowed_connections(&policy);
     Json(result)
 }
 
@@ -205,6 +210,32 @@ fn list_connections() -> Value {
     json!(safe_list)
 }
 
+/// Saved connections restricted to the policy allowlist, so MCP clients only
+/// learn about connections they are permitted to reach.
+fn list_allowed_connections(policy: &McpPolicy) -> Value {
+    if policy.allowed_connection_ids.is_empty() {
+        return list_connections();
+    }
+    filter_connections_by_allowlist(list_connections(), policy)
+}
+
+fn filter_connections_by_allowlist(connections: Value, policy: &McpPolicy) -> Value {
+    let filtered: Vec<Value> = connections
+        .as_array()
+        .map(|arr| {
+            arr.iter()
+                .filter(|c| {
+                    c.get("id")
+                        .and_then(|v| v.as_str())
+                        .is_some_and(|id| policy.allowed_connection_ids.iter().any(|a| a == id))
+                })
+                .cloned()
+                .collect()
+        })
+        .unwrap_or_default();
+    json!(filtered)
+}
+
 /// Gate a capability against the MCP permission policy.
 /// /tools advertises connection-agnostically (None), so visibility reflects
 /// the global mode + confirm_destructive gate, not per-connection overrides.
@@ -227,11 +258,26 @@ fn check_policy(
     ))
 }
 
+/// Deny reason for a connection-less invocation when an allowlist is set.
+/// AppLocal capabilities need no connection, so they stay exempt.
+fn allowlist_missing_connection_reason(cap: &Capability, policy: &McpPolicy) -> Option<String> {
+    if !policy.allowed_connection_ids.is_empty() && !matches!(cap.source_kind, SourceKind::AppLocal)
+    {
+        return Some(
+            "connection allowlist is set — supply a connection_id from the allowlist in Settings → MCP Bridge".into(),
+        );
+    }
+    None
+}
+
 async fn handle_invoke(
     State(state): State<Arc<BridgeState>>,
     Json(payload): Json<InvokeRequest>,
 ) -> Json<InvokeResponse> {
-    Json(invoke_with_policy(&state.policy, payload).await)
+    // Snapshot so an in-flight request keeps its policy if the user hot-swaps
+    // permissions mid-request.
+    let policy = state.policy.read().await.clone();
+    Json(invoke_with_policy(&policy, payload).await)
 }
 
 // Split from handle_invoke so tests can run it without a Tauri runtime —
@@ -241,6 +287,19 @@ async fn invoke_with_policy(policy: &McpPolicy, payload: InvokeRequest) -> Invok
         Some(c) => c,
         None => return InvokeResponse::error(404, format!("Unknown capability: {}", payload.name)),
     };
+
+    // Allowlist set but no connection specified: a DB capability would fall
+    // back to the default connection, bypassing the allowlist. Mirrors the
+    // guard in the built-in agent loop (agent_adapters.rs).
+    if let Some(reason) = allowlist_missing_connection_reason(cap, policy) {
+        return InvokeResponse::error(
+            403,
+            format!(
+                "Capability '{}' blocked by MCP policy: {}",
+                cap.name, reason
+            ),
+        );
+    }
 
     if let Err(msg) = check_policy(cap, policy, payload.connection_id.as_deref()) {
         return InvokeResponse::error(403, msg);
@@ -338,15 +397,22 @@ pub async fn start(
     preferred_port: u16,
     shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<u16, String> {
+    // Publish the persisted policy into the shared Arc so the running bridge
+    // and save_mcp_policy hot-swaps stay in sync.
+    let policy_arc = {
+        let mcp_handle: tauri::State<'_, McpServerHandle> = handle.state();
+        *mcp_handle.policy.write().await = McpConfig::load(&app_data_dir).policy;
+        mcp_handle.policy.clone()
+    };
+
     // Try preferred port first, fall back to random
-    let policy = McpConfig::load(&app_data_dir).policy;
     let port = match TcpListener::bind(format!("127.0.0.1:{}", preferred_port)).await {
         Ok(listener) => {
             let state = Arc::new(BridgeState {
                 handle: handle.clone(),
                 app_name: "sqlkit",
                 app_data_dir: app_data_dir.clone(),
-                policy: policy.clone(),
+                policy: policy_arc.clone(),
             });
 
             let app = axum::Router::new()
@@ -392,7 +458,7 @@ pub async fn start(
                 handle: handle.clone(),
                 app_name: "sqlkit",
                 app_data_dir: app_data_dir.clone(),
-                policy: policy.clone(),
+                policy: policy_arc.clone(),
             });
 
             let app = axum::Router::new()
@@ -481,6 +547,7 @@ pub async fn get_mcp_status(app: AppHandle) -> Result<String, String> {
 pub async fn save_mcp_config(
     port: Option<u16>,
     auto_start: bool,
+    restart: Option<bool>,
     policy: Option<McpPolicy>,
     app: AppHandle,
 ) -> Result<String, String> {
@@ -499,15 +566,17 @@ pub async fn save_mcp_config(
     }
     config.save(&app_data_dir)?;
 
-    // Always shut down the current server first and await its full exit
-    // (including port file cleanup) to prevent the new server's port file
-    // from being deleted by stale cleanup.
-    let old_task = send_shutdown(&app).await;
-    if let Some(h) = old_task {
-        let _ = h.await;
-    }
+    // Explicit restart starts now without persisting a change to auto_start.
+    let should_start = auto_start || restart.unwrap_or(false);
+    if should_start {
+        // Shut down the current server first and await its full exit (including
+        // port file cleanup) to prevent the new server's port file from being
+        // deleted by stale cleanup.
+        let old_task = send_shutdown(&app).await;
+        if let Some(h) = old_task {
+            let _ = h.await;
+        }
 
-    if auto_start {
         let (new_shutdown_tx, new_shutdown_rx) = oneshot::channel();
         {
             let server_handle: tauri::State<'_, McpServerHandle> = app.state();
@@ -520,6 +589,26 @@ pub async fn save_mcp_config(
     }
 
     Ok(serde_json::to_string(&json!({"status": "ok"})).map_err(|e| e.to_string())?)
+}
+
+/// Persist the MCP policy and hot-swap it into the running bridge without a
+/// restart, so permission changes never interrupt in-flight LLM requests.
+#[tauri::command]
+pub async fn save_mcp_policy(policy: McpPolicy, app: AppHandle) -> Result<String, String> {
+    let app_data_dir = app
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("Failed to resolve app data dir: {}", e))?
+        .to_path_buf();
+
+    let mut config = McpConfig::load(&app_data_dir);
+    config.policy = policy.clone();
+    config.save(&app_data_dir)?;
+
+    let server_handle: tauri::State<'_, McpServerHandle> = app.state();
+    *server_handle.policy.write().await = policy;
+
+    serde_json::to_string(&json!({"status": "ok"})).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
@@ -762,6 +851,87 @@ mod tests {
 
         assert_eq!(resp.status, 404);
         assert!(resp.message.unwrap().contains("Unknown capability"));
+    }
+
+    #[test]
+    fn test_allowlist_missing_connection_reason() {
+        init_registry_for_tests();
+        let tools = registry::registry().agent_tools();
+        let Some(db_cap) = tools
+            .iter()
+            .find(|c| !matches!(c.source_kind, SourceKind::AppLocal))
+        else {
+            return;
+        };
+        let Some(app_local_cap) = tools
+            .iter()
+            .find(|c| matches!(c.source_kind, SourceKind::AppLocal))
+        else {
+            return;
+        };
+
+        let allowlist = McpPolicy {
+            allowed_connection_ids: vec!["conn-1".into()],
+            ..McpPolicy::default()
+        };
+        // DB capability without a connection_id → denied by allowlist
+        assert!(allowlist_missing_connection_reason(db_cap, &allowlist).is_some());
+        // Empty allowlist → no restriction
+        assert!(allowlist_missing_connection_reason(db_cap, &McpPolicy::default()).is_none());
+        // AppLocal capabilities never need a connection
+        assert!(allowlist_missing_connection_reason(app_local_cap, &allowlist).is_none());
+    }
+
+    #[test]
+    fn test_handle_invoke_denies_missing_connection_when_allowlist_set() {
+        init_registry_for_tests();
+        let tools = registry::registry().agent_tools();
+        let Some(db_cap) = tools
+            .iter()
+            .find(|c| !matches!(c.source_kind, SourceKind::AppLocal))
+        else {
+            return;
+        };
+
+        let req = InvokeRequest {
+            name: db_cap.name.to_string(),
+            args: json!({}),
+            connection_id: None,
+        };
+        let allowlist = McpPolicy {
+            mode: McpPermissionMode::FullAccess,
+            allowed_connection_ids: vec!["conn-1".into()],
+            ..McpPolicy::default()
+        };
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let resp = rt.block_on(invoke_with_policy(&allowlist, req));
+
+        assert_eq!(resp.status, 403);
+        assert!(resp.message.unwrap().contains("allowlist"));
+    }
+
+    #[test]
+    fn test_filter_connections_by_allowlist() {
+        let conns = json!([
+            {"id": "conn-1", "name": "A", "type": "POSTGRESQL"},
+            {"id": "conn-2", "name": "B", "type": "MYSQL"},
+            {"id": "conn-3", "name": "C", "type": "SQLITE"},
+        ]);
+
+        // Empty allowlist matches nothing (the caller short-circuits on it)
+        let none = filter_connections_by_allowlist(conns.clone(), &McpPolicy::default());
+        assert_eq!(none.as_array().unwrap().len(), 0);
+
+        // Non-empty allowlist → only listed connections survive
+        let allowlist = McpPolicy {
+            allowed_connection_ids: vec!["conn-2".into()],
+            ..McpPolicy::default()
+        };
+        let filtered = filter_connections_by_allowlist(conns, &allowlist);
+        let arr = filtered.as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["id"], "conn-2");
     }
 
     #[test]

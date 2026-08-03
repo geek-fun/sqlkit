@@ -133,11 +133,8 @@ function buildPolicy(): McpPolicy {
 
 async function savePolicy() {
   try {
-    await invoke('save_mcp_config', {
-      port: portValue.value ?? null,
-      autoStart: autoStart.value,
-      policy: buildPolicy(),
-    })
+    // Policy-only save: hot-swaps into the running bridge without a restart.
+    await invoke('save_mcp_policy', { policy: buildPolicy() })
   }
   catch (e) {
     console.error(t('pages.settings.mcp.saveFailed'), e)
@@ -177,6 +174,7 @@ async function restartBridge() {
     await invoke('save_mcp_config', {
       port: portValue.value ?? null,
       autoStart: autoStart.value,
+      restart: true,
       policy: buildPolicy(),
     })
     restartPhase.value = 'starting'
@@ -212,6 +210,10 @@ async function restartBridge() {
 }
 
 async function onModeChange(mode: string) {
+  // RadioGroupItem click + wrapper div click both reach here — guard so a
+  // single click saves once instead of double-restarting the bridge.
+  if (mode === policyMode.value)
+    return
   policyMode.value = mode as McpPermissionMode
   await savePolicy()
 }
@@ -225,7 +227,7 @@ const allowlistEnabled = computed(() => allowedConnectionIds.value.length > 0)
 
 async function onAllowlistEnableChange(val: boolean) {
   allowedConnectionIds.value = val
-    ? connections.value.map(c => String(c.id)).filter((id): id is string => id !== 'undefined')
+    ? connections.value.filter(c => c.id != null).map(c => String(c.id))
     : []
   await savePolicy()
 }
@@ -303,11 +305,11 @@ async function onActionToggle(id: string, action: McpAction) {
               <Button
                 variant="outline"
                 size="sm"
-                :disabled="restartPhase !== 'idle'"
+                :disabled="restartPhase === 'shutting-down' || restartPhase === 'starting'"
                 @click="restartBridge"
               >
                 <span
-                  v-if="restartPhase !== 'idle'"
+                  v-if="restartPhase === 'shutting-down' || restartPhase === 'starting'"
                   class="i-carbon-circle-dash mr-2 shrink-0 h-4 w-4 animate-spin"
                 />
                 {{ restartButtonText }}

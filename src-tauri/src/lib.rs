@@ -329,6 +329,7 @@ pub fn run() {
             commands::get_app_version,
             crate::mcp_bridge::get_mcp_status,
             crate::mcp_bridge::save_mcp_config,
+            crate::mcp_bridge::save_mcp_policy,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

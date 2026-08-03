@@ -66,8 +66,10 @@ pub async fn run_agent_loop(
     };
 
     let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let policy = McpConfig::load(&app_data_dir).policy;
     let should_deny = move |tool_name: &str, conn_id: Option<&str>| -> bool {
+        // Reload per call so permission changes made in Settings apply to the
+        // next tool call instead of being snapshotted for the whole run.
+        let policy = McpConfig::load(&app_data_dir).policy;
         match data_studio_agent::capabilities::registry::registry().get(tool_name) {
             Some(cap) => {
                 // Allowlist set but no connection specified: a DB capability would
