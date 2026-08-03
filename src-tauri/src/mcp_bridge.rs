@@ -142,14 +142,22 @@ struct BridgeState {
 fn tools_payload(policy: &McpPolicy) -> Value {
     let reg = registry::registry();
     let caps = reg.agent_tools();
+    let notice = policy.policy_notice();
 
     let tools: Vec<Value> = caps
         .iter()
         .filter(|cap| check_policy(cap, policy, None).is_ok())
         .map(|cap| {
+            // Neon-style policy notice: tells the client (LLM) which
+            // capability classes are gated and how to lift the gate,
+            // without exposing the gated tools themselves.
+            let description = match &notice {
+                Some(n) => format!("{}\n\n{}", cap.description, n),
+                None => cap.description.to_string(),
+            };
             json!({
                 "name": cap.name,
-                "description": cap.description,
+                "description": description,
                 "inputSchema": cap.input_schema,
                 "metadata": to_metadata(cap),
             })
@@ -209,9 +217,13 @@ fn check_policy(
         return Ok(());
     }
     let risk = format!("{:?}", cap.risk_level).to_lowercase();
+    // Actionable guidance so the agent can relay "how to enable" to the user
+    let reason = policy
+        .deny_reason(cap.risk_level, connection_id)
+        .unwrap_or_else(|| "blocked by MCP policy".to_string());
     Err(format!(
-        "Capability '{}' ({}) blocked by MCP policy (mode={:?}, confirm_destructive={})",
-        cap.name, risk, policy.mode, policy.confirm_destructive
+        "Capability '{}' ({}) blocked by MCP policy: {}",
+        cap.name, risk, reason
     ))
 }
 
@@ -676,6 +688,33 @@ mod tests {
     }
 
     #[test]
+    fn test_tools_payload_appends_policy_notice_when_gated() {
+        init_registry_for_tests();
+        // Default DataReadWrite gates Destructive → notice appended
+        let v = tools_payload(&McpPolicy::default());
+        let tools = v["tools"].as_array().unwrap();
+        assert!(!tools.is_empty());
+        for t in tools {
+            let desc = t["description"].as_str().unwrap();
+            assert!(
+                desc.contains("MCP policy notice"),
+                "surviving tool descriptions must carry the policy notice"
+            );
+            assert!(desc.contains("destructive operations"));
+        }
+        // FullAccess + confirm on → no gate → no notice
+        let full = McpPolicy {
+            mode: McpPermissionMode::FullAccess,
+            ..McpPolicy::default()
+        };
+        let v_full = tools_payload(&full);
+        for t in v_full["tools"].as_array().unwrap() {
+            let desc = t["description"].as_str().unwrap();
+            assert!(!desc.contains("MCP policy notice"));
+        }
+    }
+
+    #[test]
     fn test_check_policy_message_and_gate() {
         init_registry_for_tests();
         let caps = registry::registry().agent_tools();
@@ -693,8 +732,8 @@ mod tests {
 
         let err = check_policy(risky, &McpPolicy::default(), None).unwrap_err();
         assert!(err.contains("blocked by MCP policy"));
-        assert!(err.contains("mode="));
-        assert!(err.contains("confirm_destructive="));
+        // Error carries actionable guidance for the agent to relay
+        assert!(err.contains("requires FullAccess permission mode"));
 
         let full_no_confirm = McpPolicy {
             mode: McpPermissionMode::FullAccess,
