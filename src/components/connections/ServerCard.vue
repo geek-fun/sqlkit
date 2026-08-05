@@ -93,6 +93,11 @@ const handleEdit = () => emit('edit', props.connection)
 const handleDelete = () => emit('delete', props.connection)
 const handleDuplicate = () => emit('duplicate', props.connection)
 const handleDisconnect = () => emit('disconnect', props.connection)
+
+const isConnected = computed(() => props.connectionStatus === ConnectionStatus.CONNECTED)
+const connectTooltip = computed(() =>
+  isConnected.value ? t('components.serverCard.actions.closeConnection') : t('components.serverCard.actions.connect'),
+)
 </script>
 
 <template>
@@ -229,6 +234,24 @@ const handleDisconnect = () => emit('disconnect', props.connection)
             <TooltipTrigger as-child>
               <Button variant="ghost" size="icon" class="h-8 w-8" @click="handleConnect">
                 <svg
+                  v-if="isConnected"
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="h-4 w-4"
+                >
+                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                  <polyline points="16 17 21 12 16 7" />
+                  <line x1="21" x2="9" y1="12" y2="12" />
+                </svg>
+                <svg
+                  v-else
                   xmlns="http://www.w3.org/2000/svg"
                   width="24"
                   height="24"
@@ -247,7 +270,7 @@ const handleDisconnect = () => emit('disconnect', props.connection)
               </Button>
             </TooltipTrigger>
             <TooltipContent>
-              <p>{{ t('components.serverCard.actions.connect') }}</p>
+              <p>{{ connectTooltip }}</p>
             </TooltipContent>
           </Tooltip>
         </TooltipProvider>
