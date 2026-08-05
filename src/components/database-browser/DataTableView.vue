@@ -1314,7 +1314,7 @@ watch(
         </div>
 
         <!-- Scrollable form area -->
-        <div class="px-6 py-4 flex-1 overflow-y-auto space-y-3">
+        <div class="px-6 py-4 flex-1 min-h-0 overflow-y-auto space-y-3">
           <div
             v-for="col in (data?.columns ?? [])"
             :key="col"
