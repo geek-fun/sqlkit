@@ -28,6 +28,7 @@ const emit = defineEmits<{
   (e: 'update:selectedSchema', schema: string): void
   (e: 'openListingTab', type: string, database: string, schema?: string): void
   (e: 'openDdlTab', name: string, type: string, database: string, schema?: string): void
+  (e: 'openQueryTab', database: string): void
 }>()
 
 const { t } = useI18n()
@@ -43,6 +44,7 @@ const loadingDatabases = ref<Set<string>>(new Set())
 
 // Context menu
 const contextMenuTable = ref<{ table: TableInfo, database: string, schema?: string, x: number, y: number } | null>(null)
+const contextMenuDatabase = ref<{ database: string, x: number, y: number } | null>(null)
 const selectedTreeItem = ref<{ type: string, name: string, schema?: string } | null>(null)
 
 const activeConnection = computed(() =>
@@ -150,7 +152,55 @@ function handleDoubleClick(table: TableInfo, schema: string | undefined) {
 
 function handleContextMenu(event: MouseEvent, table: TableInfo, schema: string | undefined) {
   event.preventDefault()
+  contextMenuDatabase.value = null
   contextMenuTable.value = { table, database: props.selectedDatabase!, schema, x: event.clientX, y: event.clientY }
+}
+
+function closeContextMenus() {
+  contextMenuTable.value = null
+  contextMenuDatabase.value = null
+}
+
+function handleDatabaseContextMenu(event: MouseEvent, dbName: string) {
+  event.preventDefault()
+  contextMenuTable.value = null
+  contextMenuDatabase.value = { database: dbName, x: event.clientX, y: event.clientY }
+}
+
+// Database-level context menu actions
+type DatabaseContextAction = 'openQuery' | 'showErDiagram' | 'refresh'
+
+function handleDatabaseContextAction(action: DatabaseContextAction) {
+  if (!contextMenuDatabase.value)
+    return
+  const { database } = contextMenuDatabase.value
+  const handlers: Record<DatabaseContextAction, () => void> = {
+    openQuery: () => emit('openQueryTab', database),
+    showErDiagram: () => emit('showErDiagram', database),
+    refresh: () => refreshDatabase(database),
+  }
+  handlers[action]()
+  contextMenuDatabase.value = null
+}
+
+async function refreshDatabase(dbName: string) {
+  if (!props.connectionId)
+    return
+  const connId = props.connectionId
+  loadingDatabases.value = new Set([...loadingDatabases.value, dbName])
+  try {
+    await databaseStore.fetchSchemas(connId, dbName)
+    const meta = databaseStore.metadata[connId]
+    const schemas = meta?.schemas[dbName] || []
+    const hasReal = schemas.some(s => s !== dbName)
+    if (hasReal)
+      await Promise.all(schemas.map(s => databaseStore.fetchTables(connId, dbName, s)))
+    else
+      await databaseStore.fetchTables(connId, dbName)
+  }
+  finally {
+    loadingDatabases.value = new Set([...loadingDatabases.value].filter(n => n !== dbName))
+  }
 }
 
 // Context menu action handler
@@ -330,7 +380,7 @@ defineExpose({ refresh })
 </script>
 
 <template>
-  <div class="flex flex-col h-full relative" @click="contextMenuTable = null">
+  <div class="flex flex-col h-full relative" @click="closeContextMenus">
     <!-- Initial loading overlay — only during first fetch, not during expand operations -->
     <div v-if="databaseStore.loading && allDatabases.length === 0" class="bg-background/60 flex items-center inset-0 justify-center absolute z-10">
       <div class="text-sm text-muted-foreground text-center">
@@ -509,6 +559,7 @@ defineExpose({ refresh })
         <button
           class="text-sm px-2 py-1 flex gap-1.5 w-full cursor-pointer items-center hover:bg-accent/40"
           @click="toggleDatabaseNode(db.name)"
+          @contextmenu="handleDatabaseContextMenu($event, db.name)"
         >
           <span class="i-lucide-chevron-right shrink-0 h-3 w-3 transition-transform" :class="{ 'rotate-90': expandedDatabases.has(db.name) }" />
           <span class="i-lucide-database text-yellow-500 shrink-0 h-3.5 w-3.5" />
@@ -648,6 +699,47 @@ defineExpose({ refresh })
       <p class="text-xs text-muted-foreground text-center">
         {{ t('sidebar.noDatabases') }}
       </p>
+    </div>
+
+    <!-- Click-away overlay: dismisses the context menu on any outside interaction -->
+    <div
+      v-if="contextMenuTable || contextMenuDatabase"
+      class="inset-0 fixed z-40"
+      @mousedown="closeContextMenus"
+      @contextmenu.prevent="closeContextMenus"
+    />
+
+    <!-- Database context menu -->
+    <div
+      v-if="contextMenuDatabase"
+      class="text-popover-foreground border rounded-md bg-popover w-48 shadow-md fixed z-50"
+      :style="{ left: `${contextMenuDatabase.x}px`, top: `${contextMenuDatabase.y}px` }"
+      @click.stop
+    >
+      <div class="p-1">
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleDatabaseContextAction('openQuery')"
+        >
+          <span class="i-carbon-sql mr-2 h-3.5 w-3.5" />
+          {{ t('components.databaseBrowser.contextMenu.newQuery') }}
+        </div>
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleDatabaseContextAction('showErDiagram')"
+        >
+          <span class="i-carbon-diagram mr-2 h-3.5 w-3.5" />
+          {{ t('components.databaseBrowser.contextMenu.showErDiagram') }}
+        </div>
+        <div class="my-1 bg-border h-px" />
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleDatabaseContextAction('refresh')"
+        >
+          <span class="i-carbon-renew mr-2 h-3.5 w-3.5" />
+          {{ t('components.databaseBrowser.contextMenu.refresh') }}
+        </div>
+      </div>
     </div>
 
     <!-- Context Menu -->
