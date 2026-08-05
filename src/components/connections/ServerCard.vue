@@ -27,6 +27,7 @@ const emit = defineEmits<{
   (e: 'edit', connection: ServerConnection): void
   (e: 'delete', connection: ServerConnection): void
   (e: 'duplicate', connection: ServerConnection): void
+  (e: 'disconnect', connection: ServerConnection): void
 }>()
 
 const { t } = useI18n()
@@ -91,6 +92,7 @@ const handleDoubleClick = () => emit('dblclick', props.connection)
 const handleEdit = () => emit('edit', props.connection)
 const handleDelete = () => emit('delete', props.connection)
 const handleDuplicate = () => emit('duplicate', props.connection)
+const handleDisconnect = () => emit('disconnect', props.connection)
 </script>
 
 <template>
@@ -272,6 +274,29 @@ const handleDuplicate = () => emit('duplicate', props.connection)
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              v-if="connectionStatus === ConnectionStatus.CONNECTED"
+              @click="handleDisconnect"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                class="mr-2 h-4 w-4"
+              >
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16 17 21 12 16 7" />
+                <line x1="21" x2="9" y1="12" y2="12" />
+              </svg>
+              {{ t('components.serverCard.actions.disconnect') }}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator v-if="connectionStatus === ConnectionStatus.CONNECTED" />
             <DropdownMenuItem @click="handleEdit">
               <svg
                 xmlns="http://www.w3.org/2000/svg"

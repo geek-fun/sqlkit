@@ -1111,6 +1111,7 @@ export const zhCN = {
     serverCard: {
       actions: {
         connect: '连接',
+        disconnect: '断开连接',
         edit: '编辑',
         duplicate: '复制',
         delete: '删除',
@@ -1166,6 +1167,8 @@ export const zhCN = {
         showErDiagram: '展示ER图表',
         dropTable: '删除表',
         truncateTable: '清空',
+        newQuery: '新建查询',
+        refresh: '刷新',
       },
       savedQueryActions: {
         open: '打开',

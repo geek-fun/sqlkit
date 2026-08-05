@@ -186,6 +186,18 @@ function handleDuplicateConnection(connection: ServerConnection) {
   isFormDialogOpen.value = true
 }
 
+async function handleDisconnect(connection: ServerConnection) {
+  connectError.value = null
+  if (!connection.id)
+    return
+  try {
+    await connectionStore.disconnect(connection.id)
+  }
+  catch (error) {
+    connectError.value = error instanceof Error ? error.message : String(error)
+  }
+}
+
 async function handleSaveConnection(connection: ServerConnection) {
   const result = await connectionStore.saveConnection(connection)
   if (!result.success) {
@@ -459,6 +471,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             @edit="handleEditConnection"
             @delete="handleDeleteConnection"
             @duplicate="handleDuplicateConnection"
+            @disconnect="handleDisconnect"
           />
 
           <!-- Add New Connection Card -->
