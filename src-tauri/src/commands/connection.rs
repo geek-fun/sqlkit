@@ -28,6 +28,8 @@ pub async fn connect_server(
     let mut connections = state.connections.write().await;
     connections.insert(id.clone(), connection.clone());
     drop(connections);
+    // Keep the config so a lost session can be transparently recreated later.
+    state.configs.write().await.insert(id.clone(), config);
     let status = connection
         .test_connection()
         .await
@@ -45,6 +47,8 @@ pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result
     let connection = connections
         .remove(&id)
         .ok_or_else(|| format!("No active connection found for server '{}'", id))?;
+
+    state.configs.write().await.remove(&id);
 
     let disconnect_result = connection.disconnect().await;
 

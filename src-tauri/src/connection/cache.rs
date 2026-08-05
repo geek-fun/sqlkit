@@ -85,13 +85,9 @@ impl ConnectionCache {
             }
         }
 
-        // Slow path: need to create connection
-        let conns = app_state.connections.read().await;
-        let connection = conns
-            .get(&key.connection_id)
-            .cloned()
-            .ok_or_else(|| format!("No active connection found for '{}'", key.connection_id))?;
-        drop(conns);
+        // Slow path: need to create connection — transparently reconnect when
+        // the session was lost or idle-evicted instead of erroring out.
+        let connection = app_state.ensure_connection(&key.connection_id).await?;
 
         // Evict if at capacity
         {

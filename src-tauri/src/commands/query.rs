@@ -129,10 +129,7 @@ pub async fn execute_query(
         }
 
         let temp_kind: Option<TempKind> = {
-            let connections = state.connections.read().await;
-            let connection = connections
-                .get(&connection_id)
-                .ok_or_else(|| "No active connection found".to_string())?;
+            let connection = state.ensure_connection(&connection_id).await?;
 
             match connection {
                 ActiveConnection::Postgres(adapter) => {
@@ -250,14 +247,8 @@ pub async fn execute_query(
         }
     }
 
-    // Common path: use the already-connected adapter
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| "No active connection found".to_string())?
-            .clone()
-    };
+    // Common path: use the already-connected adapter (reconnecting if needed)
+    let connection = state.ensure_connection(&connection_id).await?;
 
     // Cache this handle for future cross-database lookups
     state
@@ -334,11 +325,8 @@ pub async fn execute_sorted_query(
 ) -> Result<ApiResponse<QueryResult>, String> {
     // Derive database type from the active connection
     let db_type = {
-        let connections = state.connections.read().await;
-        let connection = connections
-            .get(&connection_id)
-            .ok_or_else(|| "No active connection found".to_string())?;
-        crate::commands::browse::get_db_type_string(connection).to_string()
+        let connection = state.ensure_connection(&connection_id).await?;
+        crate::commands::browse::get_db_type_string(&connection).to_string()
     };
 
     // Inject the database type into options and build the wrapped SQL
@@ -434,10 +422,7 @@ pub async fn explain_query(
         }
 
         let temp_kind: Option<TempExplainKind> = {
-            let connections = state.connections.read().await;
-            let connection = connections
-                .get(&connection_id)
-                .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+            let connection = state.ensure_connection(&connection_id).await?;
 
             match connection {
                 ActiveConnection::Postgres(adapter) => {
@@ -717,14 +702,8 @@ pub async fn explain_query(
         }
     }
 
-    // Common path: use the already-connected adapter
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    // Common path: use the already-connected adapter (reconnecting if needed)
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let database_type = match &connection {
         ActiveConnection::Postgres(_) => "postgresql",

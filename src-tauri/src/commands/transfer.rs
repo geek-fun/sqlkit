@@ -15,10 +15,7 @@ pub async fn preview_export_data(
     preview_rows: u32,
     state: State<'_, AppState>,
 ) -> Result<ExportPreview, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&request.connection_id)
-        .ok_or_else(|| "No active connection found".to_string())?;
+    let connection = state.ensure_connection(&request.connection_id).await?;
 
     match connection {
         ActiveConnection::Postgres(adapter) => {
@@ -47,10 +44,7 @@ pub async fn execute_export_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&request.connection_id)
-        .ok_or_else(|| "No active connection found".to_string())?;
+    let connection = state.ensure_connection(&request.connection_id).await?;
 
     match connection {
         ActiveConnection::Postgres(adapter) => {
@@ -93,10 +87,7 @@ pub async fn execute_import_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&request.connection_id)
-        .ok_or_else(|| "No active connection found".to_string())?;
+    let connection = state.ensure_connection(&request.connection_id).await?;
 
     match connection {
         ActiveConnection::Postgres(adapter) => {
@@ -124,11 +115,7 @@ pub async fn preview_migration_data(
     request: MigrationRequest,
     state: State<'_, AppState>,
 ) -> Result<MigrationPreview, String> {
-    let connections = state.connections.read().await;
-
-    let source_connection = connections
-        .get(&request.source_connection_id)
-        .ok_or_else(|| "No source connection found".to_string())?;
+    let source_connection = state.ensure_connection(&request.source_connection_id).await?;
 
     match source_connection {
         ActiveConnection::Postgres(adapter) => {
@@ -157,15 +144,9 @@ pub async fn execute_migration_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.read().await;
+    let source_connection = state.ensure_connection(&request.source_connection_id).await?;
 
-    let source_connection = connections
-        .get(&request.source_connection_id)
-        .ok_or_else(|| "No source connection found".to_string())?;
-
-    let target_connection = connections
-        .get(&request.target_connection_id)
-        .ok_or_else(|| "No target connection found".to_string())?;
+    let target_connection = state.ensure_connection(&request.target_connection_id).await?;
 
     macro_rules! run_migration {
         ($source_adapter:expr, $target_adapter:expr) => {
@@ -269,10 +250,7 @@ pub async fn auto_map_migration_columns(
 ) -> Result<Vec<crate::transfer::MigrationMapping>, String> {
     use crate::database::DatabaseAdapter;
 
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| "No active connection found".to_string())?;
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let target_db_type = match target_engine.to_lowercase().as_str() {
         "postgresql" | "postgres" => DatabaseType::PostgreSQL,
@@ -307,10 +285,7 @@ pub async fn generate_ddl_for_objects(
     request: DdlRequest,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&request.connection_id)
-        .ok_or_else(|| "No active connection found".to_string())?;
+    let connection = state.ensure_connection(&request.connection_id).await?;
 
     let engine = match connection {
         ActiveConnection::Postgres(_) => DatabaseType::PostgreSQL,
@@ -441,10 +416,7 @@ pub async fn execute_sql_content(
     on_error: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| "No active connection found".to_string())?;
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let strategy = on_error.as_deref().unwrap_or("stop");
     let statements = split_sql_statements(&content);

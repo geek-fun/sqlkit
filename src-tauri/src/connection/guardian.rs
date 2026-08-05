@@ -359,18 +359,15 @@ impl ConnectionGuardian {
         }
         self.emit_state_change(connection_id, HealthState::Reconnecting, None);
 
-        // Try to reconnect by calling test_connection on the active connection
+        // Try to reconnect by recreating the adapter from the stored config.
+        // Pinging the stale adapter is not enough — the underlying session may
+        // be irrecoverable (server restart, dropped connection).
         let success = {
             let state = APP_HANDLE
                 .get()
                 .expect("APP_HANDLE not initialized")
                 .state::<AppState>();
-            let conns = state.connections.read().await;
-            let conn = conns.get(connection_id);
-            match conn {
-                Some(c) => self.ping_connection(c).await,
-                None => false,
-            }
+            state.ensure_connection(connection_id).await.is_ok()
         };
 
         if success {
