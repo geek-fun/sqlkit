@@ -294,7 +294,7 @@ const handleDisconnect = () => emit('disconnect', props.connection)
                 <polyline points="16 17 21 12 16 7" />
                 <line x1="21" x2="9" y1="12" y2="12" />
               </svg>
-              {{ t('components.serverCard.actions.disconnect') }}
+              {{ t('components.serverCard.actions.closeConnection') }}
             </DropdownMenuItem>
             <DropdownMenuSeparator v-if="connectionStatus === ConnectionStatus.CONNECTED" />
             <DropdownMenuItem @click="handleEdit">
