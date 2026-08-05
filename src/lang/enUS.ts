@@ -1112,6 +1112,7 @@ export const enUS = {
     serverCard: {
       actions: {
         connect: 'Connect',
+        openEditor: 'Open in Editor',
         closeConnection: 'Close Connection',
         edit: 'Edit',
         duplicate: 'Duplicate',

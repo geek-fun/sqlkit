@@ -96,7 +96,7 @@ const handleDisconnect = () => emit('disconnect', props.connection)
 
 const isConnected = computed(() => props.connectionStatus === ConnectionStatus.CONNECTED)
 const connectTooltip = computed(() =>
-  isConnected.value ? t('components.serverCard.actions.closeConnection') : t('components.serverCard.actions.connect'),
+  isConnected.value ? t('components.serverCard.actions.openEditor') : t('components.serverCard.actions.connect'),
 )
 </script>
 
@@ -246,9 +246,9 @@ const connectTooltip = computed(() =>
                   stroke-linejoin="round"
                   class="h-4 w-4"
                 >
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                  <polyline points="16 17 21 12 16 7" />
-                  <line x1="21" x2="9" y1="12" y2="12" />
+                  <path d="M15 3h6v6" />
+                  <path d="M10 14 21 3" />
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                 </svg>
                 <svg
                   v-else
