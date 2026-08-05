@@ -1111,7 +1111,7 @@ export const zhCN = {
     serverCard: {
       actions: {
         connect: '连接',
-        disconnect: '断开连接',
+        closeConnection: '关闭连接',
         edit: '编辑',
         duplicate: '复制',
         delete: '删除',
