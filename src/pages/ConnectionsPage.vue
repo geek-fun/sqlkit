@@ -133,12 +133,11 @@ async function handleConnect(connection: ServerConnection) {
   const status = connectionStore.getConnectionStatus(connection.id)
 
   if (status === ConnectionStatus.CONNECTED) {
-    try {
-      await connectionStore.disconnect(connection.id)
-    }
-    catch (error) {
-      connectError.value = error instanceof Error ? error.message : String(error)
-    }
+    // Already connected — primary action opens the connection in the editor.
+    router.push({
+      name: 'queries',
+      query: { connectionId: connection.id },
+    })
   }
   else {
     await establishConnection(connection, true)
