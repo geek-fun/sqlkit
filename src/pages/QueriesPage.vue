@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { StatementToExecute } from '@/composables/useSqlStatements'
-import type { DatabaseType } from '@/store/connectionStore'
 import type { TableInfo } from '@/store/databaseStore'
 import type { ApiResponse } from '@/types/api'
 import { invoke } from '@tauri-apps/api/core'
@@ -22,6 +21,7 @@ import { usePlatform } from '@/composables/usePlatform'
 import { useSqlFormatter } from '@/composables/useSqlFormatter'
 import { browseApi, loadQueryFile, saveQueryFile, saveQueryFileAs, saveQueryMetadata } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
+import { DatabaseType } from '@/store/connectionStore'
 import { isApiSuccess } from '@/types/api'
 
 const { t } = useI18n()
@@ -313,6 +313,14 @@ function handleNewTab() {
   tabStore.createTab(connId ?? undefined, db)
 }
 
+function handleOpenQueryTab(database: string) {
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+  const tab = tabStore.createTab(connId, database)
+  tabStore.setActiveTab(tab.id)
+}
+
 function handleTabSelect(tabId: string) {
   const tab = tabStore.tabById(tabId)
   if (tab?.orphanFromConnectionId) {
@@ -388,11 +396,48 @@ CREATE TABLE ${schemaPrefix}"${table.name}" (
   }
 }
 
-function handleSelectTopN(table: TableInfo, database: string, schema?: string, n = 100) {
-  const schemaPrefix = schema ? `"${schema}".` : ''
-  const query = `SELECT * FROM ${schemaPrefix}"${table.name}" LIMIT ${n};`
+// Databases speaking the MySQL dialect quote identifiers with backticks.
+const MYSQL_LIKE_DB_TYPES = new Set<DatabaseType>([
+  DatabaseType.MYSQL,
+  DatabaseType.MARIADB,
+  DatabaseType.TIDB,
+  DatabaseType.OCEANBASE,
+  DatabaseType.TDSQL,
+  DatabaseType.POLARDB,
+  DatabaseType.DORIS,
+  DatabaseType.SELECTDB,
+  DatabaseType.STARROCKS,
+  DatabaseType.DATABEND,
+  DatabaseType.GOLDENDB,
+  DatabaseType.MANTICORESEARCH,
+  DatabaseType.SINGLESTOREMEMSQL,
+  DatabaseType.CLOUDSQLMYSQL,
+])
 
+function quoteIdentifier(name: string, dbType: DatabaseType | undefined): string {
+  if (dbType === DatabaseType.SQLSERVER)
+    return `[${name.replace(/\]/g, ']]')}]`
+  if (dbType && MYSQL_LIKE_DB_TYPES.has(dbType))
+    return `\`${name.replace(/`/g, '``')}\``
+  return `"${name.replace(/"/g, '""')}"`
+}
+
+function buildSelectTopN(table: TableInfo, schema: string | undefined, n: number, dbType: DatabaseType | undefined): string {
+  const tableRef = schema
+    ? `${quoteIdentifier(schema, dbType)}.${quoteIdentifier(table.name, dbType)}`
+    : quoteIdentifier(table.name, dbType)
+  if (dbType === DatabaseType.SQLSERVER)
+    return `SELECT TOP ${n} * FROM ${tableRef};`
+  if (dbType === DatabaseType.ORACLE || dbType === DatabaseType.OCEANBASE_ORACLE)
+    return `SELECT * FROM ${tableRef} FETCH FIRST ${n} ROWS ONLY;`
+  return `SELECT * FROM ${tableRef} LIMIT ${n};`
+}
+
+function handleSelectTopN(table: TableInfo, database: string, schema?: string, n = 100) {
   const connId = getActiveConnectionId()
+  const dbType = connId ? connectionStore.getConnectionById(connId)?.type : undefined
+  const query = buildSelectTopN(table, schema, n, dbType)
+
   if (connId) {
     const tab = tabStore.createTab(connId, database, schema)
     tabStore.updateTabContent(tab.id, query)
@@ -975,6 +1020,7 @@ function closeResultPanel() {
                 @truncate-table="handleTruncateTable"
                 @open-listing-tab="handleOpenListingTab"
                 @open-ddl-tab="handleOpenDdlTab"
+                @open-query-tab="handleOpenQueryTab"
               />
             </template>
             <template #bottom>
