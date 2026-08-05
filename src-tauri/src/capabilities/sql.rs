@@ -65,8 +65,8 @@ async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String
     // Store the adapter for future use
     {
         let state: tauri::State<'_, crate::state::AppState> = app.state();
-        let mut conns = state.connections.write().await;
-        conns.insert(connection_id.to_string(), adapter.clone());
+        state.connections.write().await.insert(connection_id.to_string(), adapter.clone());
+        state.configs.write().await.insert(connection_id.to_string(), server_config);
     }
 
     Ok(adapter)

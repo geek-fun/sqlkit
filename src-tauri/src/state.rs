@@ -287,6 +287,9 @@ pub struct AppConfig {
 pub struct AppState {
     /// Active database connections indexed by connection ID.
     pub connections: Arc<RwLock<HashMap<String, ActiveConnection>>>,
+    /// Server configs for active connections, kept so a lost/evicted session can
+    /// be transparently recreated on the next user action.
+    pub configs: Arc<RwLock<HashMap<String, ServerConfig>>>,
     /// LRU cache for cross-database connection handles.
     pub cache: crate::connection::cache::ConnectionCache,
     /// SSH tunnel lifecycle manager.
@@ -298,9 +301,60 @@ impl AppState {
     pub fn new() -> Self {
         Self {
             connections: Arc::new(RwLock::new(HashMap::new())),
+            configs: Arc::new(RwLock::new(HashMap::new())),
             cache: crate::connection::cache::ConnectionCache::default(),
             tunnels: TunnelManager::new(),
         }
+    }
+
+    /// Return the active connection for `connection_id`.
+    ///
+    /// If the session was lost or idle-evicted, transparently reconnects using
+    /// the stored server config so user actions never fail with a
+    /// "No active connection found" error. Errors are returned only when the
+    /// server cannot be reached or no config was ever stored for this id.
+    pub async fn ensure_connection(&self, connection_id: &str) -> Result<ActiveConnection, String> {
+        if let Some(conn) = self.connections.read().await.get(connection_id) {
+            return Ok(conn.clone());
+        }
+
+        let config = self
+            .configs
+            .read()
+            .await
+            .get(connection_id)
+            .cloned()
+            .ok_or_else(|| format!("No active connection found for server '{}'", connection_id))?;
+
+        let mut conn_config = config.to_connection_config()?;
+        let (host, port) = crate::commands::helpers::connection_host_port(
+            connection_id,
+            &conn_config,
+            &self.tunnels,
+        )
+        .await?;
+        conn_config.host = host;
+        conn_config.port = port;
+
+        let timeout_secs = conn_config.connect_timeout_secs;
+        let connection = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_secs),
+            crate::commands::helpers::create_and_connect_adapter(&config.db_type, conn_config),
+        )
+        .await
+        .map_err(|_| format!("Reconnect timed out after {} seconds", timeout_secs))??;
+
+        self.connections
+            .write()
+            .await
+            .insert(connection_id.to_string(), connection.clone());
+
+        // Notify the guardian so the frontend state flips back to CONNECTED.
+        if let Some(guardian) = crate::GUARDIAN.get() {
+            guardian.mark_healthy(connection_id, None).await;
+        }
+
+        Ok(connection)
     }
 }
 

@@ -147,13 +147,7 @@ pub async fn list_databases(
     connection_id: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<DatabaseSchema>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
     let databases = connection
         .list_databases()
         .await
@@ -179,13 +173,7 @@ pub async fn list_schemas(
     database: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<String>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let schemas = connection
         .list_schemas(Some(&database))
@@ -214,13 +202,7 @@ pub async fn list_tables(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<TableInfo>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let tables = connection
         .list_tables(Some(&database), schema.as_deref())
@@ -251,13 +233,7 @@ pub async fn get_table_info(
     table_name: String,
     state: State<'_, AppState>,
 ) -> Result<TableInfo, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let table_info = connection
         .get_table_info(Some(&database), schema.as_deref(), &table_name)
@@ -276,13 +252,7 @@ pub async fn list_columns(
     table_name: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<ColumnInfo>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let columns = match &connection {
         ActiveConnection::Postgres(adapter) => {
@@ -344,13 +314,7 @@ pub async fn get_foreign_keys(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ForeignKeyInfo>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let result = connection
         .get_foreign_keys(Some(&database), schema.as_deref())
@@ -377,13 +341,7 @@ pub async fn get_table_data(
     query: TableDataQuery,
     state: State<'_, AppState>,
 ) -> Result<QueryResult, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let limit_val = query.limit.unwrap_or(100);
     let offset_val = query.offset.unwrap_or(0);
@@ -510,13 +468,7 @@ pub async fn get_table_count(
     filter: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<u64, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let filter_ref = filter.as_deref();
     let db_type = get_db_type_string(&connection);
@@ -685,13 +637,7 @@ pub async fn update_table_row(
         return Ok(());
     }
 
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let db_type = get_db_type_string(&connection);
 
@@ -823,13 +769,7 @@ pub async fn delete_table_row(
         return Err("Cannot delete row: no primary key values provided".to_string());
     }
 
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     let db_type = get_db_type_string(&connection);
 
@@ -930,13 +870,7 @@ pub async fn list_views(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ObjectInfo>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     connection
         .list_views(Some(&database), schema.as_deref())
@@ -952,13 +886,7 @@ pub async fn list_procedures(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ObjectInfo>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     connection
         .list_procedures(Some(&database), schema.as_deref())
@@ -974,13 +902,7 @@ pub async fn list_functions(
     schema: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<ObjectInfo>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     connection
         .list_functions(Some(&database), schema.as_deref())
@@ -997,13 +919,7 @@ pub async fn list_triggers(
     table: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<TriggerInfo>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     connection
         .list_triggers(Some(&database), schema.as_deref(), &table)
@@ -1020,13 +936,7 @@ pub async fn list_indexes(
     table: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<IndexInfo>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     connection
         .list_indexes(Some(&database), schema.as_deref(), &table)
@@ -1043,13 +953,7 @@ pub async fn list_foreign_keys(
     table: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<ForeignKeyInfo>, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     connection
         .list_foreign_keys_for_table(Some(&database), schema.as_deref(), &table)
@@ -1067,13 +971,7 @@ pub async fn get_object_ddl(
     object_type: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     connection
         .get_object_ddl(
@@ -1096,13 +994,7 @@ pub async fn drop_object(
     object_type: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     connection
         .drop_object(
@@ -1126,13 +1018,7 @@ pub async fn rename_object(
     new_name: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let connection = {
-        let connections = state.connections.read().await;
-        connections
-            .get(&connection_id)
-            .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?
-            .clone()
-    };
+    let connection = state.ensure_connection(&connection_id).await?;
 
     connection
         .rename_object(
@@ -1205,14 +1091,11 @@ pub async fn build_table_search_filter(
     search_term: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    let connections = state.connections.read().await;
-    let connection = connections
-        .get(&connection_id)
-        .ok_or_else(|| format!("No active connection found for ID '{}'", connection_id))?;
+    let connection = state.ensure_connection(&connection_id).await?;
 
-    let db_type = get_db_type_string(connection);
+    let db_type = get_db_type_string(&connection);
 
-    let columns = match connection {
+    let columns = match &connection {
         ActiveConnection::Postgres(adapter) => {
             let adapter = adapter.lock().await;
             if Some(database.as_str()) != adapter.config.database.as_deref() {

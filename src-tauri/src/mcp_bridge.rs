@@ -511,10 +511,7 @@ async fn resolve_connection(connection_id: &str) -> Result<Value, String> {
         .ok_or_else(|| "AppHandle not initialized".to_string())?;
     use tauri::State;
     let state: State<'_, crate::state::AppState> = handle.state();
-    let conns = state.connections.read().await;
-    let _active = conns
-        .get(connection_id)
-        .ok_or_else(|| format!("Connection not found: {}", connection_id))?;
+    state.ensure_connection(connection_id).await?;
     Ok(json!({ "connectionId": connection_id }))
 }
 
