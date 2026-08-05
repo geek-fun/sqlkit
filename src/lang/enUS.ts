@@ -1112,6 +1112,7 @@ export const enUS = {
     serverCard: {
       actions: {
         connect: 'Connect',
+        disconnect: 'Disconnect',
         edit: 'Edit',
         duplicate: 'Duplicate',
         delete: 'Delete',
@@ -1167,6 +1168,8 @@ export const enUS = {
         showErDiagram: 'Show ER Diagram',
         dropTable: 'Drop Table',
         truncateTable: 'Truncate',
+        newQuery: 'New Query',
+        refresh: 'Refresh',
       },
       savedQueryActions: {
         open: 'Open',
