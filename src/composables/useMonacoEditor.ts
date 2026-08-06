@@ -5,6 +5,7 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { onBeforeUnmount } from 'vue'
+import { hasGrammar } from './sqlCompletion/dialects'
 import { getCompletionProvider } from './sqlCompletion/provider'
 import {
   getSqlGutterDecorations,
@@ -63,6 +64,9 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
   let refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null
   const { isDark } = useTheme()
 
+  /** Monaco ships grammars only for sql/mysql/pgsql; other dialect ids use the generic sql grammar. Completion still resolves the real dialect profile per-editor. */
+  const resolveEditorLanguage = (id: SQLDialect): SQLDialect => hasGrammar(id) ? id : 'sql'
+
   const refreshGutterDecorations = () => {
     if (refreshDebounceTimer !== null)
       clearTimeout(refreshDebounceTimer)
@@ -93,7 +97,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
 
     editor = monaco.editor.create(containerRef.value, {
       value: initialValue.value,
-      language: options.language || 'sql',
+      language: resolveEditorLanguage(options.language || 'sql'),
       theme: isDark.value ? 'vs-dark' : 'vs',
       automaticLayout: true,
       readOnly: options.readOnly || false,
@@ -208,7 +212,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     if (editor) {
       const model = editor.getModel()
       if (model) {
-        monaco.editor.setModelLanguage(model, id)
+        monaco.editor.setModelLanguage(model, resolveEditorLanguage(id))
       }
     }
   }

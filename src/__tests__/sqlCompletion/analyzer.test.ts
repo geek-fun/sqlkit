@@ -81,4 +81,28 @@ describe('analyzeCompletionContext', () => {
     expect(ctx.word).toBe('')
     expect(ctx.activeTable?.table).toBe('users')
   })
+
+  it('(i) schema-qualified qualifier with unmatched FROM table → activeTable null (no fallback)', () => {
+    const text = 'SELECT u.name, public.us FROM users u'
+    const ctx = analyzeCompletionContext(text, text.indexOf('public.us') + 'public.us'.length)
+    expect(ctx.qualifier).toBe('public.')
+    expect(ctx.isAfterDot).toBe(true)
+    expect(ctx.activeTable).toBeNull()
+  })
+
+  it('(j) quoted qualifier matches the table name (unquoted before compare)', () => {
+    const text = 'SELECT "users". FROM users'
+    const ctx = analyzeCompletionContext(text, text.indexOf('"users".') + '"users".'.length)
+    expect(ctx.qualifier).toBe('"users".')
+    expect(ctx.isAfterDot).toBe(true)
+    expect(ctx.activeTable?.table).toBe('users')
+  })
+
+  it('(k) multi-segment qualifier never matches a bare FROM table', () => {
+    const text = 'SELECT * FROM app.public.'
+    const ctx = analyzeCompletionContext(text, text.length)
+    expect(ctx.qualifier).toBe('app.public.')
+    expect(ctx.isAfterDot).toBe(true)
+    expect(ctx.activeTable).toBeNull()
+  })
 })

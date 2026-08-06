@@ -28,7 +28,7 @@ export type CompletionContext = {
   word: string
   /** The current statement's table references in order of appearance. */
   tableRefs: TableRef[]
-  /** Table the cursor is scoped to (alias match first, else last FROM/JOIN table). */
+  /** Table the cursor is scoped to: alias/table match on a single-segment qualifier, else the last FROM/JOIN table in bare-column context; null for unmatched schema/db qualifiers (`public.`). */
   activeTable: TableRef | null
   /** Qualifier prefix before the word, e.g. 'u.' or 'public.' or 'db.public.'. */
   qualifier: string

@@ -263,15 +263,22 @@ export function analyzeCompletionContext(text: string, offset: number): Completi
     tableRefs = extractTableRefs(text, span.start, span.end)
   }
 
-  // activeTable: alias match on qualifier first; else last FROM/JOIN table.
+  // activeTable: alias/table match on a single-segment qualifier (`u.`, `users.`);
+  // otherwise the last FROM/JOIN table as the bare-column context table. A
+  // qualifier matching neither an alias nor a table (e.g. `public.us`) must NOT
+  // fall back to a FROM table — the builder would return that table's columns
+  // instead of the schema/table objects the user is completing.
   let activeTable: TableRef | null = null
   if (isAfterDot && tableRefs.length > 0) {
-    const firstQualSeg = qualifier.split('.')[0]
-    const byAlias = tableRefs.find(r => r.alias && r.alias.toLowerCase() === firstQualSeg.toLowerCase())
-    const byName = tableRefs.find(r => r.table.toLowerCase() === firstQualSeg.toLowerCase())
-    activeTable = byAlias ?? byName ?? null
+    const segments = qualifier.split('.').filter(Boolean)
+    if (segments.length === 1) {
+      const firstQualSeg = unquote(segments[0])
+      const byAlias = tableRefs.find(r => r.alias && r.alias.toLowerCase() === firstQualSeg.toLowerCase())
+      const byName = tableRefs.find(r => r.table.toLowerCase() === firstQualSeg.toLowerCase())
+      activeTable = byAlias ?? byName ?? null
+    }
   }
-  if (!activeTable && tableRefs.length > 0) {
+  if (!activeTable && !isAfterDot && tableRefs.length > 0) {
     activeTable = tableRefs[tableRefs.length - 1]
   }
 

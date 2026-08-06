@@ -197,8 +197,8 @@ export type CompletionProvider = ReturnType<typeof createProvider>
 let singleton: CompletionProvider | null = null
 let registrationDisposables: monaco.IDisposable[] | null = null
 
-/** Memoized singleton. Pass the real monaco on first call (from useMonacoEditor). */
-export function getCompletionProvider(monacoLike: typeof monaco = undefined as never): CompletionProvider {
+/** Memoized singleton. The real monaco must be passed on first call (from useMonacoEditor) to register providers. */
+export function getCompletionProvider(monacoLike: typeof monaco): CompletionProvider {
   if (!singleton) {
     const provider = createProvider(monacoLike, {
       metadataService: getMetadataService(),

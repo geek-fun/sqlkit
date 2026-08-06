@@ -92,6 +92,37 @@ describe('buildSuggestions', () => {
     expect(labels(result)).toContain('events')
   })
 
+  it('(d2) schema-qualified word → schema tables, never the FROM-table columns', () => {
+    // Regression: `public.us` must offer tables in `public`, not columns of
+    // the last FROM table (`users`) — activeTable is null for unmatched
+    // qualifiers, so the builder falls through to the schema branch.
+    const snap: SchemaSnapshot = {
+      ...snapshot,
+      tablesByKey: { ...snapshot.tablesByKey, 'app.public': ['users', 'orders', 'user_events'] },
+      columnsByTable: {
+        ...snapshot.columnsByTable,
+        'c1|app|public|users': [
+          { name: 'id', dataType: 'int4' },
+          { name: 'user_id', dataType: 'int4' },
+        ],
+      },
+    }
+    const result = buildSuggestions(
+      ctx({
+        word: 'user',
+        isAfterDot: true,
+        qualifier: 'public.',
+        tableRefs: [{ table: 'users', alias: 'u' }],
+        activeTable: null,
+      }),
+      snap,
+      profile,
+      opts,
+    )
+    expect(labels(result)).toEqual(['user_events', 'users'])
+    expect(result.every(r => r.kind !== 'column')).toBe(true)
+  })
+
   it('(e) noParenFunctions preserved: NOW without parens, CONCAT with', () => {
     const result = buildSuggestions(ctx({ word: 'N' }), snapshot, profile, opts)
     const now = result.find(r => r.label === 'NOW')

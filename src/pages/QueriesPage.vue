@@ -309,6 +309,11 @@ const completionContext = computed(() => {
   }
 })
 
+// Column prefetch covers only the currently selected schema. Schema-qualified
+// refs to other schemas (`FROM public.users` while `dbo` is selected) get no
+// column completion: the provider is synchronous (no per-keystroke backend
+// call), so a cache miss is a silent no-op. Wiring fetchTableColumns() into an
+// async resolve path is the escape hatch for multi-schema databases.
 watch(() => {
   const connId = getConnectionId()
   const db = selectedDatabase.value

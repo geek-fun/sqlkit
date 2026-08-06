@@ -149,6 +149,11 @@ export class SchemaMetadataService {
    * Prefetch columns for the given tables, chunked at `concurrency` in-flight
    * invokes, capped at `maxTables` tables per call. Never throws: failures
    * leave the affected cache keys absent.
+   *
+   * Only the caller-provided `schema` gets cached. Completion for
+   * schema-qualified refs to other schemas (e.g. `FROM public.users` while
+   * `dbo` is the active schema) therefore misses silently — acceptable for the
+   * sync provider; `fetchTableColumns()` on a miss is the async escape.
    */
   async prefetchColumns(connectionId: string, database: string, schema: string | undefined, tableNames: string[]): Promise<void> {
     const targets = tableNames.slice(0, this.maxTables)
