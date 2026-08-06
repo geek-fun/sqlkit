@@ -16,6 +16,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from '@/components/ui/button'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { resolveMonacoDialect } from '@/composables/sqlCompletion/dialects'
+import { getMetadataService } from '@/composables/sqlCompletion/metadata'
 import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
 import { useSqlFormatter } from '@/composables/useSqlFormatter'
@@ -108,6 +110,7 @@ watch(selectedConnectionId, (newConnId, oldConnId) => {
   tabStore.reconcileTabsForConnection(newConnId)
   if (oldConnId) {
     databaseStore.clearMetadata(oldConnId)
+    getMetadataService().clearColumnCache(oldConnId)
   }
 }, { flush: 'sync' })
 
@@ -271,6 +274,59 @@ function getActiveDialect(): string | null {
   const dbType = conn.type as DatabaseType
   return resolveDialect(dbType)
 }
+
+const activeMonacoDialect = computed(() => {
+  const formatterId = getActiveDialect()
+  return formatterId ? resolveMonacoDialect(formatterId) : 'sql'
+})
+
+const completionContext = computed(() => {
+  const connId = activeTab.value?.connectionId || getConnectionId() || undefined
+  const db = activeTab.value?.database || selectedDatabase.value || null
+  const schema = activeTab.value?.schema || selectedSchema.value || null
+  // Track async-loaded schema metadata so the provider snapshot rebuilds once
+  // databases/schemas/tables arrive (they load after connect, not at mount).
+  if (connId) {
+    const meta = databaseStore.metadata[connId]
+    if (meta) {
+      void meta.databases
+      if (db) {
+        const schemas = meta.schemas[db] ?? []
+        void schemas
+        void meta.tables[db]
+        for (const s of schemas)
+          void meta.tables[`${db}.${s}`]
+        if (schema)
+          void meta.tables[`${db}.${schema}`]
+      }
+    }
+  }
+  return {
+    connectionId: connId,
+    database: db,
+    schema,
+    dialectId: activeMonacoDialect.value,
+  }
+})
+
+watch(() => {
+  const connId = getConnectionId()
+  const db = selectedDatabase.value
+  if (!connId || !db)
+    return ''
+  const meta = databaseStore.metadata[connId]
+  if (!meta)
+    return ''
+  const key = selectedSchema.value ? `${db}.${selectedSchema.value}` : db
+  return meta.tables[key]?.map(t => t.name).join(',') ?? ''
+}, (tablesCsv) => {
+  const connId = getConnectionId()
+  const db = selectedDatabase.value
+  if (!connId || !db || !tablesCsv)
+    return
+  const tableNames = tablesCsv.split(',').filter(Boolean)
+  void getMetadataService().prefetchColumns(connId, db, selectedSchema.value || undefined, tableNames)
+})
 
 function handleFormatSql(sql?: string): string {
   const content = sql ?? activeTab.value?.content ?? ''
@@ -1225,7 +1281,8 @@ function closeResultPanel() {
                 v-if="activeTab"
                 v-model="editorContent"
                 height="100%"
-                dialect="sql"
+                :dialect="activeMonacoDialect"
+                :completion-context="completionContext"
                 :is-executing="activeTab.isExecuting"
                 :font-size="appStore.editorConfig.fontSize"
                 :tab-size="appStore.editorConfig.tabSize"

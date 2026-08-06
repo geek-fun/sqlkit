@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { CompletionContextInput } from '@/composables/sqlCompletion/types'
 import type { MonacoEditorOptions, SQLDialect } from '@/composables/useMonacoEditor'
 import type { StatementToExecute } from '@/composables/useSqlStatements'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
@@ -21,6 +22,7 @@ type Props = {
   placeholder?: string
   isExecuting?: boolean
   formatSql?: (sql: string) => string
+  completionContext?: CompletionContextInput
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -75,7 +77,7 @@ const editorOptions: MonacoEditorOptions = {
   wordWrap: props.wordWrap,
 }
 
-const { initEditor, getValue, setValue, updateTheme, updateOptions, executeAtLine, getStatementTextAtLine } = useMonacoEditor(
+const { initEditor, getValue, setValue, updateTheme, updateOptions, updateLanguage, setCompletionContext, executeAtLine, getStatementTextAtLine } = useMonacoEditor(
   editorContainer,
   editorValue,
   editorOptions,
@@ -141,6 +143,9 @@ onMounted(() => {
     })
   }
 
+  updateLanguage(props.dialect)
+  setCompletionContext(props.completionContext ?? {})
+
   document.addEventListener('click', handleDocumentClick)
   document.addEventListener('keydown', handleDocumentKeydown)
 })
@@ -165,6 +170,10 @@ watch(() => props.wordWrap, val => updateOptions({ wordWrap: val }))
 watch(() => props.fontSize, val => updateOptions({ fontSize: val }))
 watch(() => props.tabSize, val => updateOptions({ tabSize: val }))
 watch(() => props.minimap, val => updateOptions({ minimap: val }))
+
+watch(() => props.dialect, val => updateLanguage(val), { immediate: true })
+
+watch(() => props.completionContext, val => setCompletionContext(val ?? {}), { deep: true, immediate: true })
 
 function handleContextMenuExecute() {
   if (contextMenuLine.value === null)
