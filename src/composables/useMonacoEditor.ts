@@ -1,9 +1,12 @@
 import type { Ref } from 'vue'
+import type { CompletionContextInput, SQLDialect } from './sqlCompletion/types'
 import type { SqlStatement, StatementToExecute } from './useSqlStatements'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
+
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { onBeforeUnmount } from 'vue'
-
+import { hasGrammar } from './sqlCompletion/dialects'
+import { getCompletionProvider } from './sqlCompletion/provider'
 import {
   getSqlGutterDecorations,
   getStatementAtLine,
@@ -21,6 +24,7 @@ import 'monaco-editor/esm/vs/basic-languages/mysql/mysql.contribution'
 import 'monaco-editor/esm/vs/basic-languages/pgsql/pgsql.contribution'
 
 export type { ExecuteSource, StatementToExecute } from './useSqlStatements'
+export type { SQLDialect }
 
 // Configure Monaco Editor workers for Vite
 globalThis.MonacoEnvironment = {
@@ -28,8 +32,6 @@ globalThis.MonacoEnvironment = {
     return new EditorWorker()
   },
 }
-
-export type SQLDialect = 'sql' | 'mysql' | 'pgsql' | 'mssql' | 'plsql' | 'sqlite'
 
 export type MonacoEditorOptions = {
   language?: SQLDialect
@@ -40,160 +42,6 @@ export type MonacoEditorOptions = {
   showLineNumbers?: boolean
   wordWrap?: boolean
 }
-
-// SQL keywords for auto-completion
-const SQL_KEYWORDS = [
-  'SELECT',
-  'FROM',
-  'WHERE',
-  'INSERT',
-  'UPDATE',
-  'DELETE',
-  'CREATE',
-  'ALTER',
-  'DROP',
-  'TABLE',
-  'INDEX',
-  'VIEW',
-  'DATABASE',
-  'SCHEMA',
-  'JOIN',
-  'INNER',
-  'LEFT',
-  'RIGHT',
-  'OUTER',
-  'ON',
-  'AS',
-  'AND',
-  'OR',
-  'NOT',
-  'NULL',
-  'IS',
-  'IN',
-  'BETWEEN',
-  'LIKE',
-  'ORDER',
-  'BY',
-  'GROUP',
-  'HAVING',
-  'LIMIT',
-  'OFFSET',
-  'UNION',
-  'DISTINCT',
-  'COUNT',
-  'SUM',
-  'AVG',
-  'MAX',
-  'MIN',
-  'CAST',
-  'CASE',
-  'WHEN',
-  'THEN',
-  'ELSE',
-  'END',
-  'PRIMARY',
-  'KEY',
-  'FOREIGN',
-  'REFERENCES',
-  'CONSTRAINT',
-  'UNIQUE',
-  'CHECK',
-  'DEFAULT',
-  'AUTO_INCREMENT',
-  'CASCADE',
-  'SET',
-  'VALUES',
-  'INTO',
-  'BEGIN',
-  'COMMIT',
-  'ROLLBACK',
-  'TRANSACTION',
-  'SAVEPOINT',
-  'TRUNCATE',
-  'GRANT',
-  'REVOKE',
-  'WITH',
-  'RECURSIVE',
-  'WINDOW',
-  'PARTITION',
-  'OVER',
-  'ROW_NUMBER',
-  'RANK',
-  'DENSE_RANK',
-]
-
-// SQL data types
-const SQL_TYPES = [
-  'INT',
-  'INTEGER',
-  'BIGINT',
-  'SMALLINT',
-  'TINYINT',
-  'DECIMAL',
-  'NUMERIC',
-  'FLOAT',
-  'REAL',
-  'DOUBLE',
-  'CHAR',
-  'VARCHAR',
-  'TEXT',
-  'NCHAR',
-  'NVARCHAR',
-  'NTEXT',
-  'DATE',
-  'TIME',
-  'DATETIME',
-  'TIMESTAMP',
-  'YEAR',
-  'BOOLEAN',
-  'BOOL',
-  'BINARY',
-  'VARBINARY',
-  'BLOB',
-  'CLOB',
-  'JSON',
-  'UUID',
-  'SERIAL',
-  'BIGSERIAL',
-]
-
-// SQL functions
-const SQL_FUNCTIONS = [
-  'CONCAT',
-  'SUBSTRING',
-  'UPPER',
-  'LOWER',
-  'TRIM',
-  'LTRIM',
-  'RTRIM',
-  'LENGTH',
-  'REPLACE',
-  'COALESCE',
-  'NULLIF',
-  'IFNULL',
-  'NOW',
-  'CURRENT_DATE',
-  'CURRENT_TIME',
-  'CURRENT_TIMESTAMP',
-  'DATE_ADD',
-  'DATE_SUB',
-  'DATEDIFF',
-  'EXTRACT',
-  'TO_CHAR',
-  'TO_DATE',
-  'TO_NUMBER',
-  'ROUND',
-  'CEIL',
-  'FLOOR',
-  'ABS',
-  'SIGN',
-  'MOD',
-  'POWER',
-  'SQRT',
-  'EXP',
-  'LN',
-  'LOG',
-]
 
 type ExecuteGutterCallback = (lineNumber: number) => void
 type ExecuteQueryCallback = (result: StatementToExecute) => void
@@ -210,12 +58,14 @@ export type EditorCallbacks = {
 
 export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialValue: Ref<string>, options: MonacoEditorOptions = {}) {
   let editor: monaco.editor.IStandaloneCodeEditor | null = null
-  let completionProvider: monaco.IDisposable | null = null
   let gutterDecorations: monaco.editor.IEditorDecorationsCollection | null = null
   let parsedStatements: SqlStatement[] = []
   let registeredCallbacks: EditorCallbacks | null = null
   let refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null
   const { isDark } = useTheme()
+
+  /** Monaco ships grammars only for sql/mysql/pgsql; other dialect ids use the generic sql grammar. Completion still resolves the real dialect profile per-editor. */
+  const resolveEditorLanguage = (id: SQLDialect): SQLDialect => hasGrammar(id) ? id : 'sql'
 
   const refreshGutterDecorations = () => {
     if (refreshDebounceTimer !== null)
@@ -243,45 +93,11 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     if (!containerRef.value)
       return
 
-    completionProvider = monaco.languages.registerCompletionItemProvider('sql', {
-      provideCompletionItems: (model, position) => {
-        const word = model.getWordUntilPosition(position)
-        const range = {
-          startLineNumber: position.lineNumber,
-          endLineNumber: position.lineNumber,
-          startColumn: word.startColumn,
-          endColumn: word.endColumn,
-        }
-
-        const noParenFunctions = ['NOW', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP']
-        const suggestions: monaco.languages.CompletionItem[] = [
-          ...SQL_KEYWORDS.map(keyword => ({
-            label: keyword,
-            kind: monaco.languages.CompletionItemKind.Keyword,
-            insertText: keyword,
-            range,
-          })),
-          ...SQL_TYPES.map(type => ({
-            label: type,
-            kind: monaco.languages.CompletionItemKind.TypeParameter,
-            insertText: type,
-            range,
-          })),
-          ...SQL_FUNCTIONS.map(func => ({
-            label: func,
-            kind: monaco.languages.CompletionItemKind.Function,
-            insertText: noParenFunctions.includes(func) ? func : `${func}()`,
-            range,
-          })),
-        ]
-
-        return { suggestions }
-      },
-    })
+    getCompletionProvider(monaco).register()
 
     editor = monaco.editor.create(containerRef.value, {
       value: initialValue.value,
-      language: options.language || 'sql',
+      language: resolveEditorLanguage(options.language || 'sql'),
       theme: isDark.value ? 'vs-dark' : 'vs',
       automaticLayout: true,
       readOnly: options.readOnly || false,
@@ -392,11 +208,29 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     monaco.editor.setTheme(dark ? 'vs-dark' : 'vs')
   }
 
+  const updateLanguage = (id: SQLDialect) => {
+    if (editor) {
+      const model = editor.getModel()
+      if (model) {
+        monaco.editor.setModelLanguage(model, resolveEditorLanguage(id))
+      }
+    }
+  }
+
+  const setCompletionContext = (ctx: CompletionContextInput) => {
+    if (!editor)
+      return
+    getCompletionProvider(monaco).setContext(editor.getModel(), ctx)
+  }
+
   const dispose = () => {
     if (refreshDebounceTimer !== null)
       clearTimeout(refreshDebounceTimer)
     gutterDecorations?.clear()
-    completionProvider?.dispose()
+    const model = editor?.getModel()
+    if (model) {
+      getCompletionProvider(monaco).clearModel(model)
+    }
     editor?.dispose()
   }
 
@@ -410,6 +244,8 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     setValue,
     updateTheme,
     updateOptions,
+    updateLanguage,
+    setCompletionContext,
     dispose,
     executeAtLine: (lineNumber: number) => {
       if (!editor || !registeredCallbacks)

@@ -582,10 +582,10 @@ watch(() => [props.rows, props.columns], () => {
         <!-- Actions Column Header -->
         <div
           v-if="connectionId"
-          class="bg-muted flex-shrink-0 w-10 right-0 sticky z-10"
+          class="bg-muted flex-shrink-0 w-20 right-0 sticky z-10"
         >
-          <div class="flex h-8 items-center justify-center">
-            <span class="i-carbon-overflow-menu-vertical text-muted-foreground h-3.5 w-3.5" />
+          <div class="flex h-8 items-center justify-center px-2">
+            <span class="text-xs font-medium text-muted-foreground truncate">{{ $t('components.dataGrid.row.actions') }}</span>
           </div>
         </div>
       </div>
@@ -694,7 +694,7 @@ watch(() => [props.rows, props.columns], () => {
             <!-- Row Actions -->
             <div
               v-if="connectionId"
-              class="bg-background/80 flex flex-shrink-0 w-10 items-center right-0 justify-center sticky z-10"
+              class="bg-background/80 flex flex-shrink-0 w-20 items-center right-0 justify-center sticky z-10"
               @click.stop
             >
               <DropdownMenu>
