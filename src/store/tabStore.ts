@@ -48,6 +48,8 @@ export type QueryTab = {
   results?: QueryResult
   error?: ApiError | string
   executionTime?: number
+  /** The exact SQL statement that produced `results`. May differ from `content` (a multi-statement editor buffer). Used to map results back to a table. */
+  lastExecutedSql?: string
   tableView?: TableViewMeta
   erDiagram?: ErDiagramMeta
   listingTab?: ListingTabMeta
@@ -324,6 +326,7 @@ export const useTabStore = defineStore('tabs', {
         return
       }
 
+      tab.lastExecutedSql = sql
       const activeConnectionId = tab.connectionId
       if (!activeConnectionId) {
         return
@@ -469,6 +472,21 @@ export const useTabStore = defineStore('tabs', {
     setActiveTab(tabId: string) {
       if (this.tabs.find(t => t.id === tabId)) {
         this.activeTabId = tabId
+      }
+    },
+
+    /**
+     * Rebind an orphaned tab to a connection so its SQL can execute again.
+     * Clears the orphan marker and points the tab at the given connection.
+     */
+    reattachTab(tabId: string, connectionId: string, database?: string) {
+      const tab = this.tabs.find(t => t.id === tabId)
+      if (!tab)
+        return
+      tab.connectionId = connectionId
+      tab.orphanFromConnectionId = undefined
+      if (database !== undefined) {
+        tab.database = database
       }
     },
 

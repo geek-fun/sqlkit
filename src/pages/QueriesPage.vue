@@ -53,6 +53,8 @@ const destructiveAction = ref<{ type: 'drop' | 'truncate', table: TableInfo, dat
 const isDestructiveActionExecuting = ref(false)
 const showOrphanTabDialog = ref(false)
 const orphanTabToHandle = ref<string | null>(null)
+const showExecuteOrphanDialog = ref(false)
+const pendingExecuteSql = ref<string | null>(null)
 
 // ── Database action dialog state ──
 const createDatabaseDialogOpen = ref(false)
@@ -219,7 +221,7 @@ const listingTabObjects = computed(() => {
 })
 
 async function executeQuery(details?: StatementToExecute) {
-  if (!activeTab.value || activeTab.value.orphanFromConnectionId) {
+  if (!activeTab.value) {
     return
   }
 
@@ -231,6 +233,15 @@ async function executeQuery(details?: StatementToExecute) {
   const sqlToExecute = details?.found ? details.sql : tabContent
 
   if (!sqlToExecute?.trim()) {
+    return
+  }
+
+  // Orphaned tabs point at a connection that is no longer active. Instead of
+  // silently dropping the execution, surface a dialog so the user can rebind
+  // the tab to the current connection, close it, or cancel.
+  if (activeTab.value.orphanFromConnectionId) {
+    pendingExecuteSql.value = sqlToExecute
+    showExecuteOrphanDialog.value = true
     return
   }
 
@@ -406,6 +417,54 @@ function handleOrphanTabAcknowledge() {
     orphanTabToHandle.value = null
   }
   showOrphanTabDialog.value = false
+}
+
+const activeConnectionForOrphan = computed(() => {
+  const connId = getConnectionId()
+  if (!connId)
+    return null
+  return connectionStore.getConnectionById(connId)
+})
+
+const orphanConnectionPair = computed<{ from: string, to: string }>(() => {
+  const fromId = activeTab.value?.orphanFromConnectionId
+  const fromName = fromId
+    ? (connectionStore.getConnectionById(fromId)?.name ?? fromId)
+    : ''
+  return {
+    from: fromName,
+    to: activeConnectionForOrphan.value?.name ?? '',
+  }
+})
+
+function handleExecuteOrphanRebind() {
+  const tab = activeTab.value
+  const connId = getConnectionId()
+  const sql = pendingExecuteSql.value
+  if (!tab || !connId || !sql) {
+    showExecuteOrphanDialog.value = false
+    pendingExecuteSql.value = null
+    return
+  }
+  tabStore.reattachTab(tab.id, connId, selectedDatabase.value || connectionStore.getCurrentDatabase(connId) || undefined)
+  showExecuteOrphanDialog.value = false
+  pendingExecuteSql.value = null
+  showResultPanel.value = true
+  void tabStore.executeQuery(tab.id, sql)
+}
+
+function handleExecuteOrphanClose() {
+  const tab = activeTab.value
+  if (tab) {
+    tabStore.closeTab(tab.id)
+  }
+  showExecuteOrphanDialog.value = false
+  pendingExecuteSql.value = null
+}
+
+function handleExecuteOrphanCancel() {
+  showExecuteOrphanDialog.value = false
+  pendingExecuteSql.value = null
 }
 
 function handleTabClose(tabId: string) {
@@ -1179,7 +1238,7 @@ function closeResultPanel() {
                       variant="ghost"
                       size="icon"
                       class="text-emerald-600 h-7 w-7 dark:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 dark:hover:bg-emerald-500/20"
-                      :disabled="!activeTab || activeTab.orphanFromConnectionId"
+                      :disabled="!activeTab"
                       @click="executeQuery"
                     >
                       <span class="i-lucide-play shrink-0 h-3.5 w-3.5" />
@@ -1353,7 +1412,7 @@ function closeResultPanel() {
               :error="activeTab?.error"
               :is-executing="activeTab?.isExecuting"
               :execution-time="activeTab?.executionTime"
-              :sql="activeTab?.content"
+              :sql="activeTab?.lastExecutedSql ?? activeTab?.content"
               :connection-id="getConnectionId() ?? undefined"
               :database="activeTab?.database"
               :explain-plan="activeTab?.explainPlan ?? null"
@@ -1424,6 +1483,38 @@ function closeResultPanel() {
           <AlertDialogAction @click="handleOrphanTabClose">
             {{ t('pages.queries.orphanDialog.close') }}
           </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+
+    <!-- Execute Orphaned Tab Dialog -->
+    <AlertDialog v-model:open="showExecuteOrphanDialog">
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{{ t('pages.queries.executeOrphanDialog.title') }}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {{ t('pages.queries.executeOrphanDialog.message', {
+              from: orphanConnectionPair.from,
+              to: orphanConnectionPair.to,
+            }) }}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel @click="handleExecuteOrphanCancel">
+            {{ t('pages.queries.executeOrphanDialog.cancel') }}
+          </AlertDialogCancel>
+          <Button
+            variant="outline"
+            @click="handleExecuteOrphanClose"
+          >
+            {{ t('pages.queries.executeOrphanDialog.close') }}
+          </Button>
+          <Button
+            :disabled="!activeConnectionForOrphan"
+            @click="handleExecuteOrphanRebind"
+          >
+            {{ t('pages.queries.executeOrphanDialog.rebindAndExecute') }}
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
