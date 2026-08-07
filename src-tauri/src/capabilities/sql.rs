@@ -20,7 +20,7 @@ fn app_handle() -> AppHandle {
         .clone()
 }
 
-async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String> {
+pub(crate) async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String> {
     let app = app_handle();
 
     // Check if already connected
@@ -132,11 +132,18 @@ async fn execute_on_adapter(adapter: &ActiveConnection, sql: &str) -> Result<Que
 }
 
 fn get_connection_id(config: Option<&Value>) -> Result<String, String> {
-    config
-        .and_then(|c| c.get("connectionId"))
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| "Missing connectionId in connection config".to_string())
+    match config {
+        None => Err(
+            "No connection was provided for this tool call. Supply a connection_id \
+             (list them with sqlkit__list_connections) or enable it in Settings → MCP Bridge"
+                .to_string(),
+        ),
+        Some(c) => c
+            .get("connectionId")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| "Connection config is missing the 'connectionId' field".to_string()),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -776,4 +783,28 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         tags: &["agent"],
         parallel_ok: true,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_connection_id_returns_id_when_present() {
+        let config = json!({ "connectionId": "conn-1" });
+        assert_eq!(get_connection_id(Some(&config)), Ok("conn-1".to_string()));
+    }
+
+    #[test]
+    fn get_connection_id_explains_missing_config() {
+        let err = get_connection_id(None).unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[test]
+    fn get_connection_id_rejects_config_without_field() {
+        let err = get_connection_id(Some(&json!({ "host": "x" }))).unwrap_err();
+        assert!(err.contains("connectionId"), "got: {}", err);
+    }
 }
