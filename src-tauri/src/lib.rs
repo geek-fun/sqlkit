@@ -286,6 +286,7 @@ pub fn run() {
             commands::execute_sorted_query,
             commands::cancel_query,
             commands::explain_query,
+            commands::sql_analysis::analyze_sql_editability_command,
             // Database browsing commands
             commands::list_databases,
             commands::list_schemas,
