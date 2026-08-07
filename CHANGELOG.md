@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-08-07
+
+### Added
+
+- Schema-aware autocomplete with dialect switching (#131)
+- Primary button opens editor when connected
+- Toggle connect button label/icon by connection state
+- Disconnect action for connected connection cards
+- Database context menu with dismiss on outside click
+
+### Fixed
+
+- Use power icon for close connection action
+- Label the action 'Close Connection' instead of 'Disconnect'
+- Scrollable edit dialogs for wide tables
+- Generate executable top-N SQL per database dialect
+- Transparently reconnect lost or evicted sessions
+
 ## [0.8.2] - 2026-07-30
 
 ### Added
