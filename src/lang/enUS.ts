@@ -782,6 +782,13 @@ export const enUS = {
         acknowledge: 'Keep as Orphan',
         close: 'Close Tab',
       },
+      executeOrphanDialog: {
+        title: 'Connection Changed',
+        message: 'The original connection for this query tab has changed: {from} → {to}. Rebind to the current active connection and execute?',
+        cancel: 'Cancel',
+        close: 'Close Tab',
+        rebindAndExecute: 'Rebind and Execute',
+      },
       explain: {
         title: 'Explain Plan',
         treeView: 'Tree',
@@ -1392,6 +1399,16 @@ export const enUS = {
         copyAsJson: 'Copy Row as JSON',
         copyAsInsert: 'Copy Row as INSERT',
         actions: 'Actions',
+        noTableContext: 'Query result is not tied to a table, so rows cannot be edited or deleted',
+        editUnsupported: {
+          'not-select': 'This statement is not a SELECT query; result rows cannot be edited or deleted',
+          'cte': 'Query uses WITH (CTE); rows cannot be mapped back to a table, so editing is not supported',
+          'set-operation': 'Query uses UNION/INTERSECT/EXCEPT; rows come from multiple statements, so editing is not supported',
+          'aggregation': 'Query is aggregated (GROUP BY/DISTINCT/aggregate functions); rows cannot be mapped back to base rows, so editing is not supported',
+          'multiple-sources': 'Query joins multiple tables; rows cannot be edited or deleted',
+          'no-table': 'Query has no FROM table; rows cannot be edited or deleted',
+          'complex-source': 'Query source is a subquery or complex expression; rows cannot be edited or deleted',
+        },
       },
       cell: {
         copyValue: 'Copy Cell Value',
