@@ -20,7 +20,7 @@ fn app_handle() -> AppHandle {
         .clone()
 }
 
-async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String> {
+pub(crate) async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String> {
     let app = app_handle();
 
     // Check if already connected
@@ -72,7 +72,7 @@ async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String
     Ok(adapter)
 }
 
-async fn execute_on_adapter(adapter: &ActiveConnection, sql: &str) -> Result<QueryResult, String> {
+pub(crate) async fn execute_on_adapter(adapter: &ActiveConnection, sql: &str) -> Result<QueryResult, String> {
     match adapter {
         ActiveConnection::Postgres(a) => a
             .lock()
@@ -131,12 +131,19 @@ async fn execute_on_adapter(adapter: &ActiveConnection, sql: &str) -> Result<Que
     }
 }
 
-fn get_connection_id(config: Option<&Value>) -> Result<String, String> {
-    config
-        .and_then(|c| c.get("connectionId"))
-        .and_then(|v| v.as_str())
-        .map(|s| s.to_string())
-        .ok_or_else(|| "Missing connectionId in connection config".to_string())
+pub(crate) fn get_connection_id(config: Option<&Value>) -> Result<String, String> {
+    match config {
+        None => Err(
+            "No connection was provided for this tool call. Supply a connection_id \
+             (list them with sqlkit__list_connections) or enable it in Settings → MCP Bridge"
+                .to_string(),
+        ),
+        Some(c) => c
+            .get("connectionId")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string())
+            .ok_or_else(|| "Connection config is missing the 'connectionId' field".to_string()),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -168,6 +175,11 @@ impl CapabilityHandler for ExecuteQueryHandler {
             .and_then(|v| v.as_str())
             .ok_or_else(|| "Missing 'sql' argument".to_string())?;
         let adapter = resolve_adapter(&conn_id).await?;
+
+        // Read-only guard: reject write/delete/ddl statements with actionable
+        // guidance so agents migrate to the split write tools.
+        let db_type = crate::capabilities::sql_write::adapter_db_type(&adapter);
+        crate::capabilities::sql_write::ensure_read_only(&db_type, sql)?;
 
         // Check connection quality and warn the AI agent about flaky connections
         let mut guardian_warning: Option<String> = None;
@@ -676,17 +688,17 @@ fn connection_id_schema() -> Value {
 pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
     reg.register(Capability {
         name: "sqlkit__execute_query",
-        description: "Execute an arbitrary SQL query and return the result set. Supports SELECT, INSERT, UPDATE, DELETE, DDL, and any other SQL statement.",
+        description: "Execute a read-only SQL query (SELECT, SHOW, EXPLAIN) and return the result set. Write statements (INSERT/UPDATE/MERGE), deletes (DELETE/TRUNCATE), and DDL (CREATE/ALTER/DROP) are rejected — use sqlkit__execute_write, sqlkit__execute_delete, or sqlkit__execute_ddl respectively.",
         handler: Arc::new(ExecuteQueryHandler),
         input_schema: json!({"type": "object", "properties": {
             "connection_id": connection_id_schema(),
-            "sql": {"type": "string", "description": "The SQL query to execute"}
+            "sql": {"type": "string", "description": "The read-only SQL query (SELECT/SHOW/EXPLAIN)"}
         }, "required": ["connection_id", "sql"]}),
-        risk_level: RiskLevel::Elevated,
+        risk_level: RiskLevel::Safe,
         required_permission: "read",
         source_kind: SourceKind::SqlDatabase,
         tags: &["agent"],
-        parallel_ok: false,
+        parallel_ok: true,
     });
 
     reg.register(Capability {
@@ -776,4 +788,28 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         tags: &["agent"],
         parallel_ok: true,
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn get_connection_id_returns_id_when_present() {
+        let config = json!({ "connectionId": "conn-1" });
+        assert_eq!(get_connection_id(Some(&config)), Ok("conn-1".to_string()));
+    }
+
+    #[test]
+    fn get_connection_id_explains_missing_config() {
+        let err = get_connection_id(None).unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[test]
+    fn get_connection_id_rejects_config_without_field() {
+        let err = get_connection_id(Some(&json!({ "host": "x" }))).unwrap_err();
+        assert!(err.contains("connectionId"), "got: {}", err);
+    }
 }

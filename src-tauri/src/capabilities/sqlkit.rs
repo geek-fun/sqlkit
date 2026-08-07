@@ -89,27 +89,6 @@ impl CapabilityHandler for ListConnections {
 }
 
 // ---------------------------------------------------------------------------
-// GetStoreValue handler (kept from original)
-// ---------------------------------------------------------------------------
-
-struct GetStoreValueHandler;
-
-#[async_trait::async_trait]
-impl CapabilityHandler for GetStoreValueHandler {
-    async fn handle(
-        &self,
-        args: &Value,
-        _connection_config: Option<&Value>,
-    ) -> Result<String, String> {
-        let key = args
-            .get("key")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| "Missing 'key' argument".to_string())?;
-        Ok(serde_json::json!({ "key": key, "value": null }).to_string())
-    }
-}
-
-// ---------------------------------------------------------------------------
 // Registration
 // ---------------------------------------------------------------------------
 
@@ -123,27 +102,6 @@ pub(crate) fn register_all(reg: &mut CapabilityRegistry) {
             "type": "object",
             "properties": {},
             "required": []
-        }),
-        risk_level: RiskLevel::Safe,
-        required_permission: "read",
-        source_kind: SourceKind::AppLocal,
-        tags: &["agent"],
-        parallel_ok: true,
-    });
-
-    reg.register(Capability {
-        name: "sqlkit__get_store_value",
-        description: "Get a value from the persistent key-value store.",
-        handler: Arc::new(GetStoreValueHandler),
-        input_schema: serde_json::json!({
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string",
-                    "description": "The key to look up"
-                }
-            },
-            "required": ["key"]
         }),
         risk_level: RiskLevel::Safe,
         required_permission: "read",

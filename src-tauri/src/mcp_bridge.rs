@@ -506,12 +506,9 @@ fn to_metadata(cap: &Capability) -> Value {
 }
 
 async fn resolve_connection(connection_id: &str) -> Result<Value, String> {
-    let handle = crate::APP_HANDLE
-        .get()
-        .ok_or_else(|| "AppHandle not initialized".to_string())?;
-    use tauri::State;
-    let state: State<'_, crate::state::AppState> = handle.state();
-    state.ensure_connection(connection_id).await?;
+    // Shared resolver: connects saved-but-inactive connections in-process;
+    // credentials never leave the app. McpPolicy auth already ran upstream.
+    crate::capabilities::sql::resolve_adapter(connection_id).await?;
     Ok(json!({ "connectionId": connection_id }))
 }
 
@@ -619,6 +616,7 @@ mod tests {
         data_studio_agent::capabilities::registry::init_registry(&[
             crate::capabilities::sqlkit::register_all,
             crate::capabilities::sql::register_sql_tools,
+            crate::capabilities::sql_write::register_write_tools,
         ]);
     }
 
