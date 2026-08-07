@@ -50,6 +50,8 @@ type Props = {
   connectionId?: string
   hideToolbar?: boolean
   hideBatchActions?: boolean
+  /** Why the result cannot be edited, when tableName is absent. */
+  editabilityReason?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -64,6 +66,7 @@ const props = withDefaults(defineProps<Props>(), {
   connectionId: undefined,
   hideToolbar: false,
   hideBatchActions: false,
+  editabilityReason: undefined,
 })
 
 const emit = defineEmits<DataGridEmits>()
@@ -222,13 +225,28 @@ function handleClearFilter(column: string) {
 }
 
 // ── Row Operations ──
+function editabilityMessage(): string {
+  if (props.editabilityReason) {
+    return t(`components.dataGrid.row.editUnsupported.${props.editabilityReason}`)
+  }
+  return t('components.dataGrid.row.noTableContext')
+}
+
 function openEditDialog(rowIndex: number) {
+  if (!props.tableName) {
+    toast.warning(editabilityMessage())
+    return
+  }
   editingRowIndex.value = rowIndex
   isDuplicateRow.value = false
   editDialogOpen.value = true
 }
 
 function openDuplicateDialog(rowIndex: number) {
+  if (!props.tableName) {
+    toast.warning(editabilityMessage())
+    return
+  }
   editingRowIndex.value = rowIndex
   isDuplicateRow.value = true
   editDialogOpen.value = true
@@ -246,6 +264,10 @@ function openJsonDialog(value: unknown, column: string) {
 }
 
 function openDeleteDialog(rowIndex: number) {
+  if (!props.tableName) {
+    toast.warning(editabilityMessage())
+    return
+  }
   deletingRowIndex.value = rowIndex
   deleteDialogOpen.value = true
 }
@@ -584,8 +606,8 @@ watch(() => [props.rows, props.columns], () => {
           v-if="connectionId"
           class="bg-muted flex-shrink-0 w-20 right-0 sticky z-10"
         >
-          <div class="flex h-8 items-center justify-center px-2">
-            <span class="text-xs font-medium text-muted-foreground truncate">{{ $t('components.dataGrid.row.actions') }}</span>
+          <div class="px-2 flex h-8 items-center justify-center">
+            <span class="text-xs text-muted-foreground font-medium truncate">{{ $t('components.dataGrid.row.actions') }}</span>
           </div>
         </div>
       </div>
