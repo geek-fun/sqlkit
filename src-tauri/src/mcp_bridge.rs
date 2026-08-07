@@ -616,6 +616,7 @@ mod tests {
         data_studio_agent::capabilities::registry::init_registry(&[
             crate::capabilities::sqlkit::register_all,
             crate::capabilities::sql::register_sql_tools,
+            crate::capabilities::sql_write::register_write_tools,
         ]);
     }
 
