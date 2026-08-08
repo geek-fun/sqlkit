@@ -421,7 +421,7 @@ impl DatabaseAdapter for SqlServerAdapter {
             .map(Duration::from_millis);
 
         // Execute query with optional timeout
-        let stream = if let Some(timeout_duration) = timeout {
+        let mut stream = if let Some(timeout_duration) = timeout {
             tokio::time::timeout(timeout_duration, client.simple_query(query))
                 .await
                 .map_err(|_| {
@@ -436,6 +436,20 @@ impl DatabaseAdapter for SqlServerAdapter {
         };
 
         // Collect results
+        // QueryStream::columns() forwards to the first result-set metadata
+        // without consuming rows, so column names survive even when the result
+        // set is empty — an empty SELECT must still render its columns rather
+        // than looking like a DML statement.
+        let stream_columns = stream
+            .columns()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .map(|cols| {
+                cols.iter()
+                    .map(|col| (col.name().to_string(), format!("{:?}", col.column_type())))
+                    .collect::<Vec<_>>()
+            });
+
         let results = stream
             .into_results()
             .await
@@ -452,28 +466,34 @@ impl DatabaseAdapter for SqlServerAdapter {
         } else {
             let result_set = &results[0];
 
-            if result_set.is_empty() {
-                Ok(QueryResult::new(Vec::new()).with_execution_time(execution_time))
-            } else {
-                let columns: Vec<String> = result_set[0]
-                    .columns()
-                    .iter()
-                    .map(|col| col.name().to_string())
-                    .collect();
-                let column_types: Vec<String> = result_set[0]
-                    .columns()
-                    .iter()
-                    .map(|col| format!("{:?}", col.column_type()))
-                    .collect();
+            // Fall back to the first row for column names when the stream
+            // metadata is unavailable (should not happen in practice).
+            let columns: Vec<String> = stream_columns
+                .as_ref()
+                .map(|cols| cols.iter().map(|(name, _)| name.clone()).collect())
+                .or_else(|| {
+                    result_set
+                        .first()
+                        .map(|row| row.columns().iter().map(|col| col.name().to_string()).collect())
+                })
+                .unwrap_or_default();
+            let column_types: Vec<String> = stream_columns
+                .as_ref()
+                .map(|cols| cols.iter().map(|(_, ty)| ty.clone()).collect())
+                .or_else(|| {
+                    result_set
+                        .first()
+                        .map(|row| row.columns().iter().map(|col| format!("{:?}", col.column_type())).collect())
+                })
+                .unwrap_or_default();
 
-                let mut query_result = QueryResult::with_columns(columns, column_types);
-                for row in result_set {
-                    let query_row = Self::row_to_query_row(row)?;
-                    query_result.add_row(query_row);
-                }
-
-                Ok(query_result.with_execution_time(execution_time))
+            let mut query_result = QueryResult::with_columns(columns, column_types);
+            for row in result_set {
+                let query_row = Self::row_to_query_row(row)?;
+                query_result.add_row(query_row);
             }
+
+            Ok(query_result.with_execution_time(execution_time))
         }
     }
 

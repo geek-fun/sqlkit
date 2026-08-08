@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { ColumnInfo } from '@/composables/sqlCompletion/metadata'
 import type { QueryResult } from '@/store/tabStore'
 import type { ApiError, ApiResponse } from '@/types/api'
 import type { ExplainResult } from '@/types/explainPlan'
@@ -12,6 +13,7 @@ import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDataGridCopy } from '@/composables/useDataGridCopy'
+import { useConnectionStore } from '@/store'
 import { formatApiError, isApiError } from '@/types/api'
 
 type Props = {
@@ -87,6 +89,76 @@ const gridResults = ref<QueryResult | null>(null)
 const gridExecutionTimeMs = ref<number | undefined>(undefined)
 const activeSort = ref<SortColumn[]>([])
 const activeFilters = ref<ColumnFilter[]>([])
+
+// ── Result editability (single-table SELECTs only) ──
+const connectionStore = useConnectionStore()
+
+type SqlEditability = {
+  editable: boolean
+  tableName?: string | null
+  schema?: string | null
+  reason?: string | null
+}
+
+const editability = ref<SqlEditability>({ editable: false })
+const editableTableName = ref<string | undefined>(undefined)
+const editableSchema = ref<string | undefined>(undefined)
+const editablePrimaryKeys = ref<string[]>([])
+
+const connectionTypeForAnalysis = computed(() => {
+  if (!props.connectionId)
+    return undefined
+  const conn = connectionStore.getConnectionById(props.connectionId)
+  return conn?.type ? String(conn.type).toLowerCase() : undefined
+})
+
+async function refreshEditability() {
+  editability.value = { editable: false }
+  editableTableName.value = undefined
+  editableSchema.value = undefined
+  editablePrimaryKeys.value = []
+
+  if (!props.sql || !props.connectionId) {
+    return
+  }
+
+  try {
+    const result = await invoke<SqlEditability>('analyze_sql_editability_command', {
+      sql: props.sql,
+      databaseType: connectionTypeForAnalysis.value,
+    })
+    editability.value = result
+    if (!result.editable || !result.tableName) {
+      return
+    }
+
+    editableTableName.value = result.tableName
+    editableSchema.value = result.schema ?? undefined
+
+    // Fetch primary keys so edit/delete can locate rows.
+    const columns = await invoke<ColumnInfo[]>('list_columns', {
+      connectionId: props.connectionId,
+      database: props.database ?? null,
+      schema: result.schema ?? props.schema ?? null,
+      tableName: result.tableName,
+    })
+    editablePrimaryKeys.value = (columns ?? [])
+      .filter(col => col.is_primary_key)
+      .map(col => col.name)
+  }
+  catch {
+    // Analysis is best-effort; fall back to read-only grid on failure.
+    editability.value = { editable: false }
+  }
+}
+
+watch(
+  () => [props.sql, props.connectionId, props.database],
+  () => {
+    void refreshEditability()
+  },
+  { immediate: true },
+)
 
 // Sync from props when results change
 watch(() => props.results, (r) => {
@@ -365,7 +437,10 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
           :execution-time-ms="displayExecutionTime"
           :connection-id="connectionId"
           :database="database"
-          :schema="schema"
+          :schema="editableSchema ?? schema"
+          :table-name="editableTableName"
+          :primary-keys="editablePrimaryKeys"
+          :editability-reason="editability.reason ?? undefined"
           :loading="displayExecuting"
           :hide-toolbar="true"
           :hide-batch-actions="true"

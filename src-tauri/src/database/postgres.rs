@@ -1005,8 +1005,11 @@ impl DatabaseAdapter for PostgresAdapter {
         let execution_time;
 
         if is_select {
-            let result = if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, client.query(query, &[]))
+            // Prepare first so column metadata is available even when the
+            // result set is empty — an empty SELECT must still render its
+            // columns (empty table) rather than looking like a DML statement.
+            let statement = if let Some(timeout_duration) = timeout {
+                tokio::time::timeout(timeout_duration, client.prepare(query))
                     .await
                     .map_err(|_| {
                         DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
@@ -1014,35 +1017,45 @@ impl DatabaseAdapter for PostgresAdapter {
                     .map_err(postgres_error_to_db_error)?
             } else {
                 client
-                    .query(query, &[])
+                    .prepare(query)
+                    .await
+                    .map_err(postgres_error_to_db_error)?
+            };
+
+            let result = if let Some(timeout_duration) = timeout {
+                tokio::time::timeout(timeout_duration, client.query(&statement, &[]))
+                    .await
+                    .map_err(|_| {
+                        DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
+                    })?
+                    .map_err(postgres_error_to_db_error)?
+            } else {
+                client
+                    .query(&statement, &[])
                     .await
                     .map_err(postgres_error_to_db_error)?
             };
 
             execution_time = start.elapsed().as_millis() as u64;
 
-            if result.is_empty() {
-                Ok(QueryResult::new(Vec::new()).with_execution_time(execution_time))
-            } else {
-                let columns: Vec<String> = result[0]
-                    .columns()
-                    .iter()
-                    .map(|col| col.name().to_string())
-                    .collect();
-                let column_types: Vec<String> = result[0]
-                    .columns()
-                    .iter()
-                    .map(|col| col.type_().name().to_string())
-                    .collect();
+            let columns: Vec<String> = statement
+                .columns()
+                .iter()
+                .map(|col| col.name().to_string())
+                .collect();
+            let column_types: Vec<String> = statement
+                .columns()
+                .iter()
+                .map(|col| col.type_().name().to_string())
+                .collect();
 
-                let mut query_result = QueryResult::with_columns(columns, column_types);
-                for row in &result {
-                    let query_row = Self::row_to_query_row(row)?;
-                    query_result.add_row(query_row);
-                }
-
-                Ok(query_result.with_execution_time(execution_time))
+            let mut query_result = QueryResult::with_columns(columns, column_types);
+            for row in &result {
+                let query_row = Self::row_to_query_row(row)?;
+                query_result.add_row(query_row);
             }
+
+            Ok(query_result.with_execution_time(execution_time))
         } else {
             // For INSERT, UPDATE, DELETE, etc.
             let affected = if let Some(timeout_duration) = timeout {

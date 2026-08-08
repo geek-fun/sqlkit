@@ -527,42 +527,42 @@ impl DatabaseAdapter for MySQLAdapter {
         let execution_time;
 
         if is_select {
-            // Execute query and get results
-            let result: Vec<Row> = if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, conn.query(query))
+            // Use query_iter so column metadata is available even when the
+            // result set is empty — an empty SELECT must still render its
+            // columns (empty table) rather than looking like a DML statement.
+            let mut result = if let Some(timeout_duration) = timeout {
+                tokio::time::timeout(timeout_duration, conn.query_iter(query))
                     .await
                     .map_err(|_| {
                         DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
                     })?
                     .map_err(mysql_error_to_db_error)?
             } else {
-                conn.query(query).await.map_err(mysql_error_to_db_error)?
+                conn.query_iter(query).await.map_err(mysql_error_to_db_error)?
             };
 
             execution_time = start.elapsed().as_millis() as u64;
 
-            if result.is_empty() {
-                Ok(QueryResult::new(Vec::new()).with_execution_time(execution_time))
-            } else {
-                let columns: Vec<String> = result[0]
-                    .columns_ref()
-                    .iter()
-                    .map(|col| col.name_str().to_string())
-                    .collect();
-                let column_types: Vec<String> = result[0]
-                    .columns_ref()
-                    .iter()
-                    .map(|col| format!("{:?}", col.column_type()))
-                    .collect();
+            let columns: Vec<String> = result
+                .columns()
+                .map(|cols| cols.iter().map(|col| col.name_str().to_string()).collect())
+                .unwrap_or_default();
+            let column_types: Vec<String> = result
+                .columns()
+                .map(|cols| {
+                    cols.iter()
+                        .map(|col| format!("{:?}", col.column_type()))
+                        .collect()
+                })
+                .unwrap_or_default();
 
-                let mut query_result = QueryResult::with_columns(columns, column_types);
-                for row in result {
-                    let query_row = Self::row_to_query_row(row)?;
-                    query_result.add_row(query_row);
-                }
-
-                Ok(query_result.with_execution_time(execution_time))
+            let mut query_result = QueryResult::with_columns(columns, column_types);
+            while let Some(row) = result.next().await.map_err(mysql_error_to_db_error)? {
+                let query_row = Self::row_to_query_row(row)?;
+                query_result.add_row(query_row);
             }
+
+            Ok(query_result.with_execution_time(execution_time))
         } else {
             // For INSERT, UPDATE, DELETE, etc.
             if let Some(timeout_duration) = timeout {

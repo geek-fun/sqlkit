@@ -6,6 +6,7 @@ pub mod helpers;
 pub mod jdbc;
 pub mod query;
 pub mod server;
+pub mod sql_analysis;
 pub mod store;
 pub mod transfer;
 

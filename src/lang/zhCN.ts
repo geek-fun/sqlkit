@@ -782,6 +782,13 @@ export const zhCN = {
         acknowledge: '保持孤立',
         close: '关闭标签页',
       },
+      executeOrphanDialog: {
+        title: '连接已变更',
+        message: '此查询标签的原始连接已变更：{from} → {to}。是否绑定到当前活跃连接并执行？',
+        cancel: '取消',
+        close: '关闭标签页',
+        rebindAndExecute: '绑定并执行',
+      },
       explain: {
         title: '执行计划',
         treeView: '树形',
@@ -1330,6 +1337,16 @@ export const zhCN = {
         copyAsJson: '复制为 JSON',
         copyAsInsert: '复制为 INSERT',
         actions: '操作',
+        noTableContext: '查询结果未关联具体表，无法编辑或删除行',
+        editUnsupported: {
+          'not-select': '当前语句不是查询，无法编辑或删除结果行',
+          'cte': '包含 WITH 公共表表达式，无法确定行来源，不支持编辑',
+          'set-operation': '包含 UNION/INTERSECT/EXCEPT，行来自多条语句，不支持编辑',
+          'aggregation': '包含聚合、GROUP BY 或 DISTINCT，结果行无法映射回原始行，不支持编辑',
+          'multiple-sources': '查询关联了多张表（JOIN），不支持编辑或删除行',
+          'no-table': '查询没有 FROM 表，不支持编辑或删除行',
+          'complex-source': '查询来源为子查询或复杂表达式，不支持编辑或删除行',
+        },
       },
       cell: {
         copyValue: '复制单元格值',

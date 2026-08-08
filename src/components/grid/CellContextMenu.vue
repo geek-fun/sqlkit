@@ -20,6 +20,7 @@ const props = defineProps<{
   column: string
   columnType?: string
   row: Record<string, unknown> | null
+  rowIndex?: number
   columns: string[]
   tableName?: string
 }>()
