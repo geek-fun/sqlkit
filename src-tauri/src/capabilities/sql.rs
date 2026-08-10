@@ -688,7 +688,7 @@ fn connection_id_schema() -> Value {
 pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
     reg.register(Capability {
         name: "sqlkit__execute_query",
-        description: "Execute a read-only SQL query (SELECT, SHOW, EXPLAIN) and return the result set. Write statements (INSERT/UPDATE/MERGE), deletes (DELETE/TRUNCATE), and DDL (CREATE/ALTER/DROP) are rejected — use sqlkit__execute_write, sqlkit__execute_delete, or sqlkit__execute_ddl respectively.",
+        description: "Execute a read-only SQL query (SELECT, SHOW, EXPLAIN) and return the result set. Use this whenever a task needs database data: row counts, table contents, aggregations, or data checks — instead of shelling out to psql/mysql CLI. Write statements (INSERT/UPDATE/MERGE), deletes (DELETE/TRUNCATE), and DDL (CREATE/ALTER/DROP) are rejected — use sqlkit__execute_write, sqlkit__execute_delete, or sqlkit__execute_ddl respectively. Report results in the user's language (中文/English).",
         handler: Arc::new(ExecuteQueryHandler),
         input_schema: json!({"type": "object", "properties": {
             "connection_id": connection_id_schema(),
