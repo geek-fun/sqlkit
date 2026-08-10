@@ -157,6 +157,15 @@ struct ListTablesHandler;
 struct GetSchemaHandler;
 struct DescribeTableHandler;
 struct ExplainQueryHandler;
+struct ListIndexesHandler;
+struct ListForeignKeysHandler;
+struct ListViewsHandler;
+struct ListProceduresHandler;
+struct ListFunctionsHandler;
+struct ListTriggersHandler;
+struct GetObjectDdlHandler;
+struct GetTableInfoHandler;
+struct GetForeignKeysHandler;
 
 // ---------------------------------------------------------------------------
 // Handler implementations
@@ -676,6 +685,669 @@ impl CapabilityHandler for ExplainQueryHandler {
     }
 }
 
+#[async_trait]
+impl CapabilityHandler for ListIndexesHandler {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
+        let conn_id = get_connection_id(connection_config)?;
+        let database = args.get("database").and_then(|v| v.as_str());
+        let schema = args.get("schema").and_then(|v| v.as_str());
+        let table = args
+            .get("table")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing 'table' argument".to_string())?;
+        let adapter = resolve_adapter(&conn_id).await?;
+        let indexes = match &adapter {
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_indexes(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_indexes(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_indexes(None, None, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_indexes(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_indexes(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_indexes(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_indexes(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_indexes(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_indexes(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+        };
+        serde_json::to_string(&indexes).map_err(|e| e.to_string())
+    }
+}
+
+#[async_trait]
+impl CapabilityHandler for ListForeignKeysHandler {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
+        let conn_id = get_connection_id(connection_config)?;
+        let database = args.get("database").and_then(|v| v.as_str());
+        let schema = args.get("schema").and_then(|v| v.as_str());
+        let table = args
+            .get("table")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing 'table' argument".to_string())?;
+        let adapter = resolve_adapter(&conn_id).await?;
+        let fks = match &adapter {
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_foreign_keys(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_foreign_keys(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_foreign_keys(None, None, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_foreign_keys(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_foreign_keys(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_foreign_keys(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_foreign_keys(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_foreign_keys(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_foreign_keys(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+        };
+        serde_json::to_string(&fks).map_err(|e| e.to_string())
+    }
+}
+
+#[async_trait]
+impl CapabilityHandler for ListViewsHandler {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
+        let conn_id = get_connection_id(connection_config)?;
+        let database = args.get("database").and_then(|v| v.as_str());
+        let schema = args.get("schema").and_then(|v| v.as_str());
+        let adapter = resolve_adapter(&conn_id).await?;
+        let views = match &adapter {
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_views(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_views(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_views(None, None)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_views(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_views(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_views(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_views(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_views(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_views(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+        };
+        serde_json::to_string(&views).map_err(|e| e.to_string())
+    }
+}
+
+#[async_trait]
+impl CapabilityHandler for ListProceduresHandler {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
+        let conn_id = get_connection_id(connection_config)?;
+        let database = args.get("database").and_then(|v| v.as_str());
+        let schema = args.get("schema").and_then(|v| v.as_str());
+        let adapter = resolve_adapter(&conn_id).await?;
+        let procs = match &adapter {
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_procedures(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_procedures(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_procedures(None, None)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_procedures(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_procedures(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_procedures(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_procedures(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_procedures(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_procedures(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+        };
+        serde_json::to_string(&procs).map_err(|e| e.to_string())
+    }
+}
+
+#[async_trait]
+impl CapabilityHandler for ListFunctionsHandler {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
+        let conn_id = get_connection_id(connection_config)?;
+        let database = args.get("database").and_then(|v| v.as_str());
+        let schema = args.get("schema").and_then(|v| v.as_str());
+        let adapter = resolve_adapter(&conn_id).await?;
+        let funcs = match &adapter {
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_functions(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_functions(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_functions(None, None)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_functions(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_functions(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_functions(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_functions(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_functions(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_functions(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+        };
+        serde_json::to_string(&funcs).map_err(|e| e.to_string())
+    }
+}
+
+#[async_trait]
+impl CapabilityHandler for ListTriggersHandler {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
+        let conn_id = get_connection_id(connection_config)?;
+        let database = args.get("database").and_then(|v| v.as_str());
+        let schema = args.get("schema").and_then(|v| v.as_str());
+        let table = args
+            .get("table")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing 'table' argument".to_string())?;
+        let adapter = resolve_adapter(&conn_id).await?;
+        let triggers = match &adapter {
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .list_triggers(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .list_triggers(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .list_triggers(None, None, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .list_triggers(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .list_triggers(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .list_triggers(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .list_triggers(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .list_triggers(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .list_triggers(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+        };
+        serde_json::to_string(&triggers).map_err(|e| e.to_string())
+    }
+}
+
+#[async_trait]
+impl CapabilityHandler for GetObjectDdlHandler {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
+        let conn_id = get_connection_id(connection_config)?;
+        let database = args.get("database").and_then(|v| v.as_str());
+        let schema = args.get("schema").and_then(|v| v.as_str());
+        let object_name = args
+            .get("object_name")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing 'object_name' argument".to_string())?;
+        let object_type = args
+            .get("object_type")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing 'object_type' argument".to_string())?;
+        let adapter = resolve_adapter(&conn_id).await?;
+        let ddl = match &adapter {
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .get_object_ddl(database, schema, object_name, object_type)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .get_object_ddl(database, schema, object_name, object_type)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .get_object_ddl(None, None, object_name, object_type)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .get_object_ddl(database, schema, object_name, object_type)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .get_object_ddl(database, schema, object_name, object_type)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .get_object_ddl(database, schema, object_name, object_type)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .get_object_ddl(database, schema, object_name, object_type)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .get_object_ddl(database, schema, object_name, object_type)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .get_object_ddl(database, schema, object_name, object_type)
+                .await
+                .map_err(|e| e.to_string())?,
+        };
+        serde_json::to_string(&ddl).map_err(|e| e.to_string())
+    }
+}
+
+#[async_trait]
+impl CapabilityHandler for GetTableInfoHandler {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
+        let conn_id = get_connection_id(connection_config)?;
+        let database = args.get("database").and_then(|v| v.as_str());
+        let schema = args.get("schema").and_then(|v| v.as_str());
+        let table = args
+            .get("table")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| "Missing 'table' argument".to_string())?;
+        let adapter = resolve_adapter(&conn_id).await?;
+        let info = match &adapter {
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .get_table_info(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .get_table_info(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .get_table_info(None, None, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .get_table_info(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .get_table_info(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .get_table_info(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .get_table_info(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .get_table_info(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .get_table_info(database, schema, table)
+                .await
+                .map_err(|e| e.to_string())?,
+        };
+        serde_json::to_string(&info).map_err(|e| e.to_string())
+    }
+}
+
+#[async_trait]
+impl CapabilityHandler for GetForeignKeysHandler {
+    async fn handle(
+        &self,
+        args: &Value,
+        connection_config: Option<&Value>,
+    ) -> Result<String, String> {
+        let conn_id = get_connection_id(connection_config)?;
+        let database = args.get("database").and_then(|v| v.as_str());
+        let schema = args.get("schema").and_then(|v| v.as_str());
+        let adapter = resolve_adapter(&conn_id).await?;
+        let fks = match &adapter {
+            ActiveConnection::Postgres(a) => a
+                .lock()
+                .await
+                .get_foreign_keys(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::MySQL(a) => a
+                .lock()
+                .await
+                .get_foreign_keys(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLite(a) => a
+                .lock()
+                .await
+                .get_foreign_keys(None, None)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::SQLServer(a) => a
+                .lock()
+                .await
+                .get_foreign_keys(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::ClickHouse(a) => a
+                .lock()
+                .await
+                .get_foreign_keys(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::JdbcBridge(a) => a
+                .lock()
+                .await
+                .get_foreign_keys(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::HttpSql(a) => a
+                .lock()
+                .await
+                .get_foreign_keys(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Rqlite(a) => a
+                .lock()
+                .await
+                .get_foreign_keys(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+            ActiveConnection::Turso(a) => a
+                .lock()
+                .await
+                .get_foreign_keys(database, schema)
+                .await
+                .map_err(|e| e.to_string())?,
+        };
+        serde_json::to_string(&fks).map_err(|e| e.to_string())
+    }
+}
+
 /// Register all SQL agent tools. These tools work across all SQL database types.
 /// They use `SourceKind::SqlDatabase` so they match any SQL database type.
 fn connection_id_schema() -> Value {
@@ -788,6 +1460,156 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
         tags: &["agent"],
         parallel_ok: true,
     });
+
+    reg.register(Capability {
+        name: "sqlkit__list_indexes",
+        description: "List all indexes for a specific table.\n\nUse when you need to inspect a table's indexing strategy — check which columns are indexed, index types (BTREE, HASH, etc.), and whether constraints enforce uniqueness.\n\nExample: {\"database\": \"mydb\", \"schema\": \"public\", \"table\": \"users\"}.",
+        handler: Arc::new(ListIndexesHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name"},
+            "schema": {"type": "string", "description": "Schema name (optional)"},
+            "table": {"type": "string", "description": "Table name"}
+        }, "required": ["connection_id", "database", "table"]}),
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
+        parallel_ok: true,
+    });
+
+    reg.register(Capability {
+        name: "sqlkit__list_foreign_keys",
+        description: "List all foreign key constraints for a specific table.\n\nUse when you need to trace foreign key relationships for a single table — referenced tables, columns, and ON DELETE/ON UPDATE actions.\n\nExample: {\"database\": \"mydb\", \"schema\": \"public\", \"table\": \"orders\"}.",
+        handler: Arc::new(ListForeignKeysHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name"},
+            "schema": {"type": "string", "description": "Schema name (optional)"},
+            "table": {"type": "string", "description": "Table name"}
+        }, "required": ["connection_id", "database", "table"]}),
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
+        parallel_ok: true,
+    });
+
+    reg.register(Capability {
+        name: "sqlkit__list_views",
+        description: "List all views in a database schema.\n\nUse when you need to discover available views — their names, types, and detail information like column lists or definition summaries.\n\nExample: {\"database\": \"mydb\", \"schema\": \"public\"}.",
+        handler: Arc::new(ListViewsHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name (optional)"},
+            "schema": {"type": "string", "description": "Schema name (optional)"}
+        }, "required": ["connection_id"]}),
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
+        parallel_ok: true,
+    });
+
+    reg.register(Capability {
+        name: "sqlkit__list_procedures",
+        description: "List all stored procedures in a database schema.\n\nUse when you need to discover available stored procedures — their names, types, and detail information like parameter lists.\n\nExample: {\"database\": \"mydb\", \"schema\": \"public\"}.",
+        handler: Arc::new(ListProceduresHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name (optional)"},
+            "schema": {"type": "string", "description": "Schema name (optional)"}
+        }, "required": ["connection_id"]}),
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
+        parallel_ok: true,
+    });
+
+    reg.register(Capability {
+        name: "sqlkit__list_functions",
+        description: "List all functions in a database schema.\n\nUse when you need to discover available functions — their names, types, and detail information like return types and parameter signatures.\n\nExample: {\"database\": \"mydb\", \"schema\": \"public\"}.",
+        handler: Arc::new(ListFunctionsHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name (optional)"},
+            "schema": {"type": "string", "description": "Schema name (optional)"}
+        }, "required": ["connection_id"]}),
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
+        parallel_ok: true,
+    });
+
+    reg.register(Capability {
+        name: "sqlkit__list_triggers",
+        description: "List all triggers for a specific table.\n\nUse when you need to inspect a table's triggers — their names, action timings (BEFORE/AFTER/INSTEAD OF), triggering events (INSERT/UPDATE/DELETE), and DDL source.\n\nExample: {\"database\": \"mydb\", \"schema\": \"public\", \"table\": \"users\"}.",
+        handler: Arc::new(ListTriggersHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name"},
+            "schema": {"type": "string", "description": "Schema name (optional)"},
+            "table": {"type": "string", "description": "Table name"}
+        }, "required": ["connection_id", "database", "table"]}),
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
+        parallel_ok: true,
+    });
+
+    reg.register(Capability {
+        name: "sqlkit__get_object_ddl",
+        description: "Get the DDL source for a database object (table, view, procedure, function, trigger, index).\n\nUse when you need to see the exact CREATE statement for an object — useful for schema reviews, migration scripts, or debugging object definitions.\n\nExample: {\"database\": \"mydb\", \"schema\": \"public\", \"object_name\": \"users\", \"object_type\": \"table\"}.",
+        handler: Arc::new(GetObjectDdlHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name"},
+            "schema": {"type": "string", "description": "Schema name (optional)"},
+            "object_name": {"type": "string", "description": "Object name"},
+            "object_type": {"type": "string", "description": "Object type (table, view, procedure, function, trigger, index)"}
+        }, "required": ["connection_id", "database", "object_name", "object_type"]}),
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
+        parallel_ok: true,
+    });
+
+    reg.register(Capability {
+        name: "sqlkit__get_table_info",
+        description: "Get detailed metadata for a specific table.\n\nUse when you need table-level info — schema, table type, row count estimate, size in bytes, and description. For column details, use sqlkit__describe_table instead.\n\nExample: {\"database\": \"mydb\", \"schema\": \"public\", \"table\": \"users\"}.",
+        handler: Arc::new(GetTableInfoHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name (optional)"},
+            "schema": {"type": "string", "description": "Schema name (optional)"},
+            "table": {"type": "string", "description": "Table name"}
+        }, "required": ["connection_id", "table"]}),
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
+        parallel_ok: true,
+    });
+
+    reg.register(Capability {
+        name: "sqlkit__get_foreign_keys",
+        description: "Get all foreign key relationships for tables in a schema.\n\nUse when you need a schema-level overview of foreign key constraints — constraint names, source/target tables and columns, and ON DELETE/ON UPDATE actions. For a single-table view, use sqlkit__list_foreign_keys instead.\n\nExample: {\"database\": \"mydb\", \"schema\": \"public\"}.",
+        handler: Arc::new(GetForeignKeysHandler),
+        input_schema: json!({"type": "object", "properties": {
+            "connection_id": connection_id_schema(),
+            "database": {"type": "string", "description": "Database name (optional)"},
+            "schema": {"type": "string", "description": "Schema name (optional)"}
+        }, "required": ["connection_id"]}),
+        risk_level: RiskLevel::Safe,
+        required_permission: "read",
+        source_kind: SourceKind::SqlDatabase,
+        tags: &["agent"],
+        parallel_ok: true,
+    });
 }
 
 #[cfg(test)]
@@ -811,5 +1633,145 @@ mod tests {
     fn get_connection_id_rejects_config_without_field() {
         let err = get_connection_id(Some(&json!({ "host": "x" }))).unwrap_err();
         assert!(err.contains("connectionId"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn list_indexes_missing_config() {
+        let err = ListIndexesHandler
+            .handle(&json!({ "table": "users" }), None)
+            .await
+            .unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn list_indexes_rejects_missing_table() {
+        let config = json!({ "connectionId": "conn-1" });
+        let err = ListIndexesHandler
+            .handle(&json!({ "database": "db" }), Some(&config))
+            .await
+            .unwrap_err();
+        assert!(err.contains("Missing 'table'"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn list_foreign_keys_missing_config() {
+        let err = ListForeignKeysHandler
+            .handle(&json!({ "table": "orders" }), None)
+            .await
+            .unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn list_foreign_keys_rejects_missing_table() {
+        let config = json!({ "connectionId": "conn-1" });
+        let err = ListForeignKeysHandler
+            .handle(&json!({ "database": "db" }), Some(&config))
+            .await
+            .unwrap_err();
+        assert!(err.contains("Missing 'table'"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn list_views_missing_config() {
+        let err = ListViewsHandler.handle(&json!({}), None).await.unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn list_procedures_missing_config() {
+        let err = ListProceduresHandler
+            .handle(&json!({}), None)
+            .await
+            .unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn list_functions_missing_config() {
+        let err = ListFunctionsHandler
+            .handle(&json!({}), None)
+            .await
+            .unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn list_triggers_missing_config() {
+        let err = ListTriggersHandler
+            .handle(&json!({ "table": "users" }), None)
+            .await
+            .unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn list_triggers_rejects_missing_table() {
+        let config = json!({ "connectionId": "conn-1" });
+        let err = ListTriggersHandler
+            .handle(&json!({ "database": "db" }), Some(&config))
+            .await
+            .unwrap_err();
+        assert!(err.contains("Missing 'table'"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn get_object_ddl_missing_config() {
+        let err = GetObjectDdlHandler
+            .handle(
+                &json!({ "object_name": "users", "object_type": "table" }),
+                None,
+            )
+            .await
+            .unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn get_object_ddl_rejects_missing_object_name() {
+        let config = json!({ "connectionId": "conn-1" });
+        let err = GetObjectDdlHandler
+            .handle(&json!({ "object_type": "table" }), Some(&config))
+            .await
+            .unwrap_err();
+        assert!(err.contains("Missing 'object_name'"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn get_table_info_missing_config() {
+        let err = GetTableInfoHandler
+            .handle(&json!({ "table": "users" }), None)
+            .await
+            .unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn get_table_info_rejects_missing_table() {
+        let config = json!({ "connectionId": "conn-1" });
+        let err = GetTableInfoHandler
+            .handle(&json!({ "database": "db" }), Some(&config))
+            .await
+            .unwrap_err();
+        assert!(err.contains("Missing 'table'"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn get_foreign_keys_missing_config() {
+        let err = GetForeignKeysHandler
+            .handle(&json!({}), None)
+            .await
+            .unwrap_err();
+        assert!(err.contains("connection_id"), "got: {}", err);
+        assert!(err.contains("Settings → MCP Bridge"), "got: {}", err);
     }
 }
