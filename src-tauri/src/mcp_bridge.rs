@@ -201,6 +201,9 @@ fn list_connections() -> Value {
                         "id": c.get("id"),
                         "name": c.get("name"),
                         "type": c.get("db_type"),
+                        // First discovery tool an agent should call for this
+                        // connection type to learn its objects before querying.
+                        "discover": json!(discover_tool_for(&db_type_str(c))),
                     })
                 })
                 .collect()
@@ -208,6 +211,22 @@ fn list_connections() -> Value {
         .unwrap_or_default();
 
     json!(safe_list)
+}
+
+/// The SQL discovery entry point for a connection type: list tables first,
+/// then drill into a table with describe_table or the full schema.
+fn discover_tool_for(db_type: &str) -> &'static str {
+    match db_type.to_ascii_lowercase().as_str() {
+        "sqlite" | "sqlcipher" => "sqlkit__list_tables",
+        _ => "sqlkit__list_tables",
+    }
+}
+
+fn db_type_str(c: &serde_json::Value) -> String {
+    c.get("db_type")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string()
 }
 
 /// Saved connections restricted to the policy allowlist, so MCP clients only
