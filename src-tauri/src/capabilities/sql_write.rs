@@ -12,7 +12,9 @@ use sqlparser::dialect::{GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlD
 use sqlparser::parser::Parser;
 
 use data_studio_agent::capabilities::registry::CapabilityRegistry;
-use data_studio_agent::capabilities::types::{Capability, CapabilityHandler, RiskLevel, SourceKind};
+use data_studio_agent::capabilities::types::{
+    Capability, CapabilityHandler, RiskLevel, SourceKind,
+};
 
 use super::sql::{execute_on_adapter, resolve_adapter};
 
@@ -37,8 +39,7 @@ pub(crate) fn classify_sql(db_type: &str, sql: &str) -> Result<SqlKind, String> 
         _ => Box::new(GenericDialect {}),
     };
 
-    let stmts = Parser::parse_sql(&*dialect, sql)
-        .map_err(|e| format!("parse error: {}", e))?;
+    let stmts = Parser::parse_sql(&*dialect, sql).map_err(|e| format!("parse error: {}", e))?;
     if stmts.len() > 1 {
         return Err("multiple statements are not supported".to_string());
     }
@@ -356,14 +357,23 @@ mod tests {
 
     #[test]
     fn classifies_select_as_read() {
-        assert_eq!(classify_sql("postgres", "SELECT * FROM users").unwrap(), SqlKind::Read);
-        assert_eq!(classify_sql("postgres", "WITH x AS (SELECT 1) SELECT * FROM x").unwrap(), SqlKind::Read);
+        assert_eq!(
+            classify_sql("postgres", "SELECT * FROM users").unwrap(),
+            SqlKind::Read
+        );
+        assert_eq!(
+            classify_sql("postgres", "WITH x AS (SELECT 1) SELECT * FROM x").unwrap(),
+            SqlKind::Read
+        );
     }
 
     #[test]
     fn classifies_show_as_read() {
         assert_eq!(classify_sql("mysql", "SHOW TABLES").unwrap(), SqlKind::Read);
-        assert_eq!(classify_sql("sqlserver", "SHOW VARIABLES").unwrap(), SqlKind::Read);
+        assert_eq!(
+            classify_sql("sqlserver", "SHOW VARIABLES").unwrap(),
+            SqlKind::Read
+        );
     }
 
     #[test]
@@ -377,7 +387,11 @@ mod tests {
             SqlKind::Write
         );
         assert_eq!(
-            classify_sql("sqlserver", "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = s.x").unwrap(),
+            classify_sql(
+                "sqlserver",
+                "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = s.x"
+            )
+            .unwrap(),
             SqlKind::Write
         );
     }
@@ -404,7 +418,10 @@ mod tests {
             classify_sql("postgres", "ALTER TABLE t ADD COLUMN c int").unwrap(),
             SqlKind::Ddl
         );
-        assert_eq!(classify_sql("postgres", "DROP TABLE t").unwrap(), SqlKind::Ddl);
+        assert_eq!(
+            classify_sql("postgres", "DROP TABLE t").unwrap(),
+            SqlKind::Ddl
+        );
     }
 
     #[test]

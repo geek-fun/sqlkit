@@ -538,7 +538,9 @@ impl DatabaseAdapter for MySQLAdapter {
                     })?
                     .map_err(mysql_error_to_db_error)?
             } else {
-                conn.query_iter(query).await.map_err(mysql_error_to_db_error)?
+                conn.query_iter(query)
+                    .await
+                    .map_err(mysql_error_to_db_error)?
             };
 
             execution_time = start.elapsed().as_millis() as u64;

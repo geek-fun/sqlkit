@@ -65,14 +65,25 @@ pub(crate) async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnect
     // Store the adapter for future use
     {
         let state: tauri::State<'_, crate::state::AppState> = app.state();
-        state.connections.write().await.insert(connection_id.to_string(), adapter.clone());
-        state.configs.write().await.insert(connection_id.to_string(), server_config);
+        state
+            .connections
+            .write()
+            .await
+            .insert(connection_id.to_string(), adapter.clone());
+        state
+            .configs
+            .write()
+            .await
+            .insert(connection_id.to_string(), server_config);
     }
 
     Ok(adapter)
 }
 
-pub(crate) async fn execute_on_adapter(adapter: &ActiveConnection, sql: &str) -> Result<QueryResult, String> {
+pub(crate) async fn execute_on_adapter(
+    adapter: &ActiveConnection,
+    sql: &str,
+) -> Result<QueryResult, String> {
     match adapter {
         ActiveConnection::Postgres(a) => a
             .lock()

@@ -472,18 +472,24 @@ impl DatabaseAdapter for SqlServerAdapter {
                 .as_ref()
                 .map(|cols| cols.iter().map(|(name, _)| name.clone()).collect())
                 .or_else(|| {
-                    result_set
-                        .first()
-                        .map(|row| row.columns().iter().map(|col| col.name().to_string()).collect())
+                    result_set.first().map(|row| {
+                        row.columns()
+                            .iter()
+                            .map(|col| col.name().to_string())
+                            .collect()
+                    })
                 })
                 .unwrap_or_default();
             let column_types: Vec<String> = stream_columns
                 .as_ref()
                 .map(|cols| cols.iter().map(|(_, ty)| ty.clone()).collect())
                 .or_else(|| {
-                    result_set
-                        .first()
-                        .map(|row| row.columns().iter().map(|col| format!("{:?}", col.column_type())).collect())
+                    result_set.first().map(|row| {
+                        row.columns()
+                            .iter()
+                            .map(|col| format!("{:?}", col.column_type()))
+                            .collect()
+                    })
                 })
                 .unwrap_or_default();
 

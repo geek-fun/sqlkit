@@ -115,7 +115,9 @@ pub async fn preview_migration_data(
     request: MigrationRequest,
     state: State<'_, AppState>,
 ) -> Result<MigrationPreview, String> {
-    let source_connection = state.ensure_connection(&request.source_connection_id).await?;
+    let source_connection = state
+        .ensure_connection(&request.source_connection_id)
+        .await?;
 
     match source_connection {
         ActiveConnection::Postgres(adapter) => {
@@ -144,9 +146,13 @@ pub async fn execute_migration_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let source_connection = state.ensure_connection(&request.source_connection_id).await?;
+    let source_connection = state
+        .ensure_connection(&request.source_connection_id)
+        .await?;
 
-    let target_connection = state.ensure_connection(&request.target_connection_id).await?;
+    let target_connection = state
+        .ensure_connection(&request.target_connection_id)
+        .await?;
 
     macro_rules! run_migration {
         ($source_adapter:expr, $target_adapter:expr) => {

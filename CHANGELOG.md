@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.6] - 2026-08-11
+
+### Added
+
+- Guide agents to sqlkit tools for database access (#134)
+- Advertise a discovery tool per connection in `list_connections` (#135)
+
+### Changed
+
+- Bump data-studio-agent to v0.1.6
+
 ## [0.8.5] - 2026-08-08
 
 ### Added
