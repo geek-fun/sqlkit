@@ -215,11 +215,8 @@ fn list_connections() -> Value {
 
 /// The SQL discovery entry point for a connection type: list tables first,
 /// then drill into a table with describe_table or the full schema.
-fn discover_tool_for(db_type: &str) -> &'static str {
-    match db_type.to_ascii_lowercase().as_str() {
-        "sqlite" | "sqlcipher" => "sqlkit__list_tables",
-        _ => "sqlkit__list_tables",
-    }
+fn discover_tool_for(_db_type: &str) -> &'static str {
+    "sqlkit__list_tables"
 }
 
 fn db_type_str(c: &serde_json::Value) -> String {

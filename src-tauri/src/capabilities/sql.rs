@@ -1470,7 +1470,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
             "database": {"type": "string", "description": "Database name"},
             "schema": {"type": "string", "description": "Schema name (optional)"},
             "table": {"type": "string", "description": "Table name"}
-        }, "required": ["connection_id", "database", "table"]}),
+        }, "required": ["connection_id", "table"]}),
         risk_level: RiskLevel::Safe,
         required_permission: "read",
         source_kind: SourceKind::SqlDatabase,
@@ -1487,7 +1487,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
             "database": {"type": "string", "description": "Database name"},
             "schema": {"type": "string", "description": "Schema name (optional)"},
             "table": {"type": "string", "description": "Table name"}
-        }, "required": ["connection_id", "database", "table"]}),
+        }, "required": ["connection_id", "table"]}),
         risk_level: RiskLevel::Safe,
         required_permission: "read",
         source_kind: SourceKind::SqlDatabase,
@@ -1552,7 +1552,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
             "database": {"type": "string", "description": "Database name"},
             "schema": {"type": "string", "description": "Schema name (optional)"},
             "table": {"type": "string", "description": "Table name"}
-        }, "required": ["connection_id", "database", "table"]}),
+        }, "required": ["connection_id", "table"]}),
         risk_level: RiskLevel::Safe,
         required_permission: "read",
         source_kind: SourceKind::SqlDatabase,
@@ -1570,7 +1570,7 @@ pub fn register_sql_tools(reg: &mut CapabilityRegistry) {
             "schema": {"type": "string", "description": "Schema name (optional)"},
             "object_name": {"type": "string", "description": "Object name"},
             "object_type": {"type": "string", "description": "Object type (table, view, procedure, function, trigger, index)"}
-        }, "required": ["connection_id", "database", "object_name", "object_type"]}),
+        }, "required": ["connection_id", "object_name", "object_type"]}),
         risk_level: RiskLevel::Safe,
         required_permission: "read",
         source_kind: SourceKind::SqlDatabase,
@@ -1743,6 +1743,16 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.contains("Missing 'object_name'"), "got: {}", err);
+    }
+
+    #[tokio::test]
+    async fn get_object_ddl_rejects_missing_object_type() {
+        let config = json!({ "connectionId": "conn-1" });
+        let err = GetObjectDdlHandler
+            .handle(&json!({ "object_name": "users" }), Some(&config))
+            .await
+            .unwrap_err();
+        assert!(err.contains("Missing 'object_type'"), "got: {}", err);
     }
 
     #[tokio::test]
