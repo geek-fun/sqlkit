@@ -7,7 +7,7 @@ const { isMac, platformReady } = usePlatform()
 </script>
 
 <template>
-  <div v-if="platformReady && !isMac" class="mr-2 flex items-stretch">
+  <div v-if="platformReady && !isMac" class="flex items-stretch">
     <button
       class="inline-flex h-10 w-11 transition-colors items-center justify-center hover:bg-foreground/10"
       @click="minimize"
