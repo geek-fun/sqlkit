@@ -18,9 +18,8 @@ This directory contains the shadcn-vue UI components used in SQLKit.
 Located in `src/components/layout/`:
 
 - **AppLayout** - Main application layout wrapper
-- **AppHeader** - Top navigation header with theme toggle
+- **AppHeader** - Top navigation header
 - **AppSidebar** - Left sidebar navigation
-- **ThemeToggle** - Dark/light mode toggle button
 
 ## Theme
 
@@ -50,14 +49,9 @@ import { Input } from '@/components/ui/input'
 
 ## Theme System
 
-The theme system uses the `useTheme` composable:
+The theme system is managed by the Pinia `appStore` (`src/store/appStore.ts`):
 
-```vue
-<script setup lang="ts">
-import { useTheme } from '@/composables/useTheme'
-
-const { theme: _theme, isDark: _isDark, setTheme: _setTheme, toggleTheme: _toggleTheme } = useTheme()
-</script>
-```
-
-Theme preferences are persisted in localStorage and respect system preferences.
+- `themeType` (`auto` | `dark` | `light`) is the user preference, persisted via pinia-plugin-persistedstate.
+- `uiThemeType` (`dark` | `light`) is the resolved effective theme.
+- `applyUiTheme` toggles the `theme` attribute and `.dark` class on `<html>`.
+- Monaco editor themes are derived from `appStore.uiThemeType` in `useMonacoEditor`.

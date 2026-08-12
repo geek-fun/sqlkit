@@ -5,6 +5,7 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { onBeforeUnmount } from 'vue'
+import { ThemeType, useAppStore } from '@/store/appStore'
 import { hasGrammar } from './sqlCompletion/dialects'
 import { getCompletionProvider } from './sqlCompletion/provider'
 import {
@@ -15,7 +16,6 @@ import {
   parseSqlStatements,
   SQL_EXECUTE_GUTTER_CLASS,
 } from './useSqlStatements'
-import { useTheme } from './useTheme'
 
 // Import only SQL-related grammars instead of all Monaco languages
 // (Typescript/CSS/HTML/JSON workers alone add ~8MB to the bundle).
@@ -62,7 +62,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
   let parsedStatements: SqlStatement[] = []
   let registeredCallbacks: EditorCallbacks | null = null
   let refreshDebounceTimer: ReturnType<typeof setTimeout> | null = null
-  const { isDark } = useTheme()
+  const appStore = useAppStore()
 
   /** Monaco ships grammars only for sql/mysql/pgsql; other dialect ids use the generic sql grammar. Completion still resolves the real dialect profile per-editor. */
   const resolveEditorLanguage = (id: SQLDialect): SQLDialect => hasGrammar(id) ? id : 'sql'
@@ -98,7 +98,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     editor = monaco.editor.create(containerRef.value, {
       value: initialValue.value,
       language: resolveEditorLanguage(options.language || 'sql'),
-      theme: isDark.value ? 'vs-dark' : 'vs',
+      theme: appStore.uiThemeType === ThemeType.DARK ? 'vs-dark' : 'vs',
       automaticLayout: true,
       readOnly: options.readOnly || false,
       minimap: { enabled: options.minimap !== false },
