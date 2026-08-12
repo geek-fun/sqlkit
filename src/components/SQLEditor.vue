@@ -7,7 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { ProgressBar } from '@/components/ui/progress'
 import { useMonacoEditor } from '@/composables/useMonacoEditor'
 import { usePlatform } from '@/composables/usePlatform'
-import { useTheme } from '@/composables/useTheme'
+import { ThemeType, useAppStore } from '@/store/appStore'
 
 type Props = {
   modelValue?: string
@@ -48,7 +48,8 @@ const emit = defineEmits<{
 }>()
 
 const editorContainer = ref<HTMLElement | null>(null)
-const { isDark } = useTheme()
+const appStore = useAppStore()
+const isDark = computed(() => appStore.uiThemeType === ThemeType.DARK)
 const { modifierKey, altKey } = usePlatform()
 const { t } = useI18n()
 

@@ -202,11 +202,11 @@ describe('appStore', () => {
   })
 
   describe('getEditorTheme', () => {
-    it('should return vs-light for light theme', () => {
+    it('should return vs for light theme', () => {
       const store = useAppStore()
       store.uiThemeType = ThemeType.LIGHT
 
-      expect(store.getEditorTheme()).toBe('vs-light')
+      expect(store.getEditorTheme()).toBe('vs')
     })
 
     it('should return vs-dark for dark theme', () => {
