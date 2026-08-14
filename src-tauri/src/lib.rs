@@ -117,6 +117,7 @@ pub fn run() {
                 crate::capabilities::sqlkit::register_all,
                 crate::capabilities::sql::register_sql_tools,
                 crate::capabilities::sql_write::register_write_tools,
+                crate::capabilities::dba::register_dba_tools,
             ]);
 
             // Initialize agent SQLite database
