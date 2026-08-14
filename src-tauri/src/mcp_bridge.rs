@@ -633,6 +633,7 @@ mod tests {
             crate::capabilities::sqlkit::register_all,
             crate::capabilities::sql::register_sql_tools,
             crate::capabilities::sql_write::register_write_tools,
+            crate::capabilities::dba::register_dba_tools,
         ]);
     }
 
@@ -998,5 +999,34 @@ mod tests {
         // Policy passes; with no connection config the capability itself fails,
         // proving execution reached the invoke path.
         assert_eq!(resp.status, 400);
+    }
+
+    #[test]
+    fn test_all_sql_capabilities_are_agent_tagged() {
+        init_registry_for_tests();
+        let reg = data_studio_agent::capabilities::registry::registry();
+        let all_tools = reg.agent_tools();
+        let sql_tools: Vec<_> = all_tools
+            .iter()
+            .filter(|c| c.name.starts_with("sqlkit__"))
+            .collect();
+        assert!(
+            sql_tools.len() >= 25,
+            "expected at least 25 sqlkit capabilities tagged for agent, got {}",
+            sql_tools.len()
+        );
+        for name in &[
+            "sqlkit__list_sessions",
+            "sqlkit__kill_session",
+            "sqlkit__get_slow_queries",
+            "sqlkit__grant_privilege",
+            "sqlkit__revoke_privilege",
+        ] {
+            assert!(
+                sql_tools.iter().any(|c| c.name == *name),
+                "missing expected DBA capability: {}",
+                name
+            );
+        }
     }
 }

@@ -243,6 +243,61 @@ impl PostgresAdapter {
         Self { config, pool: None }
     }
 
+    fn quote_ident(identifier: &str) -> DbResult<String> {
+        if identifier.is_empty() || identifier.len() > 128 {
+            return Err(DbError::InvalidQuery(format!(
+                "Invalid identifier: '{}'",
+                identifier
+            )));
+        }
+        for part in identifier.split('.') {
+            let trimmed = part.trim_matches('"');
+            let valid = !trimmed.is_empty()
+                && trimmed
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && !trimmed.chars().next().unwrap().is_ascii_digit();
+            if !valid {
+                return Err(DbError::InvalidQuery(format!(
+                    "Invalid identifier: '{}'",
+                    identifier
+                )));
+            }
+        }
+        Ok(identifier
+            .split('.')
+            .map(|part| format!("\"{}\"", part.trim_matches('"')))
+            .collect::<Vec<_>>()
+            .join("."))
+    }
+
+     fn validate_privilege(privilege: &str) -> DbResult<String> {
+         const PRIVILEGES: &[&str] = &[
+             "SELECT",
+             "INSERT",
+             "UPDATE",
+             "DELETE",
+             "TRUNCATE",
+             "REFERENCES",
+             "TRIGGER",
+             "ALL",
+             "ALL PRIVILEGES",
+         ];
+        let mut validated = Vec::new();
+        for part in privilege.split(',') {
+            let trimmed = part.trim().to_uppercase();
+            if trimmed.is_empty() || !PRIVILEGES.contains(&trimmed.as_str()) {
+                return Err(DbError::InvalidQuery(format!(
+                    "Unsupported privilege: '{}'. Supported: {}",
+                    part.trim(),
+                    PRIVILEGES.join(", ")
+                )));
+            }
+            validated.push(trimmed);
+        }
+        Ok(validated.join(", "))
+    }
+
     /// Build the PostgreSQL connection string.
     fn build_connection_string(&self) -> String {
         let mut parts = Vec::new();
@@ -1940,6 +1995,218 @@ impl DatabaseAdapter for PostgresAdapter {
             .collect();
 
         Ok(indexes)
+    }
+
+    async fn list_sessions(&self, database: Option<&str>) -> DbResult<Vec<serde_json::Value>> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot list sessions from a different database without reconnecting".to_string(),
+            ));
+        }
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let query = r#"
+            SELECT
+                pid,
+                usename,
+                datname,
+                state,
+                query_start,
+                EXTRACT(EPOCH FROM (NOW() - query_start))::float8 AS duration_seconds,
+                query
+            FROM pg_stat_activity
+            WHERE state IS NOT NULL
+              AND pid <> pg_backend_pid()
+        "#;
+
+        let rows = client
+            .query(query, &[])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let sessions = rows
+            .iter()
+            .map(|row| {
+                let pid: i32 = row.get(0);
+                let usename: Option<String> = row.get(1);
+                let datname: Option<String> = row.get(2);
+                let state: Option<String> = row.get(3);
+                let query_start: Option<DateTime<FixedOffset>> = row.get(4);
+                let duration_seconds: Option<f64> = row.get(5);
+                let query: Option<String> = row.get(6);
+                serde_json::json!({
+                    "pid": pid,
+                    "usename": usename,
+                    "datname": datname,
+                    "state": state,
+                    "query_start": query_start.map(|d| d.to_string()),
+                    "duration_seconds": duration_seconds,
+                    "query": query,
+                })
+            })
+            .collect();
+
+        Ok(sessions)
+    }
+
+    async fn kill_session(&self, session_id: &str) -> DbResult<()> {
+        let pid: i32 = session_id.parse().map_err(|_| {
+            DbError::InvalidQuery(format!(
+                "Invalid session id '{}': PostgreSQL session ids are numeric PIDs",
+                session_id
+            ))
+        })?;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let rows = client
+            .query("SELECT pg_terminate_backend($1::int)", &[&pid])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let terminated: bool = rows.first().map(|row| row.get(0)).unwrap_or(false);
+        if !terminated {
+            return Err(DbError::QueryExecution(format!(
+                "Failed to terminate session {} (no such backend or insufficient privilege)",
+                session_id
+            )));
+        }
+
+        Ok(())
+    }
+
+    async fn get_slow_queries(
+        &self,
+        database: Option<&str>,
+        limit: Option<u32>,
+    ) -> DbResult<Vec<serde_json::Value>> {
+        if database.is_some() && database != self.config.database.as_deref() {
+            return Err(DbError::UnsupportedOperation(
+                "Cannot list slow queries from a different database without reconnecting"
+                    .to_string(),
+            ));
+        }
+
+        let limit = limit.unwrap_or(20) as i64;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let query = r#"
+            SELECT
+                pid,
+                usename,
+                datname,
+                EXTRACT(EPOCH FROM (NOW() - query_start))::float8 AS duration_seconds,
+                query
+            FROM pg_stat_activity
+            WHERE state = 'active'
+              AND NOW() - query_start > interval '1 second'
+            ORDER BY duration_seconds DESC
+            LIMIT $1
+        "#;
+
+        let rows = client
+            .query(query, &[&limit])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let slow = rows
+            .iter()
+            .map(|row| {
+                let pid: i32 = row.get(0);
+                let usename: String = row.get(1);
+                let datname: Option<String> = row.get(2);
+                let duration_seconds: f64 = row.get(3);
+                let query: String = row.get(4);
+                serde_json::json!({
+                    "pid": pid,
+                    "usename": usename,
+                    "datname": datname,
+                    "duration_seconds": duration_seconds,
+                    "query": query,
+                })
+            })
+            .collect();
+
+        Ok(slow)
+    }
+
+    async fn grant_privilege(&self, privilege: &str, object: &str, grantee: &str) -> DbResult<()> {
+        let privs = Self::validate_privilege(privilege)?;
+        let obj = Self::quote_ident(object)?;
+        let grantee = Self::quote_ident(grantee)?;
+        let sql = format!("GRANT {} ON {} TO {}", privs, obj, grantee);
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        client
+            .execute(&sql, &[])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn revoke_privilege(&self, privilege: &str, object: &str, grantee: &str) -> DbResult<()> {
+        let privs = Self::validate_privilege(privilege)?;
+        let obj = Self::quote_ident(object)?;
+        let grantee = Self::quote_ident(grantee)?;
+        let sql = format!("REVOKE {} ON {} FROM {}", privs, obj, grantee);
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        client
+            .execute(&sql, &[])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
     }
 
     async fn list_foreign_keys(

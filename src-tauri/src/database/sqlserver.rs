@@ -234,6 +234,64 @@ impl SqlServerAdapter {
         }
     }
 
+    fn quote_ident(identifier: &str) -> DbResult<String> {
+        if identifier.is_empty() || identifier.len() > 128 {
+            return Err(DbError::InvalidQuery(format!(
+                "Invalid identifier: '{}'",
+                identifier
+            )));
+        }
+        for part in identifier.split('.') {
+            let trimmed = part.trim_matches(|c| c == '[' || c == ']');
+            let valid = !trimmed.is_empty()
+                && trimmed
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && !trimmed.chars().next().unwrap().is_ascii_digit();
+            if !valid {
+                return Err(DbError::InvalidQuery(format!(
+                    "Invalid identifier: '{}'",
+                    identifier
+                )));
+            }
+        }
+        Ok(identifier
+            .split('.')
+            .map(|part| format!("[{}]", part.trim_matches(|c| c == '[' || c == ']')))
+            .collect::<Vec<_>>()
+            .join("."))
+    }
+
+    fn validate_privilege(privilege: &str) -> DbResult<String> {
+        const PRIVILEGES: &[&str] = &[
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "REFERENCES",
+            "EXECUTE",
+            "ALTER",
+            "CONTROL",
+            "TAKE OWNERSHIP",
+            "VIEW DEFINITION",
+            "ALL",
+            "ALL PRIVILEGES",
+        ];
+        let mut validated = Vec::new();
+        for part in privilege.split(',') {
+            let trimmed = part.trim().to_uppercase();
+            if trimmed.is_empty() || !PRIVILEGES.contains(&trimmed.as_str()) {
+                return Err(DbError::InvalidQuery(format!(
+                    "Unsupported privilege: '{}'. Supported: {}",
+                    part.trim(),
+                    PRIVILEGES.join(", ")
+                )));
+            }
+            validated.push(trimmed);
+        }
+        Ok(validated.join(", "))
+    }
+
     /// Convert a tiberius Row to QueryRow.
     fn row_to_query_row(row: &Row) -> DbResult<QueryRow> {
         let mut query_row = HashMap::new();
@@ -1646,6 +1704,180 @@ impl DatabaseAdapter for SqlServerAdapter {
         let qualified = format!("{}.{}", schema_filter, object_name);
 
         let sql = format!("EXEC sp_rename N'{}', N'{}'", qualified, new_name);
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        client
+            .simple_query(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .into_results()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn list_sessions(&self, _database: Option<&str>) -> DbResult<Vec<serde_json::Value>> {
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let stream = client
+            .simple_query(
+                "SELECT session_id, login_name, database_id, status, login_time \
+                 FROM sys.dm_exec_sessions ORDER BY session_id",
+            )
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let sessions = rows
+            .iter()
+            .map(|row| {
+                let session_id = row.try_get::<i16, _>(0).ok().flatten();
+                let login_name = row
+                    .try_get::<&str, _>(1)
+                    .ok()
+                    .flatten()
+                    .map(|s| s.to_string());
+                let database_id = row.try_get::<i16, _>(2).ok().flatten();
+                let status = row
+                    .try_get::<&str, _>(3)
+                    .ok()
+                    .flatten()
+                    .map(|s| s.to_string());
+                let login_time = row
+                    .try_get::<NaiveDateTime, _>(4)
+                    .ok()
+                    .flatten()
+                    .map(|d| d.to_string());
+                serde_json::json!({
+                    "session_id": session_id,
+                    "login_name": login_name,
+                    "database_id": database_id,
+                    "status": status,
+                    "login_time": login_time,
+                })
+            })
+            .collect();
+
+        Ok(sessions)
+    }
+
+    async fn kill_session(&self, session_id: &str) -> DbResult<()> {
+        let id: u16 = session_id.parse().map_err(|_| {
+            DbError::InvalidQuery(format!(
+                "Invalid session id '{}': SQL Server session ids are numeric",
+                session_id
+            ))
+        })?;
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        client
+            .simple_query(&format!("KILL {}", id))
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .into_results()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn get_slow_queries(
+        &self,
+        _database: Option<&str>,
+        limit: Option<u32>,
+    ) -> DbResult<Vec<serde_json::Value>> {
+        let limit = limit.unwrap_or(20);
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        let query = format!(
+            "SELECT TOP ({}) \
+                 qs.total_elapsed_time / 1000000.0 AS elapsed_seconds, \
+                 qs.execution_count, \
+                 qs.last_execution_time, \
+                 SUBSTRING(st.text, (qs.statement_start_offset / 2) + 1, \
+                     ((CASE qs.statement_end_offset \
+                         WHEN -1 THEN DATALENGTH(st.text) \
+                         ELSE qs.statement_end_offset END - qs.statement_start_offset) / 2) + 1) AS query_text \
+             FROM sys.dm_exec_query_stats qs \
+             CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) st \
+             ORDER BY qs.total_elapsed_time DESC",
+            limit
+        );
+
+        let stream = client
+            .simple_query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let rows = stream
+            .into_first_result()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let slow = rows
+            .iter()
+            .map(|row| {
+                let elapsed_seconds = row.try_get::<f64, _>(0).ok().flatten();
+                let execution_count = row.try_get::<i64, _>(1).ok().flatten();
+                let last_execution_time = row
+                    .try_get::<NaiveDateTime, _>(2)
+                    .ok()
+                    .flatten()
+                    .map(|d| d.to_string());
+                let query_text = row
+                    .try_get::<&str, _>(3)
+                    .ok()
+                    .flatten()
+                    .map(|s| s.to_string());
+                serde_json::json!({
+                    "elapsed_seconds": elapsed_seconds,
+                    "execution_count": execution_count,
+                    "last_execution_time": last_execution_time,
+                    "query_text": query_text,
+                })
+            })
+            .collect();
+
+        Ok(slow)
+    }
+
+    async fn grant_privilege(&self, privilege: &str, object: &str, grantee: &str) -> DbResult<()> {
+        let privs = Self::validate_privilege(privilege)?;
+        let obj = Self::quote_ident(object)?;
+        let grantee = Self::quote_ident(grantee)?;
+        let sql = format!("GRANT {} ON {} TO {}", privs, obj, grantee);
+
+        let client = self.get_client().await?;
+        let mut client = client.lock().await;
+
+        client
+            .simple_query(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .into_results()
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn revoke_privilege(&self, privilege: &str, object: &str, grantee: &str) -> DbResult<()> {
+        let privs = Self::validate_privilege(privilege)?;
+        let obj = Self::quote_ident(object)?;
+        let grantee = Self::quote_ident(grantee)?;
+        let sql = format!("REVOKE {} ON {} FROM {}", privs, obj, grantee);
 
         let client = self.get_client().await?;
         let mut client = client.lock().await;

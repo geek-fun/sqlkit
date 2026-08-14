@@ -142,6 +142,321 @@ pub(crate) async fn execute_on_adapter(
     }
 }
 
+pub(crate) async fn list_sessions_on_adapter(
+    adapter: &ActiveConnection,
+    database: Option<&str>,
+) -> Result<Vec<serde_json::Value>, String> {
+    match adapter {
+        ActiveConnection::Postgres(a) => a
+            .lock()
+            .await
+            .list_sessions(database)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::MySQL(a) => a
+            .lock()
+            .await
+            .list_sessions(database)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLite(a) => a
+            .lock()
+            .await
+            .list_sessions(None)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLServer(a) => a
+            .lock()
+            .await
+            .list_sessions(database)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::ClickHouse(a) => a
+            .lock()
+            .await
+            .list_sessions(database)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::JdbcBridge(a) => a
+            .lock()
+            .await
+            .list_sessions(database)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::HttpSql(a) => a
+            .lock()
+            .await
+            .list_sessions(database)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Rqlite(a) => a
+            .lock()
+            .await
+            .list_sessions(database)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Turso(a) => a
+            .lock()
+            .await
+            .list_sessions(database)
+            .await
+            .map_err(|e| e.to_string()),
+    }
+}
+
+pub(crate) async fn kill_session_on_adapter(
+    adapter: &ActiveConnection,
+    session_id: &str,
+) -> Result<(), String> {
+    match adapter {
+        ActiveConnection::Postgres(a) => a
+            .lock()
+            .await
+            .kill_session(session_id)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::MySQL(a) => a
+            .lock()
+            .await
+            .kill_session(session_id)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLite(a) => a
+            .lock()
+            .await
+            .kill_session(session_id)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLServer(a) => a
+            .lock()
+            .await
+            .kill_session(session_id)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::ClickHouse(a) => a
+            .lock()
+            .await
+            .kill_session(session_id)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::JdbcBridge(a) => a
+            .lock()
+            .await
+            .kill_session(session_id)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::HttpSql(a) => a
+            .lock()
+            .await
+            .kill_session(session_id)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Rqlite(a) => a
+            .lock()
+            .await
+            .kill_session(session_id)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Turso(a) => a
+            .lock()
+            .await
+            .kill_session(session_id)
+            .await
+            .map_err(|e| e.to_string()),
+    }
+}
+
+pub(crate) async fn get_slow_queries_on_adapter(
+    adapter: &ActiveConnection,
+    database: Option<&str>,
+    limit: Option<u32>,
+) -> Result<Vec<serde_json::Value>, String> {
+    match adapter {
+        ActiveConnection::Postgres(a) => a
+            .lock()
+            .await
+            .get_slow_queries(database, limit)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::MySQL(a) => a
+            .lock()
+            .await
+            .get_slow_queries(database, limit)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLite(a) => a
+            .lock()
+            .await
+            .get_slow_queries(None, limit)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLServer(a) => a
+            .lock()
+            .await
+            .get_slow_queries(database, limit)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::ClickHouse(a) => a
+            .lock()
+            .await
+            .get_slow_queries(database, limit)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::JdbcBridge(a) => a
+            .lock()
+            .await
+            .get_slow_queries(database, limit)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::HttpSql(a) => a
+            .lock()
+            .await
+            .get_slow_queries(database, limit)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Rqlite(a) => a
+            .lock()
+            .await
+            .get_slow_queries(database, limit)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Turso(a) => a
+            .lock()
+            .await
+            .get_slow_queries(database, limit)
+            .await
+            .map_err(|e| e.to_string()),
+    }
+}
+
+pub(crate) async fn grant_privilege_on_adapter(
+    adapter: &ActiveConnection,
+    privilege: &str,
+    object: &str,
+    grantee: &str,
+) -> Result<(), String> {
+    match adapter {
+        ActiveConnection::Postgres(a) => a
+            .lock()
+            .await
+            .grant_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::MySQL(a) => a
+            .lock()
+            .await
+            .grant_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLite(a) => a
+            .lock()
+            .await
+            .grant_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLServer(a) => a
+            .lock()
+            .await
+            .grant_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::ClickHouse(a) => a
+            .lock()
+            .await
+            .grant_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::JdbcBridge(a) => a
+            .lock()
+            .await
+            .grant_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::HttpSql(a) => a
+            .lock()
+            .await
+            .grant_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Rqlite(a) => a
+            .lock()
+            .await
+            .grant_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Turso(a) => a
+            .lock()
+            .await
+            .grant_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+    }
+}
+
+pub(crate) async fn revoke_privilege_on_adapter(
+    adapter: &ActiveConnection,
+    privilege: &str,
+    object: &str,
+    grantee: &str,
+) -> Result<(), String> {
+    match adapter {
+        ActiveConnection::Postgres(a) => a
+            .lock()
+            .await
+            .revoke_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::MySQL(a) => a
+            .lock()
+            .await
+            .revoke_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLite(a) => a
+            .lock()
+            .await
+            .revoke_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::SQLServer(a) => a
+            .lock()
+            .await
+            .revoke_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::ClickHouse(a) => a
+            .lock()
+            .await
+            .revoke_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::JdbcBridge(a) => a
+            .lock()
+            .await
+            .revoke_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::HttpSql(a) => a
+            .lock()
+            .await
+            .revoke_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Rqlite(a) => a
+            .lock()
+            .await
+            .revoke_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+        ActiveConnection::Turso(a) => a
+            .lock()
+            .await
+            .revoke_privilege(privilege, object, grantee)
+            .await
+            .map_err(|e| e.to_string()),
+    }
+}
+
 pub(crate) fn get_connection_id(config: Option<&Value>) -> Result<String, String> {
     match config {
         None => Err(

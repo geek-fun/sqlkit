@@ -353,6 +353,109 @@ impl MySQLAdapter {
             .await
             .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))
     }
+
+    fn quote_object(object: &str) -> DbResult<String> {
+        if object.is_empty() || object.len() > 256 {
+            return Err(DbError::InvalidQuery(format!(
+                "Invalid object identifier: '{}'",
+                object
+            )));
+        }
+        for part in object.split('.') {
+            if part == "*" {
+                continue;
+            }
+            let trimmed = part.trim_matches('`');
+            let valid = !trimmed.is_empty()
+                && trimmed
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && !trimmed.chars().next().unwrap().is_ascii_digit();
+            if !valid {
+                return Err(DbError::InvalidQuery(format!(
+                    "Invalid object identifier: '{}'",
+                    object
+                )));
+            }
+        }
+        Ok(object
+            .split('.')
+            .map(|part| {
+                if part == "*" {
+                    "*".to_string()
+                } else {
+                    format!("`{}`", part.trim_matches('`'))
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("."))
+    }
+
+    fn validate_user(grantee: &str) -> DbResult<String> {
+        let valid = !grantee.is_empty()
+            && grantee.len() <= 64
+            && grantee
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+            && !grantee.chars().next().unwrap().is_ascii_digit();
+        if !valid {
+            return Err(DbError::InvalidQuery(format!(
+                "Invalid user name: '{}'",
+                grantee
+            )));
+        }
+        Ok(grantee.to_string())
+    }
+
+    fn validate_privilege(privilege: &str) -> DbResult<String> {
+        const PRIVILEGES: &[&str] = &[
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "CREATE",
+            "DROP",
+            "RELOAD",
+            "SHUTDOWN",
+            "PROCESS",
+            "FILE",
+            "REFERENCES",
+            "INDEX",
+            "ALTER",
+            "SHOW DATABASES",
+            "SUPER",
+            "CREATE TEMPORARY TABLES",
+            "LOCK TABLES",
+            "EXECUTE",
+            "REPLICATION SLAVE",
+            "REPLICATION CLIENT",
+            "CREATE VIEW",
+            "SHOW VIEW",
+            "CREATE ROUTINE",
+            "ALTER ROUTINE",
+            "CREATE USER",
+            "EVENT",
+            "TRIGGER",
+            "CREATE TABLESPACE",
+            "CREATE ROLE",
+            "DROP ROLE",
+            "ALL",
+            "ALL PRIVILEGES",
+        ];
+        let mut validated = Vec::new();
+        for part in privilege.split(',') {
+            let trimmed = part.trim().to_uppercase();
+            if trimmed.is_empty() || !PRIVILEGES.contains(&trimmed.as_str()) {
+                return Err(DbError::InvalidQuery(format!(
+                    "Unsupported privilege: '{}'. Supported: {}",
+                    part.trim(),
+                    PRIVILEGES.join(", ")
+                )));
+            }
+            validated.push(trimmed);
+        }
+        Ok(validated.join(", "))
+    }
 }
 
 /// Check if a mysql_async error is SSL/TLS related.
@@ -1233,6 +1336,137 @@ impl DatabaseAdapter for MySQLAdapter {
                 )))
             }
         };
+
+        conn.query_drop(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn list_sessions(&self, _database: Option<&str>) -> DbResult<Vec<serde_json::Value>> {
+        let mut conn = self.get_conn().await?;
+
+        let query = "SELECT id, user, host, db, command, time, state, info \
+                     FROM information_schema.processlist";
+
+        let rows: Vec<Row> = conn
+            .query(query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let sessions = rows
+            .into_iter()
+            .map(|row| {
+                let id: Option<u64> = row.get_opt(0).and_then(|r| r.ok()).flatten();
+                let user: String = get_str(&row, 1);
+                let host: String = get_str(&row, 2);
+                let db: Option<String> = get_opt_str(&row, 3);
+                let command: String = get_str(&row, 4);
+                let time: Option<u64> = row.get_opt(5).and_then(|r| r.ok()).flatten();
+                let state: Option<String> = get_opt_str(&row, 6);
+                let info: Option<String> = get_opt_str(&row, 7);
+                serde_json::json!({
+                    "id": id,
+                    "user": user,
+                    "host": host,
+                    "db": db,
+                    "command": command,
+                    "time_seconds": time,
+                    "state": state,
+                    "info": info,
+                })
+            })
+            .collect();
+
+        Ok(sessions)
+    }
+
+    async fn kill_session(&self, session_id: &str) -> DbResult<()> {
+        let id: u64 = session_id.parse().map_err(|_| {
+            DbError::InvalidQuery(format!(
+                "Invalid session id '{}': MySQL session ids are numeric",
+                session_id
+            ))
+        })?;
+
+        let mut conn = self.get_conn().await?;
+
+        conn.query_drop(format!("KILL {}", id))
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn get_slow_queries(
+        &self,
+        _database: Option<&str>,
+        limit: Option<u32>,
+    ) -> DbResult<Vec<serde_json::Value>> {
+        let limit = limit.unwrap_or(20);
+
+        let mut conn = self.get_conn().await?;
+
+        let query = format!(
+            "SELECT id, user, host, db, time, state, info \
+             FROM information_schema.processlist \
+             WHERE time > 1 ORDER BY time DESC LIMIT {}",
+            limit
+        );
+
+        let rows: Vec<Row> = conn
+            .query(&query)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let slow = rows
+            .into_iter()
+            .map(|row| {
+                let id: Option<u64> = row.get_opt(0).and_then(|r| r.ok()).flatten();
+                let user: String = get_str(&row, 1);
+                let host: String = get_str(&row, 2);
+                let db: Option<String> = get_opt_str(&row, 3);
+                let time: Option<u64> = row.get_opt(4).and_then(|r| r.ok()).flatten();
+                let state: Option<String> = get_opt_str(&row, 5);
+                let info: Option<String> = get_opt_str(&row, 6);
+                serde_json::json!({
+                    "id": id,
+                    "user": user,
+                    "host": host,
+                    "db": db,
+                    "time_seconds": time,
+                    "state": state,
+                    "info": info,
+                })
+            })
+            .collect();
+
+        Ok(slow)
+    }
+
+    async fn grant_privilege(&self, privilege: &str, object: &str, grantee: &str) -> DbResult<()> {
+        let privs = Self::validate_privilege(privilege)?;
+        let obj = Self::quote_object(object)?;
+        let user = Self::validate_user(grantee)?;
+        let sql = format!("GRANT {} ON {} TO '{}'@'%'", privs, obj, user);
+
+        let mut conn = self.get_conn().await?;
+
+        conn.query_drop(&sql)
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn revoke_privilege(&self, privilege: &str, object: &str, grantee: &str) -> DbResult<()> {
+        let privs = Self::validate_privilege(privilege)?;
+        let obj = Self::quote_object(object)?;
+        let user = Self::validate_user(grantee)?;
+        let sql = format!("REVOKE {} ON {} FROM '{}'@'%'", privs, obj, user);
+
+        let mut conn = self.get_conn().await?;
 
         conn.query_drop(&sql)
             .await

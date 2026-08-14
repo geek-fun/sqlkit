@@ -251,6 +251,45 @@ pub trait DatabaseAdapter: Send + Sync {
         Err(DbError::unsupported("rename_object"))
     }
 
+    /// List active database sessions/connections.
+    async fn list_sessions(&self, _database: Option<&str>) -> DbResult<Vec<serde_json::Value>> {
+        Err(DbError::unsupported("list_sessions"))
+    }
+
+    /// Terminate a database session/connection by id (or PID for PostgreSQL).
+    async fn kill_session(&self, _session_id: &str) -> DbResult<()> {
+        Err(DbError::unsupported("kill_session"))
+    }
+
+    /// List slow-running queries currently executing on the server.
+    async fn get_slow_queries(
+        &self,
+        _database: Option<&str>,
+        _limit: Option<u32>,
+    ) -> DbResult<Vec<serde_json::Value>> {
+        Err(DbError::unsupported("get_slow_queries"))
+    }
+
+    /// Grant a privilege on an object to a grantee (user/role).
+    async fn grant_privilege(
+        &self,
+        _privilege: &str,
+        _object: &str,
+        _grantee: &str,
+    ) -> DbResult<()> {
+        Err(DbError::unsupported("grant_privilege"))
+    }
+
+    /// Revoke a privilege on an object from a grantee (user/role).
+    async fn revoke_privilege(
+        &self,
+        _privilege: &str,
+        _object: &str,
+        _grantee: &str,
+    ) -> DbResult<()> {
+        Err(DbError::unsupported("revoke_privilege"))
+    }
+
     /// Get the connection pool.
     ///
     /// This method returns a reference to the connection pool used by this adapter.
