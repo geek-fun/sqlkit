@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.7] - 2026-08-17
+
+### Added
+
+- DBA capabilities for session, slow-query, and privilege management (#138)
+
+### Fixed
+
+- Use Pinia appStore as the single theme source for the editor (#137)
+
 ## [0.8.6] - 2026-08-11
 
 ### Added
