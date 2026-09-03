@@ -72,7 +72,7 @@ fn combine_kind(a: SqlKind, b: SqlKind) -> SqlKind {
 
 /// Classify a Query, walking into its body and every CTE.
 ///
-/// sqlparser represents `WITH … INSERT/UPDATE` (PostgreSQL data-modifying
+/// sqlparser represents `WITH … INSERT/UPDATE/DELETE/MERGE` (data-modifying
 /// CTEs) as a `Query` whose body carries the DML statement, so checking only
 /// the top-level variant would let write statements through as Read.
 fn classify_query(query: &Query) -> SqlKind {
@@ -92,7 +92,10 @@ fn classify_set_expr(body: &SetExpr) -> SqlKind {
         SetExpr::SetOperation { left, right, .. } => {
             combine_kind(classify_set_expr(left), classify_set_expr(right))
         }
-        SetExpr::Insert(stmt) | SetExpr::Update(stmt) => classify_statement(stmt),
+        SetExpr::Insert(stmt)
+        | SetExpr::Update(stmt)
+        | SetExpr::Delete(stmt)
+        | SetExpr::Merge(stmt) => classify_statement(stmt),
     }
 }
 
@@ -166,13 +169,7 @@ fn classify_statement(stmt: &Statement) -> SqlKind {
         | Statement::Comment { .. }
         | Statement::LockTables { .. }
         | Statement::UnlockTables { .. }
-        | Statement::SetVariable { .. }
-        | Statement::SetNames { .. }
-        | Statement::SetNamesDefault { .. }
-        | Statement::SetRole { .. }
-        | Statement::SetSessionParam(_)
-        | Statement::SetTimeZone { .. }
-        | Statement::SetTransaction { .. }
+        | Statement::Set(_)
         | Statement::Commit { .. }
         | Statement::Rollback { .. }
         | Statement::Savepoint { .. }
@@ -489,6 +486,39 @@ mod tests {
             classify_sql(
                 "postgres",
                 "WITH x AS (SELECT 1 AS v) UPDATE t SET c = (SELECT v FROM x)"
+            )
+            .unwrap(),
+            SqlKind::Write
+        );
+    }
+
+    #[test]
+    fn classifies_with_delete_as_delete() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH x AS (SELECT 1 AS id) DELETE FROM t WHERE id IN (SELECT id FROM x)"
+            )
+            .unwrap(),
+            SqlKind::Delete
+        );
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH d AS (DELETE FROM t RETURNING id) SELECT * FROM d"
+            )
+            .unwrap(),
+            SqlKind::Delete
+        );
+    }
+
+    #[test]
+    fn classifies_with_merge_as_write() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH x AS (SELECT 1 AS id) MERGE INTO t USING x ON t.id = x.id \
+                 WHEN MATCHED THEN UPDATE SET c = 1"
             )
             .unwrap(),
             SqlKind::Write
