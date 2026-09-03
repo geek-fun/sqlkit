@@ -7,7 +7,7 @@
 use std::sync::Arc;
 
 use serde_json::{json, Value};
-use sqlparser::ast::Statement;
+use sqlparser::ast::{Query, SetExpr, Statement};
 use sqlparser::dialect::{GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect};
 use sqlparser::parser::Parser;
 
@@ -49,10 +49,57 @@ pub(crate) fn classify_sql(db_type: &str, sql: &str) -> Result<SqlKind, String> 
     Ok(classify_statement(&stmt))
 }
 
+/// Merge kinds found in different parts of one statement.
+///
+/// The most restrictive kind wins so a destructive statement never rides
+/// along inside a tree otherwise classified as Read.
+fn combine_kind(a: SqlKind, b: SqlKind) -> SqlKind {
+    fn rank(kind: SqlKind) -> u8 {
+        match kind {
+            SqlKind::Read => 0,
+            SqlKind::Write => 1,
+            SqlKind::Ddl => 2,
+            SqlKind::Delete => 3,
+            SqlKind::Other => 4,
+        }
+    }
+    if rank(b) > rank(a) {
+        b
+    } else {
+        a
+    }
+}
+
+/// Classify a Query, walking into its body and every CTE.
+///
+/// sqlparser represents `WITH … INSERT/UPDATE` (PostgreSQL data-modifying
+/// CTEs) as a `Query` whose body carries the DML statement, so checking only
+/// the top-level variant would let write statements through as Read.
+fn classify_query(query: &Query) -> SqlKind {
+    let mut kind = classify_set_expr(&query.body);
+    if let Some(with) = &query.with {
+        for cte in &with.cte_tables {
+            kind = combine_kind(kind, classify_query(&cte.query));
+        }
+    }
+    kind
+}
+
+fn classify_set_expr(body: &SetExpr) -> SqlKind {
+    match body {
+        SetExpr::Select(_) | SetExpr::Values(_) | SetExpr::Table(_) => SqlKind::Read,
+        SetExpr::Query(query) => classify_query(query),
+        SetExpr::SetOperation { left, right, .. } => {
+            combine_kind(classify_set_expr(left), classify_set_expr(right))
+        }
+        SetExpr::Insert(stmt) | SetExpr::Update(stmt) => classify_statement(stmt),
+    }
+}
+
 fn classify_statement(stmt: &Statement) -> SqlKind {
     match stmt {
-        Statement::Query(_)
-        | Statement::Explain { .. }
+        Statement::Query(query) => classify_query(query),
+        Statement::Explain { .. }
         | Statement::ExplainTable { .. }
         | Statement::ShowVariable { .. }
         | Statement::ShowVariables { .. }
@@ -406,6 +453,56 @@ mod tests {
             classify_sql("postgres", "TRUNCATE TABLE users").unwrap(),
             SqlKind::Delete
         );
+    }
+
+    #[test]
+    fn classifies_with_dml_chain_as_write() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH u AS (SELECT id FROM users WHERE email = 'seven@wentsen.com'), \
+                 o AS (INSERT INTO organizations (name, slug, created_by_email) \
+                       VALUES ('wentsen', 'release-org', 'seven@wentsen.com') RETURNING id) \
+                 INSERT INTO memberships (user_id, org_id, role, scope, permissions) \
+                 SELECT u.id, o.id, 'owner', 'org', '{}'::jsonb FROM u, o"
+            )
+            .unwrap(),
+            SqlKind::Write
+        );
+    }
+
+    #[test]
+    fn classifies_with_dml_in_cte_as_write() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH i AS (INSERT INTO t (c) VALUES (1) RETURNING id) SELECT * FROM i"
+            )
+            .unwrap(),
+            SqlKind::Write
+        );
+    }
+
+    #[test]
+    fn classifies_with_update_as_write() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH x AS (SELECT 1 AS v) UPDATE t SET c = (SELECT v FROM x)"
+            )
+            .unwrap(),
+            SqlKind::Write
+        );
+    }
+
+    #[test]
+    fn read_guard_rejects_with_insert() {
+        let err = ensure_read_only(
+            "postgres",
+            "WITH x AS (SELECT 1) INSERT INTO t (c) SELECT 1",
+        )
+        .unwrap_err();
+        assert!(err.contains("execute_write"), "got: {}", err);
     }
 
     #[test]
