@@ -4,70 +4,69 @@ import java.sql.*;
 import java.util.*;
 
 /**
- * Executes SQL queries against a JDBC connection and serializes results to JSON-compatible Maps.
+ * Executes SQL statements against a JDBC connection and serializes results to JSON-compatible Maps.
  */
 public class QueryExecutor {
 
     /**
-     * Execute a SQL query and return the result as a Map.
+     * Execute a SQL statement and return the result as a Map.
      * <p>
-     * For SELECT queries, returns {columns: [...], rows: [[...], ...]}.
-     * For UPDATE/INSERT/DELETE, returns {rows_affected: N}.
+     * Uses {@link Statement#execute(String)} so no keyword sniffing is needed:
+     * statements that return rows (SELECT, WITH ... SELECT, INSERT ... RETURNING)
+     * yield {columns, rows}; everything else (INSERT/UPDATE/DELETE/MERGE/DDL)
+     * yields {rows_affected: N}.
      */
     public static Map<String, Object> execute(Connection conn, String sql) throws Exception {
-        sql = sql.trim();
-
-        boolean isQuery;
-        String upper = sql.toUpperCase().trim();
-        isQuery = upper.startsWith("SELECT")
-                || upper.startsWith("WITH")
-                || upper.startsWith("EXPLAIN")
-                || upper.startsWith("SHOW")
-                || upper.startsWith("DESCRIBE")
-                || upper.startsWith("PRAGMA");
-
-        if (isQuery) {
-            return executeQuery(conn, sql);
-        } else {
-            return executeUpdate(conn, sql);
-        }
-    }
-
-    private static Map<String, Object> executeQuery(Connection conn, String sql) throws Exception {
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
-
-            ResultSetMetaData meta = rs.getMetaData();
-            int columnCount = meta.getColumnCount();
-
-            List<String> columns = new ArrayList<>();
-            for (int i = 1; i <= columnCount; i++) {
-                columns.add(meta.getColumnLabel(i));
-            }
-
-            List<List<Object>> rows = new ArrayList<>();
-            while (rs.next()) {
-                List<Object> row = new ArrayList<>();
-                for (int i = 1; i <= columnCount; i++) {
-                    row.add(getValue(rs, i));
-                }
-                rows.add(row);
-            }
-
-            Map<String, Object> result = new LinkedHashMap<>();
-            result.put("columns", columns);
-            result.put("rows", rows);
-            return result;
-        }
-    }
-
-    private static Map<String, Object> executeUpdate(Connection conn, String sql) throws Exception {
         try (Statement stmt = conn.createStatement()) {
-            int affected = stmt.executeUpdate(sql);
+            boolean isResultSet = stmt.execute(sql);
+
+            List<String> columns = null;
+            List<List<Object>> rows = null;
+            long rowsAffected = 0;
+
+            while (true) {
+                if (isResultSet) {
+                    try (ResultSet rs = stmt.getResultSet()) {
+                        ResultSetMetaData meta = rs.getMetaData();
+                        int columnCount = meta.getColumnCount();
+
+                        List<String> resultColumns = new ArrayList<>();
+                        for (int i = 1; i <= columnCount; i++) {
+                            resultColumns.add(meta.getColumnLabel(i));
+                        }
+
+                        List<List<Object>> resultRows = new ArrayList<>();
+                        while (rs.next()) {
+                            List<Object> row = new ArrayList<>();
+                            for (int i = 1; i <= columnCount; i++) {
+                                row.add(getValue(rs, i));
+                            }
+                            resultRows.add(row);
+                        }
+                        columns = resultColumns;
+                        rows = resultRows;
+                    }
+                } else {
+                    int count = stmt.getUpdateCount();
+                    if (count >= 0) {
+                        rowsAffected = count;
+                    }
+                }
+                isResultSet = stmt.getMoreResults();
+                if (!isResultSet && stmt.getUpdateCount() == -1) {
+                    break;
+                }
+            }
+
             Map<String, Object> result = new LinkedHashMap<>();
-            result.put("rows_affected", (long) affected);
-            result.put("columns", Collections.emptyList());
-            result.put("rows", Collections.emptyList());
+            if (rows != null) {
+                result.put("columns", columns);
+                result.put("rows", rows);
+            } else {
+                result.put("rows_affected", rowsAffected);
+                result.put("columns", Collections.emptyList());
+                result.put("rows", Collections.emptyList());
+            }
             return result;
         }
     }
