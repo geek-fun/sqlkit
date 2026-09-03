@@ -1077,6 +1077,32 @@ impl DatabaseAdapter for PostgresAdapter {
                     .map_err(postgres_error_to_db_error)?
             };
 
+            // A WITH-prefixed statement may be data-modifying — PostgreSQL runs
+            // `WITH … INSERT/UPDATE/DELETE` (no RETURNING) as a query that
+            // exposes zero columns, so a plain query() would silently swallow
+            // the writes. Route column-less statements through execute() so
+            // callers receive a rows_affected count instead of an empty result.
+            if statement.columns().is_empty() {
+                let affected = if let Some(timeout_duration) = timeout {
+                    tokio::time::timeout(timeout_duration, client.execute(&statement, &[]))
+                        .await
+                        .map_err(|_| {
+                            DbError::Timeout(format!(
+                                "Query timed out after {:?}",
+                                timeout_duration
+                            ))
+                        })?
+                        .map_err(postgres_error_to_db_error)?
+                } else {
+                    client
+                        .execute(&statement, &[])
+                        .await
+                        .map_err(postgres_error_to_db_error)?
+                };
+                return Ok(QueryResult::affected(affected)
+                    .with_execution_time(start.elapsed().as_millis() as u64));
+            }
+
             let result = if let Some(timeout_duration) = timeout {
                 tokio::time::timeout(timeout_duration, client.query(&statement, &[]))
                     .await
