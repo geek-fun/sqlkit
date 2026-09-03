@@ -380,7 +380,8 @@ impl SQLiteAdapter {
         let trimmed = query.trim().to_uppercase();
         let is_select = trimmed.starts_with("SELECT")
             || trimmed.starts_with("PRAGMA")
-            || trimmed.starts_with("EXPLAIN");
+            || trimmed.starts_with("EXPLAIN")
+            || trimmed.starts_with("WITH");
 
         if is_select {
             let mut stmt = conn_guard

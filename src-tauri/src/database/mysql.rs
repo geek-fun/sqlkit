@@ -625,7 +625,8 @@ impl DatabaseAdapter for MySQLAdapter {
         let is_select = query_trimmed.starts_with("SELECT")
             || query_trimmed.starts_with("SHOW")
             || query_trimmed.starts_with("DESCRIBE")
-            || query_trimmed.starts_with("EXPLAIN");
+            || query_trimmed.starts_with("EXPLAIN")
+            || query_trimmed.starts_with("WITH");
 
         let execution_time;
 
