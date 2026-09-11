@@ -202,7 +202,12 @@ See [BUILD.md](BUILD.md) for detailed platform-specific build requirements and t
 
 <details>
 <summary><strong>Is SqlKit free?</strong></summary>
-Yes. SqlKit is open source under the Apache 2.0 license. All features are free.
+
+Yes — the **Community edition** is free and open source under the Apache 2.0 license. Connections, SQL editing, schema browsing, data editing, query history and result export are all free, with no artificial limits.
+
+Advanced capabilities — AI agent (bring your own LLM), MCP server, ER diagrams, bulk import/export and cross-engine data transfer — are part of the paid **GEEKFUN Data Studio Ultimate** subscription ($9.9/month or $99/year, with a 7-day free trial). Every version released while you're subscribed stays yours forever, even if you cancel later.
+
+[See pricing →](https://www.geekfun.club/pricing)
 </details>
 
 <details>
