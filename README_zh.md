@@ -202,7 +202,12 @@ npm run tauri dev
 
 <details>
 <summary><strong>SqlKit 是免费的吗？</strong></summary>
-是的。SqlKit 采用 Apache 2.0 许可证开源，所有功能免费使用。
+
+是的 —— **社区版**永久免费、基于 Apache 2.0 开源协议。连接、SQL 编辑、Schema 浏览、数据编辑、查询历史与结果集导出等核心功能全部免费，没有人为限制。
+
+进阶能力 —— AI 智能体（自带 LLM）、MCP 服务器、ER 图、批量导入导出与跨引擎数据传输 —— 属于付费的 **GEEKFUN Data Studio 旗舰版**订阅（$9.9/月 或 $99/年，7 天免费试用）。订阅期间发布的所有版本永久可用，取消订阅后依然归你。
+
+[了解定价详情 →](https://www.geekfun.club/zh/pricing)
 </details>
 
 <details>
