@@ -30,6 +30,7 @@
   },
   "bundle": {
     "active": true,
+    "category": "DeveloperTool",
     "targets": "all",
     "createUpdaterArtifacts": true,
     "icon": [
@@ -39,6 +40,14 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "linux": {
+      "deb": {
+        "desktopTemplate": "linux/SqlKit.desktop"
+      },
+      "rpm": {
+        "desktopTemplate": "linux/SqlKit.desktop"
+      }
+    },
     "macOS": {
       "minimumSystemVersion": "10.15",
       "exceptionDomain": "",
