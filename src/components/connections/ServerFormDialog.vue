@@ -18,11 +18,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { openUpgradeDialog } from '@/components/upgrade'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { useDownloadEvents } from '@/composables/useDownloadEvents'
 import { toast } from '@/composables/useNotifications'
 import { jdbcApi } from '@/datasources/jdbcApi'
 import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase } from '@/store'
+import { useEntitlementStore } from '@/store/entitlementStore'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import SslConfigSection from './ssl/SslConfigSection.vue'
 
@@ -37,6 +39,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const entitlementStore = useEntitlementStore()
 const { getDatabaseIcon } = useDatabaseIcon()
 const dl = useDownloadEvents()
 
@@ -182,6 +185,10 @@ async function runStep(step: StepDef): Promise<boolean> {
 }
 
 function toggleSsh(checked: boolean) {
+  if (checked && !entitlementStore.isLocalUltimate) {
+    openUpgradeDialog('ssh_tunnel')
+    return
+  }
   if (!formData.value.sshTunnel) {
     formData.value.sshTunnel = {
       enabled: checked,

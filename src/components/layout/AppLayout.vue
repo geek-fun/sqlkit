@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { openUpgradeDialog } from '@/components/upgrade'
+import { useEntitlementStore } from '@/store/entitlementStore'
 import AiAssistantSidebar from './AiAssistantSidebar.vue'
 import AppHeader from './AppHeader.vue'
 import AppSidebar from './AppSidebar.vue'
@@ -13,7 +15,13 @@ type SidePanel = 'none' | 'ai' | 'tasks'
 
 const sidePanel = ref<SidePanel>('none')
 
+const entitlementStore = useEntitlementStore()
+
 function toggleAi() {
+  if (sidePanel.value !== 'ai' && !entitlementStore.isLocalUltimate) {
+    openUpgradeDialog('ai')
+    return
+  }
   sidePanel.value = sidePanel.value === 'ai' ? 'none' : 'ai'
 }
 

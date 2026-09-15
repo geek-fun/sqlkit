@@ -98,6 +98,8 @@ zip = { version = "2", features = [ "deflate" ] }
 # TOML parsing (drivers.toml)
 toml = "0.8"
 sha2 = "0.10"
+hmac = "0.12"
+keyring = "3"
 sqlparser = "0.62"
 russh = "0.60"
 axum = "0.8"

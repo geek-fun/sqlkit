@@ -1,4 +1,52 @@
 export const zhCN = {
+  device: {
+    replaceTitle: '设备数量已达上限',
+    replaceDescription:
+      '订阅最多可在 {limit} 台设备上激活。请从下方选择一台设备替换为本机——被替换的设备将立即失去访问权限。',
+    slotUsage: '已使用 {used}/{limit} 台',
+    thisDevice: '本机',
+    lastActive: '最后活跃',
+    neverActive: '从未活跃',
+    replaceConfirm: '替换并激活',
+    replaceFailed: '替换设备失败，请重新选择后再试。',
+  },
+  plan: {
+    tab: '账户与订阅',
+    pricing: '旗舰版 $9.9/月 · $99/年 · 7 天免费试用',
+    state: {
+      ultimate: '旗舰版',
+      community: '社区版',
+    },
+    features: {
+      ai: 'AI — SQL 生成 / 优化 / 解释 / 修复（自带 LLM Key）。',
+      er_diagram: 'ER 图 — 可视化表关系。',
+      transfer: '批量导入导出、DDL 结构同步与跨引擎迁移。',
+      ssh_tunnel: 'SSH 隧道远程连接。',
+      mcp_bridge: '内置 MCP Server bridge。',
+    },
+    upgrade: {
+      title: '升级到旗舰版',
+      description: '解锁 AI、ER 图、批量导入导出、跨引擎迁移、SSH 隧道与 MCP bridge。',
+      cta: '升级',
+      refresh: '刷新权益',
+      versionPermanent: '订阅期内发布的版本永久可用，支持离线。',
+      versionLockedOut: '当前版本需要有效订阅解锁，续订后可永久解锁。',
+    },
+    section: {
+      title: '账户与订阅',
+      desc: '当前安装的订阅权益与版本锁状态。',
+      versionPermanent: '当前版本已被版本锁覆盖，永久可用。',
+      subscriptionActive: '旗舰版订阅生效中，全部功能可用。',
+      versionLockedOut: '当前版本（{date}）未被版本锁覆盖，当前为社区版模式。',
+      expiresAt: '有效期至 {time}',
+      cancelScheduled: '订阅已计划于本期期末结束。',
+      checkFailed: '权益校验失败，当前展示缓存状态。请检查网络后刷新。',
+      notLoggedIn: '尚未登录。',
+      loginLink: '通过 Geekfun 登录',
+      refresh: '刷新',
+      logout: '退出登录',
+    },
+  },
   aside: {
     aiAssistant: 'AI 助手',
     tasks: '任务',

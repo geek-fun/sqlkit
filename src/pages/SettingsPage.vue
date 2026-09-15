@@ -9,11 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 // Separator is rendered inline as a styled div
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { PaidGate } from '@/components/upgrade'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { ThemeType, useAppStore } from '@/store/appStore'
 import AiSettings from '@/views/setting/ai-settings.vue'
 import JreDriverSection from '@/views/setting/jre-driver-section.vue'
 import McpBridge from '@/views/setting/mcp-bridge.vue'
+import PlanSection from '@/views/setting/plan-section.vue'
 
 const appStore = useAppStore()
 const { t, locale: _locale } = useI18n()
@@ -196,6 +198,9 @@ async function handleCheckUpdates() {
             </TabsTrigger>
             <TabsTrigger value="jre">
               {{ t('pages.settings.jre.title') }}
+            </TabsTrigger>
+            <TabsTrigger value="account">
+              {{ t('plan.tab') }}
             </TabsTrigger>
             <TabsTrigger value="about">
               {{ t('pages.settings.about.title') }}
@@ -588,12 +593,16 @@ async function handleCheckUpdates() {
 
           <!-- AI Tab -->
           <TabsContent value="ai" class="mt-0">
-            <AiSettings />
+            <PaidGate feature="ai">
+              <AiSettings />
+            </PaidGate>
           </TabsContent>
 
           <!-- MCP Bridge Tab -->
           <TabsContent value="mcp" class="mt-0">
-            <McpBridge />
+            <PaidGate feature="mcp_bridge">
+              <McpBridge />
+            </PaidGate>
           </TabsContent>
 
           <!-- JRE & Drivers Tab -->
@@ -602,6 +611,19 @@ async function handleCheckUpdates() {
           </TabsContent>
 
           <!-- About Tab -->
+          <!-- Account Tab -->
+          <TabsContent value="account" class="mt-0">
+            <Card>
+              <CardHeader>
+                <CardTitle>{{ t('plan.section.title') }}</CardTitle>
+                <CardDescription>{{ t('plan.section.desc') }}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <PlanSection />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           <TabsContent value="about" class="mt-0">
             <Card>
               <CardHeader>

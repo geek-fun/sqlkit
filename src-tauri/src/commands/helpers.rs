@@ -253,7 +253,10 @@ pub async fn connection_host_port(
 
     match start_transport_layers(connection_id, &layers, &config.host, config.port, tunnels).await?
     {
-        Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),
+        Some(local_port) => {
+            crate::entitlement::ensure_local_ultimate_global("SSH tunnel")?;
+            Ok(("127.0.0.1".to_string(), local_port))
+        }
         None => Ok((config.host.clone(), config.port)),
     }
 }

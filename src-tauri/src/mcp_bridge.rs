@@ -561,6 +561,11 @@ pub async fn save_mcp_config(
     policy: Option<McpPolicy>,
     app: AppHandle,
 ) -> Result<String, String> {
+    use tauri::Manager;
+    crate::entitlement::ensure_local_ultimate(
+        &app.state::<crate::entitlement::EntitlementState>(),
+        "MCP Server",
+    )?;
     let app_data_dir = app
         .path()
         .app_data_dir()
@@ -605,6 +610,11 @@ pub async fn save_mcp_config(
 /// restart, so permission changes never interrupt in-flight LLM requests.
 #[tauri::command]
 pub async fn save_mcp_policy(policy: McpPolicy, app: AppHandle) -> Result<String, String> {
+    use tauri::Manager;
+    crate::entitlement::ensure_local_ultimate(
+        &app.state::<crate::entitlement::EntitlementState>(),
+        "MCP Server",
+    )?;
     let app_data_dir = app
         .path()
         .app_data_dir()
