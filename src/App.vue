@@ -51,9 +51,10 @@ onMounted(async () => {
   })
 
   // Transparent session refresh (Rust rotates the lease): keep the frontend
-  // copy of the access token in sync.
-  unlistenSessionRefresh = await listen<string>('session-refreshed', ({ payload }) => {
-    accountStore.setToken(payload)
+  // copy of both tokens in sync.
+  unlistenSessionRefresh = await listen<{ accessToken: string, refreshToken: string }>('session-refreshed', ({ payload }) => {
+    accountStore.setToken(payload.accessToken)
+    accountStore.setRefreshToken(payload.refreshToken)
   })
 })
 

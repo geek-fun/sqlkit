@@ -162,9 +162,7 @@ pub fn run() {
                 app.manage(crate::device_activation::DeviceIdentityState::load(
                     app_data_dir.clone(),
                 ));
-                app.manage(crate::session::SessionState {
-                    app_data_dir: app_data_dir.clone(),
-                });
+                app.manage(crate::session::SessionState::default());
                 let config = crate::mcp_bridge::McpConfig::load(&app_data_dir);
                 let mcp_entitled = app
                     .state::<crate::entitlement::EntitlementState>()
@@ -351,8 +349,6 @@ pub fn run() {
             crate::entitlement::get_entitlement,
             crate::entitlement::clear_entitlement,
             crate::device_activation::activate_device,
-            crate::session::refresh_session,
-            crate::session::clear_session,
             crate::mcp_bridge::get_mcp_status,
             crate::mcp_bridge::save_mcp_config,
             crate::mcp_bridge::save_mcp_policy,

@@ -1,5 +1,10 @@
 import type { EntitlementView } from '@/common'
-import { ENTITLEMENT_ERROR_TYPE, isEntitlementError } from '@/common'
+import {
+  ENTITLEMENT_ERROR_TYPE,
+  isEntitlementError,
+  isSessionRejected,
+  SESSION_REJECTED_ERROR_TYPE,
+} from '@/common'
 
 function view(overrides: Partial<EntitlementView> = {}): EntitlementView {
   return {
@@ -39,6 +44,22 @@ describe('isEntitlementError', () => {
     expect(isEntitlementError('DNS_ERROR: cannot resolve')).toBe(false)
     expect(isEntitlementError(null)).toBe(false)
     expect(isEntitlementError(undefined)).toBe(false)
+  })
+})
+
+describe('isSessionRejected', () => {
+  it('detects the structured Rust rejection payload', () => {
+    const raw = JSON.stringify({
+      error_type: SESSION_REJECTED_ERROR_TYPE,
+      message: 'session refresh rejected',
+    })
+    expect(isSessionRejected(raw)).toBe(true)
+    expect(isEntitlementError(raw)).toBe(false)
+  })
+
+  it('rejects unrelated errors', () => {
+    expect(isSessionRejected('network error: timeout')).toBe(false)
+    expect(isSessionRejected(undefined)).toBe(false)
   })
 })
 

@@ -8,10 +8,14 @@ jest.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => mockInvoke(...args),
 }))
 
+const mockSetRefreshToken = jest.fn()
+
 jest.mock('@/store/accountStore', () => ({
   useAccountStore: () => ({
     isLoggedIn: true,
     token: 'token-1',
+    refreshToken: 'lease-1',
+    setRefreshToken: mockSetRefreshToken,
   }),
 }))
 
@@ -55,7 +59,7 @@ const limitPayload = {
   manageUrl: 'https://console/home/devices',
 }
 
-const activatedPayload = { deviceId: 'dev_new', limit: 3, used: 3 }
+const activatedPayload = { deviceId: 'dev_new', limit: 3, used: 3, refreshToken: 'lease-2' }
 
 describe('deviceStore', () => {
   beforeEach(() => {
@@ -81,11 +85,14 @@ describe('deviceStore', () => {
 
     expect(mockInvoke).toHaveBeenCalledWith('activate_device', {
       token: 'token-1',
+      refreshToken: 'lease-1',
       replaceDeviceId: null,
     })
     expect(store.isActivated).toBe(true)
     expect(store.deviceId).toBe('dev_new')
     expect(store.showReplaceDialog).toBe(false)
+    // the device-bound lease rides back into the persisted account session
+    expect(mockSetRefreshToken).toHaveBeenCalledWith('lease-2')
   })
 
   it('should surface the 5030 payload and open the replace dialog', async () => {
@@ -134,6 +141,7 @@ describe('deviceStore', () => {
     expect(ok).toBe(true)
     expect(mockInvoke).toHaveBeenLastCalledWith('activate_device', {
       token: 'token-1',
+      refreshToken: 'lease-1',
       replaceDeviceId: 'dev_old',
     })
     expect(store.deviceId).toBe('dev_new')

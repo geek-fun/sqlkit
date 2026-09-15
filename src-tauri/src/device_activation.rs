@@ -13,22 +13,11 @@ use serde_json::json;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, State};
 
+use crate::common::console;
 use crate::device_identity;
 use crate::session::{self, SessionState};
 
-const CONSOLE_PROD_URL: &str = "https://console-geekfun.wentsen.com";
-const CONSOLE_DEV_URL: &str = "http://localhost:5174";
-const HTTP_TIMEOUT_SECS: u64 = 10;
-
 pub const DEVICE_LIMIT_ERROR_TYPE: &str = "DEVICE_LIMIT_REACHED";
-
-fn api_base_url() -> &'static str {
-    if cfg!(debug_assertions) {
-        CONSOLE_DEV_URL
-    } else {
-        CONSOLE_PROD_URL
-    }
-}
 
 pub struct DeviceIdentityState {
     app_data_dir: PathBuf,
@@ -122,26 +111,33 @@ enum ActivateAttempt {
     Failed(String),
 }
 
+/// Request body for one activation attempt — pure so the replace flow stays
+/// testable without HTTP.
+fn activation_body(
+    payload: &device_identity::DevicePayload,
+    replace_device_id: Option<&str>,
+) -> serde_json::Value {
+    let mut body = json!({ "device": payload });
+    if let Some(replace) = replace_device_id {
+        body["replaceDeviceId"] = json!(replace);
+    }
+    body
+}
+
 async fn post_activate(
     token: &str,
     payload: &device_identity::DevicePayload,
     replace_device_id: Option<&str>,
 ) -> ActivateAttempt {
-    let client = match reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(HTTP_TIMEOUT_SECS))
-        .build()
+    let url = format!("{}/api/v1/devices/activate", console::api_base_url());
+
+    let response = match console::client()
+        .post(url)
+        .bearer_auth(token)
+        .json(&activation_body(payload, replace_device_id))
+        .send()
+        .await
     {
-        Ok(client) => client,
-        Err(e) => return ActivateAttempt::Failed(format!("failed to build http client: {e}")),
-    };
-    let url = format!("{}/api/v1/devices/activate", api_base_url());
-
-    let mut body = json!({ "device": payload });
-    if let Some(replace) = replace_device_id {
-        body["replaceDeviceId"] = json!(replace);
-    }
-
-    let response = match client.post(url).bearer_auth(token).json(&body).send().await {
         Ok(response) => response,
         Err(e) => return ActivateAttempt::Failed(format!("network error: {e}")),
     };
@@ -181,11 +177,12 @@ async fn post_activate(
 
 /// Activate this device for the account. Idempotent on the server — safe to
 /// call at every entitlement-activation point. A stale access token (401)
-/// is transparently recovered via the stored refresh lease, and the new
-/// access token is broadcast so the frontend session stays in sync.
+/// is transparently recovered via the frontend-supplied refresh lease (the
+/// successor pair is broadcast so the persisted session stays in sync).
 #[tauri::command]
 pub async fn activate_device(
     token: String,
+    refresh_token: Option<String>,
     replace_device_id: Option<String>,
     state: State<'_, DeviceIdentityState>,
     session_state: State<'_, SessionState>,
@@ -199,24 +196,30 @@ pub async fn activate_device(
 
     let mut attempt = post_activate(&token, &payload, replace_device_id.as_deref()).await;
     if let ActivateAttempt::Unauthorized = attempt {
-        if let Ok(refreshed) = session::rotate_session(&session_state, &payload).await {
-            let _ = app.emit("session-refreshed", refreshed.access_token.clone());
-            attempt = post_activate(
-                &refreshed.access_token,
-                &payload,
-                replace_device_id.as_deref(),
-            )
-            .await;
+        let lease = refresh_token.as_deref().unwrap_or("").trim();
+        if !lease.is_empty() {
+            if let Ok(refreshed) = session::rotate_session(&session_state, lease, &payload).await {
+                let _ = app.emit(
+                    "session-refreshed",
+                    json!({
+                        "accessToken": refreshed.access_token,
+                        "refreshToken": refreshed.refresh_token,
+                    }),
+                );
+                attempt = post_activate(
+                    &refreshed.access_token,
+                    &payload,
+                    replace_device_id.as_deref(),
+                )
+                .await;
+            }
         }
     }
 
     match attempt {
-        ActivateAttempt::Ok(result) => {
-            if let Some(refresh_token) = &result.refresh_token {
-                session::persist_token(&session_state, refresh_token);
-            }
-            Ok(result)
-        }
+        // The device-bound lease rides back to the frontend, which persists
+        // it alongside the rest of the account session.
+        ActivateAttempt::Ok(result) => Ok(result),
         ActivateAttempt::LimitReached(info) => Err(device_limit_error(&info)),
         ActivateAttempt::Unauthorized => Err("session expired — please sign in again".to_string()),
         ActivateAttempt::Failed(message) => Err(message),
@@ -300,7 +303,7 @@ mod tests {
     }
 
     #[test]
-    fn payload_bodies_carry_the_device_and_optional_replace_target() {
+    fn activation_bodies_carry_the_device_and_optional_replace_target() {
         let identity = device_identity::RawIdentity {
             primary: Some("PLATFORM".to_string()),
             secondary: vec![],
@@ -308,9 +311,11 @@ mod tests {
         };
         let composed = device_identity::compose_payload(&identity, "install", "n", "linux");
 
-        let mut without_replace = json!({ "device": composed });
+        let without_replace = activation_body(&composed, None);
         assert!(without_replace.get("replaceDeviceId").is_none());
-        without_replace["replaceDeviceId"] = json!("dev_9");
-        assert_eq!(without_replace["replaceDeviceId"], "dev_9");
+        assert_eq!(without_replace["device"]["platform"], "linux");
+
+        let with_replace = activation_body(&composed, Some("dev_9"));
+        assert_eq!(with_replace["replaceDeviceId"], "dev_9");
     }
 }

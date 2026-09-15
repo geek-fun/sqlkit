@@ -25,6 +25,11 @@ export type ActivatedResult = {
   deviceId: string
   limit: number
   used: number
+  /**
+   * Device-bound lease issued/renewed by this activation — persisted with
+   * the account session. Optional: older backends may omit it.
+   */
+  refreshToken?: string | null
 }
 
 /** One activation attempt per app run, plus re-activation after each login. */
@@ -72,13 +77,10 @@ export const useDeviceStore = defineStore('device', {
       try {
         const result = await invoke<ActivatedResult>('activate_device', {
           token: accountStore.token,
+          refreshToken: accountStore.refreshToken || null,
           replaceDeviceId: null,
         })
-        this.deviceId = result.deviceId
-        this.limit = result.limit
-        this.used = result.used
-        this.limitInfo = null
-        this.showReplaceDialog = false
+        this.applyActivated(result)
         localStorage.setItem(LAST_ACTIVATED_KEY, String(Date.now()))
       }
       catch (err) {
@@ -102,13 +104,10 @@ export const useDeviceStore = defineStore('device', {
       try {
         const result = await invoke<ActivatedResult>('activate_device', {
           token: accountStore.token,
+          refreshToken: accountStore.refreshToken || null,
           replaceDeviceId: deviceId,
         })
-        this.deviceId = result.deviceId
-        this.limit = result.limit
-        this.used = result.used
-        this.limitInfo = null
-        this.showReplaceDialog = false
+        this.applyActivated(result)
         localStorage.setItem(LAST_ACTIVATED_KEY, String(Date.now()))
         return true
       }
@@ -123,6 +122,21 @@ export const useDeviceStore = defineStore('device', {
       }
       finally {
         this.activating = false
+      }
+    },
+    /**
+     * Persist an activation outcome: device slots plus the (possibly
+     * renewed) device-bound lease, which rides back to the account session.
+     */
+    applyActivated(result: ActivatedResult): void {
+      const accountStore = useAccountStore()
+      this.deviceId = result.deviceId
+      this.limit = result.limit
+      this.used = result.used
+      this.limitInfo = null
+      this.showReplaceDialog = false
+      if (result.refreshToken) {
+        accountStore.setRefreshToken(result.refreshToken)
       }
     },
     dismissReplaceDialog(): void {

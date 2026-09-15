@@ -16,17 +16,19 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tauri::{AppHandle, Emitter, State};
 
-/// Release date of the running app version (UTC, `YYYY-MM-DD`). Bump on
-/// every release; a version stays unlocked forever when
-/// `APP_RELEASE_DATE <= versionLockHorizon`.
-pub const APP_RELEASE_DATE: &str = "2026-09-12";
+use crate::common::console;
+
+/// Release date of the running app version (UTC, `YYYY-MM-DD`). The release
+/// workflow stamps the build date via the `APP_RELEASE_DATE` env var; the
+/// fallback only covers local/dev builds — bump it on release. A version
+/// stays unlocked forever when `APP_RELEASE_DATE <= versionLockHorizon`.
+pub const APP_RELEASE_DATE: &str = match option_env!("APP_RELEASE_DATE") {
+    Some(date) => date,
+    None => "2026-09-12",
+};
 
 /// Minimum interval between two network refreshes (contract rule 2).
 pub const REFRESH_MIN_INTERVAL_MS: i64 = 5 * 60 * 1000;
-
-const CONSOLE_PROD_URL: &str = "https://console-geekfun.wentsen.com";
-const CONSOLE_DEV_URL: &str = "http://localhost:5174";
-const HTTP_TIMEOUT_SECS: u64 = 10;
 
 pub const ENTITLEMENT_ERROR_TYPE: &str = "ENTITLEMENT_REQUIRED";
 
@@ -34,14 +36,6 @@ enum SubscriptionsError {
     /// 401 — the access token expired; a session refresh may recover.
     Unauthorized,
     Other(String),
-}
-
-fn subscriptions_base_url() -> &'static str {
-    if cfg!(debug_assertions) {
-        CONSOLE_DEV_URL
-    } else {
-        CONSOLE_PROD_URL
-    }
 }
 
 /// Days since 1970-01-01 for a civil UTC date (Howard Hinnant's algorithm).
@@ -147,6 +141,18 @@ pub struct SubscriptionCache {
     pub cancel_scheduled_at: Option<String>,
 }
 
+/// Pure entitlement decision — no transport or caching semantics.
+pub struct EntitlementDecision {
+    /// Active benefit (paid period or trial) — gates cloud services and,
+    /// while active, local features too.
+    pub ultimate_active: bool,
+    /// This app release falls under the version lock — permanent offline
+    /// access to local Ultimate features.
+    pub version_locked: bool,
+    /// `ultimateActive || versionLocked` — the gate for local features.
+    pub local_ultimate: bool,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EntitlementView {
@@ -171,7 +177,7 @@ pub struct EntitlementView {
 
 /// Pure entitlement decision. Fail-closed: an unparseable release date or
 /// missing horizon locks the release out of version-locked features.
-pub fn compute_entitlement(cache: Option<&SubscriptionCache>, now_ms: i64) -> EntitlementView {
+pub fn compute_entitlement(cache: Option<&SubscriptionCache>, now_ms: i64) -> EntitlementDecision {
     let release_ms = parse_date_utc_ms(APP_RELEASE_DATE);
     let ultimate_active = cache
         .and_then(|c| c.ultimate_expires_at.as_deref())
@@ -185,17 +191,10 @@ pub fn compute_entitlement(cache: Option<&SubscriptionCache>, now_ms: i64) -> En
             .is_some_and(|horizon| release_ms <= horizon),
         _ => false,
     };
-    EntitlementView {
+    EntitlementDecision {
         ultimate_active,
         version_locked,
         local_ultimate: ultimate_active || version_locked,
-        app_release_date: APP_RELEASE_DATE,
-        ultimate_expires_at: cache.and_then(|c| c.ultimate_expires_at.clone()),
-        version_lock_horizon: cache.and_then(|c| c.version_lock_horizon.clone()),
-        cancel_scheduled_at: cache.and_then(|c| c.cancel_scheduled_at.clone()),
-        cached: true,
-        fetched_at_ms: cache.map(|c| c.fetched_at_ms),
-        last_error: None,
     }
 }
 
@@ -236,10 +235,21 @@ impl EntitlementState {
 
     pub fn view(&self, cached: bool, last_error: Option<String>) -> EntitlementView {
         let binding = self.cache.lock().unwrap_or_else(|e| e.into_inner());
-        let mut view = compute_entitlement(binding.as_ref(), now_unix_ms());
-        view.cached = cached;
-        view.last_error = last_error;
-        view
+        let decision = compute_entitlement(binding.as_ref(), now_unix_ms());
+        EntitlementView {
+            ultimate_active: decision.ultimate_active,
+            version_locked: decision.version_locked,
+            local_ultimate: decision.local_ultimate,
+            app_release_date: APP_RELEASE_DATE,
+            ultimate_expires_at: binding.as_ref().and_then(|c| c.ultimate_expires_at.clone()),
+            version_lock_horizon: binding
+                .as_ref()
+                .and_then(|c| c.version_lock_horizon.clone()),
+            cancel_scheduled_at: binding.as_ref().and_then(|c| c.cancel_scheduled_at.clone()),
+            cached,
+            fetched_at_ms: binding.as_ref().map(|c| c.fetched_at_ms),
+            last_error,
+        }
     }
 
     pub fn local_entitled(&self) -> bool {
@@ -305,12 +315,8 @@ pub fn ensure_local_ultimate_global(feature: &str) -> Result<(), String> {
 }
 
 async fn fetch_subscriptions(token: &str) -> Result<SubscriptionCache, SubscriptionsError> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(HTTP_TIMEOUT_SECS))
-        .build()
-        .map_err(|e| SubscriptionsError::Other(format!("failed to build http client: {e}")))?;
-    let url = format!("{}/api/v1/subscriptions", subscriptions_base_url());
-    let response = client
+    let url = format!("{}/api/v1/subscriptions", console::api_base_url());
+    let response = console::client()
         .get(url)
         .bearer_auth(token)
         .send()
@@ -350,10 +356,13 @@ async fn fetch_subscriptions(token: &str) -> Result<SubscriptionCache, Subscript
 }
 
 /// Refresh entitlements from the server. Network/5xx failures degrade to the
-/// cached view (contract rule 5) — only an invalid input is a hard error.
+/// cached view (contract rule 5). A 401 triggers one lease-rotation recovery
+/// when the frontend supplied a refresh token; a rejected lease surfaces the
+/// structured `SESSION_REJECTED` error so the frontend drops it.
 #[tauri::command]
 pub async fn refresh_entitlement(
     token: String,
+    refresh_token: Option<String>,
     force: bool,
     state: State<'_, EntitlementState>,
     session_state: State<'_, crate::session::SessionState>,
@@ -372,9 +381,19 @@ pub async fn refresh_entitlement(
             Ok(state.view(false, None))
         }
         Err(SubscriptionsError::Unauthorized) => {
-            match crate::session::rotate_session(&session_state, &identity.payload()).await {
+            let lease = refresh_token.as_deref().unwrap_or("").trim();
+            if lease.is_empty() {
+                return Ok(state.view(true, Some("session expired".to_string())));
+            }
+            match crate::session::rotate_session(&session_state, lease, &identity.payload()).await {
                 Ok(refreshed) => {
-                    let _ = app.emit("session-refreshed", refreshed.access_token.clone());
+                    let _ = app.emit(
+                        "session-refreshed",
+                        json!({
+                            "accessToken": refreshed.access_token,
+                            "refreshToken": refreshed.refresh_token,
+                        }),
+                    );
                     match fetch_subscriptions(&refreshed.access_token).await {
                         Ok(cache) => {
                             state.set_cache(cache);
@@ -383,7 +402,13 @@ pub async fn refresh_entitlement(
                         Err(_) => Ok(state.view(true, Some("session refresh failed".to_string()))),
                     }
                 }
-                Err(err) => Ok(state.view(true, Some(err))),
+                Err(err) => {
+                    if err.contains(crate::session::SESSION_REJECTED_ERROR_TYPE) {
+                        Err(err)
+                    } else {
+                        Ok(state.view(true, Some(err)))
+                    }
+                }
             }
         }
         Err(SubscriptionsError::Other(err)) => Ok(state.view(true, Some(err))),
@@ -440,23 +465,25 @@ mod tests {
 
     #[test]
     fn trial_is_active_but_never_version_locked() {
-        let view = compute_entitlement(cache(Some("2026-10-09T00:00:00.000Z"), None).as_ref(), NOW);
-        assert!(view.ultimate_active);
-        assert!(!view.version_locked);
-        assert!(view.local_ultimate);
+        let decision =
+            compute_entitlement(cache(Some("2026-10-09T00:00:00.000Z"), None).as_ref(), NOW);
+        assert!(decision.ultimate_active);
+        assert!(!decision.version_locked);
+        assert!(decision.local_ultimate);
     }
 
     #[test]
     fn expired_trial_without_horizon_falls_back_to_free() {
-        let view = compute_entitlement(cache(Some("2020-01-01T00:00:00.000Z"), None).as_ref(), NOW);
-        assert!(!view.ultimate_active);
-        assert!(!view.version_locked);
-        assert!(!view.local_ultimate);
+        let decision =
+            compute_entitlement(cache(Some("2020-01-01T00:00:00.000Z"), None).as_ref(), NOW);
+        assert!(!decision.ultimate_active);
+        assert!(!decision.version_locked);
+        assert!(!decision.local_ultimate);
     }
 
     #[test]
     fn expired_subscription_stays_version_locked_for_older_releases() {
-        let view = compute_entitlement(
+        let decision = compute_entitlement(
             cache(
                 Some("2020-01-01T00:00:00.000Z"),
                 Some("2027-01-01T00:00:00.000Z"),
@@ -464,15 +491,19 @@ mod tests {
             .as_ref(),
             NOW,
         );
-        assert!(!view.ultimate_active);
-        assert!(view.version_locked);
-        assert!(view.local_ultimate);
+        assert!(!decision.ultimate_active);
+        assert!(decision.version_locked);
+        assert!(decision.local_ultimate);
     }
 
     #[test]
     fn releases_after_the_horizon_need_renewal() {
-        let view = compute_entitlement(cache(None, Some("2020-01-01T00:00:00.000Z")).as_ref(), NOW);
-        assert!(view.version_locked == (parse_date_utc_ms(APP_RELEASE_DATE).unwrap() <= 0));
+        let decision =
+            compute_entitlement(cache(None, Some("2020-01-01T00:00:00.000Z")).as_ref(), NOW);
+        assert!(
+            decision.version_locked == (parse_date_utc_ms(APP_RELEASE_DATE).unwrap() <= 0),
+            "release date must stay a plain YYYY-MM-DD for the version-lock check"
+        );
         let fresh =
             compute_entitlement(cache(None, Some("2999-01-01T00:00:00.000Z")).as_ref(), NOW);
         assert!(fresh.version_locked);
@@ -481,10 +512,10 @@ mod tests {
 
     #[test]
     fn no_cache_means_community_mode() {
-        let view = compute_entitlement(None, NOW);
-        assert!(!view.ultimate_active);
-        assert!(!view.version_locked);
-        assert!(!view.local_ultimate);
+        let decision = compute_entitlement(None, NOW);
+        assert!(!decision.ultimate_active);
+        assert!(!decision.version_locked);
+        assert!(!decision.local_ultimate);
     }
 
     #[test]

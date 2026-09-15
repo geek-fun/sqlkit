@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { RefreshCw } from 'lucide-vue-next'
+import { LogOut, RefreshCw } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
@@ -7,12 +7,14 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { openUpgradeDialog } from '@/components/upgrade'
 import { useAccountStore } from '@/store/accountStore'
+import { useDeviceStore } from '@/store/deviceStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import { openLoginUrl } from '@/utils/authService'
 
 const { t } = useI18n()
 const entitlementStore = useEntitlementStore()
 const accountStore = useAccountStore()
+const deviceStore = useDeviceStore()
 const refreshing = ref(false)
 
 onMounted(() => {
@@ -26,14 +28,14 @@ const versionStateText = computed(() => {
       ? t('plan.section.versionPermanent')
       : t('plan.section.subscriptionActive')
   }
-  return t('plan.section.versionLockedOut').replace('{date}', release ?? '')
+  return t('plan.section.versionLockedOut', { date: release ?? '' })
 })
 
 const expiryText = computed(() => {
   const expiresAt = entitlementStore.view?.ultimateExpiresAt
   if (!expiresAt || !entitlementStore.isCloudUltimate)
     return ''
-  return t('plan.section.expiresAt').replace('{time}', new Date(expiresAt).toLocaleString())
+  return t('plan.section.expiresAt', { time: new Date(expiresAt).toLocaleString() })
 })
 
 async function handleRefresh() {
@@ -48,6 +50,14 @@ async function handleRefresh() {
 
 async function handleLogin() {
   await openLoginUrl()
+}
+
+// Entitlements are account-scoped: the cached view and the device lease must
+// never outlive the account session on this machine.
+async function handleLogout() {
+  await entitlementStore.clearCachedEntitlement()
+  accountStore.clearAuth()
+  deviceStore.$reset()
 }
 </script>
 
@@ -84,6 +94,15 @@ async function handleLogin() {
           </Button>
           <Button v-if="!entitlementStore.isLocalUltimate" size="sm" @click="openUpgradeDialog()">
             {{ t('plan.upgrade.cta') }}
+          </Button>
+          <Button
+            v-if="accountStore.isLoggedIn"
+            variant="ghost"
+            size="sm"
+            @click="handleLogout"
+          >
+            <LogOut class="mr-2 h-4 w-4" />
+            {{ t('plan.section.logout') }}
           </Button>
         </div>
       </div>

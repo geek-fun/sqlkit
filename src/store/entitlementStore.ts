@@ -1,12 +1,7 @@
-import type { EntitlementView, PaidFeature } from '../common'
+import type { EntitlementView } from '../common'
 import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
-import {
-  ENTITLEMENT_ERROR_TYPE,
-
-  isEntitlementError,
-
-} from '../common'
+import { isEntitlementError, isSessionRejected } from '../common'
 import { useAccountStore } from './accountStore'
 
 export type PlanState = 'ultimate' | 'community'
@@ -28,26 +23,21 @@ export const useEntitlementStore = defineStore('entitlement', {
       try {
         this.view = await invoke<EntitlementView>('refresh_entitlement', {
           token: accountStore.token,
+          refreshToken: accountStore.refreshToken || null,
           force,
         })
       }
       catch (e) {
-        if (!isEntitlementError(e)) {
+        if (isSessionRejected(e)) {
+          // The lease is dead server-side — drop it so the next login starts
+          // clean instead of presenting a revoked token.
+          accountStore.setRefreshToken('')
+        }
+        if (!isEntitlementError(e) && !isSessionRejected(e)) {
           throw e
         }
         this.view = null
       }
-    },
-    async ensureLocalUltimate(feature: PaidFeature): Promise<boolean> {
-      await this.refreshEntitlement(false)
-      if (this.isLocalUltimate) {
-        return true
-      }
-      throw Object.assign(new Error(`'${feature}' requires an Ultimate subscription`), {
-        status: 403,
-        details: feature,
-        errorType: ENTITLEMENT_ERROR_TYPE,
-      })
     },
     async clearCachedEntitlement(): Promise<void> {
       try {

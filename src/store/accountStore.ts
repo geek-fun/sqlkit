@@ -1,8 +1,12 @@
-import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
 
 type AccountState = {
   token: string
+  /**
+   * Device-bound 30-day lease (geekfun#59) — lives with the session so a
+   * logout (or a web re-login) invalidates it with the rest.
+   */
+  refreshToken: string
   username: string
   email: string
 }
@@ -10,6 +14,7 @@ type AccountState = {
 export const useAccountStore = defineStore('account', {
   state: (): AccountState => ({
     token: '',
+    refreshToken: '',
     username: '',
     email: '',
   }),
@@ -22,18 +27,20 @@ export const useAccountStore = defineStore('account', {
       this.token = token
       this.username = username
       this.email = email
+      // A web login has no device lease yet — never carry one over.
+      this.refreshToken = ''
     },
     setToken(token: string) {
       this.token = token
     },
+    setRefreshToken(token: string) {
+      this.refreshToken = token
+    },
     clearAuth() {
       this.token = ''
+      this.refreshToken = ''
       this.username = ''
       this.email = ''
-      // the refresh lease must not outlive the account on this machine
-      invoke('clear_session').catch(() => {
-        // best effort — local-only logout still applies
-      })
     },
   },
 })
