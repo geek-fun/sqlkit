@@ -123,8 +123,8 @@ pub async fn rotate_session(
     }
 
     let data = raw.get("data").cloned().unwrap_or(json!({}));
-    let session: RefreshedSession = serde_json::from_value(data)
-        .map_err(|e| format!("invalid refresh result: {e}"))?;
+    let session: RefreshedSession =
+        serde_json::from_value(data).map_err(|e| format!("invalid refresh result: {e}"))?;
     persist_token(state, &session.refresh_token);
     Ok(session)
 }
@@ -183,7 +183,10 @@ mod tests {
         assert_eq!(load_token(&session_state), None);
 
         std::fs::write(state.0.join(FALLBACK_FILE), "raw-lease-token\n").unwrap();
-        assert_eq!(load_token(&session_state).as_deref(), Some("raw-lease-token"));
+        assert_eq!(
+            load_token(&session_state).as_deref(),
+            Some("raw-lease-token")
+        );
 
         clear_token(&session_state);
         assert_eq!(load_token(&session_state), None);

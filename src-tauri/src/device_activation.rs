@@ -106,7 +106,11 @@ fn parse_envelope(payload: serde_json::Value) -> Option<(u32, Vec<String>, serde
                 .collect()
         })
         .unwrap_or_default();
-    Some((code, messages, payload.get("data").cloned().unwrap_or_default()))
+    Some((
+        code,
+        messages,
+        payload.get("data").cloned().unwrap_or_default(),
+    ))
 }
 
 /// Outcome of a single activation HTTP attempt.
@@ -270,7 +274,10 @@ mod tests {
         });
         let dto: DeviceDto = serde_json::from_value(raw).expect("dto");
         assert!(dto.is_current);
-        assert_eq!(dto.activated_at.as_deref(), Some("2026-09-01T00:00:00.000Z"));
+        assert_eq!(
+            dto.activated_at.as_deref(),
+            Some("2026-09-01T00:00:00.000Z")
+        );
         assert!(dto.last_seen_at.is_none());
     }
 

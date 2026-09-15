@@ -25,8 +25,8 @@ pub mod db;
 pub mod device_activation;
 pub mod device_identity;
 pub mod entitlement;
-pub mod session;
 pub mod mcp_bridge;
+pub mod session;
 
 use std::sync::Arc;
 use std::sync::OnceLock;

@@ -440,10 +440,7 @@ mod tests {
 
     #[test]
     fn trial_is_active_but_never_version_locked() {
-        let view = compute_entitlement(
-            cache(Some("2026-10-09T00:00:00.000Z"), None).as_ref(),
-            NOW,
-        );
+        let view = compute_entitlement(cache(Some("2026-10-09T00:00:00.000Z"), None).as_ref(), NOW);
         assert!(view.ultimate_active);
         assert!(!view.version_locked);
         assert!(view.local_ultimate);
@@ -451,10 +448,7 @@ mod tests {
 
     #[test]
     fn expired_trial_without_horizon_falls_back_to_free() {
-        let view = compute_entitlement(
-            cache(Some("2020-01-01T00:00:00.000Z"), None).as_ref(),
-            NOW,
-        );
+        let view = compute_entitlement(cache(Some("2020-01-01T00:00:00.000Z"), None).as_ref(), NOW);
         assert!(!view.ultimate_active);
         assert!(!view.version_locked);
         assert!(!view.local_ultimate);
@@ -477,15 +471,10 @@ mod tests {
 
     #[test]
     fn releases_after_the_horizon_need_renewal() {
-        let view = compute_entitlement(
-            cache(None, Some("2020-01-01T00:00:00.000Z")).as_ref(),
-            NOW,
-        );
+        let view = compute_entitlement(cache(None, Some("2020-01-01T00:00:00.000Z")).as_ref(), NOW);
         assert!(view.version_locked == (parse_date_utc_ms(APP_RELEASE_DATE).unwrap() <= 0));
-        let fresh = compute_entitlement(
-            cache(None, Some("2999-01-01T00:00:00.000Z")).as_ref(),
-            NOW,
-        );
+        let fresh =
+            compute_entitlement(cache(None, Some("2999-01-01T00:00:00.000Z")).as_ref(), NOW);
         assert!(fresh.version_locked);
         assert!(fresh.local_ultimate);
     }

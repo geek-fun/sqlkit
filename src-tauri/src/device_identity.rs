@@ -53,7 +53,10 @@ pub fn hardware_serial() -> Option<String> {
         .args(["-rd1", "-c", "IOPlatformExpertDevice"])
         .output()
         .ok()?;
-    parse_ioreg_value(&String::from_utf8_lossy(&output.stdout), "IOPlatformSerialNumber")
+    parse_ioreg_value(
+        &String::from_utf8_lossy(&output.stdout),
+        "IOPlatformSerialNumber",
+    )
 }
 
 #[cfg(target_os = "macos")]
@@ -75,9 +78,8 @@ fn parse_ioreg_value(text: &str, key: &str) -> Option<String> {
 
 #[cfg(target_os = "windows")]
 pub fn platform_uuid() -> Option<String> {
-    command_line("csproduct get UUID").or_else(|| {
-        powershell("(Get-CimInstance Win32_ComputerSystemProduct).UUID.Value")
-    })
+    command_line("csproduct get UUID")
+        .or_else(|| powershell("(Get-CimInstance Win32_ComputerSystemProduct).UUID.Value"))
 }
 
 #[cfg(target_os = "windows")]
@@ -101,16 +103,18 @@ pub fn machine_guid() -> Option<String> {
 
 #[cfg(target_os = "windows")]
 pub fn system_manufacturer() -> Option<String> {
-    command_line("computersystem get Manufacturer").or_else(|| {
-        powershell("(Get-CimInstance Win32_ComputerSystem).Manufacturer.Value")
-    })
+    command_line("computersystem get Manufacturer")
+        .or_else(|| powershell("(Get-CimInstance Win32_ComputerSystem).Manufacturer.Value"))
 }
 
 #[cfg(target_os = "windows")]
 fn command_line(wmic_args: &str) -> Option<String> {
     let mut args = vec!["/value:off", "/header:off"];
     args.extend(wmic_args.split_whitespace());
-    let output = std::process::Command::new("wmic").args(args).output().ok()?;
+    let output = std::process::Command::new("wmic")
+        .args(args)
+        .output()
+        .ok()?;
     parse_value_output(&String::from_utf8_lossy(&output.stdout))
 }
 
@@ -185,7 +189,9 @@ fn detect_hostname() -> Option<String> {
 
 #[cfg(target_os = "windows")]
 fn detect_hostname() -> Option<String> {
-    std::env::var("COMPUTERNAME").ok().filter(|name| !name.is_empty())
+    std::env::var("COMPUTERNAME")
+        .ok()
+        .filter(|name| !name.is_empty())
 }
 
 pub const CURRENT_PLATFORM: &str = if cfg!(target_os = "macos") {
@@ -211,19 +217,32 @@ fn detect_virtual() -> bool {
         .unwrap_or(false)
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(target_os = "linux")]
 fn detect_virtual() -> bool {
-    let vendor = if cfg!(target_os = "linux") {
-        system_vendor()
-    } else {
-        system_manufacturer()
-    };
+    detect_virtual_from(system_vendor())
+}
+
+#[cfg(target_os = "windows")]
+fn detect_virtual() -> bool {
+    detect_virtual_from(system_manufacturer())
+}
+
+#[cfg(any(target_os = "linux", target_os = "windows"))]
+fn detect_virtual_from(vendor: Option<String>) -> bool {
     vendor
         .map(|vendor| vendor.to_lowercase())
         .map(|vendor| {
-            ["qemu", "kvm", "vmware", "virtualbox", "xen", "microsoft", "parallels"]
-                .iter()
-                .any(|marker| vendor.contains(marker))
+            [
+                "qemu",
+                "kvm",
+                "vmware",
+                "virtualbox",
+                "xen",
+                "microsoft",
+                "parallels",
+            ]
+            .iter()
+            .any(|marker| vendor.contains(marker))
         })
         .unwrap_or(false)
 }
