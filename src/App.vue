@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { UnlistenFn } from '@tauri-apps/api/event'
+import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted, watch } from 'vue'
@@ -13,6 +14,8 @@ import { useAccountStore } from '@/store/accountStore'
 import { useAppStore } from '@/store/appStore'
 import { useDeviceStore } from '@/store/deviceStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
+
+type AuthPayload = { token: string, username: string, email: string }
 
 const appStore = useAppStore()
 const { themeType } = storeToRefs(appStore)
@@ -29,6 +32,15 @@ watch(themeType, (newTheme) => {
 let unlistenAuth: UnlistenFn | null = null
 let unlistenSessionRefresh: UnlistenFn | null = null
 
+// Idempotent: events and the cold-start pull may both deliver the same link.
+function handleAuth(payload: AuthPayload) {
+  accountStore.setAuth(payload.token, payload.username, payload.email)
+  entitlementStore.refreshEntitlement(true)
+  // The deep-linked token comes from a web login with no device attached —
+  // register/verify this machine right away.
+  deviceStore.ensureActivated(true)
+}
+
 onMounted(async () => {
   checkForUpdates(false)
 
@@ -38,16 +50,9 @@ onMounted(async () => {
     deviceStore.ensureActivated()
   }
 
-  unlistenAuth = await listen<{
-    token: string
-    username: string
-    email: string
-  }>('sqlkit://auth', ({ payload }) => {
-    accountStore.setAuth(payload.token, payload.username, payload.email)
-    entitlementStore.refreshEntitlement(true)
-    // The deep-linked token comes from a web login with no device attached —
-    // register/verify this machine right away.
-    deviceStore.ensureActivated(true)
+  // Listeners must exist before the pending-auth pull below.
+  unlistenAuth = await listen<AuthPayload>('sqlkit://auth', ({ payload }) => {
+    handleAuth(payload)
   })
 
   // Transparent session refresh (Rust rotates the lease): keep the frontend
@@ -56,6 +61,18 @@ onMounted(async () => {
     accountStore.setToken(payload.accessToken)
     accountStore.setRefreshToken(payload.refreshToken)
   })
+
+  // Cold start: a deep link can arrive before these listeners exist — Rust
+  // parks it in pending state; consume it now.
+  try {
+    const pending = await invoke<AuthPayload | null>('consume_pending_auth')
+    if (pending) {
+      handleAuth(pending)
+    }
+  }
+  catch {
+    // no pending auth is the normal case
+  }
 })
 
 onUnmounted(() => {
