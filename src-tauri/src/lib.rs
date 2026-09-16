@@ -82,6 +82,28 @@ fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
     })
 }
 
+/// Deep links that arrive before the frontend has mounted cannot be delivered
+/// via events (Tauri events are not queued) — they are parked here and the
+/// frontend pulls them via `consume_pending_auth` once its listeners are up.
+#[derive(Default)]
+struct PendingAuthState(std::sync::Mutex<Option<AuthPayload>>);
+
+impl PendingAuthState {
+    fn store(&self, payload: AuthPayload) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(payload);
+    }
+
+    /// Take-and-clear so a delivered token can never be replayed.
+    fn consume(&self) -> Option<AuthPayload> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).take()
+    }
+}
+
+#[tauri::command]
+fn consume_pending_auth(state: tauri::State<'_, PendingAuthState>) -> Option<AuthPayload> {
+    state.consume()
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     use crate::connection::guardian::ConnectionGuardian;
@@ -195,25 +217,31 @@ pub fn run() {
 
             use tauri::{Emitter, Listener};
 
-            // Handle deep links received while the app is already running
+            app.manage(PendingAuthState::default());
+
+            // Handle deep links received while the app is already running.
+            // Double-write: the event reaches a loaded frontend, the pending
+            // slot covers the window before its listeners exist.
             let app_handle = app.handle().clone();
             app.listen("deep-link://new-url", move |event: tauri::Event| {
                 if let Ok(urls) = serde_json::from_str::<Vec<String>>(event.payload()) {
                     for url in &urls {
                         if let Some(payload) = parse_auth_from_url(url) {
-                            let _ = app_handle.emit("sqlkit://auth", payload.clone());
+                            app_handle.state::<PendingAuthState>().store(payload.clone());
+                            let _ = app_handle.emit("sqlkit://auth", payload);
                         }
                     }
                 }
             });
 
-            // Handle deep links passed at launch (cold start)
+            // Cold start: the URL arrived via argv before any frontend
+            // listener could exist — park it for the pull above.
+            let pending = app.state::<PendingAuthState>();
             use tauri_plugin_deep_link::DeepLinkExt;
             if let Ok(Some(urls)) = app.deep_link().get_current() {
-                let app_handle = app.handle().clone();
                 for url in &urls {
                     if let Some(payload) = parse_auth_from_url(url.as_str()) {
-                        let _ = app_handle.emit("sqlkit://auth", payload);
+                        pending.store(payload);
                     }
                 }
             }
@@ -345,6 +373,7 @@ pub fn run() {
             commands::generate_ddl_for_objects,
             commands::execute_sql_content,
             commands::get_app_version,
+            crate::consume_pending_auth,
             crate::entitlement::refresh_entitlement,
             crate::entitlement::get_entitlement,
             crate::entitlement::clear_entitlement,

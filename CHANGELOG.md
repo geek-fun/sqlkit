@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Entitlements & version-lock subscription model (geekfun#56)** — client-side implementation of the Ultimate entitlement contract: the two server-computed fields `ultimateExpiresAt` + `versionLockHorizon` are consumed via a new Rust entitlement module (persisted cache, offline tolerance, failure degradation, 5-minute refresh throttle, `app.releaseDate <= versionLockHorizon` unlock check). Rust command gates return `ENTITLEMENT_REQUIRED` for AI (agent loop/step, compaction, LLM validation), the whole Transfer module (import/export/migration/structure execution), SSH tunnel establishment, and the MCP bridge (config/policy save + auto-start). The frontend adds an entitlement store, Geekfun login entry, paid-feature gates with upgrade guidance on Data Studio, Transfer, AI assistant sidebar, ER diagram actions, AI/MCP settings, SSH tunnel option in the connection form, plus an Account & Plan settings tab showing the version-lock state with Geekfun login and logout (logout clears the local entitlement cache so entitlements never outlive the account session).
 
+### Fixed
+
+- **Deep-link sign-in on cold start** — a `sqlkit://auth` link that launches the app no longer drops the token: the payload is parked in a pending-auth slot during startup and the frontend pulls it via `consume_pending_auth` once mounted; running-instance links double-write the same slot, closing the startup window too.
+
 ## [0.8.7] - 2026-08-17
 
 ### Added
