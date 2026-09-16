@@ -6521,6 +6521,7 @@ dependencies = [
  "flate2",
  "futures",
  "hex",
+ "hmac 0.12.1",
  "http",
  "log",
  "mockall",

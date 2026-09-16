@@ -22,7 +22,11 @@ pub mod agent_adapters;
 pub mod capabilities;
 pub mod common;
 pub mod db;
+pub mod device_activation;
+pub mod device_identity;
+pub mod entitlement;
 pub mod mcp_bridge;
+pub mod session;
 
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -151,8 +155,19 @@ pub fn run() {
                     .app_data_dir()
                     .map_err(|e| format!("{}", e))?
                     .to_path_buf();
+                let entitlement_state = crate::entitlement::EntitlementState::load(Some(
+                    app_data_dir.join("entitlement-cache.json"),
+                ));
+                app.manage(entitlement_state);
+                app.manage(crate::device_activation::DeviceIdentityState::load(
+                    app_data_dir.clone(),
+                ));
+                app.manage(crate::session::SessionState::default());
                 let config = crate::mcp_bridge::McpConfig::load(&app_data_dir);
-                if config.auto_start {
+                let mcp_entitled = app
+                    .state::<crate::entitlement::EntitlementState>()
+                    .local_entitled();
+                if config.auto_start && mcp_entitled {
                     let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
                     let server_handle: tauri::State<'_, crate::mcp_bridge::McpServerHandle> =
                         app.state();
@@ -330,6 +345,10 @@ pub fn run() {
             commands::generate_ddl_for_objects,
             commands::execute_sql_content,
             commands::get_app_version,
+            crate::entitlement::refresh_entitlement,
+            crate::entitlement::get_entitlement,
+            crate::entitlement::clear_entitlement,
+            crate::device_activation::activate_device,
             crate::mcp_bridge::get_mcp_status,
             crate::mcp_bridge::save_mcp_config,
             crate::mcp_bridge::save_mcp_policy,

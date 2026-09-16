@@ -251,6 +251,10 @@ pub async fn connection_host_port(
         return Ok((config.host.clone(), config.port));
     }
 
+    // Gate before any transport is established — an unentitled user must
+    // not spin up tunnels at all.
+    crate::entitlement::ensure_local_ultimate_global("SSH tunnel")?;
+
     match start_transport_layers(connection_id, &layers, &config.host, config.port, tunnels).await?
     {
         Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),

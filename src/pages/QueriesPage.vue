@@ -16,6 +16,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from '@/components/ui/button'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { openUpgradeDialog } from '@/components/upgrade'
 import { resolveMonacoDialect } from '@/composables/sqlCompletion/dialects'
 import { getMetadataService } from '@/composables/sqlCompletion/metadata'
 import { toast } from '@/composables/useNotifications'
@@ -24,6 +25,7 @@ import { useSqlFormatter } from '@/composables/useSqlFormatter'
 import { browseApi, loadQueryFile, saveQueryFile, saveQueryFileAs, saveQueryMetadata } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 import { DatabaseType } from '@/store/connectionStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 import { isApiSuccess } from '@/types/api'
 
 const { t } = useI18n()
@@ -33,6 +35,7 @@ const appStore = useAppStore()
 const connectionStore = useConnectionStore()
 const databaseStore = useDatabaseStore()
 const tabStore = useTabStore()
+const entitlementStore = useEntitlementStore()
 const { modifierKey } = usePlatform()
 
 const showResultPanel = ref(false)
@@ -590,6 +593,10 @@ function handleExportData(_table: TableInfo, _database: string, _schema?: string
 }
 
 function handleShowErDiagram(database: string, schema?: string) {
+  if (!entitlementStore.isLocalUltimate) {
+    openUpgradeDialog('er_diagram')
+    return
+  }
   const connId = getActiveConnectionId()
   if (connId)
     tabStore.openErDiagramTab(connId, database, schema)
@@ -865,6 +872,10 @@ function handleDatabaseAction(kind: string) {
       router.push('/transfer')
       break
     case 'showErDiagram': {
+      if (!entitlementStore.isLocalUltimate) {
+        openUpgradeDialog('er_diagram')
+        break
+      }
       const connId = getActiveConnectionId()
       const db = selectedDatabase.value
       // Database-level ER diagram: omit schema to show all tables across all schemas

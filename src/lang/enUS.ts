@@ -1,4 +1,52 @@
 export const enUS = {
+  device: {
+    replaceTitle: 'Device limit reached',
+    replaceDescription:
+      'Your subscription can stay activated on up to {limit} devices. Pick a device below to replace it with this one — the replaced device loses access immediately.',
+    slotUsage: '{used}/{limit} devices in use',
+    thisDevice: 'This device',
+    lastActive: 'Last active',
+    neverActive: 'Never',
+    replaceConfirm: 'Replace & Activate',
+    replaceFailed: 'Failed to replace the device. Pick another one and try again.',
+  },
+  plan: {
+    tab: 'Account & Plan',
+    pricing: 'Ultimate $9.9/mo · $99/yr · 7-day free trial',
+    state: {
+      ultimate: 'Ultimate',
+      community: 'Community',
+    },
+    features: {
+      ai: 'AI — SQL generation, optimization, explanation and fix. Bring your own LLM key.',
+      er_diagram: 'ER diagrams — visualize table relationships across schemas.',
+      transfer: 'Bulk import/export, DDL structure sync and cross-engine migration.',
+      ssh_tunnel: 'SSH tunnel for remote connections.',
+      mcp_bridge: 'Built-in MCP Server bridge.',
+    },
+    upgrade: {
+      title: 'Upgrade to Ultimate',
+      description: 'Unlock AI, ER diagrams, bulk import/export, cross-engine migration, SSH tunnels and the MCP bridge.',
+      cta: 'Upgrade',
+      refresh: 'Refresh entitlements',
+      versionPermanent: 'Subscribed versions are permanently usable, even offline.',
+      versionLockedOut: 'This release requires an active subscription to unlock. Renew to unlock it permanently.',
+    },
+    section: {
+      title: 'Account & Plan',
+      desc: 'Subscription entitlements and version-lock state for this installation.',
+      versionPermanent: 'Current version is permanently usable (covered by your version lock).',
+      subscriptionActive: 'Ultimate is active — all features unlocked while subscribed.',
+      versionLockedOut: 'This version ({date}) is not covered by a version lock — showing Community mode.',
+      expiresAt: 'Active until {time}',
+      cancelScheduled: 'Subscription is scheduled to end at the close of the current billing period.',
+      checkFailed: 'Could not verify entitlements — showing cached state. Check your network and refresh.',
+      notLoggedIn: 'You are not logged in.',
+      loginLink: 'Log in with Geekfun',
+      refresh: 'Refresh',
+      logout: 'Log out',
+    },
+  },
   aside: {
     aiAssistant: 'AI Assistant',
     tasks: 'Tasks',
