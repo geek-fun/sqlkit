@@ -29,6 +29,7 @@ export const zhCN = {
       description: '解锁 AI、ER 图、批量导入导出、跨引擎迁移、SSH 隧道与 MCP bridge。',
       cta: '升级',
       refresh: '刷新权益',
+      startFree: '免费开始',
       versionPermanent: '订阅期内发布的版本永久可用，支持离线。',
       versionLockedOut: '当前版本需要有效订阅解锁，续订后可永久解锁。',
     },
