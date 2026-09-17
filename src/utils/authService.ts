@@ -1,6 +1,6 @@
 import { openUrl } from '@tauri-apps/plugin-opener'
 
-const GEEKFUN_BASE_URL = 'https://console-geekfun.wentsen.com'
+const GEEKFUN_BASE_URL = 'https://console.geekfun.club'
 
 export async function openLoginUrl(): Promise<void> {
   const loginUrl = `${GEEKFUN_BASE_URL}/login?source=sqlkit`
