@@ -9,7 +9,7 @@ import { openUpgradeDialog } from '@/components/upgrade'
 import { useAccountStore } from '@/store/accountStore'
 import { useDeviceStore } from '@/store/deviceStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
-import { openLoginUrl } from '@/utils/authService'
+import { openLoginUrl, openRegisterUrl } from '@/utils/authService'
 
 const { t } = useI18n()
 const entitlementStore = useEntitlementStore()
@@ -18,7 +18,8 @@ const deviceStore = useDeviceStore()
 const refreshing = ref(false)
 
 onMounted(() => {
-  entitlementStore.refreshEntitlement(false)
+  if (accountStore.isLoggedIn)
+    entitlementStore.refreshEntitlement(false)
 })
 
 const versionStateText = computed(() => {
@@ -52,6 +53,10 @@ async function handleLogin() {
   await openLoginUrl()
 }
 
+async function handleStartFree() {
+  await openRegisterUrl()
+}
+
 // Entitlements are account-scoped: the cached view and the device lease must
 // never outlive the account session on this machine.
 async function handleLogout() {
@@ -83,18 +88,39 @@ async function handleLogout() {
           <p v-if="entitlementStore.cancelScheduled" class="text-xs text-amber-600">
             {{ t('plan.section.cancelScheduled') }}
           </p>
-          <p v-if="entitlementStore.hasEntitlementError" class="text-xs text-destructive">
+          <p
+            v-if="entitlementStore.hasEntitlementError && accountStore.isLoggedIn"
+            class="text-xs text-destructive"
+          >
             {{ t('plan.section.checkFailed') }}
           </p>
         </div>
         <div class="flex gap-2 items-center">
-          <Button variant="outline" size="sm" :disabled="refreshing" @click="handleRefresh">
+          <Button
+            v-if="accountStore.isLoggedIn"
+            variant="outline"
+            size="sm"
+            :disabled="refreshing"
+            @click="handleRefresh"
+          >
             <RefreshCw v-if="refreshing" class="mr-2 h-4 w-4 animate-spin" />
             {{ t('plan.section.refresh') }}
           </Button>
-          <Button v-if="!entitlementStore.isLocalUltimate" size="sm" @click="openUpgradeDialog()">
+          <Button
+            v-if="accountStore.isLoggedIn && !entitlementStore.isLocalUltimate"
+            size="sm"
+            @click="openUpgradeDialog()"
+          >
             {{ t('plan.upgrade.cta') }}
           </Button>
+          <template v-if="!accountStore.isLoggedIn">
+            <Button variant="outline" size="sm" @click="openUpgradeDialog()">
+              {{ t('plan.upgrade.cta') }}
+            </Button>
+            <Button size="sm" @click="handleStartFree">
+              {{ t('plan.upgrade.startFree') }}
+            </Button>
+          </template>
           <Button
             v-if="accountStore.isLoggedIn"
             variant="ghost"

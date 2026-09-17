@@ -29,6 +29,7 @@ export const enUS = {
       description: 'Unlock AI, ER diagrams, bulk import/export, cross-engine migration, SSH tunnels and the MCP bridge.',
       cta: 'Upgrade',
       refresh: 'Refresh entitlements',
+      startFree: 'Start free',
       versionPermanent: 'Subscribed versions are permanently usable, even offline.',
       versionLockedOut: 'This release requires an active subscription to unlock. Renew to unlock it permanently.',
     },
