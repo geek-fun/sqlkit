@@ -192,6 +192,9 @@ jobs:
           distribution: temurin
           cache: maven
 
+      - name: Run bridge tests
+        run: mvn -f jdbc-bridge/pom.xml test
+
       - name: Build bridge JAR
         run: |
           VERSION=${{ needs.check-version.outputs.version }}

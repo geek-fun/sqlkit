@@ -163,3 +163,58 @@ impl From<ConnectionStatusData> for crate::database::types::ConnectionStatus {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn connect_params_omit_ssl_fields_when_unsupported() {
+        // `None` must serialize to an absent field: the Java side reads the
+        // message into a String and applies SSL properties only when the
+        // value is non-null (issue #158).
+        let value = serde_json::to_value(ConnectParams {
+            url: "jdbc:duckdb:/data/app.duckdb".to_string(),
+            username: String::new(),
+            password: None,
+            database: None,
+            driver_class: "org.duckdb.DuckDBDriver".to_string(),
+            driver_jars: vec![],
+            pool_min: 1,
+            pool_max: 5,
+            oracle_options: None,
+            credentials_in_url: None,
+            ssl_mode: None,
+            ssl_ca_cert: None,
+            ssl_client_cert: None,
+            ssl_client_key: None,
+            trust_server_certificate: false,
+        })
+        .expect("serialize");
+        assert!(value.get("ssl_mode").is_none());
+        assert!(value.get("ssl_ca_cert").is_none());
+
+        let value = serde_json::to_value(ConnectParams {
+            url: "jdbc:postgresql://db/internal".to_string(),
+            username: String::new(),
+            password: None,
+            database: None,
+            driver_class: "org.postgresql.Driver".to_string(),
+            driver_jars: vec![],
+            pool_min: 1,
+            pool_max: 5,
+            oracle_options: None,
+            credentials_in_url: None,
+            ssl_mode: Some("verify-full".to_string()),
+            ssl_ca_cert: None,
+            ssl_client_cert: None,
+            ssl_client_key: None,
+            trust_server_certificate: false,
+        })
+        .expect("serialize");
+        assert_eq!(
+            value.get("ssl_mode"),
+            Some(&serde_json::json!("verify-full"))
+        );
+    }
+}

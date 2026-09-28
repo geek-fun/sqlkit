@@ -159,6 +159,45 @@ pub enum DatabaseType {
     Turso,
 }
 
+impl DatabaseType {
+    /// Whether this connection type has an SSL/TLS concept at all.
+    ///
+    /// Embedded / file-based engines mirror the frontend
+    /// `SSL_UNSUPPORTED_DATABASES`: their settings form never shows SSL, so
+    /// no ssl mode is ever persisted and the stored value is just the
+    /// `Prefer` default. The bridge must not receive one either — injecting
+    /// SSL properties into such drivers breaks the connection (DuckDB
+    /// rejects unknown options, issue #158).
+    pub fn ssl_supported(self) -> bool {
+        !matches!(
+            self,
+            DatabaseType::SQLite
+                | DatabaseType::SQLCipher
+                | DatabaseType::DuckDb
+                | DatabaseType::Access
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_types_have_no_ssl_concept() {
+        assert!(!DatabaseType::SQLite.ssl_supported());
+        assert!(!DatabaseType::SQLCipher.ssl_supported());
+        assert!(!DatabaseType::DuckDb.ssl_supported());
+        assert!(!DatabaseType::Access.ssl_supported());
+        // network types keep their ssl mode
+        assert!(DatabaseType::PostgreSQL.ssl_supported());
+        assert!(DatabaseType::MySQL.ssl_supported());
+        assert!(DatabaseType::Oracle.ssl_supported());
+        assert!(DatabaseType::H2.ssl_supported());
+        assert!(DatabaseType::Firebird.ssl_supported());
+    }
+}
+
 /// SSL/TLS mode for connections.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SslMode {

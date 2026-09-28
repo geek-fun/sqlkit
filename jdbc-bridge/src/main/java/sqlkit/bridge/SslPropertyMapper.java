@@ -116,7 +116,10 @@ public class SslPropertyMapper {
                 if (sslMode.equals("verify-full")) props.setProperty("ssl_hostname_verify", "true");
                 break;
             default:
-                props.setProperty("ssl", "true");
+                // Unknown driver — inject nothing. Blindly setting `ssl=true`
+                // breaks drivers that reject unknown options (DuckDB,
+                // issue #158). Drivers with real SSL support get an explicit
+                // case above (opt-in, like Snowflake/Hive/Vertica).
                 break;
         }
     }
