@@ -12,7 +12,6 @@ export const enUS = {
   },
   plan: {
     tab: 'Account & Plan',
-    pricing: 'Ultimate $9.9/mo · $99/yr · 7-day free trial',
     state: {
       ultimate: 'Ultimate',
       community: 'Community',
@@ -91,16 +90,8 @@ export const enUS = {
       mcp: 'MCP bridge',
       versionLock: 'Version lock',
     },
-    features: {
-      ai: 'AI — SQL generation, optimization, explanation and fix. Bring your own LLM key.',
-      er_diagram: 'ER diagrams — visualize table relationships across schemas.',
-      transfer: 'Bulk import/export, DDL structure sync and cross-engine migration.',
-      ssh_tunnel: 'SSH tunnel for remote connections.',
-      mcp_bridge: 'Built-in MCP Server bridge.',
-    },
     upgrade: {
       title: 'Upgrade to Ultimate',
-      description: 'Unlock AI, ER diagrams, bulk import/export, cross-engine migration, SSH tunnels and the MCP bridge.',
       cta: 'Upgrade',
       refresh: 'Refresh entitlements',
       startFree: 'Start free',
