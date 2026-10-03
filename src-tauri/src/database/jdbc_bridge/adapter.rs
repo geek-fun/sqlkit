@@ -48,6 +48,15 @@ impl JdbcBridgeAdapter {
             crate::database::config::SslMode::VerifyCA => "verify-ca",
             crate::database::config::SslMode::VerifyFull => "verify-full",
         };
+        // Embedded / file-based types have no SSL settings in the UI, so the
+        // stored mode is just the Prefer default — sending it would make the
+        // bridge inject `ssl=true` into drivers that reject unknown options
+        // (e.g. DuckDB, issue #158). None omits the field entirely.
+        let ssl_mode = if db_type.ssl_supported() {
+            Some(ssl_mode_str)
+        } else {
+            None
+        };
 
         // Use fallback chain for JDBC-dependent databases (Oracle, DB2, H2, etc.)
         // For non-registry types, fall back to the old single-driver approach
@@ -59,7 +68,7 @@ impl JdbcBridgeAdapter {
             &self.config.username,
             &self.config.password,
             self.config.oracle_options.as_ref(),
-            Some(ssl_mode_str),
+            ssl_mode.as_deref(),
             self.config.ssl_ca_cert.as_deref(),
             self.config.ssl_client_cert.as_deref(),
             self.config.ssl_client_key.as_deref(),
