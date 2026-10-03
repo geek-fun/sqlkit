@@ -4,10 +4,11 @@
 //! JSON over stdin/stdout.
 
 use crate::database::error::{DbError, DbResult};
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 
 use super::protocol::{JdbcRequest, JdbcResponse};
@@ -486,6 +487,10 @@ impl JdbcBridgeLauncher {
     }
 
     /// Shutdown the bridge process gracefully.
+    ///
+    /// Only belongs to the shared registry owner: connections must release their
+    /// own pool through the `disconnect` RPC (`JdbcMethod::Disconnect`) instead,
+    /// because other connections may be served by the same process.
     pub fn shutdown(&mut self) {
         if let Some(mut child) = self.process.take() {
             let _ = child.kill();
@@ -493,6 +498,75 @@ impl JdbcBridgeLauncher {
         }
         self.stdin = None;
         self.stderr_buffer = None;
+    }
+}
+
+/// Bridge processes shared across connections, keyed by JAR + JVM options.
+type LauncherRegistry = Mutex<HashMap<String, Arc<tokio::sync::Mutex<JdbcBridgeLauncher>>>>;
+
+fn launcher_registry() -> &'static LauncherRegistry {
+    static REGISTRY: OnceLock<LauncherRegistry> = OnceLock::new();
+    REGISTRY.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// Key of a reusable bridge process configuration.
+///
+/// JVM options are part of the key because they cannot change once the process
+/// is running (Oracle wallet/keystore arguments, for example).
+fn launcher_key(bridge_jar: &Path, jvm_args: &[String]) -> String {
+    format!("{}::{}", bridge_jar.display(), jvm_args.join(" "))
+}
+
+/// Get the bridge JVM shared by every connection with the same JAR and options,
+/// starting one when none is alive.
+///
+/// Starting a JVM is cheap, but the first JDBC connection inside it is not:
+/// DuckDB's driver maps a ~107 MB native library (measured ~1.4 s), and the
+/// driver resolution also reaches Maven Central. Sharing the process pays both
+/// costs once per app session instead of once per connection or "Test".
+pub fn shared_launcher(
+    bridge_jar: &Path,
+    jvm_args: &[String],
+) -> DbResult<Arc<tokio::sync::Mutex<JdbcBridgeLauncher>>> {
+    let key = launcher_key(bridge_jar, jvm_args);
+    let mut registry = launcher_registry()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+
+    if let Some(existing) = registry.get(&key) {
+        let alive = match existing.try_lock() {
+            Ok(mut guard) => guard.is_alive(),
+            // Busy means another request is in flight, so the process is alive.
+            Err(_) => true,
+        };
+        if alive {
+            return Ok(existing.clone());
+        }
+    }
+
+    let mut launcher = JdbcBridgeLauncher::new(bridge_jar.to_path_buf());
+    launcher.start(jvm_args)?;
+    let shared = Arc::new(tokio::sync::Mutex::new(launcher));
+    registry.insert(key, shared.clone());
+    Ok(shared)
+}
+
+#[cfg(test)]
+mod launcher_registry_tests {
+    use super::*;
+
+    #[test]
+    fn launcher_key_separates_jars_and_jvm_options() {
+        let jar = PathBuf::from("/tmp/jdbc-bridge-0.8.8.jar");
+        assert_eq!(launcher_key(&jar, &[]), launcher_key(&jar, &[]),);
+        assert_ne!(
+            launcher_key(&jar, &[]),
+            launcher_key(&jar, &["-Dfoo=bar".to_string()]),
+        );
+        assert_ne!(
+            launcher_key(&jar, &[]),
+            launcher_key(Path::new("/tmp/other.jar"), &[]),
+        );
     }
 }
 

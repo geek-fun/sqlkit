@@ -44,6 +44,7 @@ export type ServerConfig = {
   trust_server_certificate?: boolean | null
   transport_layers?: TransportLayerConfig[] | null
   oracle_options?: OracleConnectionOptions | null
+  read_only?: boolean | null
 }
 
 export type ConnectionStatus = {

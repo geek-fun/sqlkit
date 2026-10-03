@@ -414,6 +414,50 @@ impl ConnectionConfig {
     }
 }
 
+/// Expand a leading `~` to the current user's home directory.
+///
+/// File-based engines pass the path straight to the driver, which does not
+/// expand shell short-hands, so `~/data/app.duckdb` would otherwise create a
+/// literal `~` directory next to the process working directory.
+pub fn expand_tilde(path: &str) -> String {
+    let trimmed = path.trim();
+    let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"));
+    match home {
+        Ok(home) if trimmed == "~" => home,
+        Ok(home) if trimmed.starts_with("~/") || trimmed.starts_with("~\\") => {
+            format!("{}{}", home, &trimmed[1..])
+        }
+        _ => trimmed.to_string(),
+    }
+}
+
+/// Build the `{database}` component of the DuckDB JDBC URL template
+/// (`jdbc:duckdb:{database}`).
+///
+/// DuckDB accepts JDBC URL options after the database part, so read-only mode is
+/// expressed as `access_mode=READ_ONLY`. Paths are tilde-expanded because the
+/// driver treats the value literally.
+///
+/// The driver splits the URL on `;` before opening the database (verified
+/// against `duckdb_jdbc` 1.5.6: `semi;colon.duckdb` fails with
+/// `Invalid URL entry`), so such paths are rejected instead of being silently
+/// turned into options — or, worse, into a read-write connection when the user
+/// asked for read-only.
+pub fn duckdb_database_value(host: &str, read_only: bool) -> Result<String, String> {
+    let path = expand_tilde(host);
+    if path.contains(';') {
+        return Err(
+            "DuckDB's JDBC driver splits the connection URL on ';', so a database path \
+             containing ';' cannot be opened. Rename the file and try again."
+                .to_string(),
+        );
+    }
+    if !read_only {
+        return Ok(path);
+    }
+    Ok(format!("{};access_mode=READ_ONLY", path))
+}
+
 /// Serialization helpers for Duration.
 mod duration_serde {
     use serde::{Deserialize, Deserializer, Serializer};
@@ -432,5 +476,70 @@ mod duration_serde {
     {
         let secs = u64::deserialize(deserializer)?;
         Ok(Duration::from_secs(secs))
+    }
+}
+
+#[cfg(test)]
+mod file_path_tests {
+    use super::*;
+
+    #[test]
+    fn expand_tilde_leaves_plain_paths_untouched() {
+        assert_eq!(expand_tilde("/tmp/app.duckdb"), "/tmp/app.duckdb");
+        assert_eq!(expand_tilde(":memory:"), ":memory:");
+        assert_eq!(expand_tilde("  /tmp/app.duckdb  "), "/tmp/app.duckdb");
+    }
+
+    #[test]
+    fn expand_tilde_replaces_leading_home() {
+        let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"));
+        let Ok(home) = home else {
+            return;
+        };
+        assert_eq!(
+            expand_tilde("~/data/app.duckdb"),
+            format!("{}/data/app.duckdb", home)
+        );
+        assert_eq!(expand_tilde("~"), home);
+    }
+
+    #[test]
+    fn duckdb_database_value_appends_read_only_option() {
+        assert_eq!(
+            duckdb_database_value("/tmp/app.duckdb", false),
+            Ok("/tmp/app.duckdb".to_string())
+        );
+        assert_eq!(
+            duckdb_database_value("/tmp/app.duckdb", true),
+            Ok("/tmp/app.duckdb;access_mode=READ_ONLY".to_string())
+        );
+    }
+
+    #[test]
+    fn duckdb_database_value_keeps_named_memory_instances() {
+        assert_eq!(
+            duckdb_database_value("memory:sqlkit_ab12cd34", false),
+            Ok("memory:sqlkit_ab12cd34".to_string())
+        );
+        assert_eq!(
+            duckdb_database_value("memory:sqlkit_ab12cd34", true),
+            Ok("memory:sqlkit_ab12cd34;access_mode=READ_ONLY".to_string())
+        );
+    }
+
+    #[test]
+    fn duckdb_database_value_rejects_pre_joined_options() {
+        // Callers pass a bare path; a value that already carries URL options is
+        // rejected so options can never be applied twice by accident.
+        let once = duckdb_database_value("/tmp/app.duckdb", true).expect("value");
+        assert!(duckdb_database_value(&once, true).is_err());
+    }
+
+    #[test]
+    fn duckdb_database_value_rejects_paths_with_semicolons() {
+        // Verified against duckdb_jdbc 1.5.6: `jdbc:duckdb:/tmp/semi;colon.duckdb`
+        // fails with `Invalid URL entry: colon.duckdb`.
+        assert!(duckdb_database_value("/tmp/semi;colon.duckdb", false).is_err());
+        assert!(duckdb_database_value("/tmp/semi;colon.duckdb", true).is_err());
     }
 }
