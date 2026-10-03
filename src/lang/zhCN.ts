@@ -12,7 +12,6 @@ export const zhCN = {
   },
   plan: {
     tab: '账户与订阅',
-    pricing: '旗舰版 $9.9/月 · $99/年 · 7 天免费试用',
     state: {
       ultimate: '旗舰版',
       community: '社区版',
@@ -91,16 +90,8 @@ export const zhCN = {
       mcp: 'MCP bridge',
       versionLock: '版本锁',
     },
-    features: {
-      ai: 'AI — SQL 生成 / 优化 / 解释 / 修复（自带 LLM Key）。',
-      er_diagram: 'ER 图 — 可视化表关系。',
-      transfer: '批量导入导出、DDL 结构同步与跨引擎迁移。',
-      ssh_tunnel: 'SSH 隧道远程连接。',
-      mcp_bridge: '内置 MCP Server bridge。',
-    },
     upgrade: {
       title: '升级到旗舰版',
-      description: '解锁 AI、ER 图、批量导入导出、跨引擎迁移、SSH 隧道与 MCP bridge。',
       cta: '升级',
       refresh: '刷新权益',
       startFree: '免费开始',
