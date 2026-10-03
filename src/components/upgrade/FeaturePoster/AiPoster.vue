@@ -75,6 +75,10 @@ ORDER BY revenue DESC;</pre>
       </div>
     </div>
 
+    <div class="poster__cta">
+      <slot name="cta" />
+    </div>
+
     <ProgressiveBlur />
     <div class="poster__lock">
       <Lock class="poster__lock-icon" />
@@ -347,6 +351,16 @@ ORDER BY revenue DESC;</pre>
   animation: p-code-flow 12s linear both;
 }
 
+/* CTA slot: laid out inside the poster's own flex column so the button is
+   structurally pinned to the window bottom — immune to containing-block
+   resolution and content height changes. */
+.poster__cta {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  justify-content: center;
+  padding: 18px 0 20px;
+}
 .poster__lock {
   position: absolute;
   left: 24px;
