@@ -16,6 +16,80 @@ export const enUS = {
     state: {
       ultimate: 'Ultimate',
       community: 'Community',
+      unknown: 'Unknown',
+    },
+    gate: {
+      additive: 'Everything in Community, plus:',
+      recommended: 'Recommended',
+      currentFeature: 'This feature',
+      trustLine: 'Version lock keeps paid releases yours · Cancel anytime',
+      headline: {
+        ai: 'Ask your data in plain language',
+        transfer: 'Move data in bulk — fast and safe',
+        er_diagram: 'See your schema as a map',
+        ssh_tunnel: 'Reach remote databases over SSH',
+        mcp_bridge: 'Bring SQLKit into your agent stack',
+      },
+      tiles: {
+        aiQueryT: 'Natural-language queries',
+        aiQueryD: 'Ask in plain language, get editable SQL',
+        aiAgentT: 'Agentic explain & fix',
+        aiAgentD: 'One click to optimize slow queries',
+        mcpServerT: 'Built-in MCP server',
+        mcpServerD: 'Runs locally — zero setup',
+        mcpClientsT: 'Any MCP client',
+        mcpClientsD: 'Claude Desktop, Cursor & more',
+      },
+      groups: {
+        cloud: 'Cloud',
+        local: 'Local',
+        custom: 'Custom',
+        clients: 'Clients',
+      },
+      detail: {
+        ai: 'Works with any model — cloud, local or custom',
+        mcp: 'Connects to your favorite MCP clients',
+      },
+      price: {
+        yearly: '$99 / year',
+        save: 'Save 17%',
+        monthly: '$9.9 / month',
+      },
+      trust: {
+        versionLock: 'Versions released while subscribed stay yours, even offline',
+        byok: 'Bring your own LLM key — no token markup',
+        cancel: 'Cancel anytime',
+      },
+      cta: {
+        trial: 'Start 7-day free trial',
+        subscribe: 'Subscribe',
+        unlock: 'Unlock with Ultimate',
+        unlockSub: '7-day free trial · $9.9/mo · $99/yr',
+      },
+    },
+    poster: {
+      mcp: {
+        clients: 'Works with',
+        config: 'Client configuration',
+      },
+      ai: {
+        question: 'Find failed payments from the last 7 days',
+        loop: 'Loop 1',
+        thinking: 'Thinking',
+        toolVerb: 'Queried public.orders',
+        answer: 'Found 3 failed payments — the generated query:',
+      },
+      transfer: {
+        scopeDatabase: 'Whole database',
+      },
+    },
+    compare: {
+      ai: 'AI assistant & NL2SQL',
+      er_diagram: 'ER diagrams',
+      transfer: 'Bulk import / export & migration',
+      ssh: 'SSH tunnel',
+      mcp: 'MCP bridge',
+      versionLock: 'Version lock',
     },
     features: {
       ai: 'AI — SQL generation, optimization, explanation and fix. Bring your own LLM key.',
@@ -372,6 +446,7 @@ export const enUS = {
       goToTask: 'Go to Task',
       dismiss: 'Dismiss',
       noTasks: 'No transfer tasks',
+      rows: 'rows',
       emptyDescription: 'Export, import, and migration jobs will appear here',
       status: {
         pending: 'Pending',

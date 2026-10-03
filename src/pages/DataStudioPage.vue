@@ -2,16 +2,21 @@
 import type { ServerConnection } from '@/store/connectionStore'
 import { onClickOutside } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChatPanel from '@/components/chat-panel.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+// NOTE: without this import the <PaidGate> tag resolves to an unknown element
+// and the page renders its content completely ungated (no auto-import plugin
+// exists in this repo — components must be imported explicitly).
+import { PaidGate } from '@/components/upgrade'
 import { disposeAgentRuntime, initAgentRuntime } from '@/composables/agentRuntime'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { useDataStudioChatAgent } from '@/composables/useDataStudioChatAgent'
 import { useAppStore } from '@/store'
 import { DatabaseType, useConnectionStore } from '@/store/connectionStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 import ModifySourceModal from '@/views/data-studio/components/modify-source-modal.vue'
 import SessionHistoryPanel from '@/views/data-studio/components/session-history-panel.vue'
 
@@ -236,8 +241,7 @@ async function onModelChange(modelId: string) {
   }
 }
 
-onMounted(async () => {
-  await initAgentRuntime()
+async function initDataStudio() {
   await dataStudioStore.loadSessions()
   await connectionStore.fetchConnections()
   await dataStudioStore.loadAttachedSourcesFromDb()
@@ -245,7 +249,26 @@ onMounted(async () => {
     await dataStudioStore.loadConfirmationRulesFromDb(dataStudioStore.activeSessionId)
   }
   await initContextSettings()
+}
+
+const entitlementStore = useEntitlementStore()
+
+onMounted(async () => {
+  await initAgentRuntime()
+  if (entitlementStore.isLocalUltimate) {
+    await initDataStudio()
+  }
 })
+
+// while gated, the store/session loads stay dormant; a restored subscription
+// initializes the page in place
+watch(
+  () => entitlementStore.isLocalUltimate,
+  (ultimate) => {
+    if (ultimate)
+      void initDataStudio()
+  },
+)
 
 onBeforeUnmount(() => {
   disposeAgentRuntime()

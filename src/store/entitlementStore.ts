@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 import { isEntitlementError, isSessionRejected } from '../common'
 import { useAccountStore } from './accountStore'
 
-export type PlanState = 'ultimate' | 'community'
+export type PlanState = 'ultimate' | 'community' | 'unknown'
 
 export const useEntitlementStore = defineStore('entitlement', {
   state: (): { view: EntitlementView | null } => ({
@@ -13,7 +13,15 @@ export const useEntitlementStore = defineStore('entitlement', {
   getters: {
     isLocalUltimate: (state): boolean => state.view?.localUltimate ?? false,
     isCloudUltimate: (state): boolean => state.view?.ultimateActive ?? false,
-    planState: (state): PlanState => (state.view?.localUltimate ? 'ultimate' : 'community'),
+    // 'community' is only claimed when the server answered; a failed or
+    // missing check must never masquerade as a confirmed plan.
+    planState: (state): PlanState => {
+      if (state.view?.localUltimate)
+        return 'ultimate' as PlanState
+      if (state.view === null || state.view.lastError)
+        return 'unknown' as PlanState
+      return 'community' as PlanState
+    },
     cancelScheduled: (state): boolean => Boolean(state.view?.cancelScheduledAt),
     hasEntitlementError: (state): boolean => Boolean(state.view?.lastError),
   },
