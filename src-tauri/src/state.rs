@@ -87,6 +87,12 @@ pub struct ServerConfig {
     /// Transport layer configuration (SSH tunnels).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub transport_layers: Option<Vec<TransportLayerConfig>>,
+    /// Open the local database file read-only (DuckDB currently).
+    ///
+    /// Read-only is the only way for several processes to share a DuckDB file,
+    /// because a read-write instance holds an exclusive file lock.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub read_only: bool,
 }
 
 fn default_timeout_10() -> u64 {
@@ -125,6 +131,7 @@ impl ServerConfig {
             connect_timeout_secs: default_timeout_10(),
             query_timeout_secs: default_timeout_30(),
             transport_layers: None,
+            read_only: false,
         }
     }
 
@@ -214,13 +221,15 @@ impl ServerConfig {
         }
 
         let db_lower = self.db_type.to_lowercase();
-        // SQLite, SQLCipher, and DuckDB are file-based
-        if db_lower == "sqlite"
-            || db_lower == "sqlcipher"
-            || db_lower == "duckdb"
-            || db_lower == "duck"
-        {
-            config = config.with_database(&self.host);
+        // SQLite, SQLCipher, and DuckDB are file-based: the UI keeps the path in
+        // `host`, while the adapters and the JDBC URL builder read `database`.
+        if db_lower == "sqlite" || db_lower == "sqlcipher" {
+            config = config.with_database(crate::database::config::expand_tilde(&self.host));
+        } else if db_lower == "duckdb" || db_lower == "duck" {
+            let database =
+                crate::database::config::duckdb_database_value(&self.host, self.read_only)
+                    .map_err(|e| format!("Invalid DuckDB database path: {}", e))?;
+            config = config.with_database(database);
         } else if let Some(ref database) = self.database {
             config = config.with_database(database);
         }
@@ -361,5 +370,57 @@ impl AppState {
 impl Default for AppState {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn file_config(db_type: &str, host: &str, read_only: bool) -> ServerConfig {
+        let mut config = ServerConfig::new(
+            "local".to_string(),
+            db_type.to_string(),
+            host.to_string(),
+            0,
+            String::new(),
+        );
+        config.read_only = read_only;
+        config
+    }
+
+    #[test]
+    fn duckdb_maps_the_file_path_into_the_database_field() {
+        let config = file_config("duckdb", "/tmp/analytics.duckdb", false)
+            .to_connection_config()
+            .expect("config");
+        assert_eq!(config.database.as_deref(), Some("/tmp/analytics.duckdb"));
+    }
+
+    #[test]
+    fn duckdb_read_only_appends_access_mode_to_the_jdbc_database() {
+        let config = file_config("duckdb", "/tmp/analytics.duckdb", true)
+            .to_connection_config()
+            .expect("config");
+        assert_eq!(
+            config.database.as_deref(),
+            Some("/tmp/analytics.duckdb;access_mode=READ_ONLY")
+        );
+    }
+
+    #[test]
+    fn duckdb_named_memory_instance_is_preserved() {
+        let config = file_config("duckdb", "memory:sqlkit_shared", false)
+            .to_connection_config()
+            .expect("config");
+        assert_eq!(config.database.as_deref(), Some("memory:sqlkit_shared"));
+    }
+
+    #[test]
+    fn sqlite_keeps_memory_sentinel_and_never_gets_duckdb_options() {
+        let config = file_config("sqlite", ":memory:", true)
+            .to_connection_config()
+            .expect("config");
+        assert_eq!(config.database.as_deref(), Some(":memory:"));
     }
 }

@@ -119,7 +119,12 @@ pub async fn test_connection(
         ConnectionStrategy::JdbcBridge => {
             let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;
-            adapter.test_connection().await.map_err(|e| e.to_string())
+            let status = adapter.test_connection().await.map_err(|e| e.to_string());
+            // Close the pool explicitly: the bridge process is shared, so a pooled
+            // connection left behind would hold the database (and a DuckDB file
+            // lock) open until the app exits.
+            let _ = adapter.disconnect().await;
+            status
         }
         ConnectionStrategy::Http => match dt {
             DatabaseType::RQLite => {

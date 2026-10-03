@@ -247,6 +247,38 @@ pub fn read_jre_version() -> Option<String> {
 
 // ── Adoptium update check ─────────────────────────────────
 
+/// How long an Adoptium update answer is reused.
+///
+/// The check follows a redirect through Adoptium's CDN and measured 1.4–2.5 s
+/// per call. It used to run before *every* JDBC connect, which made a cached,
+/// local DuckDB connection feel like a network connection.
+const UPDATE_CHECK_TTL: std::time::Duration = std::time::Duration::from_secs(6 * 60 * 60);
+
+/// Memoised Adoptium update check: `(checked_at, redirect_url)`.
+static UPDATE_CHECK_CACHE: OnceLock<
+    std::sync::Mutex<Option<(std::time::Instant, Option<String>)>>,
+> = OnceLock::new();
+
+/// Memoised variant of [`check_adoptium_update`] with a TTL, so a burst of
+/// connects only pays for one update check.
+pub async fn check_adoptium_update_cached() -> Option<String> {
+    let cache = UPDATE_CHECK_CACHE.get_or_init(|| std::sync::Mutex::new(None));
+
+    if let Ok(guard) = cache.lock() {
+        if let Some((checked_at, result)) = guard.as_ref() {
+            if checked_at.elapsed() < UPDATE_CHECK_TTL {
+                return result.clone();
+            }
+        }
+    }
+
+    let result = check_adoptium_update().await;
+    if let Ok(mut guard) = cache.lock() {
+        *guard = Some((std::time::Instant::now(), result.clone()));
+    }
+    result
+}
+
 /// Check if a newer JRE build is available from Adoptium.
 ///
 /// Returns `Some(redirect_url)` with the redirect target containing the build
@@ -630,5 +662,30 @@ mod tests {
         // A non-Java binary should return None.
         let current = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("/"));
         assert!(system_java_version(&current).is_none());
+    }
+}
+
+#[cfg(test)]
+mod update_check_tests {
+    use super::*;
+
+    #[test]
+    fn update_check_cache_reuses_fresh_results() {
+        let cache = std::sync::Mutex::new(Some((
+            std::time::Instant::now(),
+            Some("https://example.invalid/jre.tar.gz".to_string()),
+        )));
+
+        let (checked_at, result) = cache.lock().unwrap().clone().unwrap();
+        assert!(checked_at.elapsed() < UPDATE_CHECK_TTL);
+        assert_eq!(
+            result.as_deref(),
+            Some("https://example.invalid/jre.tar.gz")
+        );
+    }
+
+    #[test]
+    fn update_check_ttl_is_hours_not_seconds() {
+        assert!(UPDATE_CHECK_TTL >= std::time::Duration::from_secs(3600));
     }
 }

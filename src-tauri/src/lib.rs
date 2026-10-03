@@ -227,7 +227,9 @@ pub fn run() {
                 if let Ok(urls) = serde_json::from_str::<Vec<String>>(event.payload()) {
                     for url in &urls {
                         if let Some(payload) = parse_auth_from_url(url) {
-                            app_handle.state::<PendingAuthState>().store(payload.clone());
+                            app_handle
+                                .state::<PendingAuthState>()
+                                .store(payload.clone());
                             let _ = app_handle.emit("sqlkit://auth", payload);
                         }
                     }
@@ -362,6 +364,8 @@ pub fn run() {
             commands::read_saved_queries_metadata,
             commands::write_saved_queries_metadata,
             commands::save_query_metadata,
+            commands::probe_database_file,
+            commands::create_database_directory,
             commands::preview_export_data,
             commands::execute_export_data,
             commands::detect_file_format,

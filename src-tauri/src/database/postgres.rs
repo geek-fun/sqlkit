@@ -271,18 +271,18 @@ impl PostgresAdapter {
             .join("."))
     }
 
-     fn validate_privilege(privilege: &str) -> DbResult<String> {
-         const PRIVILEGES: &[&str] = &[
-             "SELECT",
-             "INSERT",
-             "UPDATE",
-             "DELETE",
-             "TRUNCATE",
-             "REFERENCES",
-             "TRIGGER",
-             "ALL",
-             "ALL PRIVILEGES",
-         ];
+    fn validate_privilege(privilege: &str) -> DbResult<String> {
+        const PRIVILEGES: &[&str] = &[
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "TRUNCATE",
+            "REFERENCES",
+            "TRIGGER",
+            "ALL",
+            "ALL PRIVILEGES",
+        ];
         let mut validated = Vec::new();
         for part in privilege.split(',') {
             let trimmed = part.trim().to_uppercase();

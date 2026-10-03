@@ -16,6 +16,17 @@ public class ConnectionManager {
     private final Map<String, DriverClassLoader> loaders = new HashMap<>();
 
     /**
+     * Driver classes loaded once per JAR set.
+     *
+     * A fresh class loader per connection re-runs the driver's static
+     * initialisation, which for DuckDB maps a ~107 MB native library (measured
+     * ~1.4 s). Caching the loader keeps that cost to the first connection of the
+     * bridge process; entries are released together with the process.
+     */
+    private final Map<String, DriverClassLoader> sharedLoaders = new HashMap<>();
+    private final Map<String, Driver> sharedDrivers = new HashMap<>();
+
+    /**
      * Create a new JDBC connection pool.
      *
      * @param connId      unique identifier for this connection
@@ -49,15 +60,16 @@ public class ConnectionManager {
         }
         final String jdbcUrl = url;
 
-        DriverClassLoader loader = new DriverClassLoader(driverJars);
-        Class<?> driverCls = Class.forName(driverClass, true, loader);
-        if (!java.sql.Driver.class.isAssignableFrom(driverCls)) {
-            throw new ClassifiedException("Class " + driverClass + " does not implement java.sql.Driver", null, ErrorClassifier.ErrorType.UNKNOWN);
-        }
-        final java.sql.Driver driver = (java.sql.Driver) driverCls.getDeclaredConstructor().newInstance();
+        final java.sql.Driver driver = sharedDriver(driverClass, driverJars);
+        DriverClassLoader loader = loaderFor(driverJars);
         loaders.put(connId, loader);
 
         HikariConfig config = new HikariConfig();
+        // Keep HikariCP's read-only flag aligned with the connection the driver
+        // already opened: HikariCP calls `connection.setReadOnly(config.isReadOnly())`
+        // whenever the two disagree, and DuckDB rejects changing the mode at
+        // connection level ("Can't change read-only status on connection level").
+        config.setReadOnly(isReadOnlyUrl(jdbcUrl));
         config.setDataSource(new javax.sql.DataSource() {
             public java.sql.Connection getConnection() throws java.sql.SQLException {
                 java.util.Properties info = new java.util.Properties();
@@ -106,6 +118,51 @@ public class ConnectionManager {
         pools.put(connId, ds);
     }
 
+    /** Reuse one {@link DriverClassLoader} per set of driver JARs. */
+    private DriverClassLoader loaderFor(List<String> driverJars) throws Exception {
+        String key = String.join("|", driverJars);
+        DriverClassLoader loader = sharedLoaders.get(key);
+        if (loader == null) {
+            loader = new DriverClassLoader(driverJars);
+            sharedLoaders.put(key, loader);
+        }
+        return loader;
+    }
+
+    /** Reuse the instantiated JDBC driver for a driver class + JAR set. */
+    private Driver sharedDriver(String driverClass, List<String> driverJars) throws Exception {
+        String key = driverClass + "|" + String.join("|", driverJars);
+        Driver driver = sharedDrivers.get(key);
+        if (driver != null) {
+            return driver;
+        }
+
+        DriverClassLoader loader = loaderFor(driverJars);
+        Class<?> driverCls = Class.forName(driverClass, true, loader);
+        if (!java.sql.Driver.class.isAssignableFrom(driverCls)) {
+            throw new ClassifiedException("Class " + driverClass + " does not implement java.sql.Driver", null, ErrorClassifier.ErrorType.UNKNOWN);
+        }
+        driver = (java.sql.Driver) driverCls.getDeclaredConstructor().newInstance();
+        sharedDrivers.put(key, driver);
+        return driver;
+    }
+
+    /**
+     * Whether a JDBC URL asks for a read-only database.
+     *
+     * DuckDB expresses this in the URL (`access_mode=READ_ONLY` from SQLKit, or
+     * the driver property `duckdb.read_only`), and the driver refuses to change
+     * the mode through {@link java.sql.Connection#setReadOnly(boolean)}.
+     */
+    static boolean isReadOnlyUrl(String jdbcUrl) {
+        if (jdbcUrl == null) {
+            return false;
+        }
+        String normalized = jdbcUrl.toLowerCase(Locale.ROOT);
+        return normalized.contains("access_mode=read_only")
+                || normalized.contains("duckdb.read_only=true");
+    }
+
     /**
      * Close and remove a connection pool.
      */
@@ -114,10 +171,9 @@ public class ConnectionManager {
         if (ds != null) {
             ds.close();
         }
-        DriverClassLoader loader = loaders.remove(connId);
-        if (loader != null) {
-            try { loader.close(); } catch (Exception ignored) { }
-        }
+        // The loader is shared with other connections (see sharedLoaders), so it is
+        // only closed when the whole bridge shuts down.
+        loaders.remove(connId);
     }
 
     /**
@@ -164,5 +220,10 @@ public class ConnectionManager {
             try { loader.close(); } catch (Exception ignored) { }
         }
         loaders.clear();
+        for (DriverClassLoader loader : sharedLoaders.values()) {
+            try { loader.close(); } catch (Exception ignored) { }
+        }
+        sharedLoaders.clear();
+        sharedDrivers.clear();
     }
 }

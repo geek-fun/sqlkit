@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { OracleConnectionOptions, ServerConnection } from '@/store'
+import type { DatabaseFileAssessment } from '@/utils/databaseFiles'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { computed, ref, watch } from 'vue'
@@ -22,10 +23,14 @@ import { openUpgradeDialog } from '@/components/upgrade'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { useDownloadEvents } from '@/composables/useDownloadEvents'
 import { toast } from '@/composables/useNotifications'
+import { usePlatform } from '@/composables/usePlatform'
 import { jdbcApi } from '@/datasources/jdbcApi'
-import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase } from '@/store'
+import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase, useConnectionStore } from '@/store'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
+import { buildMemoryDatabaseHost, createMemoryDatabaseLabel, isMemoryDatabaseHost, isSameDatabaseFile, memoryDatabaseLabel } from '@/utils/databaseFiles'
+import { classifyDuckDbFailure } from '@/utils/duckdbErrors'
+import DatabaseFileField from './DatabaseFileField.vue'
 import SslConfigSection from './ssl/SslConfigSection.vue'
 
 const props = defineProps<{
@@ -205,44 +210,20 @@ function toggleSsh(checked: boolean) {
 
 // SQLite-specific state
 const sqliteTab = ref<'file' | 'in-memory'>('file')
-const recentDatabases = ref<Array<{ path: string, timestamp: number }>>([])
 const savedFilePath = ref<string>('') // Preserve file path when switching to in-memory
 
-// Load recent databases from localStorage
-const RECENT_DB_KEY = 'sqlite_recent_databases'
-const MAX_RECENT_DB = 10
+// DuckDB-specific state. DuckDB mirrors the SQLite File / In-Memory split, but
+// in-memory databases are *named* instances (`memory:<label>`): the JDBC pool
+// opens several connections, and unnamed in-memory databases are private to a
+// single connection, so every pooled connection would otherwise see its own
+// empty database.
+const duckdbTab = ref<'file' | 'in-memory'>('file')
+const savedDuckDbFilePath = ref<string>('')
+const duckdbMemoryLabel = ref<string>('')
+const duckdbFileStatus = ref<DatabaseFileAssessment | null>(null)
 
-function loadRecentDatabases() {
-  try {
-    const stored = localStorage.getItem(RECENT_DB_KEY)
-    if (stored)
-      recentDatabases.value = JSON.parse(stored)
-  }
-  catch {
-    recentDatabases.value = []
-  }
-}
-
-function saveRecentDatabase(path: string) {
-  const updated = [{ path, timestamp: Date.now() }, ...recentDatabases.value.filter(db => db.path !== path)].slice(0, MAX_RECENT_DB)
-  recentDatabases.value = updated
-  localStorage.setItem(RECENT_DB_KEY, JSON.stringify(updated))
-}
-
-function formatTimeAgo(timestamp: number): string {
-  const seconds = Math.floor((Date.now() - timestamp) / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-
-  if (days > 0)
-    return t('components.serverForm.sqlite.ago', { time: `${days}d` })
-  if (hours > 0)
-    return t('components.serverForm.sqlite.ago', { time: `${hours}h` })
-  if (minutes > 0)
-    return t('components.serverForm.sqlite.ago', { time: `${minutes}m` })
-  return t('components.serverForm.sqlite.ago', { time: `${seconds}s` })
-}
+const connectionStore = useConnectionStore()
+const { platform } = usePlatform()
 
 watch(() => props.open, (open) => {
   if (open) {
@@ -258,6 +239,17 @@ watch(() => props.open, (open) => {
           savedFilePath.value = props.connection.host
         }
       }
+      // Detect DuckDB File / In-Memory mode from the stored host
+      if (props.connection.type === DatabaseType.DUCKDB) {
+        if (isMemoryDatabaseHost(props.connection.host)) {
+          duckdbTab.value = 'in-memory'
+          duckdbMemoryLabel.value = memoryDatabaseLabel(props.connection.host) || createMemoryDatabaseLabel()
+        }
+        else {
+          duckdbTab.value = 'file'
+          savedDuckDbFilePath.value = props.connection.host
+        }
+      }
       // Sync Oracle options when editing
       if (props.connection.type === DatabaseType.ORACLE) {
         syncOracleFromFormData()
@@ -271,6 +263,10 @@ watch(() => props.open, (open) => {
       formData.value = { ...defaultConnection }
       sqliteTab.value = 'file'
       savedFilePath.value = ''
+      duckdbTab.value = 'file'
+      savedDuckDbFilePath.value = ''
+      duckdbMemoryLabel.value = ''
+      duckdbFileStatus.value = null
       resetOracleOptions()
     }
     testStatus.value = 'idle'
@@ -281,7 +277,6 @@ watch(() => props.open, (open) => {
       s.progress = undefined
       s.error = undefined
     })
-    loadRecentDatabases()
   }
 })
 
@@ -299,6 +294,25 @@ watch(sqliteTab, (tab) => {
       // Restore saved file path when switching back to file mode
       formData.value.host = savedFilePath.value
     }
+  }
+})
+
+// Watch for DuckDB tab changes: in-memory mode stores a named instance host
+watch(duckdbTab, (tab) => {
+  if (formData.value.type !== DatabaseType.DUCKDB)
+    return
+
+  if (tab === 'in-memory') {
+    if (!isMemoryDatabaseHost(formData.value.host))
+      savedDuckDbFilePath.value = formData.value.host
+    if (!duckdbMemoryLabel.value)
+      duckdbMemoryLabel.value = createMemoryDatabaseLabel()
+    formData.value.host = buildMemoryDatabaseHost(duckdbMemoryLabel.value)
+    formData.value.readOnly = false
+    duckdbFileStatus.value = null
+  }
+  else {
+    formData.value.host = savedDuckDbFilePath.value
   }
 })
 
@@ -329,8 +343,18 @@ function handleDatabaseTypeChange(value: string) {
       formData.value.username = ''
       formData.value.password = ''
     }
-    sqliteTab.value = type === DatabaseType.SQLITE ? 'file' : 'file'
+    sqliteTab.value = 'file'
     savedFilePath.value = ''
+  }
+  if (type === DatabaseType.DUCKDB) {
+    duckdbTab.value = 'file'
+    savedDuckDbFilePath.value = ''
+    duckdbMemoryLabel.value = ''
+    duckdbFileStatus.value = null
+    formData.value.readOnly = false
+  }
+  if (type !== DatabaseType.DUCKDB && type !== DatabaseType.SQLITE) {
+    formData.value.readOnly = false
   }
 }
 
@@ -346,6 +370,67 @@ const isEncryptedFileDb = computed(() =>
 )
 
 const isJdbcDb = computed(() => isJdbcDatabase(formData.value.type))
+
+const isDuckDb = computed(() => formData.value.type === DatabaseType.DUCKDB)
+
+const isDuckDbFileMode = computed(() =>
+  isDuckDb.value
+  && duckdbTab.value === 'file'
+  && !isMemoryDatabaseHost(formData.value.host),
+)
+
+// DuckDB caches one database instance per file inside the JDBC process, and
+// options are instance-scoped: a second connection to the same file with a
+// different configuration (read-only vs read-write) is rejected by the driver.
+// Block that combination up front instead of surfacing the raw engine error.
+const duckDbFileConnections = computed(() => {
+  if (!isDuckDbFileMode.value || !formData.value.host.trim())
+    return []
+  return connectionStore.connections.filter(connection =>
+    connection.id !== formData.value.id
+    && connection.type === DatabaseType.DUCKDB
+    && !isMemoryDatabaseHost(connection.host)
+    && isSameDatabaseFile(connection.host, formData.value.host, platform.value ?? 'unknown'),
+  )
+})
+
+const conflictingDuckDbConnection = computed(() =>
+  duckDbFileConnections.value.find(connection =>
+    (connection.readOnly ?? false) !== (formData.value.readOnly ?? false),
+  ),
+)
+
+const sharedDuckDbConnection = computed(() =>
+  duckDbFileConnections.value.find(connection =>
+    (connection.readOnly ?? false) === (formData.value.readOnly ?? false),
+  ),
+)
+
+function handleDuckDbFileStatus(status: DatabaseFileAssessment) {
+  duckdbFileStatus.value = status
+}
+
+const testFailureHint = computed(() =>
+  isDuckDb.value ? classifyDuckDbFailure(testError.value) : null,
+)
+
+async function retryAsReadOnly() {
+  formData.value.readOnly = true
+  testStatus.value = 'idle'
+  await handleTestConnection()
+}
+
+async function retryAsReadWrite() {
+  formData.value.readOnly = false
+  testStatus.value = 'idle'
+  await handleTestConnection()
+}
+
+function switchToConnection(connection: ServerConnection) {
+  if (connection.id)
+    connectionStore.setActiveConnection(connection.id)
+  isOpen.value = false
+}
 
 const dbTypeI18nKeyMap: Record<string, string> = {
   MANTICORESEARCH: 'manticore',
@@ -516,37 +601,6 @@ async function browseDirectory(target: 'tns' | 'wallet') {
   }
 }
 
-// SQLite file picker function - handles both open existing and create new
-async function selectDatabaseFile() {
-  isPickingFile.value = true
-  try {
-    const selected = await openDialog({
-      multiple: false,
-      filters: [
-        { name: 'Database', extensions: ['db', 'sqlite', 'sqlite3', 'sqlcipher', 'db3'] },
-        { name: 'DuckDB', extensions: ['duckdb', 'db'] },
-        { name: 'All Files', extensions: ['*'] },
-      ],
-    })
-    if (typeof selected === 'string') {
-      formData.value.host = selected
-    }
-  }
-  catch (error) {
-    toast.error(t('components.serverForm.errors.filePickerFailed'), {
-      description: error instanceof Error ? error.message : String(error),
-    })
-  }
-  finally {
-    isPickingFile.value = false
-  }
-}
-
-// Handle recent database selection
-function selectRecentDatabase(path: string) {
-  formData.value.host = path
-}
-
 function validateForm(): boolean {
   const errors: Record<string, string> = {}
 
@@ -555,8 +609,19 @@ function validateForm(): boolean {
   }
 
   if (isFileBased.value) {
-    if (formData.value.host !== ':memory:' && !formData.value.host.trim()) {
+    if (!isMemoryDatabaseHost(formData.value.host) && !formData.value.host.trim()) {
       errors.host = t('components.serverForm.errors.filePathRequired')
+    }
+    else if (conflictingDuckDbConnection.value) {
+      errors.host = t('components.serverForm.duckdb.conflictingConnection', {
+        name: conflictingDuckDbConnection.value.name,
+      })
+    }
+    else if (isDuckDbFileMode.value && duckdbFileStatus.value?.status === 'directory') {
+      errors.host = t('components.serverForm.fileStatus.directory')
+    }
+    else if (isDuckDbFileMode.value && duckdbFileStatus.value?.status === 'unsupported-path') {
+      errors.host = t('components.serverForm.fileStatus.unsupportedPath')
     }
   }
   else if (isOracle.value && !showsStandardHostFields.value) {
@@ -680,6 +745,7 @@ async function handleTestConnection() {
       trust_server_certificate: formData.value.ssl.trustServerCertificate ?? null,
       transport_layers: buildTransportLayers(formData.value.sshTunnel),
       oracle_options: buildOracleOptions(formData.value.oracleOptions),
+      read_only: formData.value.readOnly ?? false,
     }
 
     // Small yield to let Vue render the loading state before the blocking invoke
@@ -776,14 +842,6 @@ function mapDatabaseTypeToBackend(type: DatabaseType): string {
 function handleSave() {
   if (!validateForm()) {
     return
-  }
-
-  // Save recent database path for file-based databases
-  if (
-    (formData.value.type === DatabaseType.SQLITE || formData.value.type === DatabaseType.SQLCIPHER)
-    && formData.value.host !== ':memory:'
-  ) {
-    saveRecentDatabase(formData.value.host)
   }
 
   emit('save', { ...formData.value })
@@ -1121,7 +1179,7 @@ function handleSave() {
           </div>
         </div>
 
-        <!-- SQLite/SQLCipher-specific fields -->
+        <!-- SQLite/SQLCipher/DuckDB-specific fields -->
         <div v-if="isFileBased" class="space-y-4">
           <!-- SQLite with file/in-memory tabs -->
           <template v-if="formData.type === DatabaseType.SQLITE">
@@ -1137,53 +1195,15 @@ function handleSave() {
 
               <!-- File Mode -->
               <TabsContent value="file" class="space-y-4">
-                <!-- Database File Path -->
-                <div class="space-y-2">
-                  <Label for="sqlite-path">{{ t('components.serverForm.labels.databaseFilePath') }}<span class="text-destructive ml-0.5">*</span></Label>
-                  <div class="flex gap-2 items-center">
-                    <Input
-                      id="sqlite-path"
-                      v-model="formData.host"
-                      :placeholder="t('components.serverForm.placeholders.filePath')"
-                      :class="{ 'border-destructive': formErrors.host }"
-                      readonly
-                      class="flex-1"
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      @click="selectDatabaseFile"
-                    >
-                      {{ t('common.buttons.browse') }}
-                    </Button>
-                  </div>
-                  <p v-if="formErrors.host" class="text-sm text-destructive">
-                    {{ formErrors.host }}
-                  </p>
-                </div>
-
-                <!-- Recent Databases -->
-                <div v-if="recentDatabases.length > 0" class="space-y-2">
-                  <Label>{{ t('components.serverForm.labels.recentDatabases') }}</Label>
-                  <div class="p-2 border rounded-md max-h-32 overflow-y-auto space-y-1">
-                    <div
-                      v-for="db in recentDatabases"
-                      :key="db.path"
-                      class="text-sm p-1 rounded flex gap-2 cursor-pointer items-center hover:bg-muted"
-                      @click="selectRecentDatabase(db.path)"
-                    >
-                      <span class="i-carbon-document text-muted-foreground h-4 w-4" />
-                      <span class="flex-1 truncate">{{ db.path }}</span>
-                      <span class="text-xs text-muted-foreground">{{ formatTimeAgo(db.timestamp) }}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Empty state for recent databases -->
-                <div v-if="recentDatabases.length === 0" class="text-sm text-muted-foreground">
-                  {{ t('components.serverForm.sqlite.recentEmpty') }}
-                </div>
+                <DatabaseFileField
+                  v-model="formData.host"
+                  engine="sqlite"
+                  required
+                  :label="t('components.serverForm.labels.databaseFilePath')"
+                  :placeholder="t('components.serverForm.placeholders.filePath')"
+                  :error-message="formErrors.host"
+                  @picking="isPickingFile = $event"
+                />
               </TabsContent>
 
               <!-- In-Memory Mode -->
@@ -1197,77 +1217,147 @@ function handleSave() {
 
           <!-- SQLCipher: file picker + encryption key -->
           <template v-else-if="formData.type === DatabaseType.SQLCIPHER">
-            <div class="space-y-2">
-              <Label for="sqlcipher-path">{{ t('components.serverForm.labels.databaseFilePath') }}<span class="text-destructive ml-0.5">*</span></Label>
-              <div class="flex gap-2 items-center">
-                <Input
-                  id="sqlcipher-path"
-                  v-model="formData.host"
-                  :placeholder="t('components.serverForm.placeholders.filePath')"
-                  :class="{ 'border-destructive': formErrors.host }"
-                  readonly
-                  class="flex-1"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  @click="selectDatabaseFile"
-                >
-                  {{ t('common.buttons.browse') }}
-                </Button>
-              </div>
-              <p v-if="formErrors.host" class="text-sm text-destructive">
-                {{ formErrors.host }}
-              </p>
-            </div>
-            <!-- Recent Databases -->
-            <div v-if="recentDatabases.length > 0" class="space-y-2">
-              <Label>{{ t('components.serverForm.labels.recentDatabases') }}</Label>
-              <div class="p-2 border rounded-md max-h-32 overflow-y-auto space-y-1">
-                <div
-                  v-for="db in recentDatabases"
-                  :key="db.path"
-                  class="text-sm p-1 rounded flex gap-2 cursor-pointer items-center hover:bg-muted"
-                  @click="selectRecentDatabase(db.path)"
-                >
-                  <span class="i-carbon-document text-muted-foreground h-4 w-4" />
-                  <span class="flex-1 truncate">{{ db.path }}</span>
-                  <span class="text-xs text-muted-foreground">{{ formatTimeAgo(db.timestamp) }}</span>
-                </div>
-              </div>
-            </div>
-            <div v-if="recentDatabases.length === 0" class="text-sm text-muted-foreground">
-              {{ t('components.serverForm.sqlite.recentEmpty') }}
-            </div>
+            <DatabaseFileField
+              v-model="formData.host"
+              engine="sqlite"
+              required
+              :label="t('components.serverForm.labels.databaseFilePath')"
+              :placeholder="t('components.serverForm.placeholders.filePath')"
+              :error-message="formErrors.host"
+              @picking="isPickingFile = $event"
+            />
           </template>
 
-          <!-- DuckDB: file picker only -->
+          <!-- DuckDB: same File / In-Memory split as SQLite -->
           <template v-else>
-            <div class="space-y-2">
-              <Label for="duckdb-path">{{ t('components.serverForm.labels.databaseFilePath') }}<span class="text-destructive ml-0.5">*</span></Label>
-              <div class="flex gap-2 items-center">
-                <Input
-                  id="duckdb-path"
+            <Tabs v-model="duckdbTab">
+              <TabsList class="grid grid-cols-2 w-full">
+                <TabsTrigger value="file">
+                  {{ t('components.serverForm.sqlite.modes.file') }}
+                </TabsTrigger>
+                <TabsTrigger value="in-memory">
+                  {{ t('components.serverForm.sqlite.modes.inMemory') }}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="file" class="space-y-4">
+                <DatabaseFileField
                   v-model="formData.host"
-                  :placeholder="t('components.serverForm.placeholders.filePath')"
-                  :class="{ 'border-destructive': formErrors.host }"
-                  readonly
-                  class="flex-1"
+                  engine="duckdb"
+                  required
+                  :label="t('components.serverForm.labels.databaseFilePath')"
+                  :placeholder="t('components.serverForm.placeholders.duckdbFilePath')"
+                  :error-message="formErrors.host"
+                  :suggested-name="formData.name ? `${formData.name}.duckdb` : undefined"
+                  @status="handleDuckDbFileStatus"
+                  @picking="isPickingFile = $event"
                 />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  @click="selectDatabaseFile"
+
+                <p v-if="formData.serverVersion" class="text-xs text-muted-foreground">
+                  {{ t('components.serverForm.duckdb.engineVersion', { version: formData.serverVersion }) }}
+                </p>
+
+                <div class="space-y-2">
+                  <Label>{{ t('components.serverForm.duckdb.accessMode') }}</Label>
+                  <div class="gap-3 grid grid-cols-2" role="radiogroup">
+                    <button
+                      type="button"
+                      role="radio"
+                      :aria-checked="!formData.readOnly"
+                      class="p-3 text-left border-2 rounded-lg transition-colors" :class="[
+                        !formData.readOnly
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-card hover:border-muted-foreground/50',
+                      ]"
+                      @click="formData.readOnly = false"
+                    >
+                      <div class="mb-1 flex gap-2 items-center">
+                        <div
+                          class="border-2 rounded-full flex shrink-0 h-3.5 w-3.5 items-center justify-center" :class="[
+                            !formData.readOnly ? 'border-primary' : 'border-muted-foreground',
+                          ]"
+                        >
+                          <div v-if="!formData.readOnly" class="rounded-full bg-primary h-1.5 w-1.5" />
+                        </div>
+                        <span class="text-sm font-medium">
+                          {{ t('components.serverForm.duckdb.readWrite') }}
+                        </span>
+                      </div>
+                      <p class="text-xs text-muted-foreground leading-relaxed pl-5">
+                        {{ t('components.serverForm.duckdb.readWriteHint') }}
+                      </p>
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      :aria-checked="formData.readOnly === true"
+                      class="p-3 text-left border-2 rounded-lg transition-colors" :class="[
+                        formData.readOnly
+                          ? 'border-primary bg-primary/5'
+                          : 'border-border bg-card hover:border-muted-foreground/50',
+                      ]"
+                      @click="formData.readOnly = true"
+                    >
+                      <div class="mb-1 flex gap-2 items-center">
+                        <div
+                          class="border-2 rounded-full flex shrink-0 h-3.5 w-3.5 items-center justify-center" :class="[
+                            formData.readOnly ? 'border-primary' : 'border-muted-foreground',
+                          ]"
+                        >
+                          <div v-if="formData.readOnly" class="rounded-full bg-primary h-1.5 w-1.5" />
+                        </div>
+                        <span class="text-sm font-medium">
+                          {{ t('components.serverForm.duckdb.readOnly') }}
+                        </span>
+                      </div>
+                      <p class="text-xs text-muted-foreground leading-relaxed pl-5">
+                        {{ t('components.serverForm.duckdb.readOnlyHint') }}
+                      </p>
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  v-if="conflictingDuckDbConnection"
+                  class="text-xs text-amber-600 p-2 border border-amber-500/50 rounded-md flex gap-2 items-start dark:text-amber-500"
                 >
-                  {{ t('common.buttons.browse') }}
-                </Button>
-              </div>
-              <p v-if="formErrors.host" class="text-sm text-destructive">
-                {{ formErrors.host }}
-              </p>
-            </div>
+                  <span class="i-carbon-warning mt-0.5 shrink-0 h-4 w-4" />
+                  <div class="flex-1 space-y-1">
+                    <p>{{ t('components.serverForm.duckdb.conflictingConnection', { name: conflictingDuckDbConnection.name }) }}</p>
+                    <div class="flex gap-2">
+                      <Button type="button" variant="outline" size="sm" class="text-xs px-2 h-6" @click="formData.readOnly = true">
+                        {{ t('components.serverForm.duckdb.openReadOnly') }}
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" class="text-xs px-2 h-6" @click="switchToConnection(conflictingDuckDbConnection)">
+                        {{ t('components.serverForm.duckdb.switchToConnection') }}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <p v-else-if="sharedDuckDbConnection" class="text-xs text-muted-foreground">
+                  {{ t('components.serverForm.duckdb.sharedConnection', { name: sharedDuckDbConnection.name }) }}
+                </p>
+              </TabsContent>
+
+              <!-- In-Memory Mode -->
+              <TabsContent value="in-memory" class="space-y-3">
+                <p class="text-sm text-muted-foreground">
+                  {{ t('components.serverForm.duckdb.inMemoryHint') }}
+                </p>
+                <div class="text-xs p-2 border rounded-md flex gap-2 items-center">
+                  <span class="i-carbon-data-table text-muted-foreground shrink-0 h-4 w-4" />
+                  <span class="text-muted-foreground">{{ t('components.serverForm.duckdb.inMemoryInstance') }}</span>
+                  <span class="font-mono flex-1 truncate" :title="formData.host">{{ formData.host || '-' }}</span>
+                </div>
+                <p class="text-xs text-muted-foreground">
+                  {{ t('components.serverForm.duckdb.inMemorySharedHint') }}
+                </p>
+                <p v-if="formData.serverVersion" class="text-xs text-muted-foreground">
+                  {{ t('components.serverForm.duckdb.engineVersion', { version: formData.serverVersion }) }}
+                </p>
+              </TabsContent>
+            </Tabs>
           </template>
         </div>
 
@@ -1498,6 +1588,35 @@ function handleSave() {
               <p v-if="testError" class="text-red-500 pl-5">
                 {{ testError }}
               </p>
+              <div
+                v-if="testFailureHint"
+                class="text-xs text-amber-600 pl-5 flex gap-2 items-start dark:text-amber-500"
+              >
+                <span class="i-carbon-warning mt-0.5 shrink-0 h-4 w-4" />
+                <div class="flex-1 space-y-1">
+                  <p>{{ t(testFailureHint.messageKey) }}</p>
+                  <Button
+                    v-if="testFailureHint.action === 'use-read-only'"
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="text-xs px-2 h-6"
+                    @click="retryAsReadOnly"
+                  >
+                    {{ t('components.serverForm.duckdb.retryReadOnly') }}
+                  </Button>
+                  <Button
+                    v-else-if="testFailureHint.action === 'use-read-write'"
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    class="text-xs px-2 h-6"
+                    @click="retryAsReadWrite"
+                  >
+                    {{ t('components.serverForm.duckdb.retryReadWrite') }}
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

@@ -135,7 +135,7 @@ function handleOpenChange(open: boolean) {
 
       <div class="dialog-actions">
         <Button variant="outline" @click="deviceStore.dismissReplaceDialog()">
-          {{ $t('common.cancel') }}
+          {{ $t('common.buttons.cancel') }}
         </Button>
         <Button :disabled="!selectedDeviceId || deviceStore.activating" @click="handleReplace">
           <Spinner v-if="deviceStore.activating" class="mr-2 h-4 w-4" />

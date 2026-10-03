@@ -117,17 +117,44 @@ pub async fn try_driver(
 ) -> DriverAttempt {
     let url = build_oracle_url(config, host, port, database, oracle_options);
 
-    // Start bridge (no driver JARs yet — ResolveDriver will download on the Java side)
+    // Reuse the app-wide bridge process: a fresh JVM would re-map DuckDB's
+    // ~107 MB native library (~1.4 s) on every single connection attempt.
     let bridge_jar = download::bridge_jar_path();
-    let mut launcher = JdbcBridgeLauncher::new(bridge_jar);
     let jvm_args = build_jvm_args(oracle_options);
-    match launcher.start(&jvm_args) {
-        Ok(_) => {}
+    let launcher = match super::launcher::shared_launcher(&bridge_jar, &jvm_args) {
+        Ok(launcher) => launcher,
         Err(e) => return DriverAttempt::Fatal(e),
-    }
-    let launcher = Arc::new(Mutex::new(launcher));
+    };
 
-    // Step 1: ResolveDriver — let the Java bridge download / resolve the driver JAR
+    // Step 1: ResolveDriver — let the Java bridge download / resolve the driver JAR.
+    // A cached JAR short-circuits the RPC (and with it a Maven metadata request on
+    // the Java side). Artifacts with a version cap keep the original
+    // latest-then-cap fallback behaviour.
+    let cached_jar = if config.version_cap.is_none() {
+        download::cached_driver_jar(config)
+    } else {
+        None
+    };
+
+    if let Some(cached) = cached_jar {
+        return connect_with_jar(
+            &launcher,
+            config,
+            cached.to_string_lossy().to_string(),
+            url,
+            username,
+            password,
+            database,
+            oracle_options,
+            ssl_mode,
+            ssl_ca_cert,
+            ssl_client_cert,
+            ssl_client_key,
+            trust_server_certificate,
+        )
+        .await;
+    }
+
     // On the first attempt, try without version_cap (LATEST).
     // If the config has no cap, or we're explicitly using it, send the cap.
     let effective_cap = if use_cap {
@@ -189,6 +216,41 @@ pub async fn try_driver(
         }
     };
 
+    connect_with_jar(
+        &launcher,
+        config,
+        jar_path,
+        url,
+        username,
+        password,
+        database,
+        oracle_options,
+        ssl_mode,
+        ssl_ca_cert,
+        ssl_client_cert,
+        ssl_client_key,
+        trust_server_certificate,
+    )
+    .await
+}
+
+/// Send the `Connect` RPC for an already resolved driver JAR.
+#[allow(clippy::too_many_arguments)]
+async fn connect_with_jar(
+    launcher: &Arc<Mutex<JdbcBridgeLauncher>>,
+    config: &DatabaseDriverConfig,
+    jar_path: String,
+    url: String,
+    username: &str,
+    password: &Option<String>,
+    database: Option<&str>,
+    oracle_options: Option<&OracleConnectionOptions>,
+    ssl_mode: Option<&str>,
+    ssl_ca_cert: Option<&str>,
+    ssl_client_cert: Option<&str>,
+    ssl_client_key: Option<&str>,
+    trust_server_certificate: bool,
+) -> DriverAttempt {
     // Step 2: Send connect request with the resolved JAR on the classpath
     let params = match serde_json::to_value(ConnectParams {
         url,
@@ -238,7 +300,7 @@ pub async fn try_driver(
                         DriverAttempt::VersionMismatch(err.clone())
                     }
                     _ => {
-                        let stderr = stderr_from_launcher(&launcher);
+                        let stderr = stderr_from_launcher(launcher);
                         let detail = if stderr.is_empty() {
                             err.clone()
                         } else {
@@ -252,11 +314,11 @@ pub async fn try_driver(
                     .result
                     .and_then(|v| v.as_str().map(|s| s.to_string()))
                     .unwrap_or_else(|| format!("conn_{}", uuid::Uuid::new_v4()));
-                DriverAttempt::Connected(conn_id, launcher)
+                DriverAttempt::Connected(conn_id, launcher.clone())
             }
         }
         Ok(Err(e)) => {
-            let stderr = stderr_from_launcher(&launcher);
+            let stderr = stderr_from_launcher(launcher);
             let msg = if stderr.is_empty() {
                 e.to_string()
             } else {
@@ -335,7 +397,9 @@ pub async fn run_fallback_chain(
             }
         }
     } else {
-        if let Some(redirect_url) = super::jre::check_adoptium_update().await {
+        // Memoised: this used to be a blocking HTTP round trip (1.4-2.5 s) before
+        // every single connect, including local DuckDB/SQLite-style files.
+        if let Some(redirect_url) = super::jre::check_adoptium_update_cached().await {
             if let Some(latest) = super::jre::parse_adoptium_build_version(&redirect_url) {
                 if let Some(current) = super::jre::read_jre_version() {
                     if super::jre::compare_versions(&latest, &current) > 0 {

@@ -160,9 +160,19 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn disconnect(&mut self) -> DbResult<()> {
-        if let Some(launcher) = &self.launcher {
-            let mut guard = launcher.lock().await;
-            guard.shutdown();
+        // Release only this connection's pool. The bridge process is shared with
+        // other connections, and `disconnect` is what closes the HikariCP pool —
+        // which in turn releases DuckDB's exclusive file lock.
+        if let (Some(launcher), Some(conn_id)) = (self.launcher.clone(), self.conn_id.clone()) {
+            let request = JdbcRequest::new(
+                JdbcMethod::Disconnect,
+                serde_json::json!({ "conn_id": conn_id }),
+            );
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                let mut guard = launcher.lock().await;
+                guard.send_request(&request)
+            })
+            .await;
         }
         self.launcher = None;
         self.conn_id = None;
@@ -574,5 +584,35 @@ mod tests {
         assert_eq!(stmts.len(), 2);
         assert_eq!(stmts[0], "SELECT * FROM t WHERE x = 1");
         assert_eq!(stmts[1], "SELECT 2");
+    }
+}
+
+impl Drop for JdbcBridgeAdapter {
+    /// Best-effort pool release for adapters dropped without `disconnect()`.
+    ///
+    /// The bridge process outlives single connections now, so a leaked pool would
+    /// keep the database open (and a DuckDB file locked) for the rest of the
+    /// session. The "Test connection" path is the main caller of this.
+    fn drop(&mut self) {
+        let (Some(launcher), Some(conn_id)) = (self.launcher.take(), self.conn_id.take()) else {
+            return;
+        };
+
+        let request = JdbcRequest::new(
+            JdbcMethod::Disconnect,
+            serde_json::json!({ "conn_id": conn_id }),
+        );
+
+        if let Ok(mut guard) = launcher.try_lock() {
+            let _ = guard.send_request(&request);
+            return;
+        }
+
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                let mut guard = launcher.lock().await;
+                let _ = guard.send_request(&request);
+            });
+        }
     }
 }

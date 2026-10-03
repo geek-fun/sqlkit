@@ -415,6 +415,8 @@ export type ServerConnection = {
   ssl: SslConfig
   sshTunnel?: SSHTunnelConfig
   oracleOptions?: OracleConnectionOptions
+  /** Open a local database file read-only (DuckDB supports this today). */
+  readOnly?: boolean
   connectTimeoutSecs?: number
   queryTimeoutSecs?: number
   isConnected?: boolean
@@ -645,6 +647,7 @@ export const useConnectionStore = defineStore('connectionStore', {
             },
             sshTunnel: extractSshTunnelFromTransport(item.transport_layers),
             oracleOptions: extractOracleOptions(item.oracle_options),
+            readOnly: (item.read_only as boolean | undefined) ?? false,
             isConnected: prev?.isConnected ?? (item.is_connected as boolean | undefined),
             lastUsed: item.last_used ? new Date(item.last_used as string) : undefined,
             serverVersion: prev?.serverVersion,
@@ -677,6 +680,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           trust_server_certificate: connection.ssl.trustServerCertificate ?? false,
           transport_layers: transportLayers,
           oracle_options: buildOracleOptions(connection.oracleOptions),
+          read_only: connection.readOnly ?? false,
         }
 
         const resultId = await connectionApi.save(serverConfig)
@@ -727,6 +731,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           query_timeout_secs: connection.queryTimeoutSecs ?? 30,
           transport_layers: transportLayers,
           oracle_options: buildOracleOptions(connection.oracleOptions),
+          read_only: connection.readOnly ?? false,
         }
 
         const result = await connectionApi.test(serverConfig)
@@ -770,6 +775,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           query_timeout_secs: connection.queryTimeoutSecs ?? 30,
           transport_layers: transportLayers,
           oracle_options: buildOracleOptions(connection.oracleOptions),
+          read_only: connection.readOnly ?? false,
         }
 
         const result = await connectionApi.connect(serverConfig)

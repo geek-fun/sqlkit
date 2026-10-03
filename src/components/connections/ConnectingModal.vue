@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
+import { classifyDuckDbFailure } from '@/utils/duckdbErrors'
 
 const { t } = useI18n()
 
@@ -12,6 +13,7 @@ const connectionName = ref('')
 const errorMessage = ref('')
 const cancelCallback = ref<(() => void) | null>(null)
 const retryCallback = ref<(() => void) | null>(null)
+const failureHint = computed(() => classifyDuckDbFailure(errorMessage.value))
 
 function show(name: string, onCancel: () => void, onRetry: () => void) {
   connectionName.value = name
@@ -98,6 +100,9 @@ defineExpose({
               </p>
               <p class="mt-1 opacity-90">
                 {{ errorMessage }}
+              </p>
+              <p v-if="failureHint" class="text-xs mt-2 opacity-90">
+                {{ t(failureHint.messageKey) }}
               </p>
             </div>
             <button
