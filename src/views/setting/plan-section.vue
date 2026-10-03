@@ -29,6 +29,10 @@ const versionStateText = computed(() => {
       ? t('plan.section.versionPermanent')
       : t('plan.section.subscriptionActive')
   }
+  // Unknown (no answer yet) or failed check: say nothing rather than render a
+  // sentence with an empty date placeholder that asserts a server-side fact.
+  if (entitlementStore.view === null || entitlementStore.hasEntitlementError)
+    return ''
   return t('plan.section.versionLockedOut', { date: release ?? '' })
 })
 

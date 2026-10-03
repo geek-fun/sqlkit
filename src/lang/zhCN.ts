@@ -16,6 +16,80 @@ export const zhCN = {
     state: {
       ultimate: '旗舰版',
       community: '社区版',
+      unknown: '未知',
+    },
+    gate: {
+      additive: '社区版之上，Ultimate 额外解锁：',
+      recommended: '推荐',
+      currentFeature: '当前功能',
+      trustLine: '版本锁：订阅期版本永久可用 · 随时取消',
+      headline: {
+        ai: '用自然语言，直接问你的数据库',
+        transfer: '批量搬运数据，又快又稳',
+        er_diagram: '把表关系画成一张图',
+        ssh_tunnel: '通过 SSH 隧道连接远程数据库',
+        mcp_bridge: '把 SQLKit 接入你的 Agent 工作流',
+      },
+      tiles: {
+        aiQueryT: '自然语言查询',
+        aiQueryD: '用大白话提问，生成可编辑的 SQL',
+        aiAgentT: 'Agent 式解释与修复',
+        aiAgentD: '一键优化慢查询',
+        mcpServerT: '内置 MCP Server',
+        mcpServerD: '本地运行，零配置',
+        mcpClientsT: '任意 MCP 客户端',
+        mcpClientsD: 'Claude Desktop、Cursor 等',
+      },
+      groups: {
+        cloud: '云端',
+        local: '本地',
+        custom: '自定义',
+        clients: '客户端',
+      },
+      detail: {
+        ai: '接入任意模型 — 云端、本地或自定义',
+        mcp: '连接你常用的 MCP 客户端',
+      },
+      price: {
+        yearly: '$99 / 年',
+        save: '省 17%',
+        monthly: '$9.9 / 月',
+      },
+      trust: {
+        versionLock: '订阅期内发布的版本永久可用（含离线）',
+        byok: '自带 LLM Key，无 token 加价',
+        cancel: '随时取消',
+      },
+      cta: {
+        trial: '开始 7 天免费试用',
+        subscribe: '订阅',
+        unlock: '解锁 Ultimate',
+        unlockSub: '7 天免费试用 · $9.9/月 · $99/年',
+      },
+    },
+    poster: {
+      mcp: {
+        clients: '兼容客户端',
+        config: '客户端配置',
+      },
+      ai: {
+        question: '找出最近 7 天支付失败的订单',
+        loop: '第 1 轮',
+        thinking: '思考中',
+        toolVerb: '查询 public.orders',
+        answer: '已定位 3 笔失败支付，生成的查询如下：',
+      },
+      transfer: {
+        scopeDatabase: '整个数据库',
+      },
+    },
+    compare: {
+      ai: 'AI 助手与自然语言查询',
+      er_diagram: 'ER 图',
+      transfer: '批量导入导出与迁移',
+      ssh: 'SSH 隧道',
+      mcp: 'MCP bridge',
+      versionLock: '版本锁',
     },
     features: {
       ai: 'AI — SQL 生成 / 优化 / 解释 / 修复（自带 LLM Key）。',
@@ -372,6 +446,7 @@ export const zhCN = {
       goToTask: '前往任务',
       dismiss: '关闭',
       noTasks: '暂无传输任务',
+      rows: '行',
       emptyDescription: '导出、导入和数据迁移任务将显示在此处',
       status: {
         pending: '等待中',
