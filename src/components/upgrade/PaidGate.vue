@@ -105,9 +105,9 @@ const providerGroups = computed(() => {
 let promptTimer: ReturnType<typeof setTimeout> | undefined
 
 onMounted(() => {
-  if (accountStore.isLoggedIn) {
-    entitlementStore.refreshEntitlement(false)
-  }
+  // SQLKit entitlements resolve without an account (device-bound) — keep the
+  // original unconditional refresh instead of dockit's login-gated one.
+  entitlementStore.refreshEntitlement(false)
   // Entrance sequence: poster settles (0.7s) → CTA enters (~1.2s) → CTA
   // pulses for attention (1.9s) → modal opens (2.8s). The poster's scenario
   // animation stays visible behind the modal, so the flow is never skipped.
