@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { ProBadge } from '@/components/upgrade'
+import { useEntitlementStore } from '@/store/entitlementStore'
 
 const route = useRoute()
+const entitlementStore = useEntitlementStore()
+const showProDots = computed(() => !entitlementStore.isLocalUltimate)
 
 const menuItems = [
   { id: 'connections', label: 'Connections', icon: 'dns', path: '/connections' },
-  { id: 'queries', label: 'Queries', icon: 'code', path: '/queries' },
-  { id: 'data-studio', label: 'Data Studio', icon: 'smart_toy', path: '/data-studio' },
+  { id: 'queries', label: 'Queries', icon: 'code', path: '/queries', gated: true },
+  { id: 'data-studio', label: 'Data Studio', icon: 'smart_toy', path: '/data-studio', gated: true },
   { id: 'history', label: 'History', icon: 'history', path: '/history' },
   { id: 'github', label: 'GitHub', icon: 'github', path: '' },
 ]
@@ -49,6 +54,11 @@ const { t } = useI18n()
                 ]"
                 @click="item.id === 'github' ? openUrl('https://github.com/geek-fun/sqlkit') : navigate()"
               >
+                <ProBadge
+                  v-if="showProDots && item.gated"
+                  size="dot"
+                  class="right-1 top-1 absolute"
+                />
                 <!-- DNS icon -->
                 <svg
                   v-if="item.icon === 'dns'"

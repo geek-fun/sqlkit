@@ -9,9 +9,10 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 // Separator is rendered inline as a styled div
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { PaidGate } from '@/components/upgrade'
+import { PaidGate, ProBadge } from '@/components/upgrade'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { ThemeType, useAppStore } from '@/store/appStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 import AiSettings from '@/views/setting/ai-settings.vue'
 import JreDriverSection from '@/views/setting/jre-driver-section.vue'
 import McpBridge from '@/views/setting/mcp-bridge.vue'
@@ -22,6 +23,7 @@ const { t, locale: _locale } = useI18n()
 const { checkForUpdates, downloadAndInstall, isChecking, isDownloading, isInstalling, updateAvailable, updateInfo, downloadProgress } = useAppUpdater()
 
 const version = ref('')
+const entitlementStore = useEntitlementStore()
 
 onMounted(async () => {
   try {
@@ -190,11 +192,13 @@ async function handleCheckUpdates() {
             <TabsTrigger value="query">
               {{ t('pages.settings.query.title') }}
             </TabsTrigger>
-            <TabsTrigger value="ai">
+            <TabsTrigger value="ai" class="gap-1.5">
               {{ t('pages.settings.ai.tabLabel') }}
+              <ProBadge v-if="!entitlementStore.isLocalUltimate" size="dot" />
             </TabsTrigger>
-            <TabsTrigger value="mcp">
+            <TabsTrigger value="mcp" class="gap-1.5">
               {{ t('pages.settings.mcp.title') }}
+              <ProBadge v-if="!entitlementStore.isLocalUltimate" size="dot" />
             </TabsTrigger>
             <TabsTrigger value="jre">
               {{ t('pages.settings.jre.title') }}

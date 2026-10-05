@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LogOut, RefreshCw } from 'lucide-vue-next'
+import { Check, LogOut, RefreshCw, X } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
@@ -43,6 +43,15 @@ const expiryText = computed(() => {
   return t('plan.section.expiresAt', { time: new Date(expiresAt).toLocaleString() })
 })
 
+const compareRows = [
+  { key: 'plan.compare.ai' },
+  { key: 'plan.compare.er_diagram' },
+  { key: 'plan.compare.transfer' },
+  { key: 'plan.compare.ssh' },
+  { key: 'plan.compare.mcp' },
+  { key: 'plan.compare.versionLock' },
+]
+
 async function handleRefresh() {
   refreshing.value = true
   try {
@@ -72,34 +81,36 @@ async function handleLogout() {
 
 <template>
   <Card>
-    <CardContent class="p-5 space-y-4">
-      <div class="flex flex-wrap gap-4 items-center justify-between">
-        <div class="space-y-1">
-          <div class="flex gap-2 items-center">
-            <Badge :variant="entitlementStore.isLocalUltimate ? 'default' : 'secondary'">
-              {{ t(`plan.state.${entitlementStore.planState}`) }}
-            </Badge>
-            <span v-if="accountStore.isLoggedIn" class="text-sm text-muted-foreground">
-              {{ accountStore.email || accountStore.username }}
-            </span>
-          </div>
-          <p class="text-xs text-muted-foreground">
-            {{ versionStateText }}
-          </p>
-          <p v-if="expiryText" class="text-xs text-muted-foreground">
-            {{ expiryText }}
-          </p>
-          <p v-if="entitlementStore.cancelScheduled" class="text-xs text-amber-600">
-            {{ t('plan.section.cancelScheduled') }}
-          </p>
-          <p
-            v-if="entitlementStore.hasEntitlementError && accountStore.isLoggedIn"
-            class="text-xs text-destructive"
-          >
-            {{ t('plan.section.checkFailed') }}
-          </p>
-        </div>
-        <div class="flex gap-2 items-center">
+    <CardContent class="px-5 py-4 space-y-4">
+      <div class="flex flex-wrap gap-3 items-center">
+        <Badge :variant="entitlementStore.isLocalUltimate ? 'default' : 'secondary'">
+          {{ t(`plan.state.${entitlementStore.planState}`) }}
+        </Badge>
+        <span v-if="accountStore.isLoggedIn" class="text-sm text-muted-foreground">
+          {{ accountStore.email || accountStore.username }}
+        </span>
+        <span class="text-xs text-muted-foreground">
+          {{ versionStateText }}
+        </span>
+        <span v-if="expiryText" class="text-xs text-muted-foreground">
+          {{ expiryText }}
+        </span>
+        <span v-if="entitlementStore.cancelScheduled" class="text-xs text-amber-600">
+          {{ t('plan.section.cancelScheduled') }}
+        </span>
+        <span
+          v-if="entitlementStore.hasEntitlementError && accountStore.isLoggedIn"
+          class="text-xs text-destructive"
+        >
+          {{ t('plan.section.checkFailed') }}
+        </span>
+        <span v-if="!accountStore.isLoggedIn" class="text-xs text-muted-foreground">
+          {{ t('plan.section.notLoggedIn') }}
+          <button class="text-primary underline cursor-pointer hover:opacity-80" @click="handleLogin">
+            {{ t('plan.section.loginLink') }}
+          </button>
+        </span>
+        <div class="flex gap-2 items-center ml-auto">
           <Button
             v-if="accountStore.isLoggedIn"
             variant="outline"
@@ -119,7 +130,7 @@ async function handleLogout() {
           </Button>
           <template v-if="!accountStore.isLoggedIn">
             <Button variant="outline" size="sm" @click="openUpgradeDialog()">
-              {{ t('plan.upgrade.cta') }}
+              {{ t('plan.gate.cta.subscribe') }}
             </Button>
             <Button size="sm" @click="handleStartFree">
               {{ t('plan.upgrade.startFree') }}
@@ -136,12 +147,97 @@ async function handleLogout() {
           </Button>
         </div>
       </div>
-      <p v-if="!accountStore.isLoggedIn" class="text-xs text-muted-foreground">
-        {{ t('plan.section.notLoggedIn') }}
-        <button class="text-primary underline cursor-pointer hover:opacity-80" @click="handleLogin">
-          {{ t('plan.section.loginLink') }}
-        </button>
-      </p>
+
+      <div class="compare-wrap">
+        <div class="compare-grid">
+          <div class="compare-head compare-cell">
+            {{ t('plan.gate.additive') }}
+          </div>
+          <div class="compare-head compare-cell compare-cell--plan">
+            {{ t('plan.state.community') }}
+          </div>
+          <div class="compare-head compare-cell compare-cell--plan compare-cell--ultimate compare-cell--stack">
+            <span>{{ t('plan.state.ultimate') }}</span>
+            <span class="compare-recommend">{{ t('plan.gate.recommended') }}</span>
+          </div>
+          <template v-for="row in compareRows" :key="row.key">
+            <div class="compare-cell compare-label">
+              {{ t(row.key) }}
+            </div>
+            <div class="compare-cell compare-cell--plan">
+              <X class="compare-no h-3.5 w-3.5" />
+            </div>
+            <div class="compare-cell compare-cell--plan compare-cell--ultimate">
+              <Check class="compare-yes h-3.5 w-3.5" />
+            </div>
+          </template>
+        </div>
+      </div>
     </CardContent>
   </Card>
 </template>
+
+<style scoped>
+.compare-wrap {
+  margin: 0 -20px -20px;
+  overflow: hidden;
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px 108px;
+}
+
+.compare-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 14px;
+  font-size: 13px;
+  color: hsl(var(--foreground));
+  border-top: 1px solid hsl(var(--border) / 0.7);
+}
+
+.compare-head {
+  border-top: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: hsl(var(--muted-foreground));
+}
+
+.compare-head.compare-cell:first-child {
+  font-weight: 500;
+}
+
+.compare-cell--plan {
+  justify-content: center;
+}
+
+.compare-cell--ultimate {
+  background-color: hsl(var(--primary) / 0.05);
+}
+
+.compare-cell--stack {
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.compare-recommend {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background-color: hsl(var(--primary) / 0.12);
+  color: hsl(var(--primary));
+  font-size: 9px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.compare-yes {
+  color: hsl(var(--primary));
+}
+
+.compare-no {
+  color: hsl(var(--muted-foreground) / 0.55);
+}
+</style>
