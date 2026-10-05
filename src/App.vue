@@ -15,7 +15,13 @@ import { useAppStore } from '@/store/appStore'
 import { useDeviceStore } from '@/store/deviceStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
 
-type AuthPayload = { token: string, username: string, email: string }
+type AuthPayload = {
+  token: string
+  username: string
+  email: string
+  userId?: string
+  avatar?: string
+}
 
 const appStore = useAppStore()
 const { themeType } = storeToRefs(appStore)
@@ -34,7 +40,7 @@ let unlistenSessionRefresh: UnlistenFn | null = null
 
 // Idempotent: events and the cold-start pull may both deliver the same link.
 function handleAuth(payload: AuthPayload) {
-  accountStore.setAuth(payload.token, payload.username, payload.email)
+  accountStore.setAuth(payload.token, payload.username, payload.email, payload.userId, payload.avatar)
   entitlementStore.refreshEntitlement(true)
   // The deep-linked token comes from a web login with no device attached —
   // register/verify this machine right away.

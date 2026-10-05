@@ -3,6 +3,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
+import UserMenu from '@/components/layout/UserMenu.vue'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { ProBadge } from '@/components/upgrade'
 import { useEntitlementStore } from '@/store/entitlementStore'
@@ -171,6 +172,7 @@ const { t } = useI18n()
 
     <!-- Bottom actions -->
     <div class="px-2 py-3 border-t space-y-2">
+      <UserMenu />
       <TooltipProvider>
         <RouterLink to="/settings" custom #="{ navigate }">
           <Tooltip>

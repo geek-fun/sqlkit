@@ -1,0 +1,137 @@
+<script setup lang="ts">
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { LogOut, RefreshCw, Settings, UserRound } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { useAccountStore } from '@/store/accountStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
+import { openLoginUrl, openRegisterUrl } from '@/utils/authService'
+
+const CONSOLE_BASE_URL = 'https://console.geekfun.club'
+
+const { t } = useI18n()
+const accountStore = useAccountStore()
+const entitlementStore = useEntitlementStore()
+const refreshing = ref(false)
+
+const planBadge = computed(() => {
+  const s = entitlementStore.planState
+  if (s === 'ultimate')
+    return { label: t('plan.state.ultimate'), cls: 'bg-primary/15 text-primary border-primary/30' }
+  if (s === 'community')
+    return { label: t('plan.state.community'), cls: 'bg-muted text-muted-foreground border-transparent' }
+  return { label: t('plan.state.unknown'), cls: 'bg-muted text-muted-foreground border-transparent' }
+})
+
+const initials = computed(() => {
+  const n = accountStore.username || accountStore.email
+  return n ? n.slice(0, 2).toUpperCase() : ''
+})
+
+const expiryText = computed(() => {
+  const expiresAt = entitlementStore.view?.ultimateExpiresAt
+  if (!expiresAt || !entitlementStore.isCloudUltimate)
+    return ''
+  return t('plan.section.expiresAt', { time: new Date(expiresAt).toLocaleString() })
+})
+
+async function handleRefresh() {
+  refreshing.value = true
+  try {
+    await entitlementStore.refreshEntitlement(true)
+  }
+  finally {
+    refreshing.value = false
+  }
+}
+
+// Entitlements are account-scoped: the cached view must never outlive the
+// account session on this machine.
+async function handleLogout() {
+  await entitlementStore.clearCachedEntitlement()
+  accountStore.clearAuth()
+}
+</script>
+
+<template>
+  <DropdownMenu>
+    <DropdownMenuTrigger as-child>
+      <button
+        class="text-muted-foreground mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center relative hover:text-foreground hover:bg-secondary"
+        :title="accountStore.isLoggedIn ? accountStore.username || accountStore.email : t('plan.section.loginLink')"
+      >
+        <span
+          v-if="accountStore.isLoggedIn"
+          class="text-[11px] text-primary font-semibold rounded-full bg-primary/15 flex h-7 w-7 items-center justify-center"
+        >
+          {{ initials || 'U' }}
+        </span>
+        <UserRound v-else class="h-5 w-5" />
+        <span
+          v-if="!accountStore.isLoggedIn"
+          class="rounded-full bg-destructive h-2 w-2 ring-2 ring-background bottom-1.5 right-1.5 absolute"
+          :title="t('plan.section.notLoggedIn')"
+        />
+      </button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent side="right" align="start" class="p-2 w-64">
+      <template v-if="accountStore.isLoggedIn">
+        <div class="p-2">
+          <p class="text-sm text-foreground font-semibold truncate">
+            {{ accountStore.username || accountStore.email }}
+          </p>
+          <p class="text-xs text-muted-foreground truncate">
+            {{ accountStore.email }}
+          </p>
+          <span
+            class="text-[10px] font-semibold mt-1.5 px-2 py-0.5 rounded-full inline-flex items-center"
+            :class="planBadge.cls"
+          >
+            {{ planBadge.label }}
+          </span>
+          <p v-if="expiryText" class="text-[11px] text-muted-foreground mt-1">
+            {{ expiryText }}
+          </p>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem @click="openUrl(`${CONSOLE_BASE_URL}/subscribe`)">
+          {{ t('plan.tab') }}
+        </DropdownMenuItem>
+        <DropdownMenuItem :disabled="refreshing" @click="handleRefresh">
+          <RefreshCw class="mr-2 h-3.5 w-3.5" :class="{ 'animate-spin': refreshing }" />
+          {{ t('plan.section.refresh') }}
+        </DropdownMenuItem>
+        <DropdownMenuItem @click="openUrl(`${CONSOLE_BASE_URL}`)">
+          <Settings class="mr-2 h-3.5 w-3.5" />
+          {{ t('plan.section.manage') }}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem class="text-destructive focus:text-destructive" @click="handleLogout">
+          <LogOut class="mr-2 h-3.5 w-3.5" />
+          {{ t('plan.section.logout') }}
+        </DropdownMenuItem>
+      </template>
+      <template v-else>
+        <div class="p-2">
+          <p class="text-sm text-foreground font-semibold">
+            {{ t('plan.section.notLoggedIn') }}
+          </p>
+          <p class="text-[11px] text-muted-foreground mt-1">
+            {{ t('plan.pricing') }}
+          </p>
+        </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem @click="openLoginUrl()">
+          {{ t('plan.section.loginLink') }}
+        </DropdownMenuItem>
+        <DropdownMenuItem @click="openRegisterUrl()">
+          {{ t('plan.upgrade.startFree') }}
+        </DropdownMenuItem>
+        <DropdownMenuItem @click="openUrl(`${CONSOLE_BASE_URL}/subscribe`)">
+          {{ t('plan.gate.cta.subscribe') }}
+        </DropdownMenuItem>
+      </template>
+    </DropdownMenuContent>
+  </DropdownMenu>
+</template>

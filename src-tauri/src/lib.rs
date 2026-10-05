@@ -64,6 +64,10 @@ struct AuthPayload {
     token: String,
     username: String,
     email: String,
+    // optional: the console handoff passes them when the account has an
+    // avatar / stable id; older console builds may omit both
+    user_id: Option<String>,
+    avatar: Option<String>,
 }
 
 fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
@@ -79,6 +83,8 @@ fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
         token,
         username,
         email,
+        user_id: params.get("userId").map(|v| v.to_string()),
+        avatar: params.get("avatar").map(|v| v.to_string()),
     })
 }
 

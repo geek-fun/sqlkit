@@ -12,6 +12,7 @@ export const enUS = {
   },
   plan: {
     tab: 'Account & Plan',
+    pricing: 'Ultimate $9.9/mo · $99/yr · 7-day free trial',
     state: {
       ultimate: 'Ultimate',
       community: 'Community',
@@ -111,6 +112,7 @@ export const enUS = {
       loginLink: 'Log in with Geekfun',
       refresh: 'Refresh',
       logout: 'Log out',
+      manage: 'Manage subscription',
     },
   },
   aside: {

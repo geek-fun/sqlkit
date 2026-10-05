@@ -9,6 +9,10 @@ type AccountState = {
   refreshToken: string
   username: string
   email: string
+  /** Stable console account id — passed through the desktop handoff. */
+  userId: string
+  /** Console avatar URL, empty when the account has none. */
+  avatar: string
 }
 
 export const useAccountStore = defineStore('account', {
@@ -17,16 +21,20 @@ export const useAccountStore = defineStore('account', {
     refreshToken: '',
     username: '',
     email: '',
+    userId: '',
+    avatar: '',
   }),
   persist: true,
   getters: {
     isLoggedIn: (state): boolean => state.token.length > 0,
   },
   actions: {
-    setAuth(token: string, username: string, email: string) {
+    setAuth(token: string, username: string, email: string, userId = '', avatar = '') {
       this.token = token
       this.username = username
       this.email = email
+      this.userId = userId
+      this.avatar = avatar
       // A web login has no device lease yet — never carry one over.
       this.refreshToken = ''
     },

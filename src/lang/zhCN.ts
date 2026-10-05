@@ -12,6 +12,7 @@ export const zhCN = {
   },
   plan: {
     tab: '账户与订阅',
+    pricing: '旗舰版 $9.9/月 · $99/年 · 7 天免费试用',
     state: {
       ultimate: '旗舰版',
       community: '社区版',
@@ -111,6 +112,7 @@ export const zhCN = {
       loginLink: '通过 Geekfun 登录',
       refresh: '刷新',
       logout: '退出登录',
+      manage: '管理订阅',
     },
   },
   aside: {
