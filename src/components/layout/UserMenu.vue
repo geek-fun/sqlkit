@@ -136,13 +136,10 @@ async function handleLogout() {
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem @click="openLoginUrl()">
-          {{ t('plan.section.loginLink') }}
+          Log in
         </DropdownMenuItem>
         <DropdownMenuItem @click="openRegisterUrl()">
-          {{ t('plan.upgrade.startFree') }}
-        </DropdownMenuItem>
-        <DropdownMenuItem @click="openUrl(`${CONSOLE_BASE_URL}/subscribe`)">
-          {{ t('plan.gate.cta.subscribe') }}
+          Register
         </DropdownMenuItem>
       </template>
     </DropdownMenuContent>

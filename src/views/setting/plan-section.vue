@@ -110,7 +110,7 @@ async function handleLogout() {
             {{ t('plan.section.loginLink') }}
           </button>
         </span>
-        <div class="flex gap-2 items-center ml-auto">
+        <div class="ml-auto flex gap-2 items-center">
           <Button
             v-if="accountStore.isLoggedIn"
             variant="outline"
@@ -129,11 +129,11 @@ async function handleLogout() {
             {{ t('plan.upgrade.cta') }}
           </Button>
           <template v-if="!accountStore.isLoggedIn">
-            <Button variant="outline" size="sm" @click="openUpgradeDialog()">
-              {{ t('plan.gate.cta.subscribe') }}
+            <Button variant="outline" size="sm" @click="handleLogin">
+              Log in
             </Button>
             <Button size="sm" @click="handleStartFree">
-              {{ t('plan.upgrade.startFree') }}
+              Register
             </Button>
           </template>
           <Button
