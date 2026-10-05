@@ -58,19 +58,32 @@ async function handleLogout() {
   <DropdownMenu>
     <DropdownMenuTrigger as-child>
       <button
-        class="text-muted-foreground mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center relative hover:text-foreground hover:bg-secondary"
+        class="mx-auto rounded-md flex h-8 w-8 cursor-pointer transition-transform items-center justify-center relative hover:scale-105"
         :title="accountStore.isLoggedIn ? accountStore.username || accountStore.email : t('plan.section.loginLink')"
       >
         <span
           v-if="accountStore.isLoggedIn"
-          class="text-[11px] text-primary font-semibold rounded-full bg-primary/15 flex h-7 w-7 items-center justify-center"
+          class="text-lg text-primary-foreground font-bold rounded-md bg-primary flex h-8 w-8 items-center justify-center overflow-hidden"
         >
-          {{ initials || 'U' }}
+          <img
+            v-if="accountStore.avatar"
+            :src="accountStore.avatar"
+            alt=""
+            class="h-full w-full object-cover"
+          >
+          <template v-else>
+            {{ initials || 'U' }}
+          </template>
         </span>
-        <UserRound v-else class="h-5 w-5" />
+        <span
+          v-else
+          class="text-muted-foreground border border-border/60 bg-muted/40 flex h-8 w-8 items-center justify-center"
+        >
+          <UserRound class="h-4 w-4" />
+        </span>
         <span
           v-if="!accountStore.isLoggedIn"
-          class="rounded-full bg-destructive h-2 w-2 ring-2 ring-background bottom-1.5 right-1.5 absolute"
+          class="rounded-full bg-destructive h-2 w-2 ring-2 ring-background bottom-0.5 right-0.5 absolute"
           :title="t('plan.section.notLoggedIn')"
         />
       </button>

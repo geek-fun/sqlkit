@@ -26,11 +26,9 @@ const { t } = useI18n()
 
 <template>
   <aside class="border-r bg-background flex flex-shrink-0 flex-col h-full w-16 z-50">
-    <!-- Logo -->
-    <div class="border-b flex h-14 items-center justify-center" data-tauri-drag-region>
-      <div class="text-lg text-white font-bold rounded-md bg-primary flex h-8 w-8 items-center justify-center">
-        S
-      </div>
+    <!-- User identity (was the logo; the app mark moved to the title bar) -->
+    <div class="border-b flex h-14 items-center justify-center">
+      <UserMenu />
     </div>
 
     <!-- Navigation -->
@@ -172,7 +170,6 @@ const { t } = useI18n()
 
     <!-- Bottom actions -->
     <div class="px-2 py-3 border-t space-y-2">
-      <UserMenu />
       <TooltipProvider>
         <RouterLink to="/settings" custom #="{ navigate }">
           <Tooltip>
