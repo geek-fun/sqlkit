@@ -6,6 +6,13 @@ import { useAccountStore } from './accountStore'
 
 export type PlanState = 'ultimate' | 'community' | 'unknown'
 
+// Bounded self-heal for the login window: the first refresh right after a
+// deep-link login can race the backend provisioning the subscription (or hit
+// a transient network error) — retry before giving up and showing Unknown.
+const REFRESH_RETRY_DELAYS_MS = [1500, 3000, 6000]
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
+
 export const useEntitlementStore = defineStore('entitlement', {
   state: (): { view: EntitlementView | null } => ({
     view: null,
@@ -24,27 +31,73 @@ export const useEntitlementStore = defineStore('entitlement', {
     },
     cancelScheduled: (state): boolean => Boolean(state.view?.cancelScheduledAt),
     hasEntitlementError: (state): boolean => Boolean(state.view?.lastError),
+    // The server classified the session as unrecoverable (401 with no
+    // lease to rotate) — only a fresh web login can verify the plan again.
+    sessionExpired: (state): boolean => {
+      const err = state.view?.lastError
+      return err === 'session expired' || err === 'not logged in'
+    },
   },
   actions: {
-    async refreshEntitlement(force = false): Promise<void> {
-      const accountStore = useAccountStore()
+    // Instant plan display right after a deep-link login: the web handoff
+    // carries an entitlement snapshot alongside the token. Seeding is
+    // best-effort — the server stays the source of truth and the regular
+    // refresh still verifies right after.
+    async seedFromHandoff(payload: {
+      ultimateExpiresAt?: string | null
+      versionLockHorizon?: string | null
+      cancelScheduledAt?: string | null
+    }): Promise<void> {
+      const { ultimateExpiresAt, versionLockHorizon, cancelScheduledAt } = payload
+      if (!ultimateExpiresAt && !versionLockHorizon)
+        return
       try {
-        this.view = await invoke<EntitlementView>('refresh_entitlement', {
-          token: accountStore.token,
-          refreshToken: accountStore.refreshToken || null,
-          force,
+        this.view = await invoke<EntitlementView>('seed_entitlement', {
+          ultimateExpiresAt: ultimateExpiresAt ?? null,
+          versionLockHorizon: versionLockHorizon ?? null,
+          cancelScheduledAt: cancelScheduledAt ?? null,
         })
       }
-      catch (e) {
-        if (isSessionRejected(e)) {
-          // The lease is dead server-side — drop it so the next login starts
-          // clean instead of presenting a revoked token.
-          accountStore.setRefreshToken('')
+      catch {
+        // best effort — the refresh below still verifies
+      }
+    },
+    // Show the persisted last success instantly at startup (Rust keeps an
+    // entitlement cache across restarts). A cache entry always carries a
+    // fetchedAtMs from a real server answer; an empty Rust state returns null
+    // and must NOT surface as a confirmed 'community'.
+    async hydrate(): Promise<void> {
+      const cached = await invoke<EntitlementView>('get_entitlement').catch(() => null)
+      if (cached?.fetchedAtMs != null)
+        this.view = cached
+    },
+    async refreshEntitlement(force = false): Promise<void> {
+      const accountStore = useAccountStore()
+      for (let attempt = 0; ; attempt += 1) {
+        try {
+          this.view = await invoke<EntitlementView>('refresh_entitlement', {
+            token: accountStore.token,
+            refreshToken: accountStore.refreshToken || null,
+            force,
+          })
+          return
         }
-        if (!isEntitlementError(e) && !isSessionRejected(e)) {
-          throw e
+        catch (e) {
+          if (isSessionRejected(e)) {
+            // The lease is dead server-side — drop it so the next login starts
+            // clean instead of presenting a revoked token. Retrying is pointless.
+            accountStore.setRefreshToken('')
+            this.view = null
+            return
+          }
+          if (attempt >= REFRESH_RETRY_DELAYS_MS.length) {
+            if (!isEntitlementError(e))
+              throw e
+            this.view = null
+            return
+          }
+          await sleep(REFRESH_RETRY_DELAYS_MS[attempt])
         }
-        this.view = null
       }
     },
     async clearCachedEntitlement(): Promise<void> {

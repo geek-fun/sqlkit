@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { invoke } from '@tauri-apps/api/core'
 import { Check, LogOut, RefreshCw, X } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -71,8 +72,11 @@ async function handleStartFree() {
 }
 
 // Entitlements are account-scoped: the cached view and the device lease must
-// never outlive the account session on this machine.
+// never outlive the account session on this machine. Server-side revocation
+// is best-effort — the local session clears even when the network or an
+// older backend says no.
 async function handleLogout() {
+  await invoke('revoke_session', { refreshToken: accountStore.refreshToken || null }).catch(() => {})
   await entitlementStore.clearCachedEntitlement()
   accountStore.clearAuth()
   deviceStore.$reset()
@@ -98,8 +102,17 @@ async function handleLogout() {
         <span v-if="entitlementStore.cancelScheduled" class="text-xs text-amber-600">
           {{ t('plan.section.cancelScheduled') }}
         </span>
+        <span v-if="entitlementStore.sessionExpired" class="text-xs text-amber-600">
+          {{ t('plan.section.sessionExpired') }}
+        </span>
         <span
-          v-if="entitlementStore.hasEntitlementError && accountStore.isLoggedIn"
+          v-else-if="accountStore.isLoggedIn && !accountStore.refreshToken && deviceStore.activationError"
+          class="text-xs text-amber-600"
+        >
+          {{ t('plan.section.deviceActivationFailed') }}
+        </span>
+        <span
+          v-else-if="entitlementStore.hasEntitlementError && accountStore.isLoggedIn"
           class="text-xs text-destructive"
         >
           {{ t('plan.section.checkFailed') }}
@@ -112,7 +125,14 @@ async function handleLogout() {
         </span>
         <div class="ml-auto flex gap-2 items-center">
           <Button
-            v-if="accountStore.isLoggedIn"
+            v-if="entitlementStore.sessionExpired"
+            size="sm"
+            @click="handleLogin"
+          >
+            {{ t('plan.section.loginLink') }}
+          </Button>
+          <Button
+            v-else-if="accountStore.isLoggedIn"
             variant="outline"
             size="sm"
             :disabled="refreshing"

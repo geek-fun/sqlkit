@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { storeToRefs } from 'pinia'
 import { onMounted, onUnmounted, watch } from 'vue'
 import { RouterView } from 'vue-router'
+import { shouldRotateToken } from '@/common'
 import DeviceReplaceDialog from '@/components/DeviceReplaceDialog.vue'
 import AppNotifications from '@/components/ui/notification/AppNotifications.vue'
 import UpdateNotification from '@/components/UpdateNotification.vue'
@@ -21,6 +22,11 @@ type AuthPayload = {
   email: string
   userId?: string
   avatar?: string
+  // Entitlement snapshot from the web handoff — lets the app show the plan
+  // instantly, before the first subscription round-trip completes.
+  ultimateExpiresAt?: string | null
+  versionLockHorizon?: string | null
+  cancelScheduledAt?: string | null
 }
 
 const appStore = useAppStore()
@@ -41,16 +47,42 @@ let unlistenSessionRefresh: UnlistenFn | null = null
 // Idempotent: events and the cold-start pull may both deliver the same link.
 function handleAuth(payload: AuthPayload) {
   accountStore.setAuth(payload.token, payload.username, payload.email, payload.userId, payload.avatar)
+  entitlementStore.seedFromHandoff(payload)
   entitlementStore.refreshEntitlement(true)
   // The deep-linked token comes from a web login with no device attached —
   // register/verify this machine right away.
   deviceStore.ensureActivated(true)
 }
 
+// Rotate an expired or near-expiry access token before anything uses it:
+// one round trip now beats a 401 on every subsequent call. The returned
+// pair is stored directly (not only via the event) so ordering with the
+// entitlement refresh below is deterministic.
+async function rotateStaleSession() {
+  if (!accountStore.refreshToken || !shouldRotateToken(accountStore.token, accountStore.refreshToken))
+    return
+  try {
+    const refreshed = await invoke<{ access_token: string, refresh_token: string }>(
+      'rotate_session_now',
+      { refreshToken: accountStore.refreshToken },
+    )
+    accountStore.setToken(refreshed.access_token)
+    accountStore.setRefreshToken(refreshed.refresh_token)
+  }
+  catch {
+    // rejected or transient — the reactive 401 paths still recover
+  }
+}
+
 onMounted(async () => {
   checkForUpdates(false)
 
   if (accountStore.isLoggedIn) {
+    // Cached last success first — the UI must not flash Unknown while the
+    // network refresh below is in flight. A stale token is rotated before
+    // the refresh so it goes out with a valid bearer.
+    await entitlementStore.hydrate()
+    await rotateStaleSession()
     entitlementStore.refreshEntitlement(true)
     // geekfun#59: entitlement-activation point — register/verify this device.
     deviceStore.ensureActivated()

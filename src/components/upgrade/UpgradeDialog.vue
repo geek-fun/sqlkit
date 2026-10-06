@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { UPGRADE_URL } from '../../common'
 import { useAccountStore, useEntitlementStore } from '../../store'
-import { openRegisterUrl } from '../../utils/authService'
+import { openLoginUrl, openRegisterUrl } from '../../utils/authService'
 import { AuroraBackground, ShimmerButton } from './effects'
 import ProBadge from './ProBadge.vue'
 import { registerUpgradeDialog } from './upgradeDialogService'
@@ -97,6 +97,10 @@ async function handleUpgrade() {
 
 async function handleStartFree() {
   await openRegisterUrl()
+}
+
+async function handleLogin() {
+  await openLoginUrl()
 }
 
 async function handleRefresh() {
@@ -201,11 +205,11 @@ onUnmounted(() => {
               </ShimmerButton>
             </template>
             <template v-else>
-              <Button variant="outline" size="sm" @click="handleUpgrade">
-                {{ $t('plan.gate.cta.subscribe') }}
+              <Button variant="outline" size="sm" @click="handleLogin">
+                {{ $t('plan.section.loginLink') }}
               </Button>
               <ShimmerButton size="sm" class="flex-1" @click="handleStartFree">
-                {{ $t('plan.gate.cta.trial') }}
+                {{ $t('plan.upgrade.startFree') }}
               </ShimmerButton>
             </template>
           </div>

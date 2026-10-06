@@ -2,6 +2,8 @@
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChatPanel from '@/components/chat-panel.vue'
+// NOTE: without this import the <PaidGate> tag resolves to an unknown element
+import { PaidGate } from '@/components/upgrade'
 import { useSidebarChatAgent } from '@/composables/useSidebarChatAgent'
 import { useDataStudioStore } from '@/store/dataStudioStore'
 import SessionHistoryPanel from '@/views/data-studio/components/session-history-panel.vue'
@@ -106,76 +108,78 @@ onUnmounted(() => {
   <div class="ai-assistant-resizable" :style="{ width: `${currentWidth}px` }">
     <div class="resize-handle" @mousedown="startResize" />
 
-    <!-- Session history slide-over -->
-    <transition name="history-slide">
-      <div v-if="historyPanelOpen" class="ai-assistant-history-overlay">
-        <SessionHistoryPanel
-          @select="switchSession"
-          @delete="deleteSession"
-          @new-session="handleNewSession"
-          @close="historyPanelOpen = false"
-        />
-      </div>
-    </transition>
-
-    <ChatPanel
-      :messages="messages"
-      :is-loading="isLoading"
-      :error="error"
-      :empty-hint="t('dataStudio.agent.emptyState')"
-      :input-placeholder="t('dataStudio.inputPlaceholder')"
-      :session-id="activeSession?.id ?? null"
-      :context-settings="lastSettings"
-      :stop-reason="stopReason"
-      :stop-message="stopMessage"
-      :progress="progress"
-      feature="sidebarAssistant"
-      compact
-      @send="sendMessage"
-      @stop-loop="cancelSession"
-      @confirm-tool-call="handleConfirmation"
-      @model-change="onModelChange"
-      @dismiss-error="dismissError"
-    >
-      <template #header>
-        <div class="header-row">
-          <span class="header-title">
-            {{ $t('aside.aiAssistant') }}
-          </span>
-          <div class="header-actions">
-            <button
-              class="header-icon-btn"
-              :title="t('dataStudio.history.newSession')"
-              @click="handleNewSession"
-            >
-              <span class="i-carbon-add h-3.5 w-3.5" />
-            </button>
-            <button
-              class="header-icon-btn"
-              :class="{ 'header-icon-btn--active': historyPanelOpen }"
-              :title="t('dataStudio.history.title')"
-              @click="historyPanelOpen = !historyPanelOpen"
-            >
-              <span class="i-carbon-time h-3.5 w-3.5" />
-            </button>
-            <button
-              class="header-icon-btn"
-              :title="t('dataStudio.agent.clearChat')"
-              @click="handleClearChat"
-            >
-              <span class="i-carbon-trash-can h-3.5 w-3.5" />
-            </button>
-            <button
-              class="header-icon-btn header-icon-btn--close"
-              :title="t('common.buttons.close')"
-              @click="handleClose"
-            >
-              <span class="i-carbon-close h-3.5 w-3.5" />
-            </button>
-          </div>
+    <PaidGate feature="ai" compact class="h-full w-full">
+      <!-- Session history slide-over -->
+      <transition name="history-slide">
+        <div v-if="historyPanelOpen" class="ai-assistant-history-overlay">
+          <SessionHistoryPanel
+            @select="switchSession"
+            @delete="deleteSession"
+            @new-session="handleNewSession"
+            @close="historyPanelOpen = false"
+          />
         </div>
-      </template>
-    </ChatPanel>
+      </transition>
+
+      <ChatPanel
+        :messages="messages"
+        :is-loading="isLoading"
+        :error="error"
+        :empty-hint="t('dataStudio.agent.emptyState')"
+        :input-placeholder="t('dataStudio.inputPlaceholder')"
+        :session-id="activeSession?.id ?? null"
+        :context-settings="lastSettings"
+        :stop-reason="stopReason"
+        :stop-message="stopMessage"
+        :progress="progress"
+        feature="sidebarAssistant"
+        compact
+        @send="sendMessage"
+        @stop-loop="cancelSession"
+        @confirm-tool-call="handleConfirmation"
+        @model-change="onModelChange"
+        @dismiss-error="dismissError"
+      >
+        <template #header>
+          <div class="header-row">
+            <span class="header-title">
+              {{ $t('aside.aiAssistant') }}
+            </span>
+            <div class="header-actions">
+              <button
+                class="header-icon-btn"
+                :title="t('dataStudio.history.newSession')"
+                @click="handleNewSession"
+              >
+                <span class="i-carbon-add h-3.5 w-3.5" />
+              </button>
+              <button
+                class="header-icon-btn"
+                :class="{ 'header-icon-btn--active': historyPanelOpen }"
+                :title="t('dataStudio.history.title')"
+                @click="historyPanelOpen = !historyPanelOpen"
+              >
+                <span class="i-carbon-time h-3.5 w-3.5" />
+              </button>
+              <button
+                class="header-icon-btn"
+                :title="t('dataStudio.agent.clearChat')"
+                @click="handleClearChat"
+              >
+                <span class="i-carbon-trash-can h-3.5 w-3.5" />
+              </button>
+              <button
+                class="header-icon-btn header-icon-btn--close"
+                :title="t('common.buttons.close')"
+                @click="handleClose"
+              >
+                <span class="i-carbon-close h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        </template>
+      </ChatPanel>
+    </PaidGate>
   </div>
 </template>
 

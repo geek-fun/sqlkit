@@ -1,12 +1,10 @@
 <script lang="ts" setup>
 import type { PaidFeature } from '../../common'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { Bot, Plug, RefreshCw, Server, Sparkles, WandSparkles } from 'lucide-vue-next'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Button } from '@/components/ui/button'
-import { UPGRADE_URL } from '../../common'
 import { useAccountStore, useEntitlementStore } from '../../store'
-import { openRegisterUrl } from '../../utils/authService'
+import { openLoginUrl, openRegisterUrl } from '../../utils/authService'
 import { AuroraBackground, ProgressiveBlur, ShimmerButton } from './effects'
 import { posterFor } from './FeaturePoster'
 import { openUpgradeDialog } from './upgradeDialogService'
@@ -138,8 +136,8 @@ async function handleStartFree() {
   await openRegisterUrl()
 }
 
-async function handleSubscribe() {
-  await openUrl(UPGRADE_URL)
+async function handleLogin() {
+  await openLoginUrl()
 }
 </script>
 
@@ -232,11 +230,11 @@ async function handleSubscribe() {
               {{ $t('plan.upgrade.cta') }}
             </ShimmerButton>
             <template v-else>
-              <Button variant="outline" size="sm" @click="handleSubscribe">
-                {{ $t('plan.gate.cta.subscribe') }}
+              <Button variant="outline" size="sm" @click="handleLogin">
+                {{ $t('plan.section.loginLink') }}
               </Button>
               <ShimmerButton size="sm" @click="handleStartFree">
-                {{ $t('plan.gate.cta.trial') }}
+                {{ $t('plan.upgrade.startFree') }}
               </ShimmerButton>
             </template>
           </div>
@@ -360,6 +358,12 @@ async function handleSubscribe() {
 .gate-card__bg {
   position: absolute;
   inset: 0;
+  /* In the compact card the poster is ambiance, not content — at full
+     opacity its scenario collides with the gate copy stacked above it. */
+  opacity: 0.2;
+  filter: blur(2px);
+  -webkit-mask-image: linear-gradient(to bottom, black, transparent 78%);
+  mask-image: linear-gradient(to bottom, black, transparent 78%);
 }
 
 .gate-card__bg :deep(.poster) {
@@ -600,6 +604,7 @@ async function handleSubscribe() {
 
 .gate-card__actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 10px;
