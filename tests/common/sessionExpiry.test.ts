@@ -1,7 +1,8 @@
 import { parseJwtExpMs, shouldRotateToken } from '../../src/common/sessionExpiry'
 
-const b64url = (obj: unknown) =>
-  btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+function b64url(obj: unknown) {
+  return btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
 
 const jwtWithExp = (exp: number) => `${b64url({ alg: 'HS256' })}.${b64url({ exp })}.sig`
 
