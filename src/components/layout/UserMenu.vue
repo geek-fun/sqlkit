@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { LogOut, RefreshCw, Settings, UserRound } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
@@ -47,8 +48,10 @@ async function handleRefresh() {
 }
 
 // Entitlements are account-scoped: the cached view must never outlive the
-// account session on this machine.
+// account session on this machine. Server-side revocation is best-effort —
+// the local session clears even when the network or an older backend says no.
 async function handleLogout() {
+  await invoke('revoke_session', { refreshToken: accountStore.refreshToken || null }).catch(() => {})
   await entitlementStore.clearCachedEntitlement()
   accountStore.clearAuth()
 }
@@ -106,12 +109,21 @@ async function handleLogout() {
           <p v-if="expiryText" class="text-[11px] text-muted-foreground mt-1">
             {{ expiryText }}
           </p>
+          <p v-if="entitlementStore.sessionExpired" class="text-[11px] text-amber-500 mt-1">
+            {{ t('plan.section.sessionExpired') }}
+          </p>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem @click="openUrl(`${CONSOLE_BASE_URL}/subscribe`)">
+        <DropdownMenuItem
+          v-if="entitlementStore.sessionExpired"
+          @click="openLoginUrl()"
+        >
+          {{ t('plan.section.loginLink') }}
+        </DropdownMenuItem>
+        <DropdownMenuItem v-else @click="openUrl(`${CONSOLE_BASE_URL}/subscribe`)">
           {{ t('plan.tab') }}
         </DropdownMenuItem>
-        <DropdownMenuItem :disabled="refreshing" @click="handleRefresh">
+        <DropdownMenuItem v-if="!entitlementStore.sessionExpired" :disabled="refreshing" @click="handleRefresh">
           <RefreshCw class="mr-2 h-3.5 w-3.5" :class="{ 'animate-spin': refreshing }" />
           {{ t('plan.section.refresh') }}
         </DropdownMenuItem>
