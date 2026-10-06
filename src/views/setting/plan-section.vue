@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
-import { Check, LogOut, RefreshCw, X } from 'lucide-vue-next'
+import { Check, Loader2, LogOut, RefreshCw, X } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Badge } from '@/components/ui/badge'
@@ -88,6 +88,7 @@ async function handleLogout() {
     <CardContent class="px-5 py-4 space-y-4">
       <div class="flex flex-wrap gap-3 items-center">
         <Badge :variant="entitlementStore.isLocalUltimate ? 'default' : 'secondary'">
+          <Loader2 v-if="entitlementStore.planState === 'checking'" class="mr-1 h-3 w-3 animate-spin" />
           {{ t(`plan.state.${entitlementStore.planState}`) }}
         </Badge>
         <span v-if="accountStore.isLoggedIn" class="text-sm text-muted-foreground">

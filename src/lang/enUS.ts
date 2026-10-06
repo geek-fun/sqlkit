@@ -17,6 +17,7 @@ export const enUS = {
       ultimate: 'Ultimate',
       community: 'Community',
       unknown: 'Unknown',
+      checking: 'Checking…',
     },
     gate: {
       additive: 'Everything in Community, plus:',

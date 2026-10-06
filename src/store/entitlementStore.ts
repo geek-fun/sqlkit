@@ -4,7 +4,7 @@ import { defineStore } from 'pinia'
 import { isEntitlementError, isSessionRejected } from '../common'
 import { useAccountStore } from './accountStore'
 
-export type PlanState = 'ultimate' | 'community' | 'unknown'
+export type PlanState = 'ultimate' | 'community' | 'unknown' | 'checking'
 
 const REFRESH_RETRY_DELAYS_MS = [1500, 3000, 6000]
 
@@ -22,7 +22,10 @@ export const useEntitlementStore = defineStore('entitlement', {
     planState: (state): PlanState => {
       if (state.view?.localUltimate)
         return 'ultimate' as PlanState
-      if (state.view === null || state.view.lastError)
+      // no server answer yet — the first refresh is still in flight
+      if (state.view === null)
+        return 'checking' as PlanState
+      if (state.view.lastError)
         return 'unknown' as PlanState
       return 'community' as PlanState
     },

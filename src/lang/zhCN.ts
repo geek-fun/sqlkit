@@ -17,6 +17,7 @@ export const zhCN = {
       ultimate: '旗舰版',
       community: '社区版',
       unknown: '未知',
+      checking: '验证中…',
     },
     gate: {
       additive: '社区版之上，Ultimate 额外解锁：',

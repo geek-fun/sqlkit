@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { LogOut, RefreshCw, Settings, UserRound } from 'lucide-vue-next'
+import { Loader2, LogOut, RefreshCw, Settings, UserRound } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -22,6 +22,8 @@ const planBadge = computed(() => {
     return { label: t('plan.state.ultimate'), cls: 'bg-primary/15 text-primary border-primary/30' }
   if (s === 'community')
     return { label: t('plan.state.community'), cls: 'bg-muted text-muted-foreground border-transparent' }
+  if (s === 'checking')
+    return { label: t('plan.state.checking'), cls: 'bg-muted text-muted-foreground border-transparent' }
   return { label: t('plan.state.unknown'), cls: 'bg-muted text-muted-foreground border-transparent' }
 })
 
@@ -104,6 +106,10 @@ async function handleLogout() {
             class="text-[10px] font-semibold mt-1.5 px-2 py-0.5 rounded-full inline-flex items-center"
             :class="planBadge.cls"
           >
+            <Loader2
+              v-if="entitlementStore.planState === 'checking'"
+              class="mr-1 h-2.5 w-2.5 animate-spin"
+            />
             {{ planBadge.label }}
           </span>
           <p v-if="expiryText" class="text-[11px] text-muted-foreground mt-1">
