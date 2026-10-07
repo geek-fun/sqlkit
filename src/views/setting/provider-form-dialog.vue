@@ -49,6 +49,7 @@ const presets = computed<Preset[]>(() => [
   { id: 'deepseek', name: 'DeepSeek', apiCompatibility: 'openai', baseUrl: 'https://api.deepseek.com/v1', kind: 'deepseek' },
   { id: 'openrouter', name: 'OpenRouter', apiCompatibility: 'openai', baseUrl: 'https://openrouter.ai/api/v1', kind: 'openrouter' },
   { id: 'requesty', name: 'Requesty', apiCompatibility: 'openai', baseUrl: 'https://router.requesty.ai/v1', kind: 'requesty' },
+  { id: 'opper', name: 'Opper', apiCompatibility: 'openai', baseUrl: 'https://api.opper.ai/v3/compat', kind: 'opper' },
   { id: 'anthropic', name: 'Anthropic', apiCompatibility: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', kind: 'anthropic' },
   { id: 'gemini', name: 'Google Gemini', apiCompatibility: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', kind: 'gemini' },
   { id: 'grok', name: 'Grok', apiCompatibility: 'openai', baseUrl: 'https://api.x.ai/v1', kind: 'grok' },
