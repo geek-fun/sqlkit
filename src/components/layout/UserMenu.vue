@@ -7,9 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAccountStore } from '@/store/accountStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
-import { openLoginUrl, openRegisterUrl } from '@/utils/authService'
-
-const CONSOLE_BASE_URL = 'https://console.geekfun.club'
+import { GEEKFUN_BASE_URL as CONSOLE_BASE_URL, openLoginUrl, openRegisterUrl } from '@/utils/authService'
 
 const { t } = useI18n()
 const accountStore = useAccountStore()

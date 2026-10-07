@@ -10,6 +10,23 @@ const REFRESH_RETRY_DELAYS_MS = [1500, 3000, 6000]
 
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
+// Terminal failure without a cached view — a synthetic answer so the UI
+// lands on Unknown (with its retry CTA) instead of an endless Checking…
+function unknownView(lastError: string): EntitlementView {
+  return {
+    ultimateActive: false,
+    versionLocked: false,
+    localUltimate: false,
+    appReleaseDate: '',
+    ultimateExpiresAt: null,
+    versionLockHorizon: null,
+    cancelScheduledAt: null,
+    cached: true,
+    fetchedAtMs: null,
+    lastError,
+  }
+}
+
 export const useEntitlementStore = defineStore('entitlement', {
   state: (): { view: EntitlementView | null } => ({
     view: null,
@@ -20,8 +37,11 @@ export const useEntitlementStore = defineStore('entitlement', {
     // 'community' is only claimed when the server answered; a failed or
     // missing check must never masquerade as a confirmed plan.
     planState: (state): PlanState => {
+      const accountStore = useAccountStore()
       if (state.view?.localUltimate)
         return 'ultimate' as PlanState
+      if (!accountStore.isLoggedIn)
+        return 'unknown' as PlanState
       // no server answer yet — the first refresh is still in flight
       if (state.view === null)
         return 'checking' as PlanState
@@ -76,15 +96,22 @@ export const useEntitlementStore = defineStore('entitlement', {
         }
         catch (e) {
           if (isSessionRejected(e)) {
-            // dead lease — drop it so the next login starts clean
+            // dead lease — drop it so the next login starts clean, and land
+            // on the session-expired state instead of an endless Checking…
             accountStore.setRefreshToken('')
-            this.view = null
+            this.view = unknownView('session expired')
             return
           }
           if (attempt >= REFRESH_RETRY_DELAYS_MS.length) {
-            if (!isEntitlementError(e))
-              throw e
-            this.view = null
+            // terminal: a cached view degrades to itself (offline contract);
+            // without one, surface Unknown rather than an endless Checking…
+            if (!this.view) {
+              this.view = unknownView(
+                isEntitlementError(e)
+                  ? 'entitlement check failed'
+                  : typeof e === 'string' ? e : String(e),
+              )
+            }
             return
           }
           await sleep(REFRESH_RETRY_DELAYS_MS[attempt])
