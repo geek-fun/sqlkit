@@ -108,7 +108,6 @@ hyper-util = { version = "0.1", default-features = false, features = [
   "client-proxy",
   "client-proxy-system"
 ] }
-system-configuration = "0.7"
 axum = "0.8"
 portpicker = "0.1.1"
 pageant = "0.2"
@@ -123,3 +122,6 @@ ohos = []
 # Use SQLCipher (encrypted SQLite) instead of plain SQLite.
 # Build with: cargo build --no-default-features --features sqlcipher
 sqlcipher = [ "rusqlite/bundled-sqlcipher" ]
+
+[target.'cfg(target_os = "macos")'.dependencies]
+system-configuration = "0.7"
