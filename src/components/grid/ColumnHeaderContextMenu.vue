@@ -19,6 +19,7 @@ const props = defineProps<{
   columnType?: string
   hasActiveFilter: boolean
   currentSortDirection: SortDirection | null
+  sortable?: boolean
 }>()
 
 const emit = defineEmits<ColumnHeaderContextMenuEmits>()
@@ -69,11 +70,11 @@ function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
         <DropdownMenuTrigger />
         <DropdownMenuContent align="start" class="min-w-48" @keydown.escape="emit('close')">
           <!-- Sort options -->
-          <DropdownMenuItem @click="emit('sort', column, 'ASC'); emit('close')">
+          <DropdownMenuItem :disabled="!sortable" @click="emit('sort', column, 'ASC'); emit('close')">
             <span class="i-carbon-arrow-up mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.sort.asc') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="emit('sort', column, 'DESC'); emit('close')">
+          <DropdownMenuItem :disabled="!sortable" @click="emit('sort', column, 'DESC'); emit('close')">
             <span class="i-carbon-arrow-down mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.sort.desc') }}
           </DropdownMenuItem>
@@ -84,6 +85,9 @@ function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
             <span class="i-carbon-close mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.sort.clear') }}
           </DropdownMenuItem>
+          <div v-if="!sortable" class="text-xs text-muted-foreground px-2 py-1.5">
+            {{ t('components.dataGrid.sort.unsortable') }}
+          </div>
 
           <DropdownMenuSeparator />
 

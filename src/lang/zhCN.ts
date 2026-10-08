@@ -1486,6 +1486,7 @@ export const zhCN = {
         asc: '升序排列',
         desc: '降序排列',
         clear: '清除排序',
+        unsortable: '该列类型不支持排序',
       },
       filter: {
         byValue: '按值过滤',
