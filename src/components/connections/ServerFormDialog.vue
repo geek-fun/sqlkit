@@ -3,8 +3,10 @@ import type { OracleConnectionOptions, ServerConnection } from '@/store'
 import type { DatabaseFileAssessment } from '@/utils/databaseFiles'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { UPGRADE_URL } from '@/common'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -19,7 +21,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { openUpgradeDialog } from '@/components/upgrade'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { useDownloadEvents } from '@/composables/useDownloadEvents'
 import { toast } from '@/composables/useNotifications'
@@ -191,7 +192,8 @@ async function runStep(step: StepDef): Promise<boolean> {
 
 function toggleSsh(checked: boolean) {
   if (checked && !entitlementStore.isLocalUltimate) {
-    openUpgradeDialog('ssh_tunnel')
+    // usage-side feature — send to the pricing site (matches dockit)
+    openUrl(UPGRADE_URL)
     return
   }
   if (!formData.value.sshTunnel) {

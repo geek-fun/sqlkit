@@ -13,8 +13,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { ProBadge } from '@/components/upgrade'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
-import { ConnectionStatus, DatabaseType, formatServerVersion, getConnectionStrategy } from '@/store'
+import { ConnectionStatus, DatabaseType, formatServerVersion, getConnectionStrategy, useEntitlementStore } from '@/store'
 
 const props = defineProps<{
   connection: ServerConnection
@@ -31,6 +32,7 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
+const entitlementStore = useEntitlementStore()
 const { getDatabaseIcon, getDatabaseColor } = useDatabaseIcon()
 
 const statusColor = computed(() => {
@@ -225,6 +227,20 @@ const connectTooltip = computed(() =>
         <Badge v-if="connection.ssl" variant="outline" class="text-xs">
           SSL
         </Badge>
+        <TooltipProvider v-if="connection.sshTunnel?.enabled">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Badge variant="outline" class="text-xs">
+                <span class="i-carbon-locked mr-0.5 h-3 w-3" />
+                SSH
+                <ProBadge v-if="!entitlementStore.isLocalUltimate" size="xs" class="ml-1" />
+              </Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>SSH tunnel</p>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       <!-- Actions -->
