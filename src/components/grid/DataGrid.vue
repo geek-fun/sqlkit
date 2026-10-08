@@ -27,6 +27,7 @@ import { useDataGridFilter } from '@/composables/useDataGridFilter'
 import { useDataGridSelection } from '@/composables/useDataGridSelection'
 import { useDataGridSort } from '@/composables/useDataGridSort'
 import { toast } from '@/composables/useNotifications'
+import { collectSortableColumns, formatSortState, sortRowsByState } from '@/utils/gridSort'
 import BatchActionBar from './BatchActionBar.vue'
 import CellContextMenu from './CellContextMenu.vue'
 import ColumnHeaderContextMenu from './ColumnHeaderContextMenu.vue'
@@ -76,6 +77,38 @@ const sort = useDataGridSort()
 const filter = useDataGridFilter()
 const selection = useDataGridSelection()
 const copyUtil = useDataGridCopy()
+
+// ── Client-side sorting ──
+// Sorting happens on the returned rows, in the frontend. Only primitive
+// columns (text/number/boolean/date) can be ordered; JSON, arrays and BLOBs
+// are excluded because they have no client-side total ordering.
+const sortableColumns = computed(() =>
+  collectSortableColumns(props.columns, props.rows, props.columnTypes ?? {}),
+)
+
+const isSortable = (column: string): boolean => sortableColumns.value.has(column)
+
+const sortedRows = computed(() =>
+  sortRowsByState(props.rows, sort.sortState.value, props.columnTypes ?? {}),
+)
+
+const sortSummary = computed(() => formatSortState(sort.sortState.value))
+
+function handleHeaderSort(column: string, shiftKey: boolean) {
+  if (!isSortable(column))
+    return
+  sort.toggleSort(column, shiftKey)
+}
+
+function handleSortFromHeader(column: string, direction: import('@/types/grid').SortDirection) {
+  if (!isSortable(column))
+    return
+  sort.setSort(column, direction)
+}
+
+function handleClearSort() {
+  sort.clearSort()
+}
 
 // ── Virtual Scroller ──
 const scrollContainer = ref<HTMLDivElement | null>(null)
@@ -170,10 +203,10 @@ function openCellContextMenu(e: MouseEvent, rowIndex: number, col: string) {
     show: true,
     x: e.clientX,
     y: e.clientY,
-    value: props.rows[rowIndex]?.[col] ?? null,
+    value: sortedRows.value[rowIndex]?.[col] ?? null,
     column: col,
     columnType: props.columnTypes?.[col] ?? '',
-    row: props.rows[rowIndex] ?? null,
+    row: sortedRows.value[rowIndex] ?? null,
     rowIndex,
   }
 }
@@ -191,19 +224,6 @@ function openHeaderContextMenu(e: MouseEvent, col: string) {
 }
 
 // ── Event Handlers ──
-function handleSortFromHeader(column: string, direction: import('@/types/grid').SortDirection) {
-  sort.clearSort()
-  sort.toggleSort(column)
-  if (sort.getSortDirection(column) !== direction)
-    sort.toggleSort(column)
-  emit('sortChange', sort.sortState.value)
-}
-
-function handleClearSort() {
-  sort.clearSort()
-  emit('sortChange', [])
-}
-
 function handleAddFilter(f: ColumnFilter) {
   filter.addFilter(f)
   emit('filterChange', filter.filters.value)
@@ -278,7 +298,7 @@ async function confirmDelete() {
   isDeleting.value = true
   try {
     const { invoke } = await import('@tauri-apps/api/core')
-    const row = props.rows[deletingRowIndex.value]
+    const row = sortedRows.value[deletingRowIndex.value]
     const pkValues = Object.fromEntries(
       props.primaryKeys.map(col => [col, row?.[col] ?? null]),
     )
@@ -312,20 +332,20 @@ const currentEditingRow = computed(() => {
     return null
   if (isDuplicateRow.value) {
     // Clone the row but remove PK values
-    const row = props.rows[editingRowIndex.value]
+    const row = sortedRows.value[editingRowIndex.value]
     if (!row)
       return null
     const clone = { ...row }
     for (const pk of props.primaryKeys) delete clone[pk]
     return clone
   }
-  return props.rows[editingRowIndex.value] ?? null
+  return sortedRows.value[editingRowIndex.value] ?? null
 })
 
 const currentDetailsRow = computed(() => {
   if (detailsRowIndex.value === null)
     return null
-  return props.rows[detailsRowIndex.value] ?? null
+  return sortedRows.value[detailsRowIndex.value] ?? null
 })
 
 // ── Type-aware Cell Formatting ──
@@ -433,19 +453,19 @@ function formatCellText(v: unknown): string {
 
 // ── Copy/Export ──
 function copyAllAs(format: import('@/types/grid').CopyFormat) {
-  copyUtil.copyRowsAs(props.rows, props.columns, format, props.tableName)
+  copyUtil.copyRowsAs(sortedRows.value, props.columns, format, props.tableName)
 }
 
 function exportAllAs(format: import('@/types/grid').CopyFormat) {
-  copyUtil.exportToFile(props.rows, props.columns, format, props.tableName)
+  copyUtil.exportToFile(sortedRows.value, props.columns, format, props.tableName)
 }
 
 // ── Status Bar ──
 const statusText = computed(() => {
-  if (props.rows.length === 0)
+  if (sortedRows.value.length === 0)
     return ''
   const start = 1
-  const end = props.rows.length
+  const end = sortedRows.value.length
   return t('components.dataGrid.status.showing', { start, end, total: props.rowCount.toLocaleString() })
 })
 
@@ -461,9 +481,14 @@ const formattedTime = computed(() => {
 // ── Load more handling for virtual scroll ──
 const allRowsLoaded = computed(() => props.rows.length >= props.rowCount)
 
-// ── Clear selection on data change ──
-watch(() => [props.rows, props.columns], () => {
+// ── Clear selection on data or sort change (indices are positional) ──
+watch(() => [props.rows, props.columns, sort.sortState.value], () => {
   selection.clearSelection()
+})
+
+// ── Drop sort rules for columns that disappeared from the result set ──
+watch(sortableColumns, (columns) => {
+  sort.pruneSort([...columns])
 })
 </script>
 
@@ -471,7 +496,7 @@ watch(() => [props.rows, props.columns], () => {
   <div class="data-grid bg-background flex flex-col h-full">
     <!-- Toolbar -->
     <div
-      v-if="rows.length > 0 && !hideToolbar"
+      v-if="sortedRows.length > 0 && !hideToolbar"
       class="px-3 py-1 border-b bg-muted/20 flex flex-shrink-0 gap-1 items-center"
     >
       <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="copyAllAs('csv')">
@@ -534,7 +559,7 @@ watch(() => [props.rows, props.columns], () => {
 
     <!-- Empty State -->
     <div
-      v-else-if="rows.length === 0 && !loading"
+      v-else-if="sortedRows.length === 0 && !loading"
       class="flex flex-1 items-center justify-center"
     >
       <div class="text-muted-foreground text-center">
@@ -554,8 +579,8 @@ watch(() => [props.rows, props.columns], () => {
         <!-- Select-All Checkbox -->
         <div class="flex flex-shrink-0 h-8 w-10 items-center justify-center">
           <Checkbox
-            :checked="selection.isAllSelected(rows.length)"
-            @update:checked="selection.toggleAll(rows.length)"
+            :checked="selection.isAllSelected(sortedRows.length)"
+            @update:checked="selection.toggleAll(sortedRows.length)"
           />
         </div>
         <!-- Column Headers -->
@@ -567,9 +592,10 @@ watch(() => [props.rows, props.columns], () => {
           @contextmenu.prevent="openHeaderContextMenu($event, col)"
         >
           <button
+            v-if="isSortable(col)"
             class="px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 items-center"
             :class="sort.getSortDirection(col) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'"
-            @click="sort.toggleSort(col, ($event as MouseEvent).shiftKey); emit('sortChange', sort.sortState.value)"
+            @click="handleHeaderSort(col, ($event as MouseEvent).shiftKey)"
           >
             <span class="text-xs font-medium truncate">{{ col }}</span>
             <span
@@ -595,6 +621,18 @@ watch(() => [props.rows, props.columns], () => {
               class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
             />
           </button>
+          <!-- Non-primitive columns (JSON/array/BLOB) cannot be sorted client-side -->
+          <div
+            v-else
+            class="text-muted-foreground px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 cursor-default items-center"
+            :title="$t('components.dataGrid.sort.unsortable')"
+          >
+            <span class="text-xs font-medium truncate">{{ col }}</span>
+            <span
+              v-if="filter.hasFilter(col)"
+              class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
+            />
+          </div>
           <!-- Resize Handle -->
           <div
             class="opacity-0 w-1 cursor-col-resize transition-opacity bottom-0 right-0 top-0 absolute z-10 hover:bg-primary/40 group-hover:opacity-100"
@@ -655,23 +693,23 @@ watch(() => [props.rows, props.columns], () => {
               class="px-3 py-1 flex flex-shrink-0 items-center overflow-hidden"
               :class="getCellClass(columnTypes?.[col])"
               :style="{ width: `${getColumnWidth(col)}px` }"
-              :title="getCellTooltip(rows[virtualRow.index][col])"
+              :title="getCellTooltip(sortedRows[virtualRow.index][col])"
               @contextmenu.prevent="openCellContextMenu($event, virtualRow.index, col)"
             >
               <!-- NULL -->
               <span
-                v-if="isNullValue(rows[virtualRow.index][col])"
+                v-if="isNullValue(sortedRows[virtualRow.index][col])"
                 class="text-xs text-muted-foreground italic"
               >{{ $t('components.dataGrid.null') }}</span>
 
               <!-- Boolean -->
               <span
                 v-else-if="isBooleanType(columnTypes?.[col])"
-                :class="rows[virtualRow.index][col] ? 'text-green-600' : 'text-red-400'"
+                :class="sortedRows[virtualRow.index][col] ? 'text-green-600' : 'text-red-400'"
                 class="inline-flex"
               >
                 <span
-                  v-if="rows[virtualRow.index][col]"
+                  v-if="sortedRows[virtualRow.index][col]"
                   class="i-carbon-checkmark h-4 w-4"
                 />
                 <span v-else class="i-carbon-close h-4 w-4" />
@@ -681,25 +719,25 @@ watch(() => [props.rows, props.columns], () => {
               <span
                 v-else-if="isNumericType(columnTypes?.[col])"
                 class="text-xs truncate tabular-nums"
-              >{{ formatNumber(rows[virtualRow.index][col], columnTypes?.[col]) }}</span>
+              >{{ formatNumber(sortedRows[virtualRow.index][col], columnTypes?.[col]) }}</span>
 
               <!-- Date/Time -->
               <span
                 v-else-if="isDateType(columnTypes?.[col])"
                 class="text-xs truncate"
-              >{{ formatDateTime(rows[virtualRow.index][col], columnTypes?.[col]) }}</span>
+              >{{ formatDateTime(sortedRows[virtualRow.index][col], columnTypes?.[col]) }}</span>
 
               <!-- JSON -->
               <span
                 v-else-if="isJsonType(columnTypes?.[col])"
                 class="text-xs flex gap-1 min-w-0 items-center"
               >
-                <span class="truncate">{{ jsonPreview(rows[virtualRow.index][col]) }}</span>
+                <span class="truncate">{{ jsonPreview(sortedRows[virtualRow.index][col]) }}</span>
                 <Button
                   variant="ghost"
                   size="sm"
                   class="text-[10px] text-primary px-1 flex-shrink-0 h-5"
-                  @click.stop="openJsonDialog(rows[virtualRow.index][col], col)"
+                  @click.stop="openJsonDialog(sortedRows[virtualRow.index][col], col)"
                 >{{ $t('components.dataGrid.json.expand') }}</Button>
               </span>
 
@@ -707,10 +745,10 @@ watch(() => [props.rows, props.columns], () => {
               <span
                 v-else-if="isBlobType(columnTypes?.[col])"
                 class="text-xs text-muted-foreground"
-              >{{ formatBlobSize(rows[virtualRow.index][col]) }}</span>
+              >{{ formatBlobSize(sortedRows[virtualRow.index][col]) }}</span>
 
               <!-- Text (default) -->
-              <span v-else class="text-xs truncate">{{ formatCellText(rows[virtualRow.index][col]) }}</span>
+              <span v-else class="text-xs truncate">{{ formatCellText(sortedRows[virtualRow.index][col]) }}</span>
             </div>
 
             <!-- Row Actions -->
@@ -735,13 +773,13 @@ watch(() => [props.rows, props.columns], () => {
                     <span class="i-carbon-information mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.details') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem @click="copyUtil.copyRowsAs([rows[virtualRow.index]], columns, 'csv', tableName)">
+                  <DropdownMenuItem @click="copyUtil.copyRowsAs([sortedRows[virtualRow.index]], columns, 'csv', tableName)">
                     <span class="i-carbon-table-split mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.copyAsCsv') }}
                   </DropdownMenuItem>
-                  <DropdownMenuItem @click="copyUtil.copyRowsAs([rows[virtualRow.index]], columns, 'json', tableName)">
+                  <DropdownMenuItem @click="copyUtil.copyRowsAs([sortedRows[virtualRow.index]], columns, 'json', tableName)">
                     <span class="i-carbon-code mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.copyAsJson') }}
                   </DropdownMenuItem>
-                  <DropdownMenuItem @click="copyUtil.copyRowsAs([rows[virtualRow.index]], columns, 'insert', tableName)">
+                  <DropdownMenuItem @click="copyUtil.copyRowsAs([sortedRows[virtualRow.index]], columns, 'insert', tableName)">
                     <span class="i-carbon-sql mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.copyAsInsert') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -758,10 +796,10 @@ watch(() => [props.rows, props.columns], () => {
 
           <!-- "Load more..." indicator if not all rows loaded -->
           <div
-            v-if="!allRowsLoaded && rows.length > 0"
+            v-if="!allRowsLoaded && sortedRows.length > 0"
             class="text-xs text-muted-foreground py-2 flex items-center justify-center"
           >
-            {{ $t('components.dataGrid.status.showingLimited', { start: 1, end: rows.length, loaded: rows.length }) }}
+            {{ $t('components.dataGrid.status.showingLimited', { start: 1, end: sortedRows.length, loaded: sortedRows.length }) }}
           </div>
         </div>
       </div>
@@ -770,10 +808,10 @@ watch(() => [props.rows, props.columns], () => {
       <BatchActionBar
         v-if="!hideBatchActions"
         :selected-count="selection.selectedCount.value"
-        :selected-rows="selection.getSelectedRows(rows)"
+        :selected-rows="selection.getSelectedRows(sortedRows)"
         :columns="columns"
         :table-name="tableName"
-        @export-selected="(fmt) => copyUtil.copyRowsAs(selection.getSelectedRows(rows), columns, fmt, tableName)"
+        @export-selected="(fmt) => copyUtil.copyRowsAs(selection.getSelectedRows(sortedRows), columns, fmt, tableName)"
       />
 
       <!-- Status Bar -->
@@ -781,8 +819,8 @@ watch(() => [props.rows, props.columns], () => {
         <span class="tabular-nums">{{ statusText }}</span>
         <span v-if="formattedTime" class="text-muted-foreground/70">{{ formattedTime }}</span>
         <div class="flex-1" />
-        <span v-if="sort.hasActiveSort.value" class="text-primary tabular-nums">
-          {{ $t('components.dataGrid.sort.asc') }}/{{ $t('components.dataGrid.sort.desc') }}
+        <span v-if="sortSummary" class="text-primary tabular-nums">
+          {{ sortSummary }}
         </span>
         <span v-if="filter.hasActiveFilters.value" class="text-blue-500 tabular-nums">
           {{ filter.filters.value.length }} {{ $t('components.dataGrid.filter.activeFilters') }}
@@ -800,6 +838,7 @@ watch(() => [props.rows, props.columns], () => {
     />
     <ColumnHeaderContextMenu
       v-bind="headerMenu"
+      :sortable="isSortable(headerMenu.column)"
       @close="headerMenu.show = false"
       @sort="handleSortFromHeader"
       @clear-sort="handleClearSort"

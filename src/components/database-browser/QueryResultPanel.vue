@@ -3,7 +3,7 @@ import type { ColumnInfo } from '@/composables/sqlCompletion/metadata'
 import type { QueryResult } from '@/store/tabStore'
 import type { ApiError, ApiResponse } from '@/types/api'
 import type { ExplainResult } from '@/types/explainPlan'
-import type { ColumnFilter, SortColumn } from '@/types/grid'
+import type { ColumnFilter } from '@/types/grid'
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -82,12 +82,13 @@ const formattedTime = computed(() => {
     : `${(props.executionTime / 1000).toFixed(2)}s`
 })
 
-// ── Sort/Filter Re-execution (backend-driven) ──
+// ── Filter Re-execution (backend-driven) ──
+// Sorting is handled client-side by DataGrid over the returned rows; only
+// filters still need a round-trip because they change the result set itself.
 const gridLoading = ref(false)
 const gridError = ref<string | null>(null)
 const gridResults = ref<QueryResult | null>(null)
 const gridExecutionTimeMs = ref<number | undefined>(undefined)
-const activeSort = ref<SortColumn[]>([])
 const activeFilters = ref<ColumnFilter[]>([])
 
 // ── Result editability (single-table SELECTs only) ──
@@ -168,17 +169,12 @@ watch(() => props.results, (r) => {
   }
 }, { immediate: true })
 
-async function handleSortChange(sort: SortColumn[]) {
-  activeSort.value = sort
-  await reExecuteWithSortFilter()
-}
-
 async function handleFilterChange(filters: ColumnFilter[]) {
   activeFilters.value = filters
-  await reExecuteWithSortFilter()
+  await reExecuteFiltered()
 }
 
-async function reExecuteWithSortFilter() {
+async function reExecuteFiltered() {
   if (!props.connectionId || !props.sql)
     return
 
@@ -193,10 +189,7 @@ async function reExecuteWithSortFilter() {
       options: {
         originalSql: props.sql,
         schemaContext: props.schema ?? null,
-        sort: activeSort.value.map(s => ({
-          column: s.column,
-          direction: s.direction === 'ASC' ? 'ASC' : 'DESC',
-        })),
+        sort: [],
         filters: activeFilters.value.map(f => ({
           column: f.column,
           operator: f.operator.toUpperCase(),
@@ -229,7 +222,6 @@ async function reExecuteWithSortFilter() {
 }
 
 function handleRefresh() {
-  activeSort.value = []
   activeFilters.value = []
   gridResults.value = props.results ?? null
   gridError.value = null
@@ -445,7 +437,6 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
           :hide-toolbar="true"
           :hide-batch-actions="true"
           :error="displayErrorMessage"
-          @sort-change="handleSortChange"
           @filter-change="handleFilterChange"
           @refresh="handleRefresh"
         />

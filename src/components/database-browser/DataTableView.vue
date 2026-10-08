@@ -20,10 +20,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { useDataGridSort } from '@/composables/useDataGridSort'
 import { useMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { toast } from '@/composables/useNotifications'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { ConnectionStatus, useConnectionStore } from '@/store'
+import { collectSortableColumns, sortRowsByState } from '@/utils/gridSort'
 import {
   computeOffset,
   computeTotalPages,
@@ -164,6 +166,35 @@ const visibleColumns = computed(() =>
 const columnTypeMap = computed(() =>
   Object.fromEntries(columnInfoList.value.map(c => [c.name, c.data_type])),
 )
+
+// ── Client-side sorting (primitive columns only) ──
+// Sorting applies to the rows already fetched for the current page; JSON,
+// array and BLOB columns stay unsortable because they have no total order.
+const sort = useDataGridSort()
+
+const sortColumnTypes = computed(() => {
+  const result = data.value
+  const fromResult = result
+    ? Object.fromEntries(result.columns.map((col, i) => [col, result.columnTypes?.[i] ?? '']))
+    : {}
+  return { ...fromResult, ...columnTypeMap.value }
+})
+
+const sortableColumns = computed(() =>
+  collectSortableColumns(visibleColumns.value, data.value?.rows ?? [], sortColumnTypes.value),
+)
+
+const sortedRows = computed(() =>
+  sortRowsByState(data.value?.rows ?? [], sort.sortState.value, sortColumnTypes.value),
+)
+
+const isSortable = (column: string): boolean => sortableColumns.value.has(column)
+
+function handleHeaderSort(column: string) {
+  if (!isSortable(column))
+    return
+  sort.toggleSort(column)
+}
 
 const columnIsPK = computed(() =>
   Object.fromEntries(columnInfoList.value.map(c => [c.name, c.is_primary_key])),
@@ -480,7 +511,7 @@ async function exportCSV() {
   if (!data.value)
     return
 
-  const csv = rowsToCsv(data.value.rows, visibleColumns.value)
+  const csv = rowsToCsv(sortedRows.value, visibleColumns.value)
   const conn = connectionStore.getConnectionById(props.connectionId)
   const connName = conn?.name || props.connectionId
   const parts = [connName, props.database]
@@ -575,7 +606,7 @@ async function confirmBatchDelete() {
   let failCount = 0
 
   for (const idx of indices) {
-    const row = data.value.rows[idx]
+    const row = sortedRows.value[idx]
     if (!row || pkColumns.value.length === 0)
       continue
 
@@ -784,6 +815,11 @@ watch(data, () => {
   selectedRows.value = new Set()
 })
 
+// Sorting reorders positional indices, so the current selection no longer maps
+watch(sort.sortState, () => {
+  selectedRows.value = new Set()
+})
+
 const formatValue = formatTableValue
 const isNullValue = isTableNullValue
 
@@ -814,6 +850,7 @@ watch(
       searchDebounceTimer = null
     }
     hiddenColumns.value = new Set()
+    sort.clearSort()
     connectionError.value = null
 
     if (newConnId !== oldConnId) {
@@ -967,7 +1004,7 @@ watch(
           variant="ghost"
           size="icon"
           class="flex-shrink-0 h-7 w-7"
-          :disabled="!data || data.rows.length === 0 || isExporting"
+          :disabled="!data || sortedRows.length === 0 || isExporting"
           :title="t('components.dataTableView.exportCsv')"
           @click.stop="exportCSV"
         >
@@ -1067,7 +1104,33 @@ watch(
                 :key="col"
                 class="data-table-header text-left"
               >
-                <div class="col-header-cell" :title="columnTypeMap[col] ? `${col} · ${columnTypeMap[col]}` : col">
+                <button
+                  v-if="isSortable(col)"
+                  class="col-header-cell text-left w-full cursor-pointer"
+                  :title="columnTypeMap[col] ? `${col} · ${columnTypeMap[col]}` : col"
+                  @click="handleHeaderSort(col)"
+                >
+                  <span v-if="columnIsPK[col]" class="i-carbon-key text-amber-500 flex-shrink-0 h-3 w-3" />
+                  <span class="col-name truncate">{{ col }}</span>
+                  <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
+                  <span
+                    v-if="sort.getSortDirection(col) === 'ASC'"
+                    class="i-carbon-arrow-up text-foreground flex-shrink-0 h-3 w-3"
+                  />
+                  <span
+                    v-else-if="sort.getSortDirection(col) === 'DESC'"
+                    class="i-carbon-arrow-down text-foreground flex-shrink-0 h-3 w-3"
+                  />
+                  <span
+                    v-else
+                    class="i-carbon-chevron-sort opacity-30 flex-shrink-0 h-3 w-3"
+                  />
+                </button>
+                <div
+                  v-else
+                  class="col-header-cell cursor-default"
+                  :title="$t('components.dataGrid.sort.unsortable')"
+                >
                   <span v-if="columnIsPK[col]" class="i-carbon-key text-amber-500 flex-shrink-0 h-3 w-3" />
                   <span class="col-name truncate">{{ col }}</span>
                   <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
@@ -1081,7 +1144,7 @@ watch(
           </thead>
           <tbody>
             <tr
-              v-for="(row, i) in data.rows"
+              v-for="(row, i) in sortedRows"
               :key="i"
               class="border-b hover:bg-muted/50"
               :class="{ 'bg-muted/30': selectedRows.has(i) }"
@@ -1137,7 +1200,7 @@ watch(
 
         <!-- Empty state -->
         <div
-          v-else-if="data && data.rows.length === 0"
+          v-else-if="data && sortedRows.length === 0"
           class="flex h-full items-center justify-center"
         >
           <div class="text-muted-foreground text-center">

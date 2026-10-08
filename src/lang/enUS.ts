@@ -1547,6 +1547,7 @@ export const enUS = {
         asc: 'Sort Ascending',
         desc: 'Sort Descending',
         clear: 'Clear Sort',
+        unsortable: 'This column type cannot be sorted',
       },
       filter: {
         byValue: 'Filter by Value',
