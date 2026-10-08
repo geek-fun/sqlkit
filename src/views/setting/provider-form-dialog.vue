@@ -50,6 +50,7 @@ const presets = computed<Preset[]>(() => [
   { id: 'openrouter', name: 'OpenRouter', apiCompatibility: 'openai', baseUrl: 'https://openrouter.ai/api/v1', kind: 'openrouter' },
   { id: 'requesty', name: 'Requesty', apiCompatibility: 'openai', baseUrl: 'https://router.requesty.ai/v1', kind: 'requesty' },
   { id: 'opper', name: 'Opper', apiCompatibility: 'openai', baseUrl: 'https://api.opper.ai/v3/compat', kind: 'opper' },
+  { id: 'api-route', name: 'API Route', apiCompatibility: 'openai', baseUrl: 'https://global.api-route.com/v1', kind: 'api-route' },
   { id: 'anthropic', name: 'Anthropic', apiCompatibility: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', kind: 'anthropic' },
   { id: 'gemini', name: 'Google Gemini', apiCompatibility: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', kind: 'gemini' },
   { id: 'grok', name: 'Grok', apiCompatibility: 'openai', baseUrl: 'https://api.x.ai/v1', kind: 'grok' },
@@ -166,7 +167,8 @@ function resetForm(provider?: LlmProvider | null) {
       contextWindowOverride: provider.contextWindowOverride ?? undefined,
     }
     // Derive the matching preset id from the provider's kind
-    const match = presets.value.find(p => p.id === provider.kind || (p.apiCompatibility === provider.apiCompatibility && !p.id.startsWith('custom-')))
+    const match = presets.value.find(p => p.id === provider.kind)
+      ?? presets.value.find(p => p.apiCompatibility === provider.apiCompatibility && !p.id.startsWith('custom-'))
     selectedPresetId.value = match ? match.id : 'custom-openai'
   }
   else {
