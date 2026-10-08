@@ -134,6 +134,9 @@ pub fn run() {
             // Store AppHandle globally for capability handlers and agent
             let _ = APP_HANDLE.set(handle.clone());
 
+            // Pin the SSH known-hosts store to the app data directory
+            ssh::init_store_dir(&app.path().app_data_dir()?);
+
             // Start connection guardian for health monitoring + auto-reconnect
             let guardian = Arc::new(ConnectionGuardian::new());
             let _ = GUARDIAN.set(guardian.clone());
@@ -269,6 +272,13 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // SSH profile management + host-key store
+            crate::ssh::commands::list_ssh_profiles,
+            crate::ssh::commands::save_ssh_profile,
+            crate::ssh::commands::delete_ssh_profile,
+            crate::ssh::commands::test_ssh_connection,
+            crate::ssh::commands::list_ssh_config_hosts,
+            crate::common::http_client::detect_system_proxy,
             // Agent commands
             invoke_capability,
             get_available_tools,

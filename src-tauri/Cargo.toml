@@ -100,7 +100,15 @@ toml = "0.8"
 sha2 = "0.10"
 hmac = "0.12"
 sqlparser = "0.62"
+fast-socks5 = "1.0"
+percent-encoding = "2"
 russh = "0.60"
+hyper-util = { version = "0.1", default-features = false, features = [
+  "client",
+  "client-proxy",
+  "client-proxy-system"
+] }
+system-configuration = "0.7"
 axum = "0.8"
 portpicker = "0.1.1"
 pageant = "0.2"

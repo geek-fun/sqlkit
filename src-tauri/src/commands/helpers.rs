@@ -260,9 +260,33 @@ pub async fn connection_host_port(
     // not spin up tunnels at all.
     crate::entitlement::ensure_local_ultimate_global("SSH tunnel")?;
 
-    match start_transport_layers(connection_id, &layers, &config.host, config.port, tunnels).await?
+    // Deterministic tunnel key — same SSH layers + same target reuse one
+    // tunnel across connections instead of stacking duplicates per bastion.
+    let connection_key = tunnel_key(&layers, &config.host, config.port);
+
+    match start_transport_layers(&connection_key, &layers, &config.host, config.port, tunnels, true).await?
     {
         Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),
         None => Ok((config.host.clone(), config.port)),
     }
+}
+
+/// Deterministic key from the enabled SSH hops + remote target — identical
+/// to dockit's tunnel_key strategy. The key never contains secrets (only
+/// the auth method name), so it is safe to log.
+fn tunnel_key(
+    layers: &[crate::ssh::config::TransportLayerConfig],
+    host: &str,
+    port: u16,
+) -> String {
+    let mut hops = Vec::new();
+    for layer in layers {
+        if let crate::ssh::config::TransportLayerConfig::Ssh(config) = layer {
+            hops.push(format!(
+                "{}:{}:{}:{}",
+                config.host, config.port, config.username, config.auth_method
+            ));
+        }
+    }
+    format!("ssh:{}:{}:{}", hops.join("->"), host, port)
 }

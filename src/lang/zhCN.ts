@@ -120,7 +120,11 @@ export const zhCN = {
     aiAssistant: 'AI 助手',
     tasks: '任务',
   },
+  connectionsPage: {
+    addSshProfile: '添加 SSH 配置档案',
+  },
   common: {
+
     copy: '复制',
     copied: '已复制！',
     browse: '浏览',
@@ -451,6 +455,7 @@ export const zhCN = {
       startedAgo: '{time}前开始',
     },
     common: {
+
       connection: '连接',
       database: '数据库',
       schema: '模式',
@@ -1269,6 +1274,20 @@ export const zhCN = {
         tnsAliasRequired: 'TNS 别名是必填项',
       },
       ssh: {
+        advancedConfig: '高级配置',
+        configSource: '配置来源',
+        sourceProfiles: 'SSH 配置档案',
+        sourceManual: '手动配置',
+        addHop: '添加跳板…',
+        newProfile: '新建配置档案',
+        hopOrderHint: '跳板按顺序尝试 —— 最后一跳转发到数据库。系统代理仅作用于第一跳。',
+        useSystemProxy: '使用系统代理',
+        importFromConfig: '从 ~/.ssh/config 导入',
+        profileName: '档案名称',
+        profileNamePlaceholder: '例如：生产堡垒机',
+        editProfile: '编辑 SSH 配置档案',
+        newProfileTitle: '新建 SSH 配置档案',
+        authAuto: '自动探测',
         useSshTunnel: '使用 SSH 隧道',
         sshHost: 'SSH 主机',
         sshPort: 'SSH 端口',

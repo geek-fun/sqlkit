@@ -120,7 +120,11 @@ export const enUS = {
     aiAssistant: 'AI Assistant',
     tasks: 'Tasks',
   },
+  connectionsPage: {
+    addSshProfile: 'Add SSH Profile',
+  },
   common: {
+
     copy: 'Copy',
     copied: 'Copied!',
     browse: 'Browse',
@@ -451,6 +455,7 @@ export const enUS = {
       startedAgo: 'Started {time} ago',
     },
     common: {
+
       connection: 'Connection',
       database: 'Database',
       schema: 'Schema',
@@ -1269,6 +1274,20 @@ export const enUS = {
         tnsAliasRequired: 'TNS alias is required',
       },
       ssh: {
+        advancedConfig: 'Advanced Configuration',
+        configSource: 'Configuration source',
+        sourceProfiles: 'SSH profiles',
+        sourceManual: 'Manual configuration',
+        addHop: 'Add profile hop…',
+        newProfile: 'New Profile',
+        hopOrderHint: 'Hops are tried in order — the last hop forwards to the database. The system proxy applies to the first hop only.',
+        useSystemProxy: 'Use system proxy',
+        importFromConfig: 'Import from ~/.ssh/config',
+        profileName: 'Profile name',
+        profileNamePlaceholder: 'e.g. Production bastion',
+        editProfile: 'Edit SSH Profile',
+        newProfileTitle: 'New SSH Profile',
+        authAuto: 'Auto-probe',
         useSshTunnel: 'Use SSH Tunnel',
         sshHost: 'SSH Host',
         sshPort: 'SSH Port',

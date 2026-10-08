@@ -7,12 +7,16 @@ import { useRouter } from 'vue-router'
 import { UPGRADE_URL } from '@/common'
 import { ServerCard, ServerFormDialog } from '@/components/connections'
 import ConnectingModal from '@/components/connections/ConnectingModal.vue'
+import { Badge } from '@/components/ui/badge'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/composables/useNotifications'
+import { openUpgradeDialog } from '@/components/upgrade'
+import { useSshProfileStore, type SshProfile } from '@/store/sshProfileStore'
+import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
 import { ConnectionStatus, useConnectionStore, useEntitlementStore } from '@/store'
 
 const MIN_LOADING_TIME = 1500
@@ -21,6 +25,14 @@ const { t } = useI18n()
 const router = useRouter()
 const connectionStore = useConnectionStore()
 const entitlementStore = useEntitlementStore()
+const sshProfileStore = useSshProfileStore()
+const sshProfileDialogRef = ref<InstanceType<typeof SshProfileDialog> | null>(null)
+
+function openProfileCreate() {
+  if (!guardSshProfileManagement())
+    return
+  sshProfileDialogRef.value?.show()
+}
 
 const searchQuery = ref('')
 const viewMode = ref<'grid' | 'list'>('grid')
@@ -51,6 +63,7 @@ const stats = computed(() => ({
 }))
 
 onMounted(async () => {
+  sshProfileStore.fetch()
   await connectionStore.fetchConnections()
 })
 
@@ -137,6 +150,20 @@ function guardSshConnection(connection: ServerConnection): boolean {
     return true
   openUrl(UPGRADE_URL)
   return false
+}
+
+// SSH profile management is Ultimate-only — the modal carries pricing + trial
+function guardSshProfileManagement(): boolean {
+  if (entitlementStore.isLocalUltimate)
+    return true
+  openUpgradeDialog('ssh_tunnel')
+  return false
+}
+
+function openProfileEdit(profile: SshProfile) {
+  if (!guardSshProfileManagement())
+    return
+  sshProfileDialogRef.value?.show(profile)
 }
 
 async function handleConnect(connection: ServerConnection) {
@@ -480,6 +507,50 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
         </div>
       </div>
       <div class="p-6 pt-0 flex-1 min-h-0 overflow-y-auto">
+        <!-- SSH Profile cards (Ultimate) -->
+        <div
+          v-if="sshProfileStore.profiles.length > 0"
+          :class="['mb-6', viewMode === 'grid'
+            ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+            : 'flex flex-col gap-3']"
+        >
+          <div
+            v-for="profile in sshProfileStore.profiles"
+            :key="profile.id"
+            class="border rounded-lg p-4 cursor-pointer transition-colors hover:bg-accent/50"
+            role="button"
+            tabindex="0"
+            @click="openProfileEdit(profile)"
+            @keydown.enter="openProfileEdit(profile)"
+          >
+            <div class="flex items-start justify-between">
+              <div class="flex items-center gap-2 min-w-0">
+                <span class="i-carbon-key h-4 w-4 text-muted-foreground shrink-0" />
+                <span class="font-medium truncate">{{ profile.name }}</span>
+              </div>
+              <Badge variant="outline" class="text-xs shrink-0">
+                SSH Profile
+              </Badge>
+            </div>
+            <p class="text-sm text-muted-foreground mt-1 truncate">
+              {{ profile.username }}@{{ profile.host }}:{{ profile.port }}
+            </p>
+          </div>
+
+          <div
+            class="border border-dashed rounded-lg p-4 cursor-pointer transition-colors hover:bg-accent/50 flex items-center justify-center min-h-[86px]"
+            role="button"
+            tabindex="0"
+            @click="openProfileCreate"
+            @keydown.enter="openProfileCreate"
+          >
+            <div class="flex items-center gap-2 text-muted-foreground">
+              <span class="i-carbon-add h-4 w-4" />
+              <span class="text-sm">{{ t('connectionsPage.addSshProfile') }}</span>
+            </div>
+          </div>
+        </div>
+
         <!-- Connections Grid/List -->
         <div
           :class="viewMode === 'grid'
@@ -606,5 +677,6 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
 
     <!-- Connecting Modal -->
     <ConnectingModal ref="connectingModal" />
+        <SshProfileDialog ref="sshProfileDialogRef" @save="sshProfileStore.fetch()" />
   </AppLayout>
 </template>
