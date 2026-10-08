@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Entitlements & version-lock subscription model (geekfun#56)** — client-side implementation of the Ultimate entitlement contract: the two server-computed fields `ultimateExpiresAt` + `versionLockHorizon` are consumed via a new Rust entitlement module (persisted cache, offline tolerance, failure degradation, 5-minute refresh throttle, `app.releaseDate <= versionLockHorizon` unlock check). Rust command gates return `ENTITLEMENT_REQUIRED` for AI (agent loop/step, compaction, LLM validation), the whole Transfer module (import/export/migration/structure execution), SSH tunnel establishment, and the MCP bridge (config/policy save + auto-start). The frontend adds an entitlement store, Geekfun login entry, paid-feature gates with upgrade guidance on Data Studio, Transfer, AI assistant sidebar, ER diagram actions, AI/MCP settings, SSH tunnel option in the connection form, plus an Account & Plan settings tab showing the version-lock state with Geekfun login and logout (logout clears the local entitlement cache so entitlements never outlive the account session).
 - Requesty provider preset in AI settings (OpenAI compatible, base URL `https://router.requesty.ai/v1`)
 - Opper provider preset in AI settings (OpenAI compatible, base URL `https://api.opper.ai/v3/compat`)
+- API Route provider preset in AI settings (OpenAI compatible, base URL `https://global.api-route.com/v1`)
 
 ### Changed
 
@@ -23,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 
 ### Fixed
+
+- Editing an AI provider now selects its exact provider preset before falling back to API compatibility.
 
 - **DuckDB read-only mode is rejected by the released JDBC bridge** — DuckDB refuses `Connection.setReadOnly()`, and HikariCP calls it whenever its own read-only flag disagrees with the opened connection (it defaults to false), so a read-only URL failed with `Can't change read-only status on connection level`. The bridge now derives HikariCP's flag from the URL (`ConnectionManager.isReadOnlyUrl`); until a bridge build with that change ships, the connection form explains the limitation and offers **retry as read-write**. Verified against a patched bridge in `src-tauri/tests/duckdb_bridge_integration.rs`.
 
