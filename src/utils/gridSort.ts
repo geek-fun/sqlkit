@@ -63,7 +63,7 @@ type SortValueKind = 'boolean' | 'number' | 'date' | 'string'
 const KIND_PRECEDENCE: Record<SortValueKind, number> = { number: 0, boolean: 1, date: 2, string: 3 }
 
 /** Kind fixed by the declared column type, if it names one. */
-function resolveDeclaredKind(columnType?: string): SortValueKind | null {
+const resolveDeclaredKind = (columnType?: string): SortValueKind | null => {
   const type = (columnType ?? '').trim()
   if (BOOLEAN_TYPE_PATTERN.test(type))
     return 'boolean'
@@ -75,7 +75,7 @@ function resolveDeclaredKind(columnType?: string): SortValueKind | null {
 }
 
 /** Kind of a value when no usable type is declared; strings are never date-sniffed. */
-function resolveValueKind(value: unknown): SortValueKind {
+const resolveValueKind = (value: unknown): SortValueKind => {
   if (typeof value === 'boolean')
     return 'boolean'
   if (typeof value === 'number')
@@ -83,18 +83,18 @@ function resolveValueKind(value: unknown): SortValueKind {
   return 'string'
 }
 
-function kindFromToken(kindOrType?: string): SortValueKind {
+const kindFromToken = (kindOrType?: string): SortValueKind => {
   if (kindOrType && (kindOrType === 'boolean' || kindOrType === 'number' || kindOrType === 'date' || kindOrType === 'string'))
     return kindOrType
   return resolveDeclaredKind(kindOrType) ?? 'string'
 }
 
 /** One kind for the whole column: declared type wins, otherwise the highest-precedence kind present. */
-function resolveColumnKind(
+const resolveColumnKind = (
   rows: readonly Record<string, unknown>[],
   column: string,
   columnType?: string,
-): SortValueKind {
+): SortValueKind => {
   const declared = resolveDeclaredKind(columnType)
   if (declared)
     return declared
