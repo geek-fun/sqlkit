@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { ServerConnection } from '@/store'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
+import { UPGRADE_URL } from '@/common'
 import { ServerCard, ServerFormDialog } from '@/components/connections'
 import ConnectingModal from '@/components/connections/ConnectingModal.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -11,13 +13,14 @@ import { Card } from '@/components/ui/card'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import { Input } from '@/components/ui/input'
 import { toast } from '@/composables/useNotifications'
-import { ConnectionStatus, useConnectionStore } from '@/store'
+import { ConnectionStatus, useConnectionStore, useEntitlementStore } from '@/store'
 
 const MIN_LOADING_TIME = 1500
 
 const { t } = useI18n()
 const router = useRouter()
 const connectionStore = useConnectionStore()
+const entitlementStore = useEntitlementStore()
 
 const searchQuery = ref('')
 const viewMode = ref<'grid' | 'list'>('grid')
@@ -57,6 +60,9 @@ function handleAddConnection() {
 }
 
 function handleEditConnection(connection: ServerConnection) {
+  if (!guardSshConnection(connection)) {
+    return
+  }
   editingConnection.value = connection
   isFormDialogOpen.value = true
 }
@@ -124,8 +130,20 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
   }
 }
 
+// an SSH-bound saved connection is only operable with Ultimate — instead of
+// attempting a connect that dies with a raw 403, route to the pricing site
+function guardSshConnection(connection: ServerConnection): boolean {
+  if (entitlementStore.isLocalUltimate || !connection.sshTunnel?.enabled)
+    return true
+  openUrl(UPGRADE_URL)
+  return false
+}
+
 async function handleConnect(connection: ServerConnection) {
   connectError.value = null
+  if (!guardSshConnection(connection)) {
+    return
+  }
   if (!connection.id) {
     return
   }
@@ -146,6 +164,9 @@ async function handleConnect(connection: ServerConnection) {
 
 async function handleDoubleClick(connection: ServerConnection) {
   connectError.value = null
+  if (!guardSshConnection(connection)) {
+    return
+  }
   if (!connection.id) {
     return
   }
@@ -164,6 +185,9 @@ async function handleDoubleClick(connection: ServerConnection) {
 }
 
 function handleDeleteConnection(connection: ServerConnection) {
+  if (!guardSshConnection(connection)) {
+    return
+  }
   connectionToDelete.value = connection
   deleteDialogOpen.value = true
 }
@@ -177,6 +201,9 @@ async function confirmDelete() {
 }
 
 function handleDuplicateConnection(connection: ServerConnection) {
+  if (!guardSshConnection(connection)) {
+    return
+  }
   editingConnection.value = {
     ...connection,
     id: undefined,
