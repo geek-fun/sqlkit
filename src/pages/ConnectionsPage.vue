@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ServerConnection } from '@/store'
+import type { SshProfile } from '@/store/sshProfileStore'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -7,17 +8,17 @@ import { useRouter } from 'vue-router'
 import { UPGRADE_URL } from '@/common'
 import { ServerCard, ServerFormDialog } from '@/components/connections'
 import ConnectingModal from '@/components/connections/ConnectingModal.vue'
-import { Badge } from '@/components/ui/badge'
+import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import { Input } from '@/components/ui/input'
-import { toast } from '@/composables/useNotifications'
 import { openUpgradeDialog } from '@/components/upgrade'
-import { useSshProfileStore, type SshProfile } from '@/store/sshProfileStore'
-import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
+import { toast } from '@/composables/useNotifications'
 import { ConnectionStatus, useConnectionStore, useEntitlementStore } from '@/store'
+import { useSshProfileStore } from '@/store/sshProfileStore'
 
 const MIN_LOADING_TIME = 1500
 
@@ -510,22 +511,22 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
         <!-- SSH Profile cards (Ultimate) -->
         <div
           v-if="sshProfileStore.profiles.length > 0"
-          :class="['mb-6', viewMode === 'grid'
+          class="mb-6" :class="[viewMode === 'grid'
             ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
             : 'flex flex-col gap-3']"
         >
           <div
             v-for="profile in sshProfileStore.profiles"
             :key="profile.id"
-            class="border rounded-lg p-4 cursor-pointer transition-colors hover:bg-accent/50"
+            class="p-4 border rounded-lg cursor-pointer transition-colors hover:bg-accent/50"
             role="button"
             tabindex="0"
             @click="openProfileEdit(profile)"
             @keydown.enter="openProfileEdit(profile)"
           >
             <div class="flex items-start justify-between">
-              <div class="flex items-center gap-2 min-w-0">
-                <span class="i-carbon-key h-4 w-4 text-muted-foreground shrink-0" />
+              <div class="flex gap-2 min-w-0 items-center">
+                <span class="i-carbon-key text-muted-foreground shrink-0 h-4 w-4" />
                 <span class="font-medium truncate">{{ profile.name }}</span>
               </div>
               <Badge variant="outline" class="text-xs shrink-0">
@@ -538,13 +539,13 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
           </div>
 
           <div
-            class="border border-dashed rounded-lg p-4 cursor-pointer transition-colors hover:bg-accent/50 flex items-center justify-center min-h-[86px]"
+            class="p-4 border rounded-lg border-dashed flex min-h-[86px] cursor-pointer transition-colors items-center justify-center hover:bg-accent/50"
             role="button"
             tabindex="0"
             @click="openProfileCreate"
             @keydown.enter="openProfileCreate"
           >
-            <div class="flex items-center gap-2 text-muted-foreground">
+            <div class="text-muted-foreground flex gap-2 items-center">
               <span class="i-carbon-add h-4 w-4" />
               <span class="text-sm">{{ t('connectionsPage.addSshProfile') }}</span>
             </div>
@@ -677,6 +678,6 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
 
     <!-- Connecting Modal -->
     <ConnectingModal ref="connectingModal" />
-        <SshProfileDialog ref="sshProfileDialogRef" @save="sshProfileStore.fetch()" />
+    <SshProfileDialog ref="sshProfileDialogRef" @save="sshProfileStore.fetch()" />
   </AppLayout>
 </template>

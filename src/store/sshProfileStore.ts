@@ -20,23 +20,25 @@ export type SshProfile = {
   exposeLan: boolean
 }
 
-export const emptySshProfile = (): SshProfile => ({
-  id: '',
-  name: '',
-  host: '',
-  port: 22,
-  username: '',
-  authMethod: '',
-  password: '',
-  keyPath: '',
-  keyPassphrase: '',
-  useSshAgent: false,
-  sshAgentSockPath: '',
-  connectTimeoutSecs: 10,
-  keepaliveIntervalSecs: 30,
-  verifyHostKey: false,
-  exposeLan: false,
-})
+export function emptySshProfile(): SshProfile {
+  return {
+    id: '',
+    name: '',
+    host: '',
+    port: 22,
+    username: '',
+    authMethod: '',
+    password: '',
+    keyPath: '',
+    keyPassphrase: '',
+    useSshAgent: false,
+    sshAgentSockPath: '',
+    connectTimeoutSecs: 10,
+    keepaliveIntervalSecs: 30,
+    verifyHostKey: false,
+    exposeLan: false,
+  }
+}
 
 export const useSshProfileStore = defineStore('sshProfiles', {
   state: () => ({
