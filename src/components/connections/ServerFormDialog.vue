@@ -3,10 +3,8 @@ import type { OracleConnectionOptions, ServerConnection } from '@/store'
 import type { DatabaseFileAssessment } from '@/utils/databaseFiles'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { UPGRADE_URL } from '@/common'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -27,11 +25,11 @@ import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
 import { jdbcApi } from '@/datasources/jdbcApi'
 import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase, useConnectionStore } from '@/store'
-import { useEntitlementStore } from '@/store/entitlementStore'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import { buildMemoryDatabaseHost, createMemoryDatabaseLabel, isMemoryDatabaseHost, isSameDatabaseFile, memoryDatabaseLabel } from '@/utils/databaseFiles'
 import { classifyDuckDbFailure } from '@/utils/duckdbErrors'
 import DatabaseFileField from './DatabaseFileField.vue'
+import SshTunnelConfigPanel from './SshTunnelConfigPanel.vue'
 import SslConfigSection from './ssl/SslConfigSection.vue'
 
 const props = defineProps<{
@@ -45,7 +43,6 @@ const emit = defineEmits<{
 }>()
 
 const { t } = useI18n()
-const entitlementStore = useEntitlementStore()
 const { getDatabaseIcon } = useDatabaseIcon()
 const dl = useDownloadEvents()
 
@@ -132,7 +129,6 @@ const formData = ref<ServerConnection>({ ...defaultConnection })
 const testStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
 const testError = ref<string>('')
 const formErrors = ref<Record<string, string>>({})
-const showAdvanced = ref(false)
 const isPickingFile = ref(false)
 
 // Step tracking for setup progress
@@ -187,26 +183,6 @@ async function runStep(step: StepDef): Promise<boolean> {
     step.status = 'error'
     step.error = e instanceof Error ? e.message : String(e)
     return false
-  }
-}
-
-function toggleSsh(checked: boolean) {
-  if (checked && !entitlementStore.isLocalUltimate) {
-    // usage-side feature — send to the pricing site (matches dockit)
-    openUrl(UPGRADE_URL)
-    return
-  }
-  if (!formData.value.sshTunnel) {
-    formData.value.sshTunnel = {
-      enabled: checked,
-      host: '',
-      port: 22,
-      username: '',
-      authMethod: 'password',
-    }
-  }
-  else {
-    formData.value.sshTunnel = { ...formData.value.sshTunnel, enabled: checked }
   }
 }
 
@@ -1417,105 +1393,13 @@ function handleSave() {
         />
 
         <!-- Advanced Configuration: SSH Tunnel -->
-        <div v-if="!isFileBased" class="pt-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            class="text-muted-foreground w-full justify-between"
-            @click="showAdvanced = !showAdvanced"
-          >
-            Advanced Configuration
-            <span class="i-carbon-chevron-down h-4 w-4 transition-transform" :class="[showAdvanced ? 'rotate-180' : '']" />
-          </Button>
-
-          <div v-if="showAdvanced" class="mt-3 p-4 border rounded-md space-y-4">
-            <div class="flex gap-2 items-center">
-              <input
-                id="use-ssh"
-                type="checkbox"
-                class="border-gray-300 rounded h-4 w-4"
-                :checked="formData.sshTunnel?.enabled ?? false"
-                @change="(e: Event) => toggleSsh((e.target as HTMLInputElement).checked)"
-              >
-              <Label for="use-ssh">{{ t('components.serverForm.ssh.useSshTunnel') }}</Label>
-            </div>
-
-            <template v-if="formData.sshTunnel?.enabled">
-              <div class="space-y-2">
-                <Label for="ssh-host">{{ t('components.serverForm.ssh.sshHost') }}</Label>
-                <Input id="ssh-host" v-model="formData.sshTunnel.host" placeholder="ssh.example.com" />
-              </div>
-
-              <div class="gap-4 grid grid-cols-2">
-                <div class="space-y-2">
-                  <Label for="ssh-port">{{ t('components.serverForm.ssh.sshPort') }}</Label>
-                  <Input id="ssh-port" v-model.number="formData.sshTunnel.port" type="number" placeholder="22" />
-                </div>
-                <div class="space-y-2">
-                  <Label for="ssh-user">{{ t('components.serverForm.ssh.username') }}</Label>
-                  <Input id="ssh-user" v-model="formData.sshTunnel.username" placeholder="username" autocomplete="off" />
-                </div>
-              </div>
-
-              <div class="space-y-2">
-                <Label for="ssh-auth">{{ t('components.serverForm.ssh.authMethod') }}</Label>
-                <Select v-model="formData.sshTunnel.authMethod">
-                  <SelectTrigger id="ssh-auth">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectGroup>
-                      <SelectItem value="password">
-                        {{ t('components.serverForm.ssh.password') }}
-                      </SelectItem>
-                      <SelectItem value="privateKey">
-                        {{ t('components.serverForm.ssh.privateKey') }}
-                      </SelectItem>
-                      <SelectItem value="agent">
-                        {{ t('components.serverForm.ssh.sshAgent') }}
-                      </SelectItem>
-                    </SelectGroup>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <template v-if="formData.sshTunnel.authMethod === 'password'">
-                <div class="space-y-2">
-                  <Label for="ssh-password">{{ t('components.serverForm.ssh.sshPassword') }}</Label>
-                  <div class="relative">
-                    <Input id="ssh-password" v-model="formData.sshTunnel.password" :type="showPasswords.ssh ? 'text' : 'password'" :placeholder="t('components.serverForm.ssh.sshPasswordPlaceholder')" autocomplete="off" class="pr-8" />
-                    <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('ssh')">
-                      <span class="i-carbon-view h-4 w-4 block" />
-                    </button>
-                  </div>
-                </div>
-              </template>
-
-              <template v-if="formData.sshTunnel.authMethod === 'privateKey'">
-                <div class="space-y-2">
-                  <Label for="ssh-key">{{ t('components.serverForm.ssh.privateKeyPath') }}</Label>
-                  <Input id="ssh-key" v-model="formData.sshTunnel.privateKey" placeholder="/path/to/id_rsa" />
-                </div>
-                <div class="space-y-2">
-                  <Label for="ssh-passphrase">{{ t('components.serverForm.ssh.passphraseOptional') }}</Label>
-                  <div class="relative">
-                    <Input id="ssh-passphrase" v-model="formData.sshTunnel.privateKeyPassphrase" :type="showPasswords.sshkey ? 'text' : 'password'" :placeholder="t('components.serverForm.ssh.keyPassphrasePlaceholder')" autocomplete="off" class="pr-8" />
-                    <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('sshkey')">
-                      <span class="i-carbon-view h-4 w-4 block" />
-                    </button>
-                  </div>
-                </div>
-              </template>
-
-              <template v-if="formData.sshTunnel.authMethod === 'agent'">
-                <p class="text-sm text-muted-foreground">
-                  {{ t('components.serverForm.ssh.agentHelpText') }}
-                </p>
-              </template>
-            </template>
-          </div>
-        </div>
+        <SshTunnelConfigPanel
+          v-if="!isFileBased"
+          :model-value="formData.sshTunnel"
+          :remote-host="formData.host"
+          :remote-port="formData.port"
+          @update:model-value="formData.sshTunnel = $event"
+        />
 
         <!-- Test Connection Status -->
         <div

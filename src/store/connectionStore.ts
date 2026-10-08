@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import { defineStore } from 'pinia'
 import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
 import { connectionApi } from '../datasources'
+import { useSshProfileStore } from './sshProfileStore'
 
 export enum DatabaseType {
   MYSQL = 'MYSQL',
@@ -391,6 +392,10 @@ export type SSHTunnelConfig = {
   password?: string
   privateKey?: string
   privateKeyPassphrase?: string
+  /** Ordered profile hops — takes priority over the inline fields. */
+  profileIds?: string[]
+  /** Route the first hop through the OS-detected HTTP proxy. */
+  useSystemProxy?: boolean
 }
 
 export type OracleConnectionOptions = {
@@ -543,7 +548,49 @@ function extractOracleOptions(raw: unknown): OracleConnectionOptions | undefined
 }
 
 export function buildTransportLayers(sshTunnel?: SSHTunnelConfig): import('@/datasources/connectionApi').TransportLayerConfig[] | null {
-  if (!sshTunnel?.enabled || !sshTunnel.host) {
+  if (!sshTunnel?.enabled) {
+    return null
+  }
+
+  // Profile hops take priority: expand each id into a full layer from the
+  // profile store, preserving hop order.
+  if (sshTunnel.profileIds?.length) {
+    const profileStore = useSshProfileStore()
+    const layers = sshTunnel.profileIds
+      .map(id => profileStore.byId(id))
+      .filter((p): p is NonNullable<typeof p> => !!p)
+      .map((profile) => {
+        let authMethod: import('@/datasources/connectionApi').SshAuthMethod
+        switch (profile.authMethod) {
+          case 'password':
+            authMethod = { method: 'password', password: profile.password || '' }
+            break
+          case 'key':
+            authMethod = { method: 'privateKey', private_key_path: profile.keyPath || '', passphrase: profile.keyPassphrase || null }
+            break
+          default:
+            authMethod = { method: 'agent' }
+        }
+        return {
+          type: 'ssh' as const,
+          host: profile.host,
+          port: profile.port,
+          username: profile.username,
+          auth_method: authMethod,
+          enabled: true,
+          use_system_proxy: false,
+          connect_timeout_secs: profile.connectTimeoutSecs,
+          keepalive_interval_secs: profile.keepaliveIntervalSecs,
+        }
+      })
+    if (layers.length > 0 && sshTunnel.useSystemProxy) {
+      const first = layers[0] as { use_system_proxy?: boolean }
+      first.use_system_proxy = true
+    }
+    return layers
+  }
+
+  if (!sshTunnel.host) {
     return null
   }
 

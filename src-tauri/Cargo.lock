@@ -2127,6 +2127,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "fast-socks5"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9545787d8304a71e1bf1b711705070a4c400cce9b332c4a11800627b7c9a2067"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "log",
+ "socket2 0.5.10",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-stream",
+]
+
+[[package]]
 name = "fastrand"
 version = "2.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6518,15 +6533,18 @@ dependencies = [
  "chrono",
  "data-studio-agent",
  "deadpool-postgres",
+ "fast-socks5",
  "flate2",
  "futures",
  "hex",
  "hmac 0.12.1",
  "http",
+ "hyper-util",
  "log",
  "mockall",
  "mysql_async",
  "pageant",
+ "percent-encoding",
  "portpicker",
  "rand 0.8.6",
  "reqwest 0.12.28",
@@ -6541,6 +6559,7 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "sqlparser",
+ "system-configuration",
  "tar",
  "tauri",
  "tauri-build",
