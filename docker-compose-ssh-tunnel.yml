@@ -1,0 +1,138 @@
+name: ssh-tunnel-test
+
+services:
+  # ── SSH Bastion (linuxserver/openssh-server) ──
+  # Exposes port 2222 to host. Password + key auth both enabled.
+  # All databases are on the same internal network, NOT exposed to host.
+  ssh-bastion:
+    image: linuxserver/openssh-server:latest
+    container_name: sqlkit-ssh-bastion
+    hostname: bastion
+    ports:
+      - "2223:2222"
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Shanghai
+      - PASSWORD_ACCESS=true
+      - USER_PASSWORD=testpass
+      - USER_NAME=tester
+      - SUDO_ACCESS=false
+      - PUBLIC_KEY_FILE=/config/.ssh/authorized_keys
+    volumes:
+      - ./docker/ssh-bastion/authorized_keys:/config/.ssh/authorized_keys:ro
+      - ./docker/ssh-bastion/sshd_config:/config/sshd/sshd_config
+      - ./docker/ssh-bastion/custom-cont-init.d:/custom-cont-init.d:ro
+    networks:
+      - ssh-tunnel
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o BatchMode=yes -i /config/.ssh/authorized_keys tester@localhost -p 2222 echo ok 2>/dev/null || exit 1",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  # ── PostgreSQL 17 (behind bastion, internal network only) ──
+  # Reachable from bastion via: pg-test:5432
+  # tester / testpass / testdb
+  pg-test:
+    image: postgres:17
+    container_name: sqlkit-ssh-pg
+    environment:
+      - POSTGRES_USER=tester
+      - POSTGRES_PASSWORD=testpass
+      - POSTGRES_DB=testdb
+    volumes:
+      - ssh-test-pg-data:/var/lib/postgresql/data
+    networks:
+      - ssh-tunnel
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tester -d testdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # ── MySQL 8.4 (behind bastion, internal network only) ──
+  # Reachable from bastion via: mysql-test:3306
+  # tester / testpass / testdb (root / testpass also works)
+  mysql-test:
+    image: mysql:8.4
+    container_name: sqlkit-ssh-mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=testpass
+      - MYSQL_DATABASE=testdb
+      - MYSQL_USER=tester
+      - MYSQL_PASSWORD=testpass
+    command: --mysql-native-password=OFF
+    volumes:
+      - ssh-test-mysql-data:/var/lib/mysql
+    networks:
+      - ssh-tunnel
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-uroot", "-ptestpass"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  # ── SQL Server 2022 (behind bastion, internal network only) ──
+  # Reachable from bastion via: sqlserver-test:1433
+  # sa / TestPass!2024 / master
+  # NOTE: needs ~2GB RAM. MSSQL_PID=Developer keeps it license-clean.
+  sqlserver-test:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: sqlkit-ssh-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_PID=Developer
+      - MSSQL_SA_PASSWORD=TestPass!2024
+    networks:
+      - ssh-tunnel
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'TestPass!2024' -Q 'SELECT 1' || exit 1",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 30
+      start_period: 30s
+
+  # ── Oracle 23ai Free (behind bastion, internal network only) ──
+  # Reachable from bastion via: oracle-test:1521
+  # Service: FREEPDB1 — sqlkit / testpass (root DBA: system / admin)
+  # NOTE: needs ~2GB RAM and takes 1-3 minutes on first init.
+  oracle-test:
+    image: gvenzl/oracle-free:23-slim
+    container_name: sqlkit-ssh-oracle
+    environment:
+      - ORACLE_PASSWORD=admin
+      - APP_USER=sqlkit
+      - APP_USER_PASSWORD=testpass
+    volumes:
+      - ssh-test-oracle-data:/opt/oracle/oradata
+    networks:
+      - ssh-tunnel
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "healthcheck.sh",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 40
+      start_period: 180s
+
+volumes:
+  ssh-test-pg-data:
+  ssh-test-mysql-data:
+  ssh-test-oracle-data:
+
+networks:
+  ssh-tunnel:
+    name: sqlkit-ssh-tunnel

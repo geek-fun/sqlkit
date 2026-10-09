@@ -41,3 +41,8 @@ jdbc-bridge/target/
 
 # Java build output
 jdbc-bridge/target/
+
+# SSH tunnel test stack — private keys stay local
+docker/ssh-bastion/test_key
+docker/ssh-bastion/test_key.pem
+docker/ssh-bastion/test_key_with_passphrase
