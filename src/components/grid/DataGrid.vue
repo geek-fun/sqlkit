@@ -112,6 +112,17 @@ function handleClearSort() {
 
 // ── Virtual Scroller ──
 const scrollContainer = ref<HTMLDivElement | null>(null)
+const headerViewport = ref<HTMLDivElement | null>(null)
+
+// The header lives outside the rows scroll container, so mirror the rows'
+// scrollLeft onto the header viewport. The overflow-hidden viewport is still a
+// scroll container for `position: sticky`, which keeps the Actions header
+// pinned at the visible right edge while columns scroll underneath.
+function syncHeaderScroll() {
+  if (headerViewport.value) {
+    headerViewport.value.scrollLeft = scrollContainer.value?.scrollLeft ?? 0
+  }
+}
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
@@ -494,25 +505,26 @@ watch(sortableColumns, (columns) => {
 
 <template>
   <div class="data-grid bg-background flex flex-col h-full">
-    <!-- Toolbar -->
+    <!-- Toolbar — always visible; buttons gray out when there are no rows
+         instead of the whole bar disappearing -->
     <div
-      v-if="sortedRows.length > 0 && !hideToolbar"
+      v-if="!hideToolbar"
       class="px-3 py-1 border-b bg-muted/20 flex flex-shrink-0 gap-1 items-center"
     >
-      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="copyAllAs('csv')">
+      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" :disabled="sortedRows.length === 0" @click="copyAllAs('csv')">
         {{ $t('components.dataGrid.export.copyAllCsv') }}
       </Button>
-      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="copyAllAs('json')">
+      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" :disabled="sortedRows.length === 0" @click="copyAllAs('json')">
         {{ $t('components.dataGrid.export.copyAllJson') }}
       </Button>
-      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="copyAllAs('insert')">
+      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" :disabled="sortedRows.length === 0" @click="copyAllAs('insert')">
         {{ $t('components.dataGrid.export.copyAllInsert') }}
       </Button>
       <span class="text-xs text-muted-foreground mx-1">|</span>
-      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="exportAllAs('csv')">
+      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" :disabled="sortedRows.length === 0" @click="exportAllAs('csv')">
         {{ $t('components.dataGrid.export.exportCsv') }}
       </Button>
-      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" @click="exportAllAs('json')">
+      <Button variant="ghost" size="sm" class="text-xs px-2 h-6" :disabled="sortedRows.length === 0" @click="exportAllAs('json')">
         {{ $t('components.dataGrid.export.exportJson') }}
       </Button>
     </div>
@@ -572,80 +584,87 @@ watch(sortableColumns, (columns) => {
 
     <!-- Grid Content -->
     <div v-else class="flex flex-1 flex-col min-h-0">
-      <!-- Header (outside scroll container — never overlaps rows) -->
+      <!-- Header (outside scroll container — never overlaps rows). The
+           viewport clips overflow and mirrors the rows' horizontal scroll so
+           the sticky Actions header stays pinned at the visible right edge. -->
       <div
-        class="border-b bg-muted flex flex-shrink-0"
+        ref="headerViewport"
+        class="border-b bg-muted flex flex-shrink-0 overflow-hidden"
       >
-        <!-- Select-All Checkbox -->
-        <div class="flex flex-shrink-0 h-8 w-10 items-center justify-center">
-          <Checkbox
-            :checked="selection.isAllSelected(sortedRows.length)"
-            @update:checked="selection.toggleAll(sortedRows.length)"
-          />
-        </div>
-        <!-- Column Headers -->
         <div
-          v-for="col in columns"
-          :key="col"
-          class="group flex flex-shrink-0 items-center relative"
-          :style="{ width: `${getColumnWidth(col)}px` }"
-          @contextmenu.prevent="openHeaderContextMenu($event, col)"
+          class="flex flex-shrink-0"
         >
-          <button
-            v-if="isSortable(col)"
-            class="px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 items-center"
-            :class="sort.getSortDirection(col) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'"
-            @click="handleHeaderSort(col, ($event as MouseEvent).shiftKey)"
-          >
-            <span class="text-xs font-medium truncate">{{ col }}</span>
-            <span
-              v-if="sort.getSortDirection(col) === 'ASC'"
-              class="i-carbon-arrow-up flex-shrink-0 h-3 w-3"
-            />
-            <span
-              v-else-if="sort.getSortDirection(col) === 'DESC'"
-              class="i-carbon-arrow-down flex-shrink-0 h-3 w-3"
-            />
-            <span
-              v-else
-              class="i-carbon-chevron-sort opacity-0 flex-shrink-0 h-3 w-3 transition-opacity group-hover:opacity-40"
-            />
-            <!-- Multi-sort priority -->
-            <span
-              v-if="sort.getSortPriority(col)"
-              class="text-[10px] text-primary leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
-            >{{ sort.getSortPriority(col) }}</span>
-            <!-- Filter indicator -->
-            <span
-              v-if="filter.hasFilter(col)"
-              class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
-            />
-          </button>
-          <!-- Non-primitive columns (JSON/array/BLOB) cannot be sorted client-side -->
-          <div
-            v-else
-            class="text-muted-foreground px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 cursor-default items-center"
-            :title="$t('components.dataGrid.sort.unsortable')"
-          >
-            <span class="text-xs font-medium truncate">{{ col }}</span>
-            <span
-              v-if="filter.hasFilter(col)"
-              class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
+          <!-- Select-All Checkbox -->
+          <div class="flex flex-shrink-0 h-8 w-10 items-center justify-center">
+            <Checkbox
+              :checked="selection.isAllSelected(sortedRows.length)"
+              @update:checked="selection.toggleAll(sortedRows.length)"
             />
           </div>
-          <!-- Resize Handle -->
+          <!-- Column Headers -->
           <div
-            class="opacity-0 w-1 cursor-col-resize transition-opacity bottom-0 right-0 top-0 absolute z-10 hover:bg-primary/40 group-hover:opacity-100"
-            @mousedown.stop="startColumnResize($event, col)"
-          />
-        </div>
-        <!-- Actions Column Header -->
-        <div
-          v-if="connectionId"
-          class="bg-muted flex-shrink-0 w-20 right-0 sticky z-10"
-        >
-          <div class="px-2 flex h-8 items-center justify-center">
-            <span class="text-xs text-muted-foreground font-medium truncate">{{ $t('components.dataGrid.row.actions') }}</span>
+            v-for="col in columns"
+            :key="col"
+            class="group flex flex-shrink-0 items-center relative"
+            :style="{ width: `${getColumnWidth(col)}px` }"
+            @contextmenu.prevent="openHeaderContextMenu($event, col)"
+          >
+            <button
+              v-if="isSortable(col)"
+              class="px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 items-center"
+              :class="sort.getSortDirection(col) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              @click="handleHeaderSort(col, ($event as MouseEvent).shiftKey)"
+            >
+              <span class="text-xs font-medium truncate">{{ col }}</span>
+              <span
+                v-if="sort.getSortDirection(col) === 'ASC'"
+                class="i-carbon-arrow-up flex-shrink-0 h-3 w-3"
+              />
+              <span
+                v-else-if="sort.getSortDirection(col) === 'DESC'"
+                class="i-carbon-arrow-down flex-shrink-0 h-3 w-3"
+              />
+              <span
+                v-else
+                class="i-carbon-chevron-sort opacity-0 flex-shrink-0 h-3 w-3 transition-opacity group-hover:opacity-40"
+              />
+              <!-- Multi-sort priority -->
+              <span
+                v-if="sort.getSortPriority(col)"
+                class="text-[10px] text-primary leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
+              >{{ sort.getSortPriority(col) }}</span>
+              <!-- Filter indicator -->
+              <span
+                v-if="filter.hasFilter(col)"
+                class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
+              />
+            </button>
+            <!-- Non-primitive columns (JSON/array/BLOB) cannot be sorted client-side -->
+            <div
+              v-else
+              class="text-muted-foreground px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 cursor-default items-center"
+              :title="$t('components.dataGrid.sort.unsortable')"
+            >
+              <span class="text-xs font-medium truncate">{{ col }}</span>
+              <span
+                v-if="filter.hasFilter(col)"
+                class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
+              />
+            </div>
+            <!-- Resize Handle -->
+            <div
+              class="opacity-0 w-1 cursor-col-resize transition-opacity bottom-0 right-0 top-0 absolute z-10 hover:bg-primary/40 group-hover:opacity-100"
+              @mousedown.stop="startColumnResize($event, col)"
+            />
+          </div>
+          <!-- Actions Column Header -->
+          <div
+            v-if="connectionId"
+            class="bg-muted flex-shrink-0 w-20 right-0 sticky z-10"
+          >
+            <div class="px-2 flex h-8 items-center justify-center">
+              <span class="text-xs text-muted-foreground font-medium truncate">{{ $t('components.dataGrid.row.actions') }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -654,7 +673,7 @@ watch(sortableColumns, (columns) => {
       <div
         ref="scrollContainer"
         class="flex-1 relative overflow-auto"
-        @scroll="() => {}"
+        @scroll="syncHeaderScroll"
       >
         <div
           :style="{ height: `${rowVirtualizer.getTotalSize()}px` }"
