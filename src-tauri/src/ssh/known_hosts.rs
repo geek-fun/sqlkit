@@ -33,8 +33,11 @@ struct KnownHostEntry {
 }
 
 fn load() -> HashMap<String, String> {
-    let path = store_path();
-    let Ok(raw) = std::fs::read_to_string(&path) else {
+    load_from(&store_path())
+}
+
+fn load_from(path: &std::path::Path) -> HashMap<String, String> {
+    let Ok(raw) = std::fs::read_to_string(path) else {
         return HashMap::new();
     };
     serde_json::from_str::<Vec<(String, String, u64)>>(&raw)
@@ -47,7 +50,10 @@ fn load() -> HashMap<String, String> {
 }
 
 fn save(hosts: &HashMap<String, String>) {
-    let path = store_path();
+    save_to(&store_path(), hosts)
+}
+
+fn save_to(path: &std::path::Path, hosts: &HashMap<String, String>) {
     if let Some(dir) = path.parent() {
         let _ = std::fs::create_dir_all(dir);
     }
@@ -67,8 +73,18 @@ fn save(hosts: &HashMap<String, String>) {
 /// TOFU check: accept and pin a first-seen host key, require a match afterwards.
 /// Returns `Err` with a user-facing message on fingerprint mismatch.
 pub fn verify_or_pin(host: &str, port: u16, fingerprint: &str) -> Result<(), String> {
+    verify_or_pin_in(&store_path(), host, port, fingerprint)
+}
+
+/// Store-injectable core — unit tests use isolated files.
+pub fn verify_or_pin_in(
+    path: &std::path::Path,
+    host: &str,
+    port: u16,
+    fingerprint: &str,
+) -> Result<(), String> {
     let key = format!("{}:{}", host, port);
-    let mut hosts = load();
+    let mut hosts = load_from(path);
     match hosts.get(&key) {
         Some(pinned) if pinned != fingerprint => Err(format!(
             "Host key for {}:{} changed (possible man-in-the-middle). \
@@ -79,7 +95,7 @@ pub fn verify_or_pin(host: &str, port: u16, fingerprint: &str) -> Result<(), Str
         Some(_) => Ok(()),
         None => {
             hosts.insert(key, fingerprint.to_string());
-            save(&hosts);
+            save_to(path, &hosts);
             Ok(())
         }
     }
@@ -98,44 +114,56 @@ pub fn unpin(host: &str, port: u16) {
 mod tests {
     use super::*;
 
-    fn temp_store(tag: &str) {
-        let dir = std::env::temp_dir().join(format!("sqlkit-known-hosts-{tag}-{}", std::process::id()));
-        let _ = std::fs::remove_dir_all(&dir);
+    fn temp_file(tag: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "sqlkit-known-hosts-{tag}-{}-{}",
+            std::process::id(),
+            uuid::Uuid::new_v4().simple()
+        ));
         std::fs::create_dir_all(&dir).unwrap();
-        let _ = STORE_PATH.set(dir.join(STORE_FILE));
+        dir.join(STORE_FILE)
     }
 
     #[test]
     fn pins_first_seen_key_and_accepts_match() {
-        temp_store("pin");
-        verify_or_pin("bastion", 22, "SHA256:abc").unwrap();
-        verify_or_pin("bastion", 22, "SHA256:abc").unwrap();
+        let path = temp_file("pin");
+        verify_or_pin_in(&path, "bastion", 22, "SHA256:abc").unwrap();
+        verify_or_pin_in(&path, "bastion", 22, "SHA256:abc").unwrap();
     }
 
     #[test]
     fn rejects_mismatched_key() {
-        temp_store("mismatch");
-        verify_or_pin("bastion", 22, "SHA256:abc").unwrap();
-        let err = verify_or_pin("bastion", 22, "SHA256:evil").unwrap_err();
+        let path = temp_file("mismatch");
+        verify_or_pin_in(&path, "bastion", 22, "SHA256:abc").unwrap();
+        let err = verify_or_pin_in(&path, "bastion", 22, "SHA256:evil").unwrap_err();
         assert!(err.contains("changed"));
         assert!(err.contains("SHA256:abc"));
     }
 
     #[test]
     fn keys_are_isolated_per_host_port() {
-        temp_store("isolation");
-        verify_or_pin("bastion", 22, "SHA256:abc").unwrap();
-        verify_or_pin("other", 22, "SHA256:xyz").unwrap();
-        verify_or_pin("bastion", 2222, "SHA256:xyz2").unwrap();
-        verify_or_pin("bastion", 22, "SHA256:abc").unwrap();
+        let path = temp_file("isolation");
+        verify_or_pin_in(&path, "bastion", 22, "SHA256:abc").unwrap();
+        verify_or_pin_in(&path, "other", 22, "SHA256:xyz").unwrap();
+        verify_or_pin_in(&path, "bastion", 2222, "SHA256:xyz2").unwrap();
+        verify_or_pin_in(&path, "bastion", 22, "SHA256:abc").unwrap();
     }
 
     #[test]
     fn pins_survive_a_store_reload() {
-        temp_store("reload");
-        verify_or_pin("bastion", 22, "SHA256:abc").unwrap();
-        // a fresh load must still see the pinned key (file-backed)
-        let err = verify_or_pin("bastion", 22, "SHA256:evil").unwrap_err();
+        let path = temp_file("reload");
+        verify_or_pin_in(&path, "bastion", 22, "SHA256:abc").unwrap();
+        let err = verify_or_pin_in(&path, "bastion", 22, "SHA256:evil").unwrap_err();
         assert!(err.contains("changed"));
+    }
+
+    #[test]
+    fn unknown_hosts_are_independent_entries() {
+        let path = temp_file("independent");
+        verify_or_pin_in(&path, "a", 22, "SHA256:a").unwrap();
+        verify_or_pin_in(&path, "b", 22, "SHA256:b").unwrap();
+        // neither rejected the other — each host:port is its own entry
+        verify_or_pin_in(&path, "a", 22, "SHA256:a").unwrap();
+        verify_or_pin_in(&path, "b", 22, "SHA256:b").unwrap();
     }
 }
