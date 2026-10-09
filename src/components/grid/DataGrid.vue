@@ -605,8 +605,8 @@ watch(sortableColumns, (columns) => {
           <div
             v-for="col in columns"
             :key="col"
-            class="group flex flex-shrink-0 items-center relative"
-            :style="{ width: `${getColumnWidth(col)}px` }"
+            class="group flex min-w-0 items-center relative"
+            :style="{ flex: `${getColumnWidth(col)} 0 ${getColumnWidth(col)}px` }"
             @contextmenu.prevent="openHeaderContextMenu($event, col)"
           >
             <button
@@ -660,7 +660,7 @@ watch(sortableColumns, (columns) => {
           <!-- Actions Column Header -->
           <div
             v-if="connectionId"
-            class="ml-auto bg-muted flex-shrink-0 w-20 right-0 sticky z-10"
+            class="bg-muted flex-shrink-0 w-20 right-0 sticky z-10"
           >
             <div class="px-2 flex h-8 items-center justify-center">
               <span class="text-xs text-muted-foreground font-medium truncate">{{ $t('components.dataGrid.row.actions') }}</span>
@@ -709,9 +709,9 @@ watch(sortableColumns, (columns) => {
             <div
               v-for="col in columns"
               :key="`c-${virtualRow.index}-${col}`"
-              class="px-3 py-1 flex flex-shrink-0 items-center overflow-hidden"
+              class="px-3 py-1 flex min-w-0 items-center overflow-hidden"
               :class="getCellClass(columnTypes?.[col])"
-              :style="{ width: `${getColumnWidth(col)}px` }"
+              :style="{ flex: `${getColumnWidth(col)} 0 ${getColumnWidth(col)}px` }"
               :title="getCellTooltip(sortedRows[virtualRow.index][col])"
               @contextmenu.prevent="openCellContextMenu($event, virtualRow.index, col)"
             >
@@ -773,7 +773,7 @@ watch(sortableColumns, (columns) => {
             <!-- Row Actions -->
             <div
               v-if="connectionId"
-              class="ml-auto bg-background/80 flex flex-shrink-0 w-20 items-center right-0 justify-center sticky z-10"
+              class="bg-background/80 flex flex-shrink-0 w-20 items-center right-0 justify-center sticky z-10"
               @click.stop
             >
               <DropdownMenu>
