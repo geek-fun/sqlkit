@@ -234,7 +234,7 @@ fn is_file_based_db(db_type: &crate::database::DatabaseType) -> bool {
 /// If transport layers are configured, starts the tunnel and returns `127.0.0.1:local_port`.
 /// Otherwise returns the original `(host, port)` for direct connection.
 pub async fn connection_host_port(
-    connection_id: &str,
+    _connection_id: &str,
     config: &ConnectionConfig,
     tunnels: &TunnelManager,
 ) -> Result<(String, u16), String> {
@@ -281,12 +281,15 @@ fn tunnel_key(
 ) -> String {
     let mut hops = Vec::new();
     for layer in layers {
-        if let crate::ssh::config::TransportLayerConfig::Ssh(config) = layer {
-            hops.push(format!(
-                "{}:{}:{}:{}",
-                config.host, config.port, config.username, config.auth_method
-            ));
-        }
+        // TransportLayerConfig currently has a single variant — a plain let
+        // keeps this correct when more transport kinds are added.
+        // TransportLayerConfig is single-variant today; the let keeps this
+        // compiling unchanged when more transport kinds arrive.
+        let crate::ssh::config::TransportLayerConfig::Ssh(config) = layer;
+        hops.push(format!(
+            "{}:{}:{}:{}",
+            config.host, config.port, config.username, config.auth_method
+        ));
     }
     format!("ssh:{}:{}:{}", hops.join("->"), host, port)
 }

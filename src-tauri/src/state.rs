@@ -54,6 +54,11 @@ pub struct ServerConfig {
     /// Password for authentication (optional).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub password: Option<String>,
+    /// SSH tunnel configuration as authored by the frontend (opaque to the
+    /// backend — persisted verbatim so the edit round-trip never loses
+    /// profile hops or options).
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "sshTunnel")]
+    pub ssh_tunnel: Option<serde_json::Value>,
     /// Default database to connect to.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub database: Option<String>,
@@ -117,6 +122,7 @@ impl ServerConfig {
             name,
             db_type,
             host,
+            ssh_tunnel: None,
             port,
             username,
             password: None,

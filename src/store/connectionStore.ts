@@ -547,7 +547,7 @@ function extractOracleOptions(raw: unknown): OracleConnectionOptions | undefined
   }
 }
 
-export function buildTransportLayers(sshTunnel?: SSHTunnelConfig): import('@/datasources/connectionApi').TransportLayerConfig[] | null {
+export async function buildTransportLayers(sshTunnel?: SSHTunnelConfig): Promise<import('@/datasources/connectionApi').TransportLayerConfig[] | null> {
   if (!sshTunnel?.enabled) {
     return null
   }
@@ -556,6 +556,10 @@ export function buildTransportLayers(sshTunnel?: SSHTunnelConfig): import('@/dat
   // profile store, preserving hop order.
   if (sshTunnel.profileIds?.length) {
     const profileStore = useSshProfileStore()
+    if (!profileStore.loaded) {
+      // a fresh app session can reach a save before any profile UI ran
+      await profileStore.fetch()
+    }
     const layers = sshTunnel.profileIds
       .map(id => profileStore.byId(id))
       .filter((p): p is NonNullable<typeof p> => !!p)
@@ -692,7 +696,8 @@ export const useConnectionStore = defineStore('connectionStore', {
               clientKeyPath: item.ssl_client_key as string | undefined,
               trustServerCertificate: item.trust_server_certificate as boolean | undefined,
             },
-            sshTunnel: extractSshTunnelFromTransport(item.transport_layers),
+            sshTunnel: (item.sshTunnel as SSHTunnelConfig | undefined)
+              ?? extractSshTunnelFromTransport(item.transport_layers),
             oracleOptions: extractOracleOptions(item.oracle_options),
             readOnly: (item.read_only as boolean | undefined) ?? false,
             isConnected: prev?.isConnected ?? (item.is_connected as boolean | undefined),
@@ -709,7 +714,7 @@ export const useConnectionStore = defineStore('connectionStore', {
 
     async saveConnection(connection: ServerConnection): Promise<{ success: boolean, message: string }> {
       try {
-        const transportLayers = buildTransportLayers(connection.sshTunnel)
+        const transportLayers = await buildTransportLayers(connection.sshTunnel)
 
         const serverConfig = {
           id: connection.id || crypto.randomUUID(),
@@ -758,7 +763,7 @@ export const useConnectionStore = defineStore('connectionStore', {
 
     async testConnection(connection: ServerConnection): Promise<boolean> {
       try {
-        const transportLayers = buildTransportLayers(connection.sshTunnel)
+        const transportLayers = await buildTransportLayers(connection.sshTunnel)
 
         const serverConfig = {
           id: connection.id || crypto.randomUUID(),
@@ -802,7 +807,7 @@ export const useConnectionStore = defineStore('connectionStore', {
       this.connectionStatus[connectionId] = ConnectionStatus.CONNECTING
 
       try {
-        const transportLayers = buildTransportLayers(connection.sshTunnel)
+        const transportLayers = await buildTransportLayers(connection.sshTunnel)
 
         const serverConfig = {
           id: connection.id!,
