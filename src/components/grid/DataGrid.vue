@@ -592,7 +592,7 @@ watch(sortableColumns, (columns) => {
         class="border-b bg-muted flex flex-shrink-0 overflow-hidden"
       >
         <div
-          class="flex flex-shrink-0"
+          class="flex flex-shrink-0 min-w-full"
         >
           <!-- Select-All Checkbox -->
           <div class="flex flex-shrink-0 h-8 w-10 items-center justify-center">
@@ -660,7 +660,7 @@ watch(sortableColumns, (columns) => {
           <!-- Actions Column Header -->
           <div
             v-if="connectionId"
-            class="bg-muted flex-shrink-0 w-20 right-0 sticky z-10"
+            class="ml-auto bg-muted flex-shrink-0 w-20 right-0 sticky z-10"
           >
             <div class="px-2 flex h-8 items-center justify-center">
               <span class="text-xs text-muted-foreground font-medium truncate">{{ $t('components.dataGrid.row.actions') }}</span>
@@ -684,7 +684,7 @@ watch(sortableColumns, (columns) => {
             v-for="virtualRow in rowVirtualizer.getVirtualItems()"
             :key="`r-${virtualRow.index}`"
             :data-index="virtualRow.index"
-            class="group border-b border-border/30 flex transition-colors duration-75 left-0 top-0 absolute hover:bg-muted/[0.08]"
+            class="group border-b border-border/30 flex min-w-full transition-colors duration-75 left-0 top-0 absolute hover:bg-muted/[0.08]"
             :class="[
               virtualRow.index % 2 === 0 ? 'bg-muted/[0.03]' : '',
               selection.isSelected(virtualRow.index) ? 'bg-primary/[0.08]' : '',
@@ -773,7 +773,7 @@ watch(sortableColumns, (columns) => {
             <!-- Row Actions -->
             <div
               v-if="connectionId"
-              class="bg-background/80 flex flex-shrink-0 w-20 items-center right-0 justify-center sticky z-10"
+              class="ml-auto bg-background/80 flex flex-shrink-0 w-20 items-center right-0 justify-center sticky z-10"
               @click.stop
             >
               <DropdownMenu>
