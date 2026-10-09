@@ -475,6 +475,10 @@ describe('connectionStore', () => {
 
         const connectPromise = store.connect('conn-1')
 
+        // connect awaits the transport-layer build (async) before reaching
+        // the mocked API — flush microtasks until it gets there
+        for (let i = 0; i < 10; i++)
+          await Promise.resolve()
         expect(store.connectionStatus['conn-1']).toBe(ConnectionStatus.CONNECTING)
 
         resolveConnect?.({ is_connected: true })
