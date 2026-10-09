@@ -8,6 +8,7 @@ use crate::database::{
     config::{ConnectionConfig, SslMode},
     error::{DbError, DbResult},
     pool::ConnectionPool,
+    sql_classification::statement_returns_rows,
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
         QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
@@ -19,6 +20,7 @@ use mysql_async::{
     prelude::*, ClientIdentity, Conn, OptsBuilder, Pool, PoolConstraints, PoolOpts, Row, SslOpts,
     Value,
 };
+use sqlparser::dialect::MySqlDialect;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -621,12 +623,11 @@ impl DatabaseAdapter for MySQLAdapter {
             .map(Duration::from_millis);
 
         // Determine if this is a query that returns rows
-        let query_trimmed = query.trim().to_uppercase();
-        let is_select = query_trimmed.starts_with("SELECT")
-            || query_trimmed.starts_with("SHOW")
-            || query_trimmed.starts_with("DESCRIBE")
-            || query_trimmed.starts_with("EXPLAIN")
-            || query_trimmed.starts_with("WITH");
+        let is_select = statement_returns_rows(
+            query,
+            &["SELECT", "SHOW", "DESCRIBE", "EXPLAIN", "WITH"],
+            &MySqlDialect {},
+        );
 
         let execution_time;
 

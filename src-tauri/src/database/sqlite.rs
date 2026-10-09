@@ -8,6 +8,7 @@ use crate::database::{
     config::ConnectionConfig,
     error::{DbError, DbResult},
     pool::ConnectionPool,
+    sql_classification::statement_returns_rows,
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
         QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
@@ -15,6 +16,7 @@ use crate::database::{
 };
 use async_trait::async_trait;
 use rusqlite::{types::ValueRef, Connection, OpenFlags, Row};
+use sqlparser::dialect::GenericDialect;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -377,11 +379,11 @@ impl SQLiteAdapter {
             .map_err(|e| DbError::QueryExecution(format!("Failed to lock connection: {}", e)))?;
 
         // Check if this is a SELECT query
-        let trimmed = query.trim().to_uppercase();
-        let is_select = trimmed.starts_with("SELECT")
-            || trimmed.starts_with("PRAGMA")
-            || trimmed.starts_with("EXPLAIN")
-            || trimmed.starts_with("WITH");
+        let is_select = statement_returns_rows(
+            query,
+            &["SELECT", "PRAGMA", "EXPLAIN", "WITH"],
+            &GenericDialect {},
+        );
 
         if is_select {
             let mut stmt = conn_guard

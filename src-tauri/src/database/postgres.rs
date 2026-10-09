@@ -8,6 +8,7 @@ use crate::database::{
     config::{ConnectionConfig, DatabaseType, SslMode},
     error::{DbError, DbResult},
     pool::ConnectionPool,
+    sql_classification::statement_returns_rows,
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
         QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
@@ -20,6 +21,7 @@ use deadpool_postgres::{
 };
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
 use rustls::ClientConfig;
+use sqlparser::dialect::PostgreSqlDialect;
 use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
@@ -1051,11 +1053,11 @@ impl DatabaseAdapter for PostgresAdapter {
             .map(Duration::from_millis);
 
         // Determine if this is a query that returns rows or a statement
-        let query_trimmed = query.trim().to_uppercase();
-        let is_select = query_trimmed.starts_with("SELECT")
-            || query_trimmed.starts_with("WITH")
-            || query_trimmed.starts_with("SHOW")
-            || query_trimmed.starts_with("EXPLAIN");
+        let is_select = statement_returns_rows(
+            query,
+            &["SELECT", "WITH", "SHOW", "EXPLAIN", "TABLE"],
+            &PostgreSqlDialect {},
+        );
 
         let execution_time;
 
