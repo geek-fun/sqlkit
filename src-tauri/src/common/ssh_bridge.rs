@@ -244,6 +244,7 @@ fn force_port_forward_for(config: &Value) -> bool {
 
 /// Inverse of the `socks5Proxy` injection in `resolve_ssh_in_place` —
 /// ssh_bridge owns both the injection and the parsing of this format.
+#[allow(dead_code)] // ported with the dockit parity batch — wired up with proxy-profile support
 pub(crate) fn parse_socks5_proxy(
     socks5_proxy: Option<&str>,
 ) -> Result<Option<(String, u16)>, String> {

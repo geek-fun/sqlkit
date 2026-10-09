@@ -8,6 +8,13 @@ use tauri::{AppHandle, Manager};
 use tauri_plugin_store::StoreExt;
 use uuid::Uuid;
 
+/// Remove the pinned host key for a host — the recovery path when a server's
+/// key legitimately changed and TOFU verification started rejecting it.
+#[tauri::command]
+pub fn unpin_ssh_host(host: String, port: u16) {
+    crate::ssh::known_hosts::unpin(&host, port);
+}
+
 /// List all saved SSH profiles.
 #[tauri::command]
 pub async fn list_ssh_profiles(app: AppHandle) -> Result<Vec<SshProfile>, String> {
@@ -112,7 +119,6 @@ pub struct TestSshResult {
 
 #[tauri::command]
 pub async fn test_ssh_connection(
-    app: tauri::AppHandle,
     config: SshTunnelConfig,
     remote_host: String,
     remote_port: u16,

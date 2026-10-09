@@ -278,6 +278,7 @@ pub fn run() {
             crate::ssh::commands::delete_ssh_profile,
             crate::ssh::commands::test_ssh_connection,
             crate::ssh::commands::list_ssh_config_hosts,
+            crate::ssh::commands::unpin_ssh_host,
             crate::common::http_client::detect_system_proxy,
             // Agent commands
             invoke_capability,

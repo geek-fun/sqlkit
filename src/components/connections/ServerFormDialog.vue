@@ -721,7 +721,7 @@ async function handleTestConnection() {
       ssl_client_cert: formData.value.ssl.clientCertPath || null,
       ssl_client_key: formData.value.ssl.clientKeyPath || null,
       trust_server_certificate: formData.value.ssl.trustServerCertificate ?? null,
-      transport_layers: buildTransportLayers(formData.value.sshTunnel),
+      transport_layers: await buildTransportLayers(formData.value.sshTunnel),
       oracle_options: buildOracleOptions(formData.value.oracleOptions),
       read_only: formData.value.readOnly ?? false,
     }
