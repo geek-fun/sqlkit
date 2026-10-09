@@ -1,13 +1,13 @@
 # SSH Tunnel 测试指南（sqlkit）
 
-配套测试栈：`docker-compose-ssh-tunnel.yml`（本仓库根目录）。
+配套测试栈：`docker-compose-sqlkit-ssh-tunnel.yml`，位于 `~/Documents/devs/geekfun/event-search/`（与 DocKit 的 2222 测试栈同仓管理）。
 架构与实现见 [ssh-tunnel-architecture.md](ssh-tunnel-architecture.md)。
 
 ## 启动 / 停止
 
 ```bash
-docker compose -f docker-compose-ssh-tunnel.yml up -d
-docker compose -f docker-compose-ssh-tunnel.yml down   # 数据卷保留
+docker compose -f docker-compose-sqlkit-ssh-tunnel.yml up -d
+docker compose -f docker-compose-sqlkit-ssh-tunnel.yml down   # 数据卷保留
 ```
 
 - 堡垒机对宿主机暴露 **2223** 端口（DocKit 的测试栈用 2222，两者可并行运行）
@@ -22,13 +22,13 @@ docker compose -f docker-compose-ssh-tunnel.yml down   # 数据卷保留
 
 ## 测试密钥（三把，覆盖三种认证路径）
 
-私钥已 gitignore，仅存在于本地 `docker/ssh-bastion/`：
+私钥已 gitignore，仅存在于`event-search/docker/ssh-bastion-sqlkit/`：
 
 | 私钥 | 认证路径 |
 |---|---|
-| `docker/ssh-bastion/test_key` | ED25519 |
-| `docker/ssh-bastion/test_key.pem` | RSA PEM |
-| `docker/ssh-bastion/test_key_with_passphrase` | ED25519 + 口令（口令：`testphrase`）|
+| `event-search/docker/ssh-bastion-sqlkit/test_key` | ED25519 |
+| `event-search/docker/ssh-bastion-sqlkit/test_key.pem` | RSA PEM |
+| `event-search/docker/ssh-bastion-sqlkit/test_key_with_passphrase` | ED25519 + 口令（口令：`testphrase`）|
 
 ## 数据库凭据
 
