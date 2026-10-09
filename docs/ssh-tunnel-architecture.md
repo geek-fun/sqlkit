@@ -1,5 +1,7 @@
 # SSH Tunnel Architecture (SqlKit)
 
+> 测试环境搭建见 [ssh-tunnel-testing.md](ssh-tunnel-testing.md)。
+
 SqlKit's SSH tunnel is aligned with DocKit's implementation (see
 `geek-fun/dockit` `docs/ssh-tunnel-architecture.md`). The backend is the
 same `russh`-based engine; this document maps it onto SqlKit's connection
