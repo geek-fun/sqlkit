@@ -39,6 +39,21 @@ impl JdbcBridgeLauncher {
         super::jre::JreDetector::detect()
     }
 
+    /// JVM options granting native access to classpath code.
+    ///
+    /// Drivers like DuckDB load a native library through `System::load`, which
+    /// Java 24+ flags as a restricted method and future JDKs will deny without
+    /// `--enable-native-access` (issue #176). The option exists since JDK 17;
+    /// older JVMs reject it at startup, so it is only passed when the detected
+    /// Java is new enough (or when the version can't be determined — every
+    /// supported launch path already requires Java 25+).
+    fn native_access_args(java_version: Option<u32>) -> Vec<String> {
+        match java_version {
+            Some(version) if version < 17 => Vec::new(),
+            _ => vec!["--enable-native-access=ALL-UNNAMED".to_string()],
+        }
+    }
+
     fn read_stderr_buffer(buf: &Arc<Mutex<Vec<String>>>) -> String {
         buf.lock().unwrap_or_else(|e| e.into_inner()).join("\n")
     }
@@ -84,7 +99,11 @@ impl JdbcBridgeLauncher {
             )
         })?;
 
+        let java_version = super::jre::system_java_version(&java);
         let mut cmd = Command::new(&java);
+        for arg in Self::native_access_args(java_version) {
+            cmd.arg(arg);
+        }
         for arg in jvm_args {
             cmd.arg(arg);
         }
@@ -147,8 +166,13 @@ impl JdbcBridgeLauncher {
             }
         }
 
-        let mut child = Command::new(&java)
-            .args(["-cp", &classpath, "sqlkit.bridge.BridgeMain"])
+        let java_version = super::jre::system_java_version(&java);
+        let mut cmd = Command::new(&java);
+        for arg in Self::native_access_args(java_version) {
+            cmd.arg(arg);
+        }
+        cmd.args(["-cp", &classpath, "sqlkit.bridge.BridgeMain"]);
+        let mut child = cmd
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -566,6 +590,40 @@ mod launcher_registry_tests {
         assert_ne!(
             launcher_key(&jar, &[]),
             launcher_key(Path::new("/tmp/other.jar"), &[]),
+        );
+    }
+
+    #[test]
+    fn native_access_args_on_for_modern_java() {
+        for version in [17u32, 21, 25] {
+            assert_eq!(
+                JdbcBridgeLauncher::native_access_args(Some(version)),
+                vec!["--enable-native-access=ALL-UNNAMED".to_string()],
+                "Java {} should get native access",
+                version,
+            );
+        }
+    }
+
+    #[test]
+    fn native_access_args_off_for_legacy_java() {
+        for version in [8u32, 11] {
+            assert!(
+                JdbcBridgeLauncher::native_access_args(Some(version)).is_empty(),
+                "Java {} would reject the option at startup",
+                version,
+            );
+        }
+    }
+
+    #[test]
+    fn native_access_args_on_when_version_unknown() {
+        // All supported launch paths require Java 25+, so an undetectable
+        // version still passes the flag — failing closed keeps DuckDB's
+        // native library load working on future JDKs (issue #176).
+        assert_eq!(
+            JdbcBridgeLauncher::native_access_args(None),
+            vec!["--enable-native-access=ALL-UNNAMED".to_string()],
         );
     }
 }
