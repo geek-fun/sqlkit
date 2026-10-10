@@ -315,13 +315,14 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         {{ t('pages.queries.explain.tabLabels.explain') }}
       </Button>
 
-      <!-- Export actions -->
+      <!-- Export actions — always visible while the results view is active;
+           disabled (grayed out) instead of hidden when there is nothing to copy/export -->
       <span class="text-muted-foreground/30 mx-1">|</span>
-      <template v-if="displayResults && displayResults.rows.length > 0 && activeOutputView === 'results'">
+      <template v-if="activeOutputView === 'results'">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'csv')">
+              <Button variant="ghost" size="icon" class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20" :disabled="!displayResults || displayResults.rows.length === 0" @click="displayResults && copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'csv')">
                 <span class="i-lucide-file-spreadsheet shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -331,7 +332,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'json')">
+              <Button variant="ghost" size="icon" class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20" :disabled="!displayResults || displayResults.rows.length === 0" @click="displayResults && copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'json')">
                 <span class="i-lucide-file-json shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -341,7 +342,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-emerald-600 h-7 w-7 dark:text-emerald-400 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/20" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'insert')">
+              <Button variant="ghost" size="icon" class="text-emerald-600 h-7 w-7 dark:text-emerald-400 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/20" :disabled="!displayResults || displayResults.rows.length === 0" @click="displayResults && copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'insert')">
                 <span class="i-lucide-database shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -352,7 +353,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'csv')">
+              <Button variant="ghost" size="icon" class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20" :disabled="!displayResults || displayResults.rows.length === 0" @click="displayResults && copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'csv')">
                 <span class="i-lucide-file-down shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
@@ -362,7 +363,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'json')">
+              <Button variant="ghost" size="icon" class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20" :disabled="!displayResults || displayResults.rows.length === 0" @click="displayResults && copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'json')">
                 <span class="i-lucide-file-down shrink-0 h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>

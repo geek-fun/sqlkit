@@ -54,16 +54,63 @@ export function collectSortableColumns(
 
 type SortValueKind = 'boolean' | 'number' | 'date' | 'string'
 
-/** Resolve how a cell should be compared, preferring the declared column type. */
-function resolveSortKind(value: unknown, columnType?: string): SortValueKind {
+/**
+ * Fixed ordering across kinds, so a column holding mixed primitive types
+ * (SQLite's dynamic typing makes this routine) still yields ONE comparator.
+ * The kind is resolved per column, never per cell — per-cell resolution
+ * breaks comparator symmetry and flips order between passes.
+ */
+const KIND_PRECEDENCE: Record<SortValueKind, number> = { number: 0, boolean: 1, date: 2, string: 3 }
+
+/** Kind fixed by the declared column type, if it names one. */
+const resolveDeclaredKind = (columnType?: string): SortValueKind | null => {
   const type = (columnType ?? '').trim()
-  if (BOOLEAN_TYPE_PATTERN.test(type) || typeof value === 'boolean')
+  if (BOOLEAN_TYPE_PATTERN.test(type))
     return 'boolean'
-  if (NUMERIC_TYPE_PATTERN.test(type) || typeof value === 'number')
+  if (NUMERIC_TYPE_PATTERN.test(type))
     return 'number'
   if (DATE_TYPE_PATTERN.test(type))
     return 'date'
+  return null
+}
+
+/** Kind of a value when no usable type is declared; strings are never date-sniffed. */
+const resolveValueKind = (value: unknown): SortValueKind => {
+  if (typeof value === 'boolean')
+    return 'boolean'
+  if (typeof value === 'number')
+    return 'number'
   return 'string'
+}
+
+const kindFromToken = (kindOrType?: string): SortValueKind => {
+  if (kindOrType && (kindOrType === 'boolean' || kindOrType === 'number' || kindOrType === 'date' || kindOrType === 'string'))
+    return kindOrType
+  return resolveDeclaredKind(kindOrType) ?? 'string'
+}
+
+/** One kind for the whole column: declared type wins, otherwise the highest-precedence kind present. */
+const resolveColumnKind = (
+  rows: readonly Record<string, unknown>[],
+  column: string,
+  columnType?: string,
+): SortValueKind => {
+  const declared = resolveDeclaredKind(columnType)
+  if (declared)
+    return declared
+  let best = 'string' as SortValueKind
+  for (const row of rows) {
+    const value = row[column]
+    if (value === null || value === undefined || typeof value === 'object')
+      continue
+    const kind = resolveValueKind(value)
+    if (KIND_PRECEDENCE[kind] < KIND_PRECEDENCE[best]) {
+      best = kind
+      if (best === 'number')
+        break
+    }
+  }
+  return best
 }
 
 function toBoolean(value: unknown): boolean {
@@ -102,7 +149,7 @@ function compareDates(a: unknown, b: unknown): number {
  * Ascending comparison for two primitive cell values.
  * NULL/undefined always sort after real values in ascending order.
  */
-export function compareSortValues(a: unknown, b: unknown, columnType?: string): number {
+export function compareSortValues(a: unknown, b: unknown, kindOrType?: string): number {
   const aNull = a === null || a === undefined
   const bNull = b === null || b === undefined
   if (aNull && bNull)
@@ -112,7 +159,7 @@ export function compareSortValues(a: unknown, b: unknown, columnType?: string): 
   if (bNull)
     return -1
 
-  switch (resolveSortKind(a, columnType)) {
+  switch (kindFromToken(kindOrType)) {
     case 'boolean':
       return (toBoolean(a) ? 1 : 0) - (toBoolean(b) ? 1 : 0)
     case 'number':
@@ -136,11 +183,16 @@ export function sortRowsByState<T extends Record<string, unknown>>(
   if (rows.length === 0 || sortState.length === 0)
     return [...rows]
 
+  const kinds = new Map(sortState.map(rule => [
+    rule.column,
+    resolveColumnKind(rows, rule.column, columnTypes[rule.column]),
+  ]))
+
   return rows
     .map((row, index) => ({ row, index }))
     .sort((a, b) => {
       for (const rule of sortState) {
-        const result = compareSortValues(a.row[rule.column], b.row[rule.column], columnTypes[rule.column])
+        const result = compareSortValues(a.row[rule.column], b.row[rule.column], kinds.get(rule.column))
         if (result !== 0)
           return rule.direction === 'DESC' ? -result : result
       }

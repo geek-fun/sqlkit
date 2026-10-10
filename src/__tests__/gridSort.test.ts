@@ -54,11 +54,31 @@ describe('isSortableColumn', () => {
   })
 })
 
-describe('compareSortValues', () => {
-  it('orders numbers numerically', () => {
-    expect(compareSortValues(2, 10, 'integer')).toBeLessThan(0)
-    expect(compareSortValues(10, 2, 'integer')).toBeGreaterThan(0)
-    expect(compareSortValues(2, 2, 'integer')).toBe(0)
+describe('mixed-type columns', () => {
+  it('compares an untyped number+string column by one fixed kind (numbers first)', () => {
+    const rows = [
+      { v: 'abc' },
+      { v: 10 },
+      { v: 2 },
+      { v: null },
+    ]
+    const sorted = sortRowsByState(rows, [{ column: 'v', direction: 'ASC' }])
+    expect(sorted.map(r => r.v)).toEqual([2, 10, 'abc', null])
+  })
+
+  it('keeps the comparator symmetric on mixed columns', () => {
+    // per-cell kind resolution made compare(a,b) !== -compare(b,a) here
+    expect(compareSortValues('10', 9, 'number')).toBeGreaterThan(0)
+    expect(compareSortValues(9, '10', 'number')).toBeLessThan(0)
+  })
+
+  it('declared type wins over value kinds', () => {
+    const rows = [
+      { v: '9' },
+      { v: '10' },
+    ]
+    const sorted = sortRowsByState(rows, [{ column: 'v', direction: 'ASC' }], { v: 'integer' })
+    expect(sorted.map(r => r.v)).toEqual(['9', '10'])
   })
 
   it('compares numeric strings with a numeric column type', () => {
