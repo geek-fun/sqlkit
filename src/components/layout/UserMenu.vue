@@ -4,10 +4,10 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { Loader2, LogOut, RefreshCw, Settings, UserRound } from 'lucide-vue-next'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import DefaultAvatar from '@/components/DefaultAvatar.vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAccountStore } from '@/store/accountStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
-import DefaultAvatar from '@/components/DefaultAvatar.vue'
 import { GEEKFUN_BASE_URL as CONSOLE_BASE_URL, openLoginUrl, openRegisterUrl } from '@/utils/authService'
 
 const { t } = useI18n()
@@ -25,7 +25,6 @@ const planBadge = computed(() => {
     return { label: t('plan.state.checking'), cls: 'bg-muted text-muted-foreground border-transparent' }
   return { label: t('plan.state.unknown'), cls: 'bg-muted text-muted-foreground border-transparent' }
 })
-
 
 const expiryText = computed(() => {
   const expiresAt = entitlementStore.view?.ultimateExpiresAt
