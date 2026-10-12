@@ -7,6 +7,7 @@ import { useI18n } from 'vue-i18n'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAccountStore } from '@/store/accountStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
+import DefaultAvatar from '@/components/DefaultAvatar.vue'
 import { GEEKFUN_BASE_URL as CONSOLE_BASE_URL, openLoginUrl, openRegisterUrl } from '@/utils/authService'
 
 const { t } = useI18n()
@@ -25,10 +26,6 @@ const planBadge = computed(() => {
   return { label: t('plan.state.unknown'), cls: 'bg-muted text-muted-foreground border-transparent' }
 })
 
-const initials = computed(() => {
-  const n = accountStore.username || accountStore.email
-  return n ? n.slice(0, 2).toUpperCase() : ''
-})
 
 const expiryText = computed(() => {
   const expiresAt = entitlementStore.view?.ultimateExpiresAt
@@ -74,9 +71,11 @@ async function handleLogout() {
             alt=""
             class="h-full w-full object-cover"
           >
-          <template v-else>
-            {{ initials || 'U' }}
-          </template>
+          <DefaultAvatar
+            v-else
+            class="h-full w-full"
+            :seed="accountStore.username || accountStore.email"
+          />
         </span>
         <span
           v-else
