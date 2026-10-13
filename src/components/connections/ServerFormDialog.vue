@@ -840,16 +840,20 @@ function handleSave() {
 
       <form class="space-y-4" @submit.prevent="handleSave">
         <Tabs :model-value="formSectionTab" @update:model-value="formSectionTab = $event as 'basic' | 'advanced'">
-          <TabsList v-if="!isFileBased" class="grid grid-cols-2 w-full">
-            <TabsTrigger value="basic">
+          <TabsList v-if="!isFileBased" class="p-0.5 h-7 w-fit">
+            <TabsTrigger value="basic" class="text-xs px-3 py-0 gap-1.5 h-6">
+              <span class="i-carbon-plug h-3.5 w-3.5" />
               {{ t('components.serverForm.basicTab') }}
             </TabsTrigger>
-            <TabsTrigger value="advanced">
+            <TabsTrigger value="advanced" class="text-xs px-3 py-0 gap-1.5 h-6">
+              <span class="i-carbon-settings h-3.5 w-3.5" />
               {{ t('components.serverForm.advancedTab') }}
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="basic" class="mt-4 space-y-4">
+          <!-- Fixed-height scroll region so Basic and Advanced render at the
+               same height — tab switches don't reflow the dialog -->
+          <TabsContent value="basic" class="mt-2 overflow-y-auto space-y-4" :class="isFileBased ? '' : 'h-[26rem] pr-1'">
             <!-- Connection Name -->
             <div class="space-y-2">
               <Label for="name">{{ t('components.serverForm.labels.connectionName') }}<span class="text-destructive ml-0.5">*</span></Label>
@@ -1398,7 +1402,7 @@ function handleSave() {
           </TabsContent>
 
           <!-- Advanced: SSL/TLS + SSH Tunnel -->
-          <TabsContent value="advanced" class="mt-4 space-y-4">
+          <TabsContent value="advanced" class="mt-2 pr-1 h-[26rem] overflow-y-auto space-y-4">
             <SslConfigSection
               v-if="showsStandardHostFields"
               v-model="formData.ssl"
