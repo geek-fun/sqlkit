@@ -245,6 +245,18 @@ impl PostgresAdapter {
         Self { config, pool: None }
     }
 
+    /// Create a temporary adapter connected to `db` for cross-database reads.
+    ///
+    /// PostgreSQL connections are per-database, so metadata for a database other
+    /// than the one this adapter was opened with requires a separate connection.
+    async fn temp_adapter_for_db(&self, db: &str) -> DbResult<Self> {
+        let mut temp_config = self.config.clone();
+        temp_config.database = Some(db.to_string());
+        let mut temp_adapter = PostgresAdapter::new(temp_config);
+        temp_adapter.connect().await?;
+        Ok(temp_adapter)
+    }
+
     fn quote_ident(identifier: &str) -> DbResult<String> {
         if identifier.is_empty() || identifier.len() > 128 {
             return Err(DbError::InvalidQuery(format!(
@@ -1209,15 +1221,9 @@ impl DatabaseAdapter for PostgresAdapter {
 
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
         // If a different database is requested, create a temporary connection to it.
-        // PostgreSQL connections are per-database, so we cannot query another database's
-        // schemas through the current connection.
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_schemas(None).await;
+                return self.temp_adapter_for_db(db).await?.list_schemas(None).await;
             }
         }
 
@@ -1257,15 +1263,13 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
         // If a different database is requested, create a temporary connection to it.
-        // PostgreSQL connections are per-database, so we cannot query another database's
-        // tables through the current connection.
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_tables(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_tables(None, schema)
+                    .await;
             }
         }
 
@@ -1332,10 +1336,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list columns from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_columns(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1447,10 +1456,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<TableInfo> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot get table info from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .get_table_info(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1543,9 +1557,20 @@ impl DatabaseAdapter for PostgresAdapter {
 
     async fn get_foreign_keys(
         &self,
-        _database: Option<&str>,
-        _schema: Option<&str>,
+        database: Option<&str>,
+        schema: Option<&str>,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .get_foreign_keys(None, schema)
+                    .await;
+            }
+        }
+
         let pool = self
             .pool
             .as_ref()
@@ -1557,7 +1582,7 @@ impl DatabaseAdapter for PostgresAdapter {
             .await
             .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
 
-        let schema_filter = _schema.unwrap_or("public");
+        let schema_filter = schema.unwrap_or("public");
 
         let query = r#"
             SELECT
@@ -1631,11 +1656,11 @@ impl DatabaseAdapter for PostgresAdapter {
     ) -> DbResult<Vec<ObjectInfo>> {
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_views(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_views(None, schema)
+                    .await;
             }
         }
 
@@ -1739,11 +1764,11 @@ impl DatabaseAdapter for PostgresAdapter {
     ) -> DbResult<Vec<ObjectInfo>> {
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_procedures(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_procedures(None, schema)
+                    .await;
             }
         }
 
@@ -1806,11 +1831,11 @@ impl DatabaseAdapter for PostgresAdapter {
     ) -> DbResult<Vec<ObjectInfo>> {
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_functions(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_functions(None, schema)
+                    .await;
             }
         }
 
@@ -1878,10 +1903,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<TriggerInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list triggers from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_triggers(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1939,10 +1969,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<IndexInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list indexes from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_indexes(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2025,12 +2060,8 @@ impl DatabaseAdapter for PostgresAdapter {
         Ok(indexes)
     }
 
-    async fn list_sessions(&self, database: Option<&str>) -> DbResult<Vec<serde_json::Value>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list sessions from a different database without reconnecting".to_string(),
-            ));
-        }
+    async fn list_sessions(&self, _database: Option<&str>) -> DbResult<Vec<serde_json::Value>> {
+        // pg_stat_activity is cluster-wide, so the requested database is irrelevant.
 
         let pool = self
             .pool
@@ -2124,16 +2155,10 @@ impl DatabaseAdapter for PostgresAdapter {
 
     async fn get_slow_queries(
         &self,
-        database: Option<&str>,
+        _database: Option<&str>,
         limit: Option<u32>,
     ) -> DbResult<Vec<serde_json::Value>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list slow queries from a different database without reconnecting"
-                    .to_string(),
-            ));
-        }
-
+        // pg_stat_activity is cluster-wide, so the requested database is irrelevant.
         let limit = limit.unwrap_or(20) as i64;
 
         let pool = self
@@ -2243,11 +2268,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list foreign keys from a different database without reconnecting"
-                    .to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_foreign_keys(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2334,10 +2363,15 @@ impl DatabaseAdapter for PostgresAdapter {
         object_name: &str,
         object_type: &str,
     ) -> DbResult<String> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot get DDL from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .get_object_ddl(None, schema, object_name, object_type)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2427,10 +2461,15 @@ impl DatabaseAdapter for PostgresAdapter {
         object_name: &str,
         object_type: &str,
     ) -> DbResult<()> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot drop object from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .drop_object(None, schema, object_name, object_type)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2489,10 +2528,15 @@ impl DatabaseAdapter for PostgresAdapter {
         object_type: &str,
         new_name: &str,
     ) -> DbResult<()> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot rename object from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .rename_object(None, schema, object_name, object_type, new_name)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");

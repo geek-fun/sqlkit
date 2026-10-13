@@ -243,7 +243,7 @@ cargo test --test postgres_integration
 
 ## Limitations
 
-- **Cross-Database Queries**: The adapter cannot query across different databases without reconnecting. If you need to work with multiple databases, create separate adapter instances.
+- **Cross-Database Queries**: A single adapter instance is bound to one database. When an operation is given a different database name, the adapter transparently opens a temporary connection to it (`temp_adapter_for_db`). Each call opens a fresh connection, so heavy repeated cross-database work still benefits from separate adapter instances.
 - **Large Result Sets**: Very large result sets are loaded entirely into memory. For large datasets, consider using pagination in your queries.
 - **Streaming**: The current implementation does not support streaming query results. All rows are fetched before returning.
 
