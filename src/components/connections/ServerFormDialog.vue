@@ -52,6 +52,7 @@ const isOpen = computed({
 })
 
 const isEditing = computed(() => !!props.connection?.id)
+const showAdvanced = ref(false)
 
 const defaultPorts: Record<string, number> = {
   [DatabaseType.POSTGRESQL]: 5432,
@@ -1384,22 +1385,35 @@ function handleSave() {
           </div>
         </div>
 
-        <!-- SSL Configuration (not for SQLite, basic-only for Oracle) -->
-        <SslConfigSection
-          v-if="!isFileBased && showsStandardHostFields"
-          v-model="formData.ssl"
-          :db-type="formData.type"
-          :errors="formErrors"
-        />
+        <!-- Advanced Configuration: SSL/TLS + SSH Tunnel -->
+        <div v-if="!isFileBased" class="pt-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            class="text-muted-foreground w-full justify-between"
+            @click="showAdvanced = !showAdvanced"
+          >
+            {{ t('components.serverForm.ssh.advancedConfig') }}
+            <span class="i-carbon-chevron-down h-4 w-4 transition-transform" :class="[showAdvanced ? 'rotate-180' : '']" />
+          </Button>
 
-        <!-- Advanced Configuration: SSH Tunnel -->
-        <SshTunnelConfigPanel
-          v-if="!isFileBased"
-          :model-value="formData.sshTunnel"
-          :remote-host="formData.host"
-          :remote-port="formData.port"
-          @update:model-value="formData.sshTunnel = $event"
-        />
+          <div v-if="showAdvanced" class="mt-3 p-4 border rounded-md space-y-4">
+            <SslConfigSection
+              v-if="showsStandardHostFields"
+              v-model="formData.ssl"
+              :db-type="formData.type"
+              :errors="formErrors"
+            />
+
+            <SshTunnelConfigPanel
+              :model-value="formData.sshTunnel"
+              :remote-host="formData.host"
+              :remote-port="formData.port"
+              @update:model-value="formData.sshTunnel = $event"
+            />
+          </div>
+        </div>
 
         <!-- Test Connection Status -->
         <div

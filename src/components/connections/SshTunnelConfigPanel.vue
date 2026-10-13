@@ -2,11 +2,9 @@
 import type { SSHTunnelConfig } from '@/store/connectionStore'
 import type { SshProfile } from '@/store/sshProfileStore'
 import { invoke } from '@tauri-apps/api/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { UPGRADE_URL } from '@/common'
 import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -20,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { openUpgradeDialog, ProBadge } from '@/components/upgrade'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import { useSshProfileStore } from '@/store/sshProfileStore'
 
@@ -37,14 +36,13 @@ const { t } = useI18n()
 const entitlementStore = useEntitlementStore()
 const profileStore = useSshProfileStore()
 
-const showAdvanced = ref(false)
+const enabled = computed(() => props.modelValue?.enabled ?? false)
+const usingProfiles = computed(() => (props.modelValue?.profileIds?.length ?? 0) > 0)
+const isGated = computed(() => !entitlementStore.isLocalUltimate)
 const detectedProxy = ref<string | null>(null)
 const configHosts = ref<Array<{ host: string, hostName?: string, port?: number, user?: string, identityFile?: string }>>([])
 const showConfigHosts = ref(false)
 const profileDialogRef = ref<InstanceType<typeof SshProfileDialog> | null>(null)
-
-const enabled = computed(() => props.modelValue?.enabled ?? false)
-const usingProfiles = computed(() => (props.modelValue?.profileIds?.length ?? 0) > 0)
 
 const hopProfiles = computed(() =>
   (props.modelValue?.profileIds ?? [])
@@ -75,11 +73,6 @@ function patch(value: Partial<SSHTunnelConfig>) {
 }
 
 function toggleSsh(checked: boolean) {
-  if (checked && !entitlementStore.isLocalUltimate) {
-    // usage-side feature — send to the pricing site (matches dockit)
-    openUrl(UPGRADE_URL)
-    return
-  }
   patch(checked
     ? { enabled: true }
     : { enabled: false, profileIds: [], useSystemProxy: false })
@@ -150,8 +143,6 @@ function applyConfigHost(host: { host: string, hostName?: string, port?: number,
 }
 
 async function detectProxy() {
-  if (!showAdvanced.value)
-    return
   try {
     detectedProxy.value = await invoke<string | null>('detect_system_proxy', {
       host: props.remoteHost ?? null,
@@ -163,33 +154,29 @@ async function detectProxy() {
   }
 }
 
-watch(showAdvanced, (visible) => {
-  if (visible) {
-    profileStore.fetch()
-    detectProxy()
-  }
-})
+profileStore.fetch()
 
 watch(() => props.modelValue?.enabled, (on) => {
   if (on)
     detectProxy()
-})
+}, { immediate: true })
 </script>
 
 <template>
-  <div class="pt-2">
-    <Button
+  <div class="space-y-4">
+    <!-- Gated: the strip replaces the whole SSH config, covering pre-existing connections too -->
+    <button
+      v-if="isGated"
       type="button"
-      variant="ghost"
-      size="sm"
-      class="text-muted-foreground w-full justify-between"
-      @click="showAdvanced = !showAdvanced"
+      class="px-3 py-2.5 text-left border rounded-lg border-dashed flex gap-2 w-full cursor-pointer transition-colors items-center hover:bg-accent/50"
+      @click="openUpgradeDialog('ssh_tunnel')"
     >
-      {{ t('components.serverForm.ssh.advancedConfig') }}
-      <span class="i-carbon-chevron-down h-4 w-4 transition-transform" :class="[showAdvanced ? 'rotate-180' : '']" />
-    </Button>
+      <ProBadge size="xs" />
+      <span class="text-sm text-muted-foreground">{{ t('components.serverForm.ssh.ultimateOnly') }}</span>
+      <span class="text-sm text-primary font-medium ml-auto shrink-0">{{ t('plan.upgrade.cta') }}</span>
+    </button>
 
-    <div v-if="showAdvanced" class="mt-3 p-4 border rounded-md space-y-4">
+    <template v-else>
       <div class="flex gap-2 items-center">
         <Checkbox
           id="use-ssh"
@@ -379,9 +366,9 @@ watch(() => props.modelValue?.enabled, (on) => {
         <p v-if="usingProfiles" class="text-[11px] text-muted-foreground">
           {{ t('components.serverForm.ssh.hopOrderHint') }}
         </p>
-      </template>
 
-      <SshProfileDialog ref="profileDialogRef" @save="onProfileSaved" />
-    </div>
+        <SshProfileDialog ref="profileDialogRef" @save="onProfileSaved" />
+      </template>
+    </template>
   </div>
 </template>
