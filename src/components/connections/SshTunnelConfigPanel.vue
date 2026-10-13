@@ -298,7 +298,7 @@ watch(() => [props.remoteHost, props.remotePort], () => detectProxy())
 watch(() => props.modelValue?.enabled, (on) => {
   if (on)
     detectProxy()
-})
+}, { immediate: true })
 </script>
 
 <template>
@@ -322,7 +322,6 @@ watch(() => props.modelValue?.enabled, (on) => {
     </button>
 
     <template v-else>
-      <!-- Header row: lock + title + hop count + chain test (left) | add profile (right) -->
       <div class="flex gap-2 items-center">
         <span class="i-carbon-locked text-green-500 shrink-0 h-4 w-4" />
         <span class="text-sm font-medium whitespace-nowrap">{{ t('components.serverForm.ssh.useSshTunnel') }}</span>
