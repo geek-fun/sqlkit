@@ -188,8 +188,8 @@ watch(() => props.modelValue?.enabled, (on) => {
       <div class="flex gap-2 items-center">
         <Checkbox
           id="use-ssh"
-          :model-value="enabled"
-          @update:model-value="(v: unknown) => toggleSsh(v === true)"
+          :checked="enabled"
+          @update:checked="checked => toggleSsh(checked === true)"
         />
         <Label for="use-ssh">{{ t('components.serverForm.ssh.useSshTunnel') }}</Label>
       </div>
@@ -361,8 +361,8 @@ watch(() => props.modelValue?.enabled, (on) => {
         <div class="flex gap-2 items-center">
           <Checkbox
             id="ssh-system-proxy"
-            :model-value="props.modelValue?.useSystemProxy ?? false"
-            @update:model-value="(v: unknown) => patch({ useSystemProxy: v === true })"
+            :checked="props.modelValue?.useSystemProxy ?? false"
+            @update:checked="checked => patch({ useSystemProxy: checked === true })"
           />
           <Label for="ssh-system-proxy" class="text-sm font-normal">
             {{ t('components.serverForm.ssh.useSystemProxy') }}
