@@ -3,7 +3,7 @@ import type { SSHTunnelConfig } from '@/store/connectionStore'
 import type { SshProfile } from '@/store/sshProfileStore'
 import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-vue-next'
+import { ArrowDown, ArrowUp, Pencil, Plus, Trash2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UPGRADE_URL } from '@/common/entitlement'
@@ -55,6 +55,22 @@ const hopProfiles = computed(() =>
 const unusedProfiles = computed(() =>
   profileStore.profiles.filter(p => !(props.modelValue?.profileIds ?? []).includes(p.id)),
 )
+
+const useSystemProxy = computed(() => props.modelValue?.useSystemProxy ?? false)
+
+/** Chain preview: proxy → hop hosts → final target, DocKit-style breadcrumb. */
+const chainSegments = computed(() => {
+  if (!enabled.value)
+    return []
+  const segments: string[] = []
+  if (useSystemProxy.value && detectedProxy.value)
+    segments.push(t('components.serverForm.ssh.systemProxy'))
+  for (const hop of hopProfiles.value)
+    segments.push(`${hop.host}:${hop.port}`)
+  if (props.remoteHost)
+    segments.push(`${props.remoteHost}:${props.remotePort ?? 22}`)
+  return segments
+})
 
 function patch(value: Partial<SSHTunnelConfig>) {
   const base: SSHTunnelConfig = {
@@ -115,10 +131,17 @@ function openNewProfile() {
   profileDialogRef.value?.show()
 }
 
+function openEditProfile(profile: SshProfile) {
+  profileDialogRef.value?.show(profile)
+}
+
 function onProfileSaved(profile: SshProfile) {
   if (!props.modelValue?.enabled)
     return
-  addHop(profile.id)
+  // Profile edits (opened from a hop row) are already part of the chain —
+  // only newly created profiles get appended.
+  if (!(props.modelValue?.profileIds ?? []).includes(profile.id))
+    addHop(profile.id)
 }
 
 async function loadConfigHosts() {
@@ -223,6 +246,38 @@ watch(() => props.modelValue?.enabled, (on) => {
         <!-- Profile hops mode -->
         <template v-if="usingProfiles">
           <div class="space-y-1.5">
+            <!-- System proxy: OS-detected, pinned as the implicit hop 0 (never persisted as a URL) -->
+            <div
+              v-if="detectedProxy"
+              class="px-2.5 py-1.5 border rounded-md flex gap-2 items-center"
+              :class="useSystemProxy ? 'border-primary/40 bg-primary/5' : ''"
+            >
+              <span class="text-[10px] text-muted-foreground font-bold shrink-0 w-4">0</span>
+              <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium flex gap-1.5 items-center">
+                  {{ t('components.serverForm.ssh.systemProxy') }}
+                  <span
+                    v-if="useSystemProxy"
+                    class="text-[10px] text-primary px-1.5 py-0.5 rounded bg-primary/10"
+                  >
+                    {{ t('components.serverForm.ssh.proxyActive') }}
+                  </span>
+                </div>
+                <div class="text-[11px] text-muted-foreground font-mono truncate">
+                  {{ detectedProxy }}
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                type="button"
+                class="text-xs shrink-0 h-6"
+                @click="patch({ useSystemProxy: !useSystemProxy })"
+              >
+                {{ useSystemProxy ? t('components.serverForm.ssh.detachProxy') : t('components.serverForm.ssh.attachProxy') }}
+              </Button>
+            </div>
+
             <div
               v-for="(profile, index) in hopProfiles"
               :key="profile.id"
@@ -243,11 +298,22 @@ watch(() => props.modelValue?.enabled, (on) => {
               <Button variant="ghost" size="icon" type="button" class="h-6 w-6" :disabled="index === hopProfiles.length - 1" @click="moveHop(index, 1)">
                 <ArrowDown class="h-3.5 w-3.5" />
               </Button>
+              <Button variant="ghost" size="icon" type="button" class="h-6 w-6" @click="openEditProfile(profile)">
+                <Pencil class="h-3.5 w-3.5" />
+              </Button>
               <Button variant="ghost" size="icon" type="button" class="text-destructive h-6 w-6" @click="removeHop(index)">
                 <Trash2 class="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
+
+          <!-- Chain preview: proxy → hops → target -->
+          <p v-if="chainSegments.length > 1" class="text-[11px] text-muted-foreground font-mono break-all">
+            {{ chainSegments.join('  →  ') }}
+          </p>
+          <p class="text-[11px] text-muted-foreground">
+            {{ t('components.serverForm.ssh.hopOrderHint') }}
+          </p>
 
           <div class="flex gap-2 items-center">
             <Select @update:model-value="addHop">
@@ -267,9 +333,6 @@ watch(() => props.modelValue?.enabled, (on) => {
               {{ t('components.serverForm.ssh.newProfile') }}
             </Button>
           </div>
-          <p class="text-[11px] text-muted-foreground">
-            {{ t('components.serverForm.ssh.hopOrderHint') }}
-          </p>
         </template>
 
         <!-- Manual mode -->
@@ -357,8 +420,9 @@ watch(() => props.modelValue?.enabled, (on) => {
           </div>
         </template>
 
-        <!-- System proxy -->
-        <div class="flex gap-2 items-center">
+        <!-- System proxy: only a force-enable fallback when OS detection found nothing;
+             when a proxy IS detected it renders as the pinned row above instead -->
+        <div v-if="!detectedProxy" class="flex gap-2 items-center">
           <Checkbox
             id="ssh-system-proxy"
             :checked="props.modelValue?.useSystemProxy ?? false"
@@ -367,13 +431,7 @@ watch(() => props.modelValue?.enabled, (on) => {
           <Label for="ssh-system-proxy" class="text-sm font-normal">
             {{ t('components.serverForm.ssh.useSystemProxy') }}
           </Label>
-          <span v-if="detectedProxy" class="text-[11px] text-muted-foreground truncate">
-            ({{ detectedProxy }})
-          </span>
         </div>
-        <p v-if="usingProfiles" class="text-[11px] text-muted-foreground">
-          {{ t('components.serverForm.ssh.hopOrderHint') }}
-        </p>
 
         <SshProfileDialog ref="profileDialogRef" @save="onProfileSaved" />
       </template>

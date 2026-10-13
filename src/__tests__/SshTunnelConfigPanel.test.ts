@@ -83,19 +83,19 @@ describe('sshTunnelConfigPanel checkbox bindings', () => {
     const wrapper = mountPanel()
     const checkbox = wrapper.find('#use-ssh')
 
-    await checkbox.setChecked(true)
+    await checkbox.setValue(true)
 
-    const emitted = wrapper.emitted('update:modelValue')
-    expect(emitted).toBeTruthy()
-    const payload = emitted?.at(-1)?.[0] as { enabled?: boolean }
+    const emitted = wrapper.emitted('update:modelValue') ?? []
+    const payload = emitted[emitted.length - 1]?.[0] as { enabled?: boolean }
     expect(payload.enabled).toBe(true)
   })
 
   it('unchecking clears profileIds and proxy flag', async () => {
     const wrapper = mountPanel({ enabled: true, profileIds: ['p1'], useSystemProxy: true })
-    await wrapper.find('#use-ssh').setChecked(false)
+    await wrapper.find('#use-ssh').setValue(false)
 
-    const payload = wrapper.emitted('update:modelValue')?.at(-1)?.[0] as {
+    const emitted = wrapper.emitted('update:modelValue') ?? []
+    const payload = emitted[emitted.length - 1]?.[0] as {
       enabled?: boolean
       profileIds?: string[]
       useSystemProxy?: boolean
@@ -107,9 +107,10 @@ describe('sshTunnelConfigPanel checkbox bindings', () => {
 
   it('toggling "Use system proxy" patches useSystemProxy', async () => {
     const wrapper = mountPanel({ enabled: true })
-    await wrapper.find('#ssh-system-proxy').setChecked(true)
+    await wrapper.find('#ssh-system-proxy').setValue(true)
 
-    const payload = wrapper.emitted('update:modelValue')?.at(-1)?.[0] as {
+    const emitted = wrapper.emitted('update:modelValue') ?? []
+    const payload = emitted[emitted.length - 1]?.[0] as {
       useSystemProxy?: boolean
     }
     expect(payload.useSystemProxy).toBe(true)

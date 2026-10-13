@@ -1073,6 +1073,8 @@ export const zhCN = {
   },
   components: {
     serverForm: {
+      basicTab: '基础',
+      advancedTab: '高级',
       title: {
         edit: '编辑连接',
         new: '新建连接',
@@ -1290,6 +1292,10 @@ export const zhCN = {
         authAuto: '自动探测',
         useSshTunnel: '使用 SSH 隧道',
         ultimateOnly: 'SSH 隧道为旗舰版功能',
+        systemProxy: '系统代理',
+        proxyActive: '已挂载',
+        attachProxy: '挂载',
+        detachProxy: '移除',
         sshHost: 'SSH 主机',
         sshPort: 'SSH 端口',
         username: '用户名',

@@ -1073,6 +1073,8 @@ export const enUS = {
   },
   components: {
     serverForm: {
+      basicTab: 'Basic',
+      advancedTab: 'Advanced',
       title: {
         edit: 'Edit Connection',
         new: 'New Connection',
@@ -1290,6 +1292,10 @@ export const enUS = {
         authAuto: 'Auto-probe',
         useSshTunnel: 'Use SSH Tunnel',
         ultimateOnly: 'SSH tunnel is an Ultimate feature',
+        systemProxy: 'System Proxy',
+        proxyActive: 'attached',
+        attachProxy: 'Attach',
+        detachProxy: 'Detach',
         sshHost: 'SSH Host',
         sshPort: 'SSH Port',
         username: 'Username',
