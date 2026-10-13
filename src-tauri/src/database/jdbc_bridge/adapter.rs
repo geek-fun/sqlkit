@@ -5,7 +5,8 @@ use crate::database::{
     config::ConnectionConfig,
     error::{DbError, DbResult},
     types::{
-        ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
+        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+        QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
     },
 };
 use async_trait::async_trait;
@@ -68,7 +69,7 @@ impl JdbcBridgeAdapter {
             &self.config.username,
             &self.config.password,
             self.config.oracle_options.as_ref(),
-            ssl_mode.as_deref(),
+            ssl_mode,
             self.config.ssl_ca_cert.as_deref(),
             self.config.ssl_client_cert.as_deref(),
             self.config.ssl_client_key.as_deref(),
@@ -148,6 +149,33 @@ impl JdbcBridgeAdapter {
             .map_err(|e| DbError::Connection(format!("Failed to parse status: {}", e)))?;
         Ok(cs.into())
     }
+
+    /// Send a metadata list request whose result parses directly into `T`
+    /// (the Java side emits the exact struct field names).
+    async fn send_list_request<T: serde::de::DeserializeOwned>(
+        &self,
+        method: JdbcMethod,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: Option<&str>,
+    ) -> DbResult<T> {
+        let launcher = self.launcher()?;
+        let data = Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                method,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                    "table": table,
+                }),
+            ),
+        )
+        .await?;
+        serde_json::from_value(data)
+            .map_err(|e| DbError::Connection(format!("Failed to parse result: {}", e)))
+    }
 }
 
 #[async_trait]
@@ -182,7 +210,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     async fn test_connection(&self) -> DbResult<ConnectionStatus> {
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::TestConnection,
                 serde_json::json!({
@@ -230,7 +258,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         };
         for stmt in &statements {
             let data = Self::send_request(
-                &launcher,
+                launcher,
                 JdbcRequest::new(
                     JdbcMethod::ExecuteQuery,
                     serde_json::json!({
@@ -260,7 +288,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::ListDatabases,
                 serde_json::json!({
@@ -285,7 +313,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::ListSchemas,
                 serde_json::json!({
@@ -306,7 +334,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     ) -> DbResult<Vec<TableInfo>> {
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::ListTables,
                 serde_json::json!({
@@ -347,7 +375,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     ) -> DbResult<Vec<ColumnInfo>> {
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::ListColumns,
                 serde_json::json!({
@@ -409,6 +437,158 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
             .into_iter()
             .find(|t| t.name == table)
             .ok_or_else(|| DbError::Connection(format!("Table '{}' not found", table)))
+    }
+
+    async fn list_views(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        self.send_list_request(JdbcMethod::ListViews, database, schema, None)
+            .await
+    }
+
+    async fn list_procedures(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        self.send_list_request(JdbcMethod::ListProcedures, database, schema, None)
+            .await
+    }
+
+    async fn list_functions(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        self.send_list_request(JdbcMethod::ListFunctions, database, schema, None)
+            .await
+    }
+
+    async fn list_triggers(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<TriggerInfo>> {
+        self.send_list_request(JdbcMethod::ListTriggers, database, schema, Some(table))
+            .await
+    }
+
+    async fn list_indexes(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<IndexInfo>> {
+        self.send_list_request(JdbcMethod::ListIndexes, database, schema, Some(table))
+            .await
+    }
+
+    async fn list_foreign_keys(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        self.send_list_request(JdbcMethod::ListForeignKeys, database, schema, Some(table))
+            .await
+    }
+
+    async fn get_foreign_keys(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        self.send_list_request(JdbcMethod::GetForeignKeys, database, schema, None)
+            .await
+    }
+
+    async fn get_object_ddl(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<String> {
+        let launcher = self.launcher()?;
+        let data = Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                JdbcMethod::GetObjectDdl,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                    "object_name": object_name,
+                    "object_type": object_type,
+                }),
+            ),
+        )
+        .await?;
+
+        let ddl: Option<String> =
+            serde_json::from_value(data.get("ddl").cloned().unwrap_or(serde_json::Value::Null))
+                .map_err(|e| DbError::Connection(format!("Failed to parse DDL: {}", e)))?;
+        ddl.ok_or_else(|| {
+            DbError::UnsupportedOperation(format!(
+                "DDL not available for {} '{}' on this engine",
+                object_type, object_name
+            ))
+        })
+    }
+
+    async fn drop_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<()> {
+        let launcher = self.launcher()?;
+        Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                JdbcMethod::DropObject,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                    "object_name": object_name,
+                    "object_type": object_type,
+                }),
+            ),
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn rename_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+        new_name: &str,
+    ) -> DbResult<()> {
+        let launcher = self.launcher()?;
+        Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                JdbcMethod::RenameObject,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                    "object_name": object_name,
+                    "object_type": object_type,
+                    "new_name": new_name,
+                }),
+            ),
+        )
+        .await?;
+        Ok(())
     }
 
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {

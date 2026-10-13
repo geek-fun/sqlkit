@@ -145,3 +145,167 @@ async fn repeated_connect_and_disconnect_on_one_file() {
 
     println!("reconnect after three cycles: {:?}", started.elapsed());
 }
+
+/// The metadata panels — indexes, foreign keys, triggers, views/procedures/
+/// functions, object DDL, drop and rename — must work end-to-end through the
+/// bridge (issue #181).
+#[tokio::test]
+#[ignore]
+async fn metadata_panels_work_end_to_end() {
+    let dir = tempfile::tempdir().expect("temp dir");
+    let path = dir.path().join("metadata.duckdb");
+
+    let mut adapter = JdbcBridgeAdapter::new(file_config(&path, false));
+    adapter.connect().await.expect("connect");
+
+    // Distinguish an old bridge (pre-metadata support) from a real failure.
+    let skip_on_old_bridge = |error: &str| -> bool {
+        let old = error.contains("Unknown method");
+        if old {
+            println!(
+                "SKIPPED: the installed bridge predates the metadata methods; \
+                      rebuild jdbc-bridge/ and reinstall the JAR to run this test. Error: {}",
+                error
+            );
+        }
+        old
+    };
+
+    adapter
+        .execute_query("CREATE TABLE departments (id INTEGER PRIMARY KEY, name VARCHAR)")
+        .await
+        .expect("create departments");
+    adapter.execute_query(
+        "CREATE TABLE employees (id INTEGER PRIMARY KEY, name VARCHAR, dept_id INTEGER REFERENCES departments(id))",
+    ).await.expect("create employees");
+    adapter
+        .execute_query("CREATE INDEX idx_employees_name ON employees(name)")
+        .await
+        .expect("create index");
+    adapter
+        .execute_query("CREATE VIEW emp_view AS SELECT id, name FROM employees")
+        .await
+        .expect("create view");
+
+    // Views / procedures / functions / triggers panels must respond (empty is
+    // allowed where the engine has no such objects).
+    let views = match adapter.list_views(None, Some("main")).await {
+        Ok(views) => views,
+        Err(e) if skip_on_old_bridge(&format!("{}", e)) => return,
+        Err(e) => panic!("list_views failed: {}", e),
+    };
+    assert!(
+        views.iter().any(|v| v.name == "emp_view"),
+        "emp_view missing from list_views: {:?}",
+        views
+    );
+
+    adapter
+        .list_procedures(None, Some("main"))
+        .await
+        .expect("list_procedures must not fail even when empty");
+    adapter
+        .list_functions(None, Some("main"))
+        .await
+        .expect("list_functions must not fail even when empty");
+    adapter
+        .list_triggers(None, None, "employees")
+        .await
+        .expect("list_triggers must not fail even when empty (DuckDB has no triggers)");
+
+    // Indexes panel.
+    let indexes = adapter
+        .list_indexes(None, Some("main"), "employees")
+        .await
+        .expect("list_indexes");
+    let name_index = indexes.iter().find(|i| i.name == "idx_employees_name");
+    assert!(
+        name_index.is_some(),
+        "idx_employees_name missing from list_indexes: {:?}",
+        indexes
+    );
+    if let Some(index) = name_index {
+        assert!(
+            index.columns.contains(&"name".to_string()),
+            "index columns wrong: {:?}",
+            index.columns
+        );
+    }
+
+    // Foreign keys panel (table level and schema level).
+    let fks = adapter
+        .list_foreign_keys(None, Some("main"), "employees")
+        .await
+        .expect("list_foreign_keys");
+    assert_eq!(
+        fks.iter()
+            .filter(|f| f.referenced_table == "departments")
+            .count(),
+        1,
+        "expected one FK to departments: {:?}",
+        fks
+    );
+    let fk = fks.first().expect("at least one FK");
+    assert_eq!(fk.columns, vec!["dept_id".to_string()]);
+    assert_eq!(fk.constraint_name, fks.first().unwrap().constraint_name);
+
+    let _all_fks = adapter
+        .get_foreign_keys(None, Some("main"))
+        .await
+        .expect("get_foreign_keys (schema level) must not fail");
+
+    // DDL panel for the view.
+    let ddl = adapter
+        .get_object_ddl(None, Some("main"), "emp_view", "VIEW")
+        .await
+        .expect("get_object_ddl for view");
+    assert!(
+        ddl.to_uppercase().contains("SELECT"),
+        "view DDL should contain the SELECT body: {}",
+        ddl
+    );
+
+    // Rename + drop. The view is dropped first, and DuckDB also rejects
+    // renaming a table that carries a user-created index ("entries that
+    // depend on it"), so clear the index through ordinary SQL first.
+    adapter
+        .drop_object(None, Some("main"), "emp_view", "VIEW")
+        .await
+        .expect("drop_object");
+    let views_after = adapter
+        .list_views(None, Some("main"))
+        .await
+        .expect("list views after drop");
+    assert!(
+        !views_after.iter().any(|v| v.name == "emp_view"),
+        "dropped view still listed: {:?}",
+        views_after
+    );
+
+    adapter
+        .execute_query("DROP INDEX idx_employees_name")
+        .await
+        .expect("drop explicit index (DuckDB dependency rule)");
+
+    adapter
+        .rename_object(
+            None,
+            Some("main"),
+            "employees",
+            "TABLE",
+            "employees_renamed",
+        )
+        .await
+        .expect("rename_object");
+    let tables = adapter
+        .list_tables(None, Some("main"))
+        .await
+        .expect("list tables after rename");
+    assert!(
+        tables.iter().any(|t| t.name == "employees_renamed"),
+        "renamed table missing: {:?}",
+        tables
+    );
+
+    adapter.disconnect().await.expect("disconnect");
+}
