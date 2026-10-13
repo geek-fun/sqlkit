@@ -1289,7 +1289,7 @@ export const enUS = {
         newProfileTitle: 'New SSH Profile',
         authAuto: 'Auto-probe',
         useSshTunnel: 'Use SSH Tunnel',
-        ultimateOnly: 'SSH tunnel is an Ultimate feature — click to upgrade',
+        ultimateOnly: 'SSH tunnel is an Ultimate feature',
         sshHost: 'SSH Host',
         sshPort: 'SSH Port',
         username: 'Username',

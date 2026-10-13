@@ -1289,7 +1289,7 @@ export const zhCN = {
         newProfileTitle: '新建 SSH 配置档案',
         authAuto: '自动探测',
         useSshTunnel: '使用 SSH 隧道',
-        ultimateOnly: 'SSH 隧道为旗舰版功能 — 点击升级',
+        ultimateOnly: 'SSH 隧道为旗舰版功能',
         sshHost: 'SSH 主机',
         sshPort: 'SSH 端口',
         username: '用户名',

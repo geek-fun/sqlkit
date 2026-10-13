@@ -2,9 +2,11 @@
 import type { SSHTunnelConfig } from '@/store/connectionStore'
 import type { SshProfile } from '@/store/sshProfileStore'
 import { invoke } from '@tauri-apps/api/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { ArrowDown, ArrowUp, Plus, Trash2 } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { UPGRADE_URL } from '@/common/entitlement'
 import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -18,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { openUpgradeDialog, ProBadge } from '@/components/upgrade'
+import { ProBadge } from '@/components/upgrade'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import { useSshProfileStore } from '@/store/sshProfileStore'
 
@@ -164,16 +166,22 @@ watch(() => props.modelValue?.enabled, (on) => {
 
 <template>
   <div class="space-y-4">
-    <!-- Gated: the strip replaces the whole SSH config, covering pre-existing connections too -->
+    <!-- Gated: the strip replaces the whole SSH config, covering pre-existing connections too.
+         Layering the upgrade modal on top of the server form dialog is awkward UX (two stacked
+         modals), so this strip routes straight to the pricing site instead. -->
     <button
       v-if="isGated"
       type="button"
-      class="px-3 py-2.5 text-left border rounded-lg border-dashed flex gap-2 w-full cursor-pointer transition-colors items-center hover:bg-accent/50"
-      @click="openUpgradeDialog('ssh_tunnel')"
+      class="group px-3 py-2.5 text-left border rounded-lg border-dashed flex gap-2.5 w-full cursor-pointer transition-colors items-center hover:bg-accent/50"
+      @click="openUrl(UPGRADE_URL)"
     >
       <ProBadge size="xs" />
-      <span class="text-sm text-muted-foreground">{{ t('components.serverForm.ssh.ultimateOnly') }}</span>
-      <span class="text-sm text-primary font-medium ml-auto shrink-0">{{ t('plan.upgrade.cta') }}</span>
+      <span class="text-sm text-muted-foreground truncate transition-colors group-hover:text-foreground/80">
+        {{ t('components.serverForm.ssh.ultimateOnly') }}
+      </span>
+      <span class="text-xs text-primary font-medium ml-auto px-2 py-1 rounded-md bg-primary/10 shrink-0 transition-colors group-hover:bg-primary/15">
+        {{ t('plan.upgrade.cta') }}
+      </span>
     </button>
 
     <template v-else>
