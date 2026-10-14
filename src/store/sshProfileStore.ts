@@ -64,3 +64,35 @@ export const useSshProfileStore = defineStore('sshProfiles', {
     },
   },
 })
+
+/**
+ * Page-level SshProfile → Rust-contract transport layer (camelCase SshTunnelConfig).
+ * Auth strings must match tunnel.rs's match arms; ''/'none' (auto-probe legacy)
+ * normalize to password so previously-created profiles keep connecting.
+ */
+export function profileToTransportLayer(
+  profile: SshProfile,
+): import('@/datasources/connectionApi').TransportLayerConfig {
+  const authMethod
+    = profile.authMethod === 'agent'
+      ? 'agent' as const
+      : profile.authMethod === 'key'
+        ? 'key' as const
+        : 'password' as const
+  return {
+    type: 'ssh',
+    enabled: true,
+    host: profile.host,
+    port: profile.port,
+    username: profile.username,
+    authMethod,
+    password: profile.password || '',
+    keyPath: profile.keyPath || '',
+    keyPassphrase: profile.keyPassphrase || '',
+    useSshAgent: authMethod === 'agent',
+    sshAgentSockPath: profile.sshAgentSockPath || '',
+    useSystemProxy: false,
+    connectTimeoutSecs: profile.connectTimeoutSecs ?? 10,
+    keepaliveIntervalSecs: profile.keepaliveIntervalSecs ?? 30,
+  }
+}

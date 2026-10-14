@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event'
 import { defineStore } from 'pinia'
 import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
 import { connectionApi } from '../datasources'
-import { useSshProfileStore } from './sshProfileStore'
+import { profileToTransportLayer, useSshProfileStore } from './sshProfileStore'
 
 export enum DatabaseType {
   MYSQL = 'MYSQL',
@@ -466,12 +466,12 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     return undefined
   }
 
-  const authMethodRaw = sshLayer.auth_method
-  const authMethod = typeof authMethodRaw === 'object' && authMethodRaw !== null
-    ? (authMethodRaw as Record<string, unknown>)
-    : undefined
+  // Saved layers carry the Rust-contract camelCase shape (see
+  // TransportLayerConfig): auth is a plain "password" | "key" | "agent" string.
+  const authMethodRaw = sshLayer.authMethod
+  const authMethod = typeof authMethodRaw === 'string' ? authMethodRaw : ''
 
-  if (authMethod && authMethod.method === 'agent') {
+  if (authMethod === 'agent') {
     return {
       enabled: safeBool(sshLayer.enabled, true),
       host: safeStr(sshLayer.host, ''),
@@ -481,22 +481,7 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     }
   }
 
-  let method: 'password' | 'privateKey' = 'password'
-  let password: string | undefined
-  let privateKey: string | undefined
-  let passphrase: string | undefined
-
-  if (authMethod) {
-    if (authMethod.method === 'password') {
-      method = 'password'
-      password = safeStr(authMethod.password, '')
-    }
-    else if (authMethod.method === 'privateKey') {
-      method = 'privateKey'
-      privateKey = safeStr(authMethod.private_key_path, '')
-      passphrase = typeof authMethod.passphrase === 'string' ? authMethod.passphrase : undefined
-    }
-  }
+  const method: 'password' | 'privateKey' = authMethod === 'key' ? 'privateKey' : 'password'
 
   return {
     enabled: safeBool(sshLayer.enabled, true),
@@ -504,9 +489,9 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     port: safePort(sshLayer.port),
     username: safeStr(sshLayer.username, ''),
     authMethod: method,
-    password,
-    privateKey,
-    privateKeyPassphrase: passphrase,
+    password: safeStr(sshLayer.password, ''),
+    privateKey: authMethod === 'key' ? safeStr(sshLayer.keyPath, '') : undefined,
+    privateKeyPassphrase: authMethod === 'key' ? safeStr(sshLayer.keyPassphrase, '') : undefined,
   }
 }
 
@@ -563,33 +548,9 @@ export async function buildTransportLayers(sshTunnel?: SSHTunnelConfig): Promise
     const layers = sshTunnel.profileIds
       .map(id => profileStore.byId(id))
       .filter((p): p is NonNullable<typeof p> => !!p)
-      .map((profile) => {
-        let authMethod: import('@/datasources/connectionApi').SshAuthMethod
-        switch (profile.authMethod) {
-          case 'password':
-            authMethod = { method: 'password', password: profile.password || '' }
-            break
-          case 'key':
-            authMethod = { method: 'privateKey', private_key_path: profile.keyPath || '', passphrase: profile.keyPassphrase || null }
-            break
-          default:
-            authMethod = { method: 'agent' }
-        }
-        return {
-          type: 'ssh' as const,
-          host: profile.host,
-          port: profile.port,
-          username: profile.username,
-          auth_method: authMethod,
-          enabled: true,
-          use_system_proxy: false,
-          connect_timeout_secs: profile.connectTimeoutSecs,
-          keepalive_interval_secs: profile.keepaliveIntervalSecs,
-        }
-      })
+      .map(profileToTransportLayer)
     if (layers.length > 0 && sshTunnel.useSystemProxy) {
-      const first = layers[0] as { use_system_proxy?: boolean }
-      first.use_system_proxy = true
+      layers[0].useSystemProxy = true
     }
     return layers
   }
@@ -598,29 +559,31 @@ export async function buildTransportLayers(sshTunnel?: SSHTunnelConfig): Promise
     return null
   }
 
-  let authMethod: import('@/datasources/connectionApi').SshAuthMethod
-
-  switch (sshTunnel.authMethod) {
-    case 'password':
-      authMethod = { method: 'password', password: sshTunnel.password || '' }
-      break
-    case 'privateKey':
-      authMethod = { method: 'privateKey', private_key_path: sshTunnel.privateKey || '', passphrase: sshTunnel.privateKeyPassphrase || null }
-      break
-    default:
-      authMethod = { method: 'agent' }
-      break
-  }
+  // Legacy inline tunnel (page-level shape): normalize auth to the Rust
+  // strings ('privateKey' → 'key') and keep the proxy-first-hop semantics.
+  const inlineAuthMethod
+    = sshTunnel.authMethod === 'agent'
+      ? 'agent' as const
+      : sshTunnel.authMethod === 'privateKey'
+        ? 'key' as const
+        : 'password' as const
 
   return [{
     type: 'ssh',
+    enabled: true,
     host: sshTunnel.host,
     port: sshTunnel.port,
     username: sshTunnel.username,
-    auth_method: authMethod,
-    enabled: true,
-    connect_timeout_secs: 10,
-    keepalive_interval_secs: 30,
+    authMethod: inlineAuthMethod,
+    password: sshTunnel.password ?? '',
+    keyPath: sshTunnel.privateKey ?? '',
+    keyPassphrase: sshTunnel.privateKeyPassphrase ?? '',
+    useSshAgent: inlineAuthMethod === 'agent',
+    sshAgentSockPath: '',
+    // The inline tunnel is the only hop, so an attached system proxy rides it.
+    useSystemProxy: sshTunnel.useSystemProxy === true,
+    connectTimeoutSecs: 10,
+    keepaliveIntervalSecs: 30,
   }]
 }
 

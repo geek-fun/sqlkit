@@ -11,15 +11,17 @@ const { t } = useI18n()
 const showModal = ref(false)
 const connectionName = ref('')
 const errorMessage = ref('')
+const warningMessage = ref('')
 const cancelCallback = ref<(() => void) | null>(null)
 const retryCallback = ref<(() => void) | null>(null)
 const failureHint = computed(() => classifyDuckDbFailure(errorMessage.value))
 
-function show(name: string, onCancel: () => void, onRetry: () => void) {
+function show(name: string, onCancel: () => void, onRetry: () => void, warning = '') {
   connectionName.value = name
   cancelCallback.value = onCancel
   retryCallback.value = onRetry
   errorMessage.value = ''
+  warningMessage.value = warning
   showModal.value = true
 }
 
@@ -27,6 +29,7 @@ function hide() {
   showModal.value = false
   connectionName.value = ''
   errorMessage.value = ''
+  warningMessage.value = ''
   cancelCallback.value = null
   retryCallback.value = null
 }
@@ -136,6 +139,15 @@ defineExpose({
 
         <p v-if="!errorMessage" class="text-sm text-muted-foreground text-center">
           {{ t('components.connectingModal.connectingSubtext') }}
+        </p>
+
+        <!-- Non-fatal heads-up while connecting, e.g. system proxy opted in but
+             no longer detected — the tunnel falls back to a direct connection -->
+        <p
+          v-if="!errorMessage && warningMessage"
+          class="text-xs text-amber-600 text-center max-w-[400px] dark:text-amber-400"
+        >
+          {{ warningMessage }}
         </p>
       </div>
 

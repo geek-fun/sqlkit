@@ -160,6 +160,9 @@ fn macos_proxy_exempts(_host: &str) -> bool {
 /// Detect the system proxy for `host:port` when given, or for an arbitrary
 /// probe target otherwise. Used by the UI to offer "use system proxy" on
 /// SSH tunnels and to warn when an opted-in proxy no longer applies.
+/// Detect the system proxy for `host:port` when given, or for an arbitrary
+/// probe target otherwise. Used by the UI to offer "use system proxy" on
+/// SSH tunnels and to warn when an opted-in proxy no longer applies.
 #[tauri::command]
 pub async fn detect_system_proxy(
     host: Option<String>,
@@ -168,5 +171,19 @@ pub async fn detect_system_proxy(
     match (host, port) {
         (Some(h), Some(p)) => Ok(system_proxy_for(&h, p)),
         _ => Ok(system_proxy_for("proxy-check.invalid", 443)),
+    }
+}
+
+#[cfg(test)]
+mod proxy_probe_tests {
+    use super::system_proxy_for;
+
+    // Machine-dependent outcome: run manually with `cargo test -- --ignored --nocapture`
+    #[test]
+    #[ignore]
+    fn print_system_proxy_probe_results() {
+        for host in ["proxy-check.invalid", "", "localhost", "127.0.0.1", "db.example.com"] {
+            println!("host={host:?} -> {:?}", system_proxy_for(host, 443));
+        }
     }
 }

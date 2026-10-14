@@ -3,14 +3,13 @@ import type { SSHTunnelConfig } from '@/store/connectionStore'
 import type { SshProfile } from '@/store/sshProfileStore'
 import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
-import { Pencil, Plus, Trash2 } from 'lucide-vue-next'
+import { Pencil, Plus } from 'lucide-vue-next'
 import Sortable from 'sortablejs'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UPGRADE_URL } from '@/common/entitlement'
 import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { SearchableSelect } from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,7 +23,7 @@ import {
 } from '@/components/ui/select'
 import { ProBadge } from '@/components/upgrade'
 import { useEntitlementStore } from '@/store/entitlementStore'
-import { emptySshProfile, useSshProfileStore } from '@/store/sshProfileStore'
+import { emptySshProfile, profileToTransportLayer, useSshProfileStore } from '@/store/sshProfileStore'
 
 const props = defineProps<{
   modelValue?: SSHTunnelConfig
@@ -105,7 +104,8 @@ function patch(value: Partial<SSHTunnelConfig>) {
   }
   // Configure-as-intent: any hop, an attached system proxy, or inline fields
   // means enabled; an empty chain without inline fields means off — the
-  // explicit "Use SSH Tunnel" toggle is gone.
+  // explicit "Use SSH Tunnel" toggle is gone. Detached hops are dormant
+  // references and never count as intent.
   base.enabled
     = (base.profileIds?.length ?? 0) > 0
       || base.useSystemProxy === true
@@ -119,7 +119,12 @@ function addHop(id: string) {
   patch({ profileIds: [...(props.modelValue?.profileIds ?? []), id] })
 }
 
-function removeHop(index: number) {
+/**
+ * Detach just takes it off the chain: the row disappears from the list, the
+ *  profile stays in the global store and can be re-added via the selector
+ *  anytime — the profile itself is never deleted.
+ */
+function detachHop(index: number) {
   const ids = [...(props.modelValue?.profileIds ?? [])]
   ids.splice(index, 1)
   patch({ profileIds: ids })
@@ -213,22 +218,6 @@ async function convertLegacyToProfile() {
 
 type TestSshResult = { success: boolean, message: string }
 
-/** Convert a profile into a single-hop tunnel config for the test command. */
-const profileToTunnelConfig = (profile: SshProfile): SSHTunnelConfig => ({
-  enabled: true,
-  host: profile.host,
-  port: profile.port,
-  username: profile.username,
-  authMethod: profile.authMethod === 'key'
-    ? 'privateKey'
-    : profile.authMethod === 'none'
-      ? 'password'
-      : (profile.authMethod || 'password') as SSHTunnelConfig['authMethod'],
-  password: profile.password,
-  privateKey: profile.keyPath,
-  privateKeyPassphrase: profile.keyPassphrase,
-})
-
 async function testFirstHop() {
   const first = hopProfiles.value[0]
   if (!first || testing.value)
@@ -236,8 +225,10 @@ async function testFirstHop() {
   testing.value = true
   testResult.value = null
   try {
+    // Shared profile → Rust-contract layer mapping (camelCase), so the test
+    // exercises EXACTLY the credentials the real chain will use.
     testResult.value = await invoke<TestSshResult>('test_ssh_connection', {
-      config: profileToTunnelConfig(first),
+      config: profileToTransportLayer(first),
       remoteHost: props.remoteHost ?? '',
       remotePort: props.remotePort ?? 22,
     })
@@ -273,12 +264,17 @@ function applyConfigHost(host: { host: string, hostName?: string, port?: number,
   showConfigHosts.value = false
 }
 
+/**
+ * Probe the OS for ANY system proxy (DockIt parity): the row is an "add the
+ * system proxy" affordance, so the probe target must not be the connect
+ * destination — a DB host inside the proxy exception list (localhost, LAN) or
+ * an empty form host would otherwise hide a proxy that DockIt reports.
+ * Host-scoped resolution happens at tunnel start, plus the connect-time
+ * "enabled but not detected" warning against the first hop.
+ */
 async function detectProxy() {
   try {
-    detectedProxy.value = await invoke<string | null>('detect_system_proxy', {
-      host: props.remoteHost ?? null,
-      port: props.remotePort ? Number(props.remotePort) : null,
-    })
+    detectedProxy.value = await invoke<string | null>('detect_system_proxy')
   }
   catch {
     detectedProxy.value = null
@@ -290,9 +286,6 @@ profileStore.fetch()
 // Detect on mount — under configure-as-intent there is no enable toggle, so
 // the pinned system-proxy row must be discoverable from the empty state on.
 onMounted(detectProxy)
-
-// Re-detect when the target host/port changes (proxies can be host-scoped).
-watch(() => [props.remoteHost, props.remotePort], () => detectProxy())
 
 // Re-detect when the tunnel first turns on (editing an existing connection).
 watch(() => props.modelValue?.enabled, (on) => {
@@ -343,12 +336,13 @@ watch(() => props.modelValue?.enabled, (on) => {
           <span v-else class="i-carbon-network-3 h-3.5 w-3.5" />
         </Button>
 
-        <div class="ml-auto max-w-[240px] min-w-0">
+        <div class="ml-auto max-w-[320px] min-w-0 w-[280px]">
           <SearchableSelect
             model-value=""
             :options="unusedProfiles.map(p => ({ label: `${p.name} (${p.username}@${p.host})`, value: p.id }))"
             :search-threshold="0"
             :placeholder="t('components.serverForm.ssh.addProfilePlaceholder')"
+            :search-placeholder="t('components.serverForm.ssh.searchProfilePlaceholder')"
             @update:model-value="(id: unknown) => addHop(String(id))"
           />
         </div>
@@ -380,22 +374,18 @@ watch(() => props.modelValue?.enabled, (on) => {
         {{ t('components.serverForm.ssh.notConfigured') }}
       </div>
 
-      <!-- System proxy: OS-detected, pinned as the implicit hop 0 (never persisted as a URL) -->
+      <!-- System proxy: OS-detected up front (DockIt parity). Attached → pinned
+           as the implicit hop 0 (never persisted as a URL); detected but not
+           attached → an Add affordance. Visible from the empty state on:
+           attaching the proxy alone is enough intent to enable the tunnel. -->
       <div
-        v-if="detectedProxy && (hopProfiles.length > 0 || legacyInline)"
-        class="px-2.5 py-1.5 border rounded-md flex gap-2 items-center"
-        :class="useSystemProxy ? 'border-primary/40 bg-primary/5' : ''"
+        v-if="detectedProxy && useSystemProxy"
+        class="px-2.5 py-1.5 border border-primary/40 rounded-md bg-primary/5 flex gap-2 items-center"
       >
         <span class="text-[10px] text-muted-foreground font-bold shrink-0 w-4">0</span>
         <div class="flex-1 min-w-0">
-          <div class="text-sm font-medium flex gap-1.5 items-center">
+          <div class="text-sm font-medium">
             {{ t('components.serverForm.ssh.systemProxy') }}
-            <span
-              v-if="useSystemProxy"
-              class="text-[10px] text-primary px-1.5 py-0.5 rounded bg-primary/10"
-            >
-              {{ t('components.serverForm.ssh.proxyActive') }}
-            </span>
           </div>
           <div class="text-[11px] text-muted-foreground font-mono truncate">
             {{ detectedProxy }}
@@ -403,12 +393,31 @@ watch(() => props.modelValue?.enabled, (on) => {
         </div>
         <Button
           variant="ghost"
+          size="icon"
+          type="button"
+          class="text-muted-foreground shrink-0 h-6 w-6 hover:text-destructive"
+          :title="t('components.serverForm.ssh.systemProxyDetach')"
+          @click="patch({ useSystemProxy: false })"
+        >
+          <span class="i-carbon-unlink h-3 w-3" />
+        </Button>
+      </div>
+      <div
+        v-else-if="detectedProxy"
+        class="px-2.5 py-1.5 border rounded-md flex gap-2 items-center"
+      >
+        <span class="i-carbon-network-public text-muted-foreground shrink-0 h-3.5 w-3.5" />
+        <span class="text-xs text-muted-foreground flex-1 min-w-0 truncate">
+          {{ t('components.serverForm.ssh.systemProxyDetected', { url: detectedProxy }) }}
+        </span>
+        <Button
+          variant="outline"
           size="sm"
           type="button"
           class="text-xs shrink-0 h-6"
-          @click="patch({ useSystemProxy: !useSystemProxy })"
+          @click="patch({ useSystemProxy: true })"
         >
-          {{ useSystemProxy ? t('components.serverForm.ssh.detachProxy') : t('components.serverForm.ssh.attachProxy') }}
+          {{ t('components.serverForm.ssh.systemProxyAdd') }}
         </Button>
       </div>
 
@@ -429,11 +438,18 @@ watch(() => props.modelValue?.enabled, (on) => {
                 {{ profile.username }}@{{ profile.host }}:{{ profile.port }}
               </div>
             </div>
-            <Button variant="ghost" size="icon" type="button" class="h-6 w-6" @click="openEditProfile(profile)">
+            <Button variant="ghost" size="icon" type="button" class="h-6 w-6" :title="t('components.serverForm.ssh.editProfile')" @click="openEditProfile(profile)">
               <Pencil class="h-3.5 w-3.5" />
             </Button>
-            <Button variant="ghost" size="icon" type="button" class="text-destructive h-6 w-6" @click="removeHop(index)">
-              <Trash2 class="h-3.5 w-3.5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              type="button"
+              class="text-muted-foreground h-6 w-6 hover:text-destructive"
+              :title="t('components.serverForm.ssh.detachAction')"
+              @click="detachHop(index)"
+            >
+              <span class="i-carbon-unlink h-3.5 w-3.5" />
             </Button>
           </div>
         </div>
@@ -538,19 +554,6 @@ watch(() => props.modelValue?.enabled, (on) => {
           </button>
         </div>
       </template>
-
-      <!-- System proxy: only a force-enable fallback when OS detection found nothing;
-             when a proxy IS detected it renders as the pinned row above instead -->
-      <div v-if="!detectedProxy" class="flex gap-2 items-center">
-        <Checkbox
-          id="ssh-system-proxy"
-          :checked="props.modelValue?.useSystemProxy ?? false"
-          @update:checked="checked => patch({ useSystemProxy: checked === true })"
-        />
-        <Label for="ssh-system-proxy" class="text-sm font-normal">
-          {{ t('components.serverForm.ssh.useSystemProxy') }}
-        </Label>
-      </div>
 
       <SshProfileDialog ref="profileDialogRef" @save="onProfileSaved" />
     </template>

@@ -62,6 +62,22 @@ jest.mock('@/store/sshProfileStore', () => ({
     profiles: HOP_PROFILES,
     save: jest.fn(async (profile: { id: string, name: string }) => ({ ...profile, id: profile.id || 'new-1' })),
   }),
+  profileToTransportLayer: (profile: { host: string, port: number, username: string }) => ({
+    type: 'ssh',
+    enabled: true,
+    host: profile.host,
+    port: profile.port,
+    username: profile.username,
+    authMethod: 'password',
+    password: '',
+    keyPath: '',
+    keyPassphrase: '',
+    useSshAgent: false,
+    sshAgentSockPath: '',
+    useSystemProxy: false,
+    connectTimeoutSecs: 10,
+    keepaliveIntervalSecs: 30,
+  }),
 }))
 
 jest.mock('@/store/entitlementStore', () => ({
@@ -88,14 +104,6 @@ jest.mock('@/components/ui/select', () => ({
   SelectItem: { template: '<option><slot /></option>' },
   SelectTrigger: { template: '<span><slot /></span>' },
   SelectValue: { template: '<span />' },
-}))
-// Radix-vue v1 Checkbox contract: `checked` prop / `update:checked` emit.
-jest.mock('@/components/ui/checkbox', () => ({
-  Checkbox: {
-    props: ['checked', 'id'],
-    emits: ['update:checked'],
-    template: '<input type="checkbox" :id="id" :checked="checked === true" @change="$emit(\'update:checked\', $event.target.checked)" />',
-  },
 }))
 jest.mock('@/components/ui/combobox', () => ({
   SearchableSelect: {
@@ -144,13 +152,22 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
     setActivePinia(createPinia())
   })
 
-  it('renders the empty state and NO enable toggle when nothing is configured', () => {
+  it('renders the empty state and NO enable toggle when nothing is configured', async () => {
     const wrapper = mountPanel()
+    await flushPromises()
     expect(wrapper.find('.stub-combobox').exists()).toBe(true)
     expect(wrapper.text()).toContain('components.serverForm.ssh.notConfigured')
-    // The explicit enable checkbox is gone — only the proxy *fallback*
-    // checkbox may exist (shown when the OS proxy is not detected).
-    expect(wrapper.find('#use-ssh').exists()).toBe(false)
+    // The explicit enable toggle is gone; with a proxy detected the Add row
+    // is the only proxy affordance — no checkbox fallback.
+    expect(wrapper.find('input[type="checkbox"]').exists()).toBe(false)
+    expect(wrapper.text()).toContain('components.serverForm.ssh.systemProxyDetected')
+  })
+
+  it('offers Add for the detected system proxy from the empty state (DockIt parity)', async () => {
+    const wrapper = mountPanel()
+    await flushPromises()
+    const addButton = wrapper.findAll('button').find(b => b.text() === 'components.serverForm.ssh.systemProxyAdd')
+    expect(addButton).toBeTruthy()
   })
 
   it('adding a hop derives enabled=true without any explicit toggle', async () => {
@@ -165,12 +182,12 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
     expect(payload.enabled).toBe(true)
   })
 
-  it('removing the last hop derives enabled=false', async () => {
+  it('detaching the last hop removes it from the list and derives enabled=false', async () => {
     const wrapper = mountPanel({ enabled: true, profileIds: ['p1'] })
     await flushPromises()
-    const removeButton = wrapper.findAll('button').find(b => b.attributes('class')?.includes('text-destructive'))
-    expect(removeButton).toBeTruthy()
-    await removeButton?.trigger('click')
+    const detachButton = wrapper.findAll('button').find(b => b.attributes('title') === 'components.serverForm.ssh.detachAction')
+    expect(detachButton).toBeTruthy()
+    await detachButton?.trigger('click')
     await syncProps(wrapper)
 
     const payload = lastPayload(wrapper)
@@ -178,20 +195,32 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
     expect(payload.enabled).toBe(false)
   })
 
-  it('attaching the system proxy alone enables the tunnel', async () => {
+  it('attaching the detected system proxy alone enables the tunnel — no hop needed', async () => {
     const wrapper = mountPanel()
     await flushPromises()
-    await wrapper.find('.stub-combobox').setValue('p1')
-    await wrapper.find('.stub-combobox').trigger('change')
-    await syncProps(wrapper)
-    const proxyButton = wrapper.findAll('button').find(b => b.text() === 'components.serverForm.ssh.attachProxy')
-    expect(proxyButton).toBeTruthy()
-    await proxyButton?.trigger('click')
+    const addButton = wrapper.findAll('button').find(b => b.text() === 'components.serverForm.ssh.systemProxyAdd')
+    expect(addButton).toBeTruthy()
+    await addButton?.trigger('click')
     await syncProps(wrapper)
 
     const payload = lastPayload(wrapper)
     expect(payload.enabled).toBe(true)
     expect(payload.useSystemProxy).toBe(true)
+  })
+
+  it('an attached system proxy renders pinned and detaches without dropping hops', async () => {
+    const wrapper = mountPanel({ enabled: true, profileIds: ['p1'], useSystemProxy: true })
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('components.serverForm.ssh.systemProxyAdd')
+    const detachButton = wrapper.findAll('button').find(b => b.attributes('title') === 'components.serverForm.ssh.systemProxyDetach')
+    expect(detachButton).toBeTruthy()
+    await detachButton?.trigger('click')
+    await syncProps(wrapper)
+
+    const payload = lastPayload(wrapper)
+    expect(payload.useSystemProxy).toBe(false)
+    expect(payload.profileIds).toEqual(['p1'])
+    expect(payload.enabled).toBe(true)
   })
 
   it('legacy inline connections keep editing fields and stay enabled', async () => {

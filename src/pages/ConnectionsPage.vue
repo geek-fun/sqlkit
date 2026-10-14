@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ServerConnection } from '@/store'
 import type { SshProfile } from '@/store/sshProfileStore'
+import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -61,6 +62,7 @@ const filteredConnections = computed(() => {
 const stats = computed(() => ({
   total: connectionStore.connections.length,
   active: connectionStore.connectedConnections.length,
+  sshProfiles: sshProfileStore.profiles.length,
 }))
 
 onMounted(async () => {
@@ -81,6 +83,33 @@ function handleEditConnection(connection: ServerConnection) {
   isFormDialogOpen.value = true
 }
 
+// DockIt parity: a tunnel opted into the system proxy connects direct when the
+// OS no longer has one — probe the FIRST hop (the backend routes the proxy
+// against the bastion, not the database host) and warn instead of silently
+// bypassing.
+const systemProxyWarning = async (connection: ServerConnection): Promise<string | undefined> => {
+  const sshTunnel = connection.sshTunnel
+  if (!sshTunnel?.enabled || !sshTunnel.useSystemProxy)
+    return undefined
+  const firstHopProfile = sshTunnel.profileIds?.length
+    ? sshProfileStore.byId(sshTunnel.profileIds[0])
+    : undefined
+  const firstHop = firstHopProfile
+    ? { host: firstHopProfile.host, port: firstHopProfile.port }
+    : sshTunnel.host
+      ? { host: sshTunnel.host, port: sshTunnel.port ?? 22 }
+      : null
+  try {
+    const detected = firstHop
+      ? await invoke<string | null>('detect_system_proxy', { host: firstHop.host, port: firstHop.port })
+      : await invoke<string | null>('detect_system_proxy')
+    return detected ? undefined : t('components.serverForm.ssh.systemProxyNotDetected')
+  }
+  catch {
+    return undefined
+  }
+}
+
 async function establishConnection(connection: ServerConnection, navigateOnSuccess = true) {
   if (!connection.id) {
     return
@@ -88,12 +117,15 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
 
   connectionCancelled.value = false
 
+  const proxyWarning = await systemProxyWarning(connection)
+
   connectingModal.value?.show(
     connection.name,
     () => {
       connectionCancelled.value = true
     },
     () => establishConnection(connection, navigateOnSuccess),
+    proxyWarning,
   )
 
   const startTime = Date.now()
@@ -339,6 +371,21 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             <div class="flex items-center justify-between">
               <div>
                 <p class="text-sm text-muted-foreground">
+                  {{ t('pages.connections.stats.sshProfiles') }}
+                </p>
+                <p class="text-2xl font-bold">
+                  {{ stats.sshProfiles }}
+                </p>
+              </div>
+              <div class="rounded-lg bg-violet-100 flex h-10 w-10 items-center justify-center dark:bg-violet-900/30">
+                <span class="i-carbon-key text-violet-600 h-5 w-5 dark:text-violet-400" />
+              </div>
+            </div>
+          </Card>
+          <Card class="p-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm text-muted-foreground">
                   {{ t('pages.connections.stats.activeSessions') }}
                 </p>
                 <p class="text-2xl font-bold">
@@ -359,35 +406,6 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                   class="text-green-600 h-5 w-5 dark:text-green-400"
                 >
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-                </svg>
-              </div>
-            </div>
-          </Card>
-          <Card class="p-4">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-sm text-muted-foreground">
-                  {{ t('pages.connections.stats.lastSync') }}
-                </p>
-                <p class="text-2xl font-bold">
-                  2m ago
-                </p>
-              </div>
-              <div class="rounded-lg bg-orange-100 flex h-10 w-10 items-center justify-center dark:bg-orange-900/30">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="text-orange-600 h-5 w-5 dark:text-orange-400"
-                >
-                  <circle cx="12" cy="12" r="10" />
-                  <polyline points="12 6 12 12 16 14" />
                 </svg>
               </div>
             </div>
@@ -508,9 +526,9 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
         </div>
       </div>
       <div class="p-6 pt-0 flex-1 min-h-0 overflow-y-auto">
-        <!-- SSH Profile cards (Ultimate) -->
+        <!-- SSH Profile cards (Ultimate): always visible so the add entry point
+             exists even with zero profiles (DockIt connect page parity) -->
         <div
-          v-if="sshProfileStore.profiles.length > 0"
           class="mb-6" :class="[viewMode === 'grid'
             ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
             : 'flex flex-col gap-3']"
