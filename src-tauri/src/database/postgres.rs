@@ -313,19 +313,25 @@ impl PostgresAdapter {
     }
 
     /// Build the PostgreSQL connection string.
-    fn build_connection_string(&self) -> String {
+    ///
+    /// Values are libpq-quoted: keyword strings parse space-separated
+    /// `key=value` pairs, so raw interpolation of user-entered values (a
+    /// database named "x host=attacker", a password with spaces…) would
+    /// rewrite neighboring params and e.g. re-point the cross-database temp
+    /// connection, leaking credentials to a spoofed host.
+    fn build_connection_string(&self) -> DbResult<String> {
         let mut parts = Vec::new();
 
-        parts.push(format!("host={}", self.config.host));
+        parts.push(format!("host={}", libpq_quote(&self.config.host)));
         parts.push(format!("port={}", self.config.port));
-        parts.push(format!("user={}", self.config.username));
+        parts.push(format!("user={}", libpq_quote(&self.config.username)));
 
         if let Some(ref password) = self.config.password {
-            parts.push(format!("password={}", password));
+            parts.push(format!("password={}", libpq_quote(password)));
         }
 
         if let Some(ref database) = self.config.database {
-            parts.push(format!("dbname={}", database));
+            parts.push(format!("dbname={}", libpq_quote(database)));
         } else if matches!(self.config.db_type, DatabaseType::PostgreSQL) {
             // Real PostgreSQL servers always have a 'postgres' maintenance DB;
             // use it as the default when the user leaves the field empty.
@@ -336,7 +342,7 @@ impl PostgresAdapter {
             // is to fall back to the username-matching database, but
             // deadpool-postgres does not implement this fallback — it requires
             // an explicit dbname. Use the username as the fallback here.
-            parts.push(format!("dbname={}", self.config.username));
+            parts.push(format!("dbname={}", libpq_quote(&self.config.username)));
         }
 
         // Add SSL mode
@@ -357,10 +363,21 @@ impl PostgresAdapter {
 
         // Add additional options
         for (key, value) in &self.config.options {
-            parts.push(format!("{}={}", key, value));
+            // The keyword side cannot be quoted: reject keys with
+            // syntax-meaningful characters instead of interpolating them.
+            if !key
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+            {
+                return Err(DbError::InvalidQuery(format!(
+                    "Unsupported connection option key: {}",
+                    key
+                )));
+            }
+            parts.push(format!("{}={}", key, libpq_quote(value)));
         }
 
-        parts.join(" ")
+        Ok(parts.join(" "))
     }
 
     fn build_rustls_config(
@@ -951,12 +968,18 @@ impl PostgresAdapter {
     }
 }
 
+/// Quote a value per libpq keyword-string rules (single-quoted, doubled
+/// quotes, escaped backslashes). See `build_connection_string`.
+fn libpq_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "''"))
+}
+
 #[async_trait]
 impl DatabaseAdapter for PostgresAdapter {
     type Pool = PostgresPool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        let connection_string = self.build_connection_string();
+        let connection_string = self.build_connection_string()?;
 
         // Create deadpool configuration
         let mut pg_config = DeadpoolConfig::new();
@@ -2617,15 +2640,15 @@ mod tests {
             .with_option("application_name", "sqlkit");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("host='localhost'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=postgres"));
-        assert!(conn_str.contains("password=password"));
-        assert!(conn_str.contains("dbname=testdb"));
+        assert!(conn_str.contains("user='postgres'"));
+        assert!(conn_str.contains("password='password'"));
+        assert!(conn_str.contains("dbname='testdb'"));
         assert!(conn_str.contains("sslmode=require"));
-        assert!(conn_str.contains("application_name=sqlkit"));
+        assert!(conn_str.contains("application_name='sqlkit'"));
     }
 
     #[test]
@@ -2644,7 +2667,7 @@ mod tests {
                     .with_ssl_mode(ssl_mode);
 
             let adapter = PostgresAdapter::new(config);
-            let conn_str = adapter.build_connection_string();
+            let conn_str = adapter.build_connection_string().unwrap();
 
             assert!(
                 conn_str.contains(expected),
@@ -2665,16 +2688,16 @@ mod tests {
                 .with_option("connect_timeout", "10");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=db.example.com"));
+        assert!(conn_str.contains("host='db.example.com'"));
         assert!(conn_str.contains("port=5433"));
-        assert!(conn_str.contains("user=admin"));
-        assert!(conn_str.contains("password=secure_pass"));
-        assert!(conn_str.contains("dbname=production"));
+        assert!(conn_str.contains("user='admin'"));
+        assert!(conn_str.contains("password='secure_pass'"));
+        assert!(conn_str.contains("dbname='production'"));
         assert!(conn_str.contains("sslmode=verify-full"));
-        assert!(conn_str.contains("application_name=sqlkit"));
-        assert!(conn_str.contains("connect_timeout=10"));
+        assert!(conn_str.contains("application_name='sqlkit'"));
+        assert!(conn_str.contains("connect_timeout='10'"));
     }
 
     #[test]
@@ -2683,13 +2706,65 @@ mod tests {
             .with_password("password");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("host='localhost'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=postgres"));
-        assert!(conn_str.contains("password=password"));
+        assert!(conn_str.contains("user='postgres'"));
+        assert!(conn_str.contains("password='password'"));
+        // the maintenance-db fallback is a literal keyword value
         assert!(conn_str.contains("dbname=postgres"));
+    }
+
+    #[test]
+    fn test_connection_string_quotes_hostile_values() {
+        // A libpq keyword string parses space-separated `key=value` pairs, so
+        // raw values could rewrite neighboring params (e.g. point the
+        // cross-database temp connection at a spoofed host). Everything the
+        // user types must land inside one quoted value instead.
+        let config = ConnectionConfig::new(
+            DatabaseType::PostgreSQL,
+            "localhost",
+            5432,
+            "postgres",
+        )
+        .with_database("x host=attacker.example")
+        .with_password("p w'ord \\");
+
+        let adapter = PostgresAdapter::new(config);
+        let conn_str = adapter.build_connection_string().unwrap();
+
+        // The hostile text survives as ONE quoted value; the only host
+        // keyword is the one the config legitimately declares.
+        assert!(
+            conn_str.contains("dbname='x host=attacker.example'"),
+            "hostile dbname must stay inside one quoted value: {}",
+            conn_str
+        );
+        assert!(
+            conn_str.starts_with("host='localhost'"),
+            "exactly one host param, the config one: {}",
+            conn_str
+        );
+        assert!(
+            conn_str.contains(r"password='p w''ord \\'"),
+            "password must be libpq-quoted: {}",
+            conn_str
+        );
+    }
+
+    #[test]
+    fn test_connection_string_rejects_hostile_option_key() {
+        let config = ConnectionConfig::new(
+            DatabaseType::PostgreSQL,
+            "localhost",
+            5432,
+            "postgres",
+        )
+        .with_option("x host=evil", "1");
+
+        let adapter = PostgresAdapter::new(config);
+        assert!(adapter.build_connection_string().is_err());
     }
 
     #[test]
@@ -2698,13 +2773,13 @@ mod tests {
             .with_password("kingbase@123");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=10.84.1.213"));
+        assert!(conn_str.contains("host='10.84.1.213'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=SYSTEM"));
+        assert!(conn_str.contains("user='SYSTEM'"));
         assert!(
-            conn_str.contains("dbname=SYSTEM"),
+            conn_str.contains("dbname='SYSTEM'"),
             "PG-wire-compat engines must fall back to username as dbname (libpq convention)"
         );
         assert!(
@@ -2719,12 +2794,12 @@ mod tests {
             .with_database("testdb");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("host='localhost'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=postgres"));
-        assert!(conn_str.contains("dbname=testdb"));
+        assert!(conn_str.contains("user='postgres'"));
+        assert!(conn_str.contains("dbname='testdb'"));
         assert!(!conn_str.contains("password="));
     }
 

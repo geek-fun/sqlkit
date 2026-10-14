@@ -249,19 +249,25 @@ public class MetadataProvider {
                     continue;
                 }
                 Map<String, Object> t = new LinkedHashMap<>();
-                t.put("name", rs.getString("trigger_name"));
-                t.put("action_timing", rs.getString("action_timing"));
-                t.put("event", rs.getString("event_manipulation"));
-                t.put("ddl", rs.getString("action_statement"));
+                t.put("name", nonNull(rs.getString("trigger_name")));
+                t.put("action_timing", nonNull(rs.getString("action_timing")));
+                t.put("event", nonNull(rs.getString("event_manipulation")));
+                t.put("ddl", nonNull(rs.getString("action_statement")));
                 triggers.add(t);
             }
         } catch (SQLException e) {
             // information_schema.triggers not available on this engine
             if (isOracle(conn)) {
+                // all_triggers spans every schema the session can see — scope
+                // by owner, otherwise same-named triggers leak in from all
+                // schemas.
+                String ownerClause = (schema != null && !schema.isEmpty())
+                        ? " WHERE owner = '" + escapeLiteral(schema) + "'"
+                        : "";
                 try (Statement stmt = conn.createStatement();
                      ResultSet rs = stmt.executeQuery(
-                         "SELECT trigger_name, trigger_type, triggering_event, trigger_body, "
-                             + "triggering_type, base_object_type, table_name FROM all_triggers")) {
+                         "SELECT owner, trigger_name, trigger_type, triggering_event, trigger_body, "
+                             + "base_object_type, table_name FROM all_triggers" + ownerClause)) {
                     while (rs.next()) {
                         String triggerTable = rs.getString("table_name");
                         if (table != null && !table.isEmpty() && triggerTable != null
@@ -269,14 +275,41 @@ public class MetadataProvider {
                             continue;
                         }
                         Map<String, Object> t = new LinkedHashMap<>();
-                        t.put("name", rs.getString("trigger_name"));
-                        t.put("action_timing", rs.getString("trigger_type"));
-                        t.put("event", rs.getString("triggering_event"));
-                        t.put("ddl", readClob(rs.getObject("trigger_body")));
+                        t.put("name", nonNull(rs.getString("trigger_name")));
+                        t.put("action_timing", nonNull(rs.getString("trigger_type")));
+                        t.put("event", nonNull(rs.getString("triggering_event")));
+                        t.put("ddl", nonNull(readClob(rs.getObject("trigger_body"))));
                         triggers.add(t);
                     }
                 } catch (SQLException ignored) {
                     // Oracle metadata also unavailable — leave the list empty
+                }
+            } else if (isFirebird(conn)) {
+                // information_schema.triggers is absent on Firebird; the engine
+                // catalog lives in RDB$TRIGGERS. RDB$TRIGGER_TYPE: 0=BEFORE,
+                // 1=AFTER; the event mix lives in the source, so event stays "".
+                try (Statement stmt = conn.createStatement();
+                     ResultSet rs = stmt.executeQuery(
+                         "SELECT RDB$TRIGGER_NAME, RDB$TRIGGER_TYPE, RDB$RELATION_NAME, "
+                             + "RDB$TRIGGER_SOURCE FROM RDB$TRIGGERS")) {
+                    while (rs.next()) {
+                        String triggerTable = rs.getString("RDB$RELATION_NAME");
+                        if (table != null && !table.isEmpty() && triggerTable != null
+                                && !triggerTable.trim().equalsIgnoreCase(table)) {
+                            continue;
+                        }
+                        Map<String, Object> t = new LinkedHashMap<>();
+                        String name = rs.getString("RDB$TRIGGER_NAME");
+                        String timing = rs.getString("RDB$TRIGGER_TYPE");
+                        t.put("name", nonNull(name == null ? null : name.trim()));
+                        t.put("action_timing",
+                                "0".equals(timing == null ? null : timing.trim()) ? "BEFORE" : "AFTER");
+                        t.put("event", "");
+                        t.put("ddl", nonNull(readBlobText(rs.getObject("RDB$TRIGGER_SOURCE"))));
+                        triggers.add(t);
+                    }
+                } catch (SQLException ignored) {
+                    // Firebird catalog unavailable — leave the list empty
                 }
             }
         }
@@ -396,7 +429,7 @@ public class MetadataProvider {
                 }
                 List<String> columns = readColumnNames(rs.getObject("expressions"));
                 Map<String, Object> idx = new LinkedHashMap<>();
-                idx.put("name", rs.getString("index_name"));
+                idx.put("name", nonNull(rs.getString("index_name")));
                 idx.put("columns", columns);
                 idx.put("index_type", "BTREE");
                 Boolean isUnique = maybeBoolean(rs, "is_unique");
@@ -458,10 +491,8 @@ public class MetadataProvider {
         Map<String, List<String>> fkReferencedColumns = new LinkedHashMap<>();
         try (ResultSet rs = conn.getMetaData().getImportedKeys(catalog, schemaPattern, table)) {
             while (rs.next()) {
-                String constraintName = rs.getString("FK_NAME");
-                if (constraintName == null) {
-                    constraintName = "fk_" + rs.getString("FKTABLE_NAME");
-                }
+                String constraintName = fkGroupKey(rs.getString("FK_NAME"),
+                        rs.getString("FKTABLE_NAME"), rs.getString("PKTABLE_NAME"));
                 fkColumns.computeIfAbsent(constraintName, k -> new ArrayList<>())
                         .add(rs.getString("FKCOLUMN_NAME"));
                 fkReferencedColumns.computeIfAbsent(constraintName, k -> new ArrayList<>())
@@ -506,7 +537,29 @@ public class MetadataProvider {
         try (ResultSet rs = conn.getMetaData().getExportedKeys(catalog, schemaPattern, "%")) {
             collectForeignKeys(rs, fks, fkColumns, fkReferencedColumns);
         } catch (SQLException e) {
-            // Pattern-based exported keys are not portable — degrade to empty
+            // Pattern-based exported keys are not portable (drivers without a
+            // "%" table pattern land here) — fall back to per-table iteration
+            // so the ER diagram keeps working instead of silently showing no
+            // relationships.
+            try (ResultSet tables = conn.getMetaData().getTables(
+                    catalog, schemaPattern, null, new String[]{"TABLE", "VIEW"})) {
+                List<String> tableNames = new ArrayList<>();
+                while (tables.next()) {
+                    String name = tables.getString("TABLE_NAME");
+                    if (name != null) {
+                        tableNames.add(name);
+                    }
+                }
+                for (String tableName : tableNames) {
+                    try (ResultSet rs = conn.getMetaData().getExportedKeys(catalog, schemaPattern, tableName)) {
+                        collectForeignKeys(rs, fks, fkColumns, fkReferencedColumns);
+                    } catch (SQLException ignored) {
+                        // one table's metadata rejected — skip it
+                    }
+                }
+            } catch (SQLException ignored) {
+                // tables listing also unavailable — degrade to empty
+            }
         }
 
         List<Map<String, Object>> result = new ArrayList<>();
@@ -524,11 +577,9 @@ public class MetadataProvider {
                                            Map<String, List<String>> fkColumns,
                                            Map<String, List<String>> fkReferencedColumns) throws SQLException {
         while (rs.next()) {
-            String constraintName = rs.getString("FK_NAME");
             String sourceTable = rs.getString("FKTABLE_NAME");
-            if (constraintName == null) {
-                constraintName = "fk_" + sourceTable;
-            }
+            String constraintName = fkGroupKey(rs.getString("FK_NAME"),
+                    sourceTable, rs.getString("PKTABLE_NAME"));
             fkColumns.computeIfAbsent(constraintName, k -> new ArrayList<>())
                     .add(rs.getString("FKCOLUMN_NAME"));
             fkReferencedColumns.computeIfAbsent(constraintName, k -> new ArrayList<>())
@@ -598,6 +649,25 @@ public class MetadataProvider {
         return value instanceof String ? (String) value : null;
     }
 
+    /** Text BLOBs (Firebird RDB$XXX_SOURCE are ODS text blobs, not VARCHAR) */
+    private static String readBlobText(Object value) {
+        if (value instanceof java.sql.Blob) {
+            try {
+                java.sql.Blob blob = (java.sql.Blob) value;
+                byte[] bytes = blob.getBytes(1, (int) blob.length());
+                return bytes == null ? null : new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
+            } catch (SQLException e) {
+                return null;
+            }
+        }
+        return readClob(value);
+    }
+
+    /** Null-defensive default for structs the Rust DTOs decode as plain Strings. */
+    private static String nonNull(String value) {
+        return value == null ? "" : value;
+    }
+
     /**
      * Get the DDL source for a view/trigger/routine. DDL is not exposed through
      * JDBC metadata, so this uses engine SQL with a fallback chain and degrades
@@ -622,17 +692,24 @@ public class MetadataProvider {
                         + "AND schema_name = '%s' AND view_name = '%s'",
                     escapeLiteral(schemaPattern), escapeLiteral(objectName)),
                 () -> String.format(
-                    "SELECT text FROM all_views WHERE view_name = '%s'",
-                    escapeLiteral(objectName)));
+                    "SELECT text FROM all_views WHERE view_name = '%s'%s",
+                    escapeLiteral(objectName), ownerClause(schemaPattern)),
+                // Firebird keeps the SELECT statement of the view
+                () -> String.format(
+                    "SELECT RDB$VIEW_SOURCE FROM RDB$RELATIONS WHERE RDB$RELATION_NAME = '%s'",
+                    escapeLiteral(objectName.toUpperCase(Locale.ROOT))));
         } else if ("TRIGGER".equalsIgnoreCase(objectType)) {
             ddl = firstNonEmpty(conn,
                 () -> String.format(
                     "SELECT action_statement FROM information_schema.triggers "
-                        + "WHERE trigger_name = '%s'",
-                    escapeLiteral(objectName)),
+                        + "WHERE trigger_name = '%s'%s",
+                    escapeLiteral(objectName), schemaClause(schemaPattern)),
                 () -> String.format(
-                    "SELECT trigger_body FROM all_triggers WHERE trigger_name = '%s'",
-                    escapeLiteral(objectName)));
+                    "SELECT trigger_body FROM all_triggers WHERE trigger_name = '%s'%s",
+                    escapeLiteral(objectName), ownerClause(schemaPattern)),
+                () -> String.format(
+                    "SELECT RDB$TRIGGER_SOURCE FROM RDB$TRIGGERS WHERE RDB$TRIGGER_NAME = '%s'",
+                    escapeLiteral(objectName.toUpperCase(Locale.ROOT))));
         } else if ("PROCEDURE".equalsIgnoreCase(objectType)
                 || "FUNCTION".equalsIgnoreCase(objectType)) {
             ddl = firstNonEmpty(conn,
@@ -642,9 +719,14 @@ public class MetadataProvider {
                     "PROCEDURE".equalsIgnoreCase(objectType) ? "PROCEDURE" : "FUNCTION",
                     escapeLiteral(objectName)),
                 () -> String.format(
-                    "SELECT text FROM all_source WHERE name = '%s' AND type = '%s'",
+                    "SELECT text FROM all_source WHERE name = '%s' AND type = '%s'%s",
                     escapeLiteral(objectName),
-                    "PROCEDURE".equalsIgnoreCase(objectType) ? "PROCEDURE" : "FUNCTION"));
+                    "PROCEDURE".equalsIgnoreCase(objectType) ? "PROCEDURE" : "FUNCTION",
+                    ownerClause(schemaPattern)),
+                () -> String.format(
+                    "SELECT RDB$PROCEDURE_SOURCE FROM RDB$PROCEDURES "
+                        + "WHERE UPPER(RDB$PROCEDURE_NAME) = '%s'",
+                    escapeLiteral(objectName.toUpperCase(Locale.ROOT))));
         }
 
         Map<String, Object> result = new LinkedHashMap<>();
@@ -696,7 +778,28 @@ public class MetadataProvider {
         String qualified = quoteQualified(schema, objectName);
         String sql;
         if (isFirebird(conn)) {
-            sql = String.format("ALTER %s ALTER %s TO %s", type, qualified, quoteIdentifier(newName));
+            if (!"TABLE".equals(type)) {
+                // Firebird has no rename statement for views — recreate it.
+                throw new Exception(
+                        "Firebird cannot rename a " + type.toLowerCase(Locale.ROOT)
+                                + "; drop and recreate it instead");
+            }
+            sql = String.format("ALTER %s %s TO %s", type, qualified, quoteIdentifier(newName));
+        } else if (isOracle(conn)) {
+            if ("TABLE".equals(type)) {
+                // ALTER TABLE x RENAME TO y accepts a fully qualified name.
+                sql = String.format("ALTER TABLE %s RENAME TO %s", qualified, quoteIdentifier(newName));
+            } else {
+                // Oracle's only view rename is RENAME x TO y, which cannot
+                // carry a schema qualifier — refuse rather than risk renaming
+                // a same-named object in the wrong schema.
+                if (schema != null && !schema.isEmpty()) {
+                    throw new Exception(
+                            "Oracle can rename a " + type.toLowerCase(Locale.ROOT)
+                                    + " only within the current schema (RENAME x TO y); recreate it instead");
+                }
+                sql = String.format("RENAME %s TO %s", quoteIdentifier(objectName), quoteIdentifier(newName));
+            }
         } else {
             sql = String.format("ALTER %s %s RENAME TO %s", type, qualified, quoteIdentifier(newName));
         }
@@ -741,6 +844,34 @@ public class MetadataProvider {
         return value == null ? "" : value.replace("'", "''");
     }
 
+    /** Scope an all_* catalog query to the requested schema (Oracle: OWNER). */
+    private static String ownerClause(String schemaPattern) {
+        if (schemaPattern == null || schemaPattern.isEmpty()) {
+            return "";
+        }
+        return " AND owner = '" + escapeLiteral(schemaPattern) + "'";
+    }
+
+    /** Scope an information_schema query to the requested schema. */
+    private static String schemaClause(String schemaPattern) {
+        if (schemaPattern == null || schemaPattern.isEmpty()) {
+            return "";
+        }
+        return " AND trigger_schema = '" + escapeLiteral(schemaPattern) + "'";
+    }
+
+    /** Group FK rows by constraint. Multi-column FKs arrive one row per
+     *  column with the same name; unnamed constraints (nameless FK in some
+     *  engines) are grouped deterministically by source + referenced table so
+     *  their columns still land in one entry, while two nameless FKs with
+     *  different targets don't merge. */
+    private static String fkGroupKey(String name, String sourceTable, String referencedTable) {
+        if (name != null && !name.isEmpty()) {
+            return name;
+        }
+        return "fk_" + String.valueOf(sourceTable) + "_" + String.valueOf(referencedTable);
+    }
+
     private interface SqlCandidate {
         String build();
     }
@@ -757,6 +888,9 @@ public class MetadataProvider {
                  ResultSet rs = stmt.executeQuery(sql)) {
                 if (rs.next()) {
                     String value = rs.getString(1);
+                    if (value == null || value.trim().isEmpty()) {
+                        value = readBlobText(rs.getObject(1));
+                    }
                     if (value != null && !value.trim().isEmpty()) {
                         return value;
                     }

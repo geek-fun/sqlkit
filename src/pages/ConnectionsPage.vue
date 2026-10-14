@@ -117,16 +117,18 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
 
   connectionCancelled.value = false
 
-  const proxyWarning = await systemProxyWarning(connection)
-
+  // Show the modal first (instant click feedback), then resolve the async
+  // system-proxy diagnostic and patch the warning in — `setWarning` tolerates
+  // the modal having closed meanwhile.
   connectingModal.value?.show(
     connection.name,
     () => {
       connectionCancelled.value = true
     },
     () => establishConnection(connection, navigateOnSuccess),
-    proxyWarning,
   )
+  const proxyWarning = await systemProxyWarning(connection)
+  connectingModal.value?.setWarning(proxyWarning ?? null)
 
   const startTime = Date.now()
 
@@ -378,7 +380,20 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                 </p>
               </div>
               <div class="rounded-lg bg-violet-100 flex h-10 w-10 items-center justify-center dark:bg-violet-900/30">
-                <span class="i-carbon-key text-violet-600 h-5 w-5 dark:text-violet-400" />
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  class="text-violet-600 h-5 w-5 dark:text-violet-400"
+                >
+                  <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
+                </svg>
               </div>
             </div>
           </Card>
@@ -528,6 +543,11 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
       <div class="p-6 pt-0 flex-1 min-h-0 overflow-y-auto">
         <!-- SSH Profile cards (Ultimate): always visible so the add entry point
              exists even with zero profiles (DockIt connect page parity) -->
+        <div class="mb-2 flex gap-2 items-center">
+          <h2 class="text-lg font-semibold">
+            {{ t('connectionsPage.sshProfilesSection') }}
+          </h2>
+        </div>
         <div
           class="mb-6" :class="[viewMode === 'grid'
             ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
@@ -540,7 +560,8 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             role="button"
             tabindex="0"
             @click="openProfileEdit(profile)"
-            @keydown.enter="openProfileEdit(profile)"
+            @keydown.enter.prevent="openProfileEdit(profile)"
+            @keydown.space.prevent="openProfileEdit(profile)"
           >
             <div class="flex items-start justify-between">
               <div class="flex gap-2 min-w-0 items-center">
@@ -548,7 +569,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                 <span class="font-medium truncate">{{ profile.name }}</span>
               </div>
               <Badge variant="outline" class="text-xs shrink-0">
-                SSH Profile
+                {{ t('connectionsPage.sshProfile') }}
               </Badge>
             </div>
             <p class="text-sm text-muted-foreground mt-1 truncate">
@@ -561,7 +582,8 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             role="button"
             tabindex="0"
             @click="openProfileCreate"
-            @keydown.enter="openProfileCreate"
+            @keydown.enter.prevent="openProfileCreate"
+            @keydown.space.prevent="openProfileCreate"
           >
             <div class="text-muted-foreground flex gap-2 items-center">
               <span class="i-carbon-add h-4 w-4" />

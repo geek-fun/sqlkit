@@ -24,8 +24,13 @@ jest.mock('@tauri-apps/plugin-opener', () => ({
 
 jest.mock('vue-i18n', () => ({
   useI18n: () => ({
-    t: (key: string, params?: Record<string, unknown>) =>
-      params && 'host' in params ? `${key}(${params.host})` : key,
+    // Plural calls pass a count (number); keyed calls pass params.
+    t: (key: string, params?: Record<string, unknown> | number) =>
+      typeof params === 'number'
+        ? key
+        : params && 'host' in params
+          ? `${key}(${params.host})`
+          : key,
   }),
 }))
 

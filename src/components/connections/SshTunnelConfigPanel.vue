@@ -2,12 +2,10 @@
 import type { SSHTunnelConfig } from '@/store/connectionStore'
 import type { SshProfile } from '@/store/sshProfileStore'
 import { invoke } from '@tauri-apps/api/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { Pencil, Plus } from 'lucide-vue-next'
 import Sortable from 'sortablejs'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { UPGRADE_URL } from '@/common/entitlement'
 import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
@@ -21,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { ProBadge } from '@/components/upgrade'
+import { openUpgradeDialog, ProBadge } from '@/components/upgrade'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import { emptySshProfile, profileToTransportLayer, useSshProfileStore } from '@/store/sshProfileStore'
 
@@ -202,7 +200,7 @@ async function convertLegacyToProfile() {
     return
   const saved = await profileStore.save({
     ...emptySshProfile(),
-    name: t('components.serverForm.ssh.convertedProfileName', { host: mv.host }),
+    name: t('components.serverForm.ssh.convertedProfileName', { host: mv.host || 'SSH' }),
     host: mv.host || '',
     port: mv.port ?? 22,
     username: mv.username || '',
@@ -216,7 +214,14 @@ async function convertLegacyToProfile() {
   patch({ profileIds: [saved.id], host: '', username: '', privateKey: '', password: '', privateKeyPassphrase: '' })
 }
 
-type TestSshResult = { success: boolean, message: string }
+type TestSshResult = {
+  success: boolean
+  message: string
+  /** Structured success actors from the backend — used to render localized copy */
+  user?: string
+  host?: string
+  port?: number
+}
 
 async function testFirstHop() {
   const first = hopProfiles.value[0]
@@ -283,27 +288,23 @@ async function detectProxy() {
 
 profileStore.fetch()
 
-// Detect on mount — under configure-as-intent there is no enable toggle, so
-// the pinned system-proxy row must be discoverable from the empty state on.
+// Probe ONCE per panel instance. The probe asks the OS for ANY proxy — its
+// result does not depend on the connection being edited, so there is nothing
+// to re-detect later. Under configure-as-intent there is no enable toggle:
+// the proxy row must be discoverable from the empty state on.
 onMounted(detectProxy)
-
-// Re-detect when the tunnel first turns on (editing an existing connection).
-watch(() => props.modelValue?.enabled, (on) => {
-  if (on)
-    detectProxy()
-}, { immediate: true })
 </script>
 
 <template>
   <div class="space-y-4">
     <!-- Gated: the strip replaces the whole SSH config, covering pre-existing connections too.
-         Layering the upgrade modal on top of the server form dialog is awkward UX (two stacked
-         modals), so this strip routes straight to the pricing site instead. -->
+         Opens the in-app upgrade dialog so the whole tunnel feature goes through ONE upsell
+         journey (same as the profile cards on the connections page). -->
     <button
       v-if="isGated"
       type="button"
       class="group px-3 py-2.5 text-left border rounded-lg border-dashed flex gap-2.5 w-full cursor-pointer transition-colors items-center hover:bg-accent/50"
-      @click="openUrl(UPGRADE_URL)"
+      @click="openUpgradeDialog('ssh_tunnel')"
     >
       <ProBadge size="xs" />
       <span class="text-sm text-muted-foreground truncate transition-colors group-hover:text-foreground/80">
@@ -319,7 +320,7 @@ watch(() => props.modelValue?.enabled, (on) => {
         <span class="i-carbon-locked text-green-500 shrink-0 h-4 w-4" />
         <span class="text-sm font-medium whitespace-nowrap">{{ t('components.serverForm.ssh.useSshTunnel') }}</span>
         <span v-if="hopProfiles.length > 0" class="text-xs text-muted-foreground whitespace-nowrap">
-          {{ hopProfiles.length }} {{ t('components.serverForm.ssh.hops') }}
+          {{ hopProfiles.length }} {{ t('components.serverForm.ssh.hops', hopProfiles.length) }}
         </span>
 
         <Button
@@ -329,7 +330,9 @@ watch(() => props.modelValue?.enabled, (on) => {
           type="button"
           class="shrink-0 h-6 w-6"
           :disabled="testing"
-          :title="t('components.serverForm.ssh.testChain')"
+          :title="hopProfiles.length > 1
+            ? t('components.serverForm.ssh.testFirstHop')
+            : t('components.serverForm.ssh.testChain')"
           @click="testFirstHop"
         >
           <span v-if="testing" class="i-carbon-circle-dash text-blue-500 h-3.5 w-3.5 animate-spin" />
@@ -358,17 +361,26 @@ watch(() => props.modelValue?.enabled, (on) => {
         </Button>
       </div>
 
+      <!-- Success renders localized from structured actors; failures keep the
+           backend diagnostic and wrap — details must stay readable. -->
       <p
         v-if="testResult"
-        class="text-xs truncate"
+        class="text-xs leading-relaxed break-words"
         :class="testResult.success ? 'text-green-600 dark:text-green-400' : 'text-destructive'"
       >
-        {{ testResult.message }}
+        {{ testResult.success && testResult.user && testResult.host && testResult.port
+          ? t('components.serverForm.ssh.testSuccess', {
+            user: testResult.user,
+            host: testResult.host,
+            port: testResult.port,
+          })
+          : testResult.message }}
       </p>
 
-      <!-- Empty state -->
+      <!-- Empty state: suppressed while a proxy-only chain is active — that is
+           a configured state, not an unscaffolded one. -->
       <div
-        v-if="hopProfiles.length === 0 && !legacyInline"
+        v-if="hopProfiles.length === 0 && !legacyInline && !useSystemProxy"
         class="text-xs text-muted-foreground py-6 text-center border rounded-md border-dashed"
       >
         {{ t('components.serverForm.ssh.notConfigured') }}
@@ -402,6 +414,34 @@ watch(() => props.modelValue?.enabled, (on) => {
           <span class="i-carbon-unlink h-3 w-3" />
         </Button>
       </div>
+      <!-- Persisted-but-undetected: the setting pools invisibly otherwise —
+           show it ON so the user can turn it off in the form (not only at
+           connect time). -->
+      <div
+        v-else-if="!detectedProxy && useSystemProxy"
+        class="px-2.5 py-1.5 border border-amber-500/50 rounded-md bg-amber-50 flex gap-2 items-center dark:bg-amber-900/20"
+      >
+        <span class="text-[10px] text-muted-foreground font-bold shrink-0 w-4">0</span>
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-medium">
+            {{ t('components.serverForm.ssh.systemProxy') }}
+          </div>
+          <div class="text-[11px] text-amber-600 truncate dark:text-amber-400">
+            {{ t('components.serverForm.ssh.systemProxyNotDetected') }}
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="icon"
+          type="button"
+          class="text-muted-foreground shrink-0 h-6 w-6 hover:text-destructive"
+          :title="t('components.serverForm.ssh.systemProxyDetach')"
+          @click="patch({ useSystemProxy: false })"
+        >
+          <span class="i-carbon-unlink h-3 w-3" />
+        </Button>
+      </div>
+
       <div
         v-else-if="detectedProxy"
         class="px-2.5 py-1.5 border rounded-md flex gap-2 items-center"
@@ -456,7 +496,7 @@ watch(() => props.modelValue?.enabled, (on) => {
       </div>
 
       <!-- Chain preview: proxy → hops → target -->
-      <p v-if="chainSegments.length > 1" class="text-[11px] text-muted-foreground font-mono break-all">
+      <p v-if="chainSegments.length > 1" class="text-[11px] text-muted-foreground font-mono break-words">
         {{ chainSegments.join('  →  ') }}
       </p>
       <p v-if="hopProfiles.length > 1" class="text-[11px] text-muted-foreground">

@@ -59,10 +59,20 @@ function handleRetry() {
   }
 }
 
+/**
+ * Update the non-fatal warning while the modal is already visible — lets the
+ *  caller show the modal FIRST (instant click feedback) and resolve async
+ *  diagnostics (e.g. the system-proxy probe) afterwards.
+ */
+function setWarning(warning: string | null) {
+  warningMessage.value = warning ?? ''
+}
+
 defineExpose({
   show,
   hide,
   showError,
+  setWarning,
 })
 </script>
 

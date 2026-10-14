@@ -60,7 +60,14 @@ async function selectKeyFile() {
   }
 }
 
-type TestSshResult = { success: boolean, message: string }
+type TestSshResult = {
+  success: boolean
+  message: string
+  /** Structured success actors from the backend — used to render localized copy */
+  user?: string
+  host?: string
+  port?: number
+}
 
 async function testProfile() {
   if (testing.value)
@@ -198,15 +205,22 @@ async function save() {
           </Tabs>
         </div>
 
-        <!-- Test result -->
+        <!-- Test result: success is localized from structured actors; failure
+             keeps the backend diagnostic and wraps so details stay readable -->
         <p
           v-if="testResult"
-          class="text-xs flex gap-1.5 truncate items-center"
+          class="text-xs leading-relaxed flex gap-1.5 break-words items-start"
           :class="testResult.success ? 'text-green-600 dark:text-green-400' : 'text-destructive'"
         >
-          <span v-if="testing" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin" />
-          <span v-else class="i-carbon-network-3 h-3.5 w-3.5" />
-          {{ testResult.message }}
+          <span v-if="testing" class="i-carbon-circle-dash mt-0.5 shrink-0 h-3.5 w-3.5 animate-spin" />
+          <span v-else class="i-carbon-network-3 mt-0.5 shrink-0 h-3.5 w-3.5" />
+          <span class="min-w-0">{{ testResult.success && testResult.user && testResult.host && testResult.port
+            ? t('components.serverForm.ssh.testSuccess', {
+              user: testResult.user,
+              host: testResult.host,
+              port: testResult.port,
+            })
+            : testResult.message }}</span>
         </p>
 
         <p v-if="error" class="text-sm text-destructive">

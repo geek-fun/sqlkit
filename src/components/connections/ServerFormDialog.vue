@@ -251,6 +251,9 @@ watch(() => props.open, (open) => {
     testStatus.value = 'idle'
     testError.value = ''
     formErrors.value = {}
+    // Always open on the Basic tab — landing on Advanced carries the previous
+    // dialog's context into a new/edit session.
+    formSectionTab.value = 'basic'
     setupSteps.value.forEach((s) => {
       s.status = 'pending'
       s.progress = undefined
@@ -634,6 +637,10 @@ function validateForm(): boolean {
     sslErrors.forEach((err) => {
       errors[`ssl.${err.field}`] = err.message
     })
+    // SSL fields live in the Advanced tab — if they fail, surface the tab
+    // showing the problem instead of blocking Save silently on Basic.
+    if (sslErrors.length > 0)
+      formSectionTab.value = 'advanced'
   }
 
   formErrors.value = errors
@@ -830,7 +837,7 @@ function handleSave() {
 
 <template>
   <Dialog v-model:open="isOpen">
-    <DialogContent class="sm:max-w-xl" @interact-outside="(e: Event) => { if (isPickingFile) e.preventDefault() }">
+    <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-xl" @interact-outside="(e: Event) => { if (isPickingFile) e.preventDefault() }">
       <DialogTitle>
         {{ isEditing ? t('components.serverForm.title.edit') : t('components.serverForm.title.new') }}
       </DialogTitle>

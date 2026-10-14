@@ -247,6 +247,11 @@ impl SqlServerAdapter {
         }
     }
 
+    /// Escape a value interpolated into a single-quoted T-SQL string literal.
+    fn escape_literal(value: &str) -> String {
+        value.replace('\'', "''")
+    }
+
     fn quote_ident(identifier: &str) -> DbResult<String> {
         if identifier.is_empty() || identifier.len() > 128 {
             return Err(DbError::InvalidQuery(format!(
@@ -706,7 +711,8 @@ impl DatabaseAdapter for SqlServerAdapter {
             WHERE s.name = '{}'
             ORDER BY table_name
             "#,
-            schema_filter, schema_filter
+            Self::escape_literal(&schema_filter),
+            Self::escape_literal(&schema_filter)
         );
 
         let client = self.get_client().await?;
@@ -800,7 +806,8 @@ impl DatabaseAdapter for SqlServerAdapter {
             WHERE s.name = '{}' AND tbl.name = '{}'
             ORDER BY c.column_id
             "#,
-            schema_filter, table
+            Self::escape_literal(&schema_filter),
+            Self::escape_literal(&table)
         );
 
         let client = self.get_client().await?;
@@ -919,7 +926,10 @@ impl DatabaseAdapter for SqlServerAdapter {
             INNER JOIN sys.schemas s ON v.schema_id = s.schema_id
             WHERE s.name = '{}' AND v.name = '{}'
             "#,
-            schema_filter, table, schema_filter, table
+            Self::escape_literal(&schema_filter),
+            Self::escape_literal(&table),
+            Self::escape_literal(&schema_filter),
+            Self::escape_literal(&table)
         );
 
         let client = self.get_client().await?;
@@ -938,7 +948,8 @@ impl DatabaseAdapter for SqlServerAdapter {
         if rows.is_empty() {
             return Err(DbError::TableNotFound(format!(
                 "Table {}.{} not found",
-                schema_filter, table
+                Self::escape_literal(&schema_filter),
+            Self::escape_literal(&table)
             )));
         }
 
@@ -1114,7 +1125,7 @@ impl DatabaseAdapter for SqlServerAdapter {
             WHERE s.name = '{}'
             ORDER BY v.name
             "#,
-            schema_filter
+            Self::escape_literal(&schema_filter)
         );
 
         let client = self.get_client().await?;
@@ -1203,7 +1214,7 @@ impl DatabaseAdapter for SqlServerAdapter {
             WHERE s.name = '{}'
             ORDER BY p.name
             "#,
-            schema_filter
+            Self::escape_literal(&schema_filter)
         );
 
         let client = self.get_client().await?;
@@ -1285,7 +1296,7 @@ impl DatabaseAdapter for SqlServerAdapter {
             WHERE s.name = '{}' AND o.type IN ('FN', 'IF', 'TF', 'FS', 'FT')
             ORDER BY o.name
             "#,
-            schema_filter
+            Self::escape_literal(&schema_filter)
         );
 
         let client = self.get_client().await?;
@@ -1370,7 +1381,8 @@ impl DatabaseAdapter for SqlServerAdapter {
             WHERE s.name = '{}' AND tb.name = '{}'
             ORDER BY t.name
             "#,
-            schema_filter, table
+            Self::escape_literal(&schema_filter),
+            Self::escape_literal(&table)
         );
 
         let client = self.get_client().await?;
@@ -1457,7 +1469,8 @@ impl DatabaseAdapter for SqlServerAdapter {
             WHERE s.name = '{}' AND t.name = '{}'
             ORDER BY i.name
             "#,
-            schema_filter, table
+            Self::escape_literal(&schema_filter),
+            Self::escape_literal(&table)
         );
 
         let client = self.get_client().await?;
@@ -1563,7 +1576,8 @@ impl DatabaseAdapter for SqlServerAdapter {
             WHERE s.name = '{}' AND t.name = '{}'
             ORDER BY fk.name
             "#,
-            schema_filter, table
+            Self::escape_literal(&schema_filter),
+            Self::escape_literal(&table)
         );
 
         let client = self.get_client().await?;
@@ -1760,7 +1774,11 @@ impl DatabaseAdapter for SqlServerAdapter {
         let schema_filter = schema.unwrap_or("dbo");
         let qualified = format!("{}.{}", schema_filter, object_name);
 
-        let sql = format!("EXEC sp_rename N'{}', N'{}'", qualified, new_name);
+        let sql = format!(
+                "EXEC sp_rename N'{}', N'{}'",
+                Self::escape_literal(&qualified),
+                Self::escape_literal(new_name)
+            );
 
         let client = self.get_client().await?;
         let mut client = client.lock().await;
