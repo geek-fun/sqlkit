@@ -1670,9 +1670,11 @@ impl DatabaseAdapter for SqlServerAdapter {
 
         let schema_filter = schema.unwrap_or("dbo");
 
+        // OBJECT_ID takes a quoted identifier: bracket each part (doubled
+        // brackets) so hostile metadata can't break out into the DDL lookup.
         let query = format!(
-            "SELECT OBJECT_DEFINITION(OBJECT_ID(N'{}.{}'))",
-            schema_filter, object_name
+            "SELECT OBJECT_DEFINITION(OBJECT_ID(N'{}'))",
+            Self::quote_ident(&format!("{}.{}", schema_filter, object_name))?
         );
 
         let client = self.get_client().await?;
@@ -1723,7 +1725,7 @@ impl DatabaseAdapter for SqlServerAdapter {
         }
 
         let schema_filter = schema.unwrap_or("dbo");
-        let qualified = format!("{}.{}", schema_filter, object_name);
+        let qualified = Self::quote_ident(&format!("{}.{}", schema_filter, object_name))?;
 
         let sql = match object_type.to_uppercase().as_str() {
             "VIEW" => format!("DROP VIEW IF EXISTS {}", qualified),

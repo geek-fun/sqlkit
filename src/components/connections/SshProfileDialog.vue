@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import type { SshProfile } from '@/store/sshProfileStore'
-import { invoke } from '@tauri-apps/api/core'
 import { open } from '@tauri-apps/plugin-dialog'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -9,7 +8,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { emptySshProfile, profileToTransportLayer, useSshProfileStore } from '@/store/sshProfileStore'
+import { emptySshProfile, profileToTransportLayer, runSshTest, useSshProfileStore } from '@/store/sshProfileStore'
 
 const emit = defineEmits<{
   save: [profile: SshProfile]
@@ -77,14 +76,19 @@ async function testProfile() {
   try {
     // DockIt parity: test the bastion against itself with the same Rust-contract
     // layer the real chain builds, so test and connect can't diverge.
-    testResult.value = await invoke<TestSshResult>('test_ssh_connection', {
-      config: profileToTransportLayer(form.value),
-      remoteHost: form.value.host,
-      remotePort: form.value.port,
-    })
+    testResult.value = await runSshTest(
+      profileToTransportLayer(form.value),
+      form.value.host,
+      form.value.port,
+    )
   }
   catch (err) {
-    testResult.value = { success: false, message: String(err) }
+    testResult.value = {
+      success: false,
+      message: String(err).includes('ssh-test-timeout')
+        ? t('components.serverForm.ssh.testTimedOut')
+        : String(err),
+    }
   }
   finally {
     testing.value = false

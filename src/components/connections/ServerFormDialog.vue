@@ -142,9 +142,9 @@ type StepDef = {
   error?: string
 }
 const setupSteps = ref<StepDef[]>([
-  { id: 'jre', label: 'Java Runtime', status: 'pending' },
-  { id: 'bridge', label: 'Bridge JAR', status: 'pending' },
-  { id: 'driver', label: 'JDBC Driver', status: 'pending' },
+  { id: 'jre', label: 'pages.settings.jre.jreCard.title', status: 'pending' },
+  { id: 'bridge', label: 'pages.settings.jre.bridgeCard.title', status: 'pending' },
+  { id: 'driver', label: 'pages.settings.jre.driversCard.title', status: 'pending' },
 ])
 
 const showPasswords = ref<Record<string, boolean>>({})
@@ -416,15 +416,34 @@ function switchToConnection(connection: ServerConnection) {
 
 const dbTypeI18nKeyMap: Record<string, string> = {
   MANTICORESEARCH: 'manticore',
+  OCEANBASE_ORACLE: 'oceanbase-oracle', // lang keys use hyphens, enums use underscores
 }
 
+// Most-popular engines first in the type selector (MYSQL → PG → MSSQL → ORACLE
+// → SQLITE → DB2 → H2); the rest keep their enum order after the pinned ones.
+const PREFERRED_DB_TYPE_ORDER: Partial<Record<DatabaseType, number>> = {
+  [DatabaseType.MYSQL]: 0,
+  [DatabaseType.POSTGRESQL]: 1,
+  [DatabaseType.SQLSERVER]: 2,
+  [DatabaseType.ORACLE]: 3,
+  [DatabaseType.SQLITE]: 4,
+  [DatabaseType.DB2]: 5,
+  [DatabaseType.H2]: 6,
+}
+
+const preferredTypeRank = (value: DatabaseType, index: number) =>
+  PREFERRED_DB_TYPE_ORDER[value] ?? 100 + index
+
 const databaseTypeOptions = computed(() =>
-  Object.values(DatabaseType).map((value) => {
-    const i18nKey = dbTypeI18nKeyMap[value] || value.toLowerCase()
-    const fullKey = `components.serverForm.databaseTypes.${i18nKey}`
-    const label = t(fullKey)
-    return { label: label === fullKey ? value : label, value }
-  }),
+  Object.values(DatabaseType)
+    .map((value, index) => ({ value, index }))
+    .sort((a, b) => preferredTypeRank(a.value, a.index) - preferredTypeRank(b.value, b.index))
+    .map(({ value }) => {
+      const i18nKey = dbTypeI18nKeyMap[value] || value.toLowerCase()
+      const fullKey = `components.serverForm.databaseTypes.${i18nKey}`
+      const label = t(fullKey)
+      return { label: label === fullKey ? value : label, value }
+    }),
 )
 
 // ── Oracle-specific state ──
@@ -583,10 +602,10 @@ async function browseDirectory(target: 'tns' | 'wallet') {
   }
 }
 
-function validateForm(): boolean {
+function collectValidationErrors(requireName: boolean): Record<string, string> {
   const errors: Record<string, string> = {}
 
-  if (!formData.value.name.trim()) {
+  if (requireName && !formData.value.name.trim()) {
     errors.name = t('components.serverForm.errors.nameRequired')
   }
 
@@ -637,20 +656,43 @@ function validateForm(): boolean {
     sslErrors.forEach((err) => {
       errors[`ssl.${err.field}`] = err.message
     })
-    // SSL fields live in the Advanced tab — if they fail, surface the tab
-    // showing the problem instead of blocking Save silently on Basic.
-    if (sslErrors.length > 0)
-      formSectionTab.value = 'advanced'
+    if (sslErrors.length > 0) {
+      errors['ssl.mode'] = errors['ssl.mode']
+        ?? t('common.status.failed')
+    }
   }
 
+  return errors
+}
+
+function validateForm(): boolean {
+  const errors = collectValidationErrors(true)
+  // SSL fields live in the Advanced tab — if they fail, surface the tab
+  // showing the problem instead of blocking Save silently on Basic.
+  if (Object.keys(errors).some(k => k.startsWith('ssl.')))
+    formSectionTab.value = 'advanced'
   formErrors.value = errors
   return Object.keys(errors).length === 0
 }
 
+/**
+ * Test is strictly read-only against the DB: every required field must pass
+ *  before the button is clickable (name is optional for a test).
+ */
+const canTestConnection = computed(() =>
+  Object.keys(collectValidationErrors(false)).length === 0,
+)
+
 async function handleTestConnection() {
   if (testStatus.value === 'testing')
     return
-  if (!validateForm())
+  // Same contract as canTestConnection (name optional): the button is enabled
+  // exactly when this passes, so a click can never be silently swallowed.
+  const errors = collectValidationErrors(false)
+  if (Object.keys(errors).some(k => k.startsWith('ssl.')))
+    formSectionTab.value = 'advanced'
+  formErrors.value = errors
+  if (Object.keys(errors).length > 0)
     return
 
   testStatus.value = 'testing'
@@ -750,7 +792,7 @@ async function handleTestConnection() {
     else {
       if (driverStep)
         driverStep.status = 'error'
-      const msg = 'Connection returned not connected'
+      const msg = t('components.serverForm.ssh.testReturnedNotConnected')
       if (driverStep)
         driverStep.error = msg
       testError.value = msg
@@ -766,7 +808,7 @@ async function handleTestConnection() {
       const jreStepFound = setupSteps.value.find(s => s.id === 'jre')
       if (jreStepFound) {
         jreStepFound.status = 'error'
-        jreStepFound.error = 'JRE is missing or broken'
+        jreStepFound.error = t('components.serverForm.ssh.jreBroken')
       }
     }
     const running = setupSteps.value.find(s => s.status === 'running')
@@ -1088,10 +1130,10 @@ function handleSave() {
                         {{ oracleTnsAlias }}
                       </p>
                       <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
-                        No aliases found in selected directory
+                        {{ t('components.serverForm.oracle.noAliases') }}
                       </p>
                       <p v-else-if="tnsAliases.length === 0" class="text-sm text-muted-foreground">
-                        Select a TNS directory to load aliases
+                        {{ t('components.serverForm.oracle.tnsSelectDir') }}
                       </p>
                       <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
                         <SelectTrigger :class="{ 'border-destructive': formErrors.tnsAlias }">
@@ -1154,10 +1196,10 @@ function handleSave() {
                         {{ oracleTnsAlias }}
                       </p>
                       <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
-                        No aliases found in selected wallet directory
+                        {{ t('components.serverForm.oracle.noAliases') }}
                       </p>
                       <p v-else-if="tnsAliases.length === 0" class="text-sm text-muted-foreground">
-                        Select a wallet directory to load aliases
+                        {{ t('components.serverForm.oracle.walletSelectDir') }}
                       </p>
                       <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
                         <SelectTrigger :class="{ 'border-destructive': formErrors.tnsAlias }">
@@ -1409,7 +1451,7 @@ function handleSave() {
           </TabsContent>
 
           <!-- Advanced: SSL/TLS + SSH Tunnel -->
-          <TabsContent value="advanced" class="mt-2 pr-1 h-[26rem] overflow-y-auto space-y-4">
+          <TabsContent value="advanced" class="mt-2 pr-1 h-[34rem] max-h-[calc(90vh-20rem)] overflow-y-auto space-y-4">
             <SslConfigSection
               v-if="showsStandardHostFields"
               v-model="formData.ssl"
@@ -1447,7 +1489,7 @@ function handleSave() {
               <span v-else-if="step.status === 'running'" class="i-carbon-circle-dash text-blue-500 shrink-0 h-3.5 w-3.5 animate-spin" />
               <span v-else-if="step.status === 'error'" class="i-carbon-close shrink-0 h-3.5 w-3.5" />
               <span v-else class="i-carbon-circle-dash shrink-0 h-3.5 w-3.5" />
-              <span class="font-medium whitespace-nowrap">{{ step.label }}</span>
+              <span class="font-medium whitespace-nowrap">{{ t(step.label) }}</span>
               <!-- Spacer + progress bar: fill remaining space -->
               <span v-if="step.status === 'running' && step.progress" class="flex flex-1 gap-1.5 min-w-0 items-center">
                 <span class="rounded-full bg-muted flex-1 h-1 min-w-[40px]">
@@ -1460,11 +1502,11 @@ function handleSave() {
               </span>
               <!-- Error + retry button (pushed right) -->
               <span v-if="step.status === 'error'" class="flex flex-1 gap-1.5 min-w-0 items-center justify-end">
-                <span class="text-red-500 text-right max-w-[200px] truncate">{{ step.error || 'Failed' }}</span>
+                <span class="text-red-500 text-right max-w-[200px] truncate">{{ step.error || t('components.serverForm.ssh.stepFailed') }}</span>
                 <button
                   type="button"
                   class="text-muted-foreground inline-flex shrink-0 gap-0.5 cursor-pointer transition-colors items-center hover:text-foreground"
-                  :title="`Retry ${step.label}`"
+                  :title="t('common.buttons.retry')"
                   @click="retryStep(step.id)"
                 >
                   <span class="i-carbon-renew h-3.5 w-3.5" />
@@ -1493,7 +1535,7 @@ function handleSave() {
                   @click="handleTestConnection"
                 >
                   <span class="i-carbon-renew h-3 w-3" />
-                  <span class="text-xs">Retry</span>
+                  <span class="text-xs">{{ t('common.buttons.retry') }}</span>
                 </button>
               </div>
               <p v-if="testError" class="text-red-500 pl-5">
@@ -1537,7 +1579,8 @@ function handleSave() {
           <Button
             type="button"
             variant="outline"
-            :disabled="testStatus === 'testing'"
+            :title="canTestConnection ? undefined : t('components.serverForm.ssh.testDisabledHint')"
+            :disabled="canTestConnection === false || testStatus === 'testing'"
             @click="handleTestConnection"
           >
             {{ t('common.buttons.testConnection') }}

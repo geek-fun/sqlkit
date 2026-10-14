@@ -54,7 +54,7 @@ function selectMode(mode: SslMode) {
       </div>
     </div>
     <p v-if="error" class="text-sm text-destructive">
-      {{ error }}
+      {{ t(error) }}
     </p>
   </div>
 </template>

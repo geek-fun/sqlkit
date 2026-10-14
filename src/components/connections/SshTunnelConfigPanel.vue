@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select'
 import { openUpgradeDialog, ProBadge } from '@/components/upgrade'
 import { useEntitlementStore } from '@/store/entitlementStore'
-import { emptySshProfile, profileToTransportLayer, useSshProfileStore } from '@/store/sshProfileStore'
+import { emptySshProfile, profileToTransportLayer, runSshTest, useSshProfileStore } from '@/store/sshProfileStore'
 
 const props = defineProps<{
   modelValue?: SSHTunnelConfig
@@ -232,14 +232,19 @@ async function testFirstHop() {
   try {
     // Shared profile → Rust-contract layer mapping (camelCase), so the test
     // exercises EXACTLY the credentials the real chain will use.
-    testResult.value = await invoke<TestSshResult>('test_ssh_connection', {
-      config: profileToTransportLayer(first),
-      remoteHost: props.remoteHost ?? '',
-      remotePort: props.remotePort ?? 22,
-    })
+    testResult.value = await runSshTest(
+      profileToTransportLayer(first),
+      props.remoteHost ?? '',
+      props.remotePort ?? 22,
+    )
   }
   catch (err) {
-    testResult.value = { success: false, message: String(err) }
+    testResult.value = {
+      success: false,
+      message: String(err).includes('ssh-test-timeout')
+        ? t('components.serverForm.ssh.testTimedOut')
+        : String(err),
+    }
   }
   finally {
     testing.value = false

@@ -3,6 +3,7 @@ import type { ServerConnection } from '@/store'
 import type { SshProfile } from '@/store/sshProfileStore'
 import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
+import { Pencil, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -16,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import { Input } from '@/components/ui/input'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { openUpgradeDialog } from '@/components/upgrade'
 import { toast } from '@/composables/useNotifications'
 import { ConnectionStatus, useConnectionStore, useEntitlementStore } from '@/store'
@@ -44,6 +46,32 @@ const deleteDialogOpen = ref(false)
 const connectionToDelete = ref<ServerConnection | null>(null)
 const connectError = ref<string | null>(null)
 const connectionCancelled = ref(false)
+const profileDeleteOpen = ref(false)
+const profileToDelete = ref<SshProfile | null>(null)
+
+const profileAuthLabel = (profile: SshProfile) => {
+  switch (profile.authMethod) {
+    case 'key':
+      return t('components.serverForm.ssh.privateKey')
+    case 'agent':
+      return t('components.serverForm.ssh.sshAgent')
+    default:
+      return t('components.serverForm.ssh.password')
+  }
+}
+
+function openProfileDelete(profile: SshProfile) {
+  profileToDelete.value = profile
+  profileDeleteOpen.value = true
+}
+
+async function confirmProfileDelete() {
+  if (profileToDelete.value) {
+    await sshProfileStore.remove(profileToDelete.value.id)
+    profileToDelete.value = null
+    profileDeleteOpen.value = false
+  }
+}
 const connectingModal = ref<InstanceType<typeof ConnectingModal> | null>(null)
 
 const filteredConnections = computed(() => {
@@ -269,7 +297,7 @@ function handleDuplicateConnection(connection: ServerConnection) {
   editingConnection.value = {
     ...connection,
     id: undefined,
-    name: `${connection.name} (Copy)`,
+    name: `${connection.name}${t('connectionsPage.copySuffix')}`,
   }
   isFormDialogOpen.value = true
 }
@@ -305,7 +333,6 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
   <AppLayout>
     <div class="flex flex-col h-full relative">
       <div class="p-6 pb-0 shrink-0 space-y-6">
-        <!-- Page Header - matching design -->
         <div class="flex items-center justify-between">
           <div class="flex gap-3 items-center">
             <h1 class="text-xl font-semibold">
@@ -315,18 +342,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             <span class="text-sm text-muted-foreground">{{ t('pages.connections.subtitle') }}</span>
           </div>
           <div class="w-64 relative">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="text-muted-foreground h-4 w-4 left-3 top-1/2 absolute -translate-y-1/2"
-            >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground h-4 w-4 left-3 top-1/2 absolute -translate-y-1/2">
               <circle cx="11" cy="11" r="8" />
               <path d="m21 21-4.3-4.3" />
             </svg>
@@ -338,7 +354,6 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
           </div>
         </div>
 
-        <!-- Stats Cards -->
         <div class="gap-4 grid md:grid-cols-3">
           <Card class="p-4">
             <div class="flex items-center justify-between">
@@ -351,18 +366,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                 </p>
               </div>
               <div class="rounded-lg bg-primary/10 flex h-10 w-10 items-center justify-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="text-primary h-5 w-5"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary h-5 w-5">
                   <ellipse cx="12" cy="5" rx="9" ry="3" />
                   <path d="M3 5v14a9 3 0 0 0 18 0V5" />
                 </svg>
@@ -380,20 +384,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                 </p>
               </div>
               <div class="rounded-lg bg-violet-100 flex h-10 w-10 items-center justify-center dark:bg-violet-900/30">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="text-violet-600 h-5 w-5 dark:text-violet-400"
-                >
-                  <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                </svg>
+                <span class="i-carbon-key text-violet-600 h-5 w-5 dark:text-violet-400" />
               </div>
             </div>
           </Card>
@@ -408,18 +399,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                 </p>
               </div>
               <div class="rounded-lg bg-green-100 flex h-10 w-10 items-center justify-center dark:bg-green-900/30">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="text-green-600 h-5 w-5 dark:text-green-400"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600 h-5 w-5 dark:text-green-400">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                 </svg>
               </div>
@@ -427,27 +407,12 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
           </Card>
         </div>
 
-        <!-- Error notification -->
-        <div
-          v-if="connectError"
-          class="p-4 rounded-md bg-red-50 dark:bg-red-900/20"
-        >
+        <div v-if="connectError" class="p-4 rounded-md bg-red-50 dark:bg-red-900/20">
           <div class="flex gap-3 items-start">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="24"
-              height="24"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              class="text-red-600 mt-0.5 flex-shrink-0 h-5 w-5 dark:text-red-400"
-            >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500 h-5 w-5">
               <circle cx="12" cy="12" r="10" />
-              <line x1="12" x2="12" y1="8" y2="12" />
-              <line x1="12" x2="12.01" y1="16" y2="16" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <div class="flex-1">
               <h3 class="text-sm text-red-800 font-medium dark:text-red-200">
@@ -457,32 +422,112 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                 {{ connectError }}
               </p>
             </div>
-            <button
-              type="button"
-              class="text-red-500 hover:text-red-700"
-              @click="connectError = null"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="h-4 w-4"
-              >
+            <button type="button" class="text-red-500 hover:text-red-700" @click="connectError = null">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
                 <path d="M18 6 6 18" />
                 <path d="m6 6 12 12" />
               </svg>
             </button>
           </div>
         </div>
+      </div>
 
-        <!-- Saved Connections Section -->
-        <div class="mb-4 flex items-center justify-between">
+      <div class="flex-1 min-h-0 overflow-y-auto">
+        <div class="mb-2 p-6 pb-3 flex items-center justify-between">
+          <h2 class="text-lg font-semibold">
+            {{ t('connectionsPage.sshProfilesSection') }}
+          </h2>
+        </div>
+        <div
+          class="mx-6 mb-8 gap-4 grid lg:grid-cols-3 sm:grid-cols-2 xl:grid-cols-4"
+        >
+          <div
+            v-for="profile in sshProfileStore.profiles"
+            :key="profile.id"
+            class="p-4 border rounded-lg cursor-pointer transition-colors hover:bg-accent/50"
+            role="button"
+            tabindex="0"
+            @click="openProfileEdit(profile)"
+            @keydown.enter.self.prevent="openProfileEdit(profile)"
+            @keydown.space.self.prevent="openProfileEdit(profile)"
+          >
+            <div class="flex gap-3 items-start">
+              <div class="p-1.5 rounded-lg bg-violet-100 flex shrink-0 h-10 w-10 items-center justify-center dark:bg-violet-900/30">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-violet-600 h-5 w-5 dark:text-violet-400">
+                  <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
+                </svg>
+              </div>
+              <div class="flex-1 min-w-0">
+                <span class="text-base font-medium block truncate">{{ profile.name }}</span>
+                <span class="text-sm text-muted-foreground block truncate">
+                  {{ profile.username }}@{{ profile.host }}:{{ profile.port }}
+                </span>
+              </div>
+            </div>
+            <div class="mt-2 flex gap-1.5 items-center">
+              <Badge variant="outline" class="text-xs shrink-0">
+                {{ t('connectionsPage.sshProfile') }}
+              </Badge>
+              <Badge variant="outline" class="text-xs text-muted-foreground shrink-0">
+                {{ profileAuthLabel(profile) }}
+              </Badge>
+              <div class="ml-auto flex shrink-0 gap-1 items-center">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        class="h-7 w-7"
+                        @click.stop="openProfileEdit(profile)"
+                      >
+                        <Pencil class="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{{ t('components.serverCard.actions.edit') }}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger as-child>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        type="button"
+                        class="text-destructive h-7 w-7 hover:text-destructive"
+                        @click.stop="openProfileDelete(profile)"
+                      >
+                        <Trash2 class="h-3.5 w-3.5" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>{{ t('components.serverCard.actions.delete') }}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
+          </div>
+
+          <div
+            class="p-4 border rounded-lg border-dashed flex min-h-[86px] cursor-pointer transition-colors items-center justify-center hover:bg-accent/50"
+            role="button"
+            tabindex="0"
+            @click="openProfileCreate"
+            @keydown.enter.self.prevent="openProfileCreate"
+            @keydown.space.self.prevent="openProfileCreate"
+          >
+            <div class="text-muted-foreground flex gap-2 items-center">
+              <span class="i-carbon-add h-4 w-4" />
+              <span class="text-sm">{{ t('connectionsPage.addSshProfile') }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-4 p-6 pt-0 flex items-center justify-between">
           <h2 class="text-lg font-semibold">
             {{ t('pages.connections.saved') }}
           </h2>
@@ -493,18 +538,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
               :class="{ 'bg-accent': viewMode === 'grid' }"
               @click="viewMode = 'grid'"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="h-4 w-4"
-              >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
                 <rect width="7" height="7" x="3" y="3" rx="1" />
                 <rect width="7" height="7" x="14" y="3" rx="1" />
                 <rect width="7" height="7" x="14" y="14" rx="1" />
@@ -517,18 +551,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
               :class="{ 'bg-accent': viewMode === 'list' }"
               @click="viewMode = 'list'"
             >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="24"
-                height="24"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                class="h-4 w-4"
-              >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
                 <line x1="8" x2="21" y1="6" y2="6" />
                 <line x1="8" x2="21" y1="12" y2="12" />
                 <line x1="8" x2="21" y1="18" y2="18" />
@@ -539,66 +562,12 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             </Button>
           </div>
         </div>
-      </div>
-      <div class="p-6 pt-0 flex-1 min-h-0 overflow-y-auto">
-        <!-- SSH Profile cards (Ultimate): always visible so the add entry point
-             exists even with zero profiles (DockIt connect page parity) -->
-        <div class="mb-2 flex gap-2 items-center">
-          <h2 class="text-lg font-semibold">
-            {{ t('connectionsPage.sshProfilesSection') }}
-          </h2>
-        </div>
-        <div
-          class="mb-6" :class="[viewMode === 'grid'
-            ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-            : 'flex flex-col gap-3']"
-        >
-          <div
-            v-for="profile in sshProfileStore.profiles"
-            :key="profile.id"
-            class="p-4 border rounded-lg cursor-pointer transition-colors hover:bg-accent/50"
-            role="button"
-            tabindex="0"
-            @click="openProfileEdit(profile)"
-            @keydown.enter.prevent="openProfileEdit(profile)"
-            @keydown.space.prevent="openProfileEdit(profile)"
-          >
-            <div class="flex items-start justify-between">
-              <div class="flex gap-2 min-w-0 items-center">
-                <span class="i-carbon-key text-muted-foreground shrink-0 h-4 w-4" />
-                <span class="font-medium truncate">{{ profile.name }}</span>
-              </div>
-              <Badge variant="outline" class="text-xs shrink-0">
-                {{ t('connectionsPage.sshProfile') }}
-              </Badge>
-            </div>
-            <p class="text-sm text-muted-foreground mt-1 truncate">
-              {{ profile.username }}@{{ profile.host }}:{{ profile.port }}
-            </p>
-          </div>
 
-          <div
-            class="p-4 border rounded-lg border-dashed flex min-h-[86px] cursor-pointer transition-colors items-center justify-center hover:bg-accent/50"
-            role="button"
-            tabindex="0"
-            @click="openProfileCreate"
-            @keydown.enter.prevent="openProfileCreate"
-            @keydown.space.prevent="openProfileCreate"
-          >
-            <div class="text-muted-foreground flex gap-2 items-center">
-              <span class="i-carbon-add h-4 w-4" />
-              <span class="text-sm">{{ t('connectionsPage.addSshProfile') }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Connections Grid/List -->
         <div
-          :class="viewMode === 'grid'
+          class="mx-6 pb-24" :class="viewMode === 'grid'
             ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
             : 'flex flex-col gap-3'"
         >
-          <!-- Connection Cards -->
           <ServerCard
             v-for="connection in filteredConnections"
             :key="connection.id"
@@ -612,25 +581,13 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             @disconnect="handleDisconnect"
           />
 
-          <!-- Add New Connection Card -->
           <Card
             class="border-dashed cursor-pointer transition-colors hover:border-primary hover:bg-accent/50"
             @click="handleAddConnection"
           >
             <div class="p-4 text-center flex flex-col min-h-40 items-center justify-center space-y-3">
               <div class="text-muted-foreground border-2 rounded-full border-dashed flex h-10 w-10 items-center justify-center">
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="h-5 w-5"
-                >
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-5 w-5">
                   <path d="M5 12h14" />
                   <path d="M12 5v14" />
                 </svg>
@@ -647,23 +604,8 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
           </Card>
         </div>
 
-        <!-- Empty state -->
-        <div
-          v-if="filteredConnections.length === 0 && searchQuery"
-          class="py-12 text-center"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            class="text-muted-foreground mx-auto mb-4 h-12 w-12"
-          >
+        <div v-if="filteredConnections.length === 0 && searchQuery" class="py-12 text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground mx-auto mb-4 h-12 w-12">
             <circle cx="11" cy="11" r="8" />
             <path d="m21 21-4.3-4.3" />
           </svg>
@@ -676,23 +618,13 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
         </div>
       </div>
 
-      <!-- Floating Action Button -->
+      <!-- Floating Add Connection — INSIDE the relative page container so the
+           absolute anchor tracks the content edge even with a side panel open -->
       <button
-        class="text-white rounded-full bg-blue-600 flex h-14 w-14 cursor-pointer shadow-lg transition-colors items-center bottom-6 right-6 justify-center fixed dark:bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-700"
+        class="text-white rounded-full bg-blue-600 flex h-14 w-14 cursor-pointer shadow-lg transition-colors items-center bottom-6 right-6 justify-center absolute dark:bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-700"
         @click="handleAddConnection"
       >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          class="h-6 w-6"
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6">
           <path d="M5 12h14" />
           <path d="M12 5v14" />
         </svg>
@@ -705,8 +637,6 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
       :connection="editingConnection"
       @save="handleSaveConnection"
     />
-
-    <!-- Delete Confirmation Dialog -->
     <DestructiveConfirmDialog
       v-model:open="deleteDialogOpen"
       :title="t('components.destructiveDialog.deleteConnection.title')"
@@ -715,8 +645,15 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
       :confirm-label="t('components.destructiveDialog.deleteConnection.confirm')"
       @confirm="confirmDelete"
     />
+    <DestructiveConfirmDialog
+      v-model:open="profileDeleteOpen"
+      :title="t('components.destructiveDialog.deleteProfile.title')"
+      :message="t('components.destructiveDialog.deleteProfile.message', { name: profileToDelete?.name })"
+      :detail="t('components.destructiveDialog.deleteProfile.detail')"
+      :confirm-label="t('components.destructiveDialog.deleteProfile.confirm')"
+      @confirm="confirmProfileDelete"
+    />
 
-    <!-- Connecting Modal -->
     <ConnectingModal ref="connectingModal" />
     <SshProfileDialog ref="sshProfileDialogRef" @save="sshProfileStore.fetch()" />
   </AppLayout>

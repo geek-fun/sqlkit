@@ -66,6 +66,38 @@ export const useSshProfileStore = defineStore('sshProfiles', {
 })
 
 /**
+ * Run the test_ssh_connection IPC with a hard client-side ceiling so a hung
+ * handshake/IPC can never wedge the dialog: worst case shows a timeout
+ * message instead of an eternally-spinning button.
+ */
+export async function runSshTest(
+  config: unknown,
+  remoteHost: string,
+  remotePort: number,
+  timeoutMs = 30_000,
+): Promise<{ success: boolean, message: string, user?: string, host?: string, port?: number }> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      invoke<{
+        success: boolean
+        message: string
+        user?: string
+        host?: string
+        port?: number
+      }>('test_ssh_connection', { config, remoteHost, remotePort }),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error('ssh-test-timeout')), timeoutMs)
+      }),
+    ])
+  }
+  finally {
+    if (timer)
+      clearTimeout(timer)
+  }
+}
+
+/**
  * Page-level SshProfile → Rust-contract transport layer (camelCase SshTunnelConfig).
  * Auth strings must match tunnel.rs's match arms; ''/'none' (auto-probe legacy)
  * normalize to password so previously-created profiles keep connecting.

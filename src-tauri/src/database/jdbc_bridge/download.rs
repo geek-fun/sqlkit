@@ -67,13 +67,29 @@ pub fn driver_cache_dir(artifact: &str) -> PathBuf {
     bridge_dir().join("drivers").join(artifact)
 }
 
-/// Newest `.jar` inside `dir`, ignoring anything that is not a regular file.
+/// A driver JAR smaller than this is a metadata/stub shell, not a usable
+/// driver. Maven "latest" can resolve to a version whose published JAR is a
+/// class-less shell (observed: `ojdbc11-23.26.3.0.0.jar`, ~6 KB) — accepting
+/// such stubs poisons the cache and breaks class loading with bare
+/// `Driver class not found` errors.
+const MIN_DRIVER_JAR_BYTES: u64 = 64 * 1024;
+
+fn is_plausible_driver_jar(path: &Path) -> bool {
+    path.is_file()
+        && std::fs::metadata(path)
+            .map(|m| m.len() >= MIN_DRIVER_JAR_BYTES)
+            .unwrap_or(false)
+}
+
+/// Newest `.jar` inside `dir`, ignoring anything that is not a regular file
+/// or fails the shell-JAR plausibility check.
 fn newest_jar_in(dir: &Path) -> Option<PathBuf> {
     std::fs::read_dir(dir)
         .ok()?
         .flatten()
         .filter(|entry| entry.path().is_file())
         .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "jar"))
+        .filter(|entry| is_plausible_driver_jar(&entry.path()))
         .filter_map(|entry| {
             let modified = entry.metadata().ok()?.modified().ok()?;
             Some((modified, entry.path()))
@@ -87,6 +103,20 @@ pub fn newest_cached_driver_jar(artifact: &str) -> Option<PathBuf> {
     newest_jar_in(&driver_cache_dir(artifact))
 }
 
+/// Delete a pinned cache JAR that fails the plausibility gate. The Java
+/// resolver skips downloading when the destination file already exists, so a
+/// truncated/shell JAR landing at the pinned filename would wedge the driver
+/// forever — evict it and let the next resolve re-download.
+pub fn evict_implausible_pinned_jar(config: &DatabaseDriverConfig) {
+    if let Some(cap) = &config.version_cap {
+        let pinned = driver_cache_dir(&config.maven_artifact)
+            .join(format!("{}-{}.jar", config.maven_artifact, cap));
+        if pinned.is_file() && !is_plausible_driver_jar(&pinned) {
+            let _ = std::fs::remove_file(&pinned);
+        }
+    }
+}
+
 /// Cached JAR to use for a driver config without touching the network.
 ///
 /// A registry `version_cap` pins the exact file to use; uncapped artifacts
@@ -96,7 +126,7 @@ pub fn cached_driver_jar(config: &DatabaseDriverConfig) -> Option<PathBuf> {
     if let Some(cap) = &config.version_cap {
         let pinned = driver_cache_dir(&config.maven_artifact)
             .join(format!("{}-{}.jar", config.maven_artifact, cap));
-        return pinned.is_file().then_some(pinned);
+        return is_plausible_driver_jar(&pinned).then_some(pinned);
     }
     newest_cached_driver_jar(&config.maven_artifact)
 }
@@ -407,12 +437,35 @@ async fn cleanup_old_bridge_versions() -> DbResult<()> {
 
 #[cfg(test)]
 mod driver_cache_tests {
+    #[test]
+    fn newest_jar_in_skips_shell_jars() {
+        let tmp = std::env::temp_dir().join(format!(
+            "sqlkit-jar-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        ));
+        std::fs::create_dir_all(&tmp).unwrap();
+        // shell JAR (older mtime, tiny size)
+        std::fs::write(tmp.join("a-1.0.0.jar"), vec![0u8; 6836]).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        // plausible JAR (newer mtime, real size)
+        let good = tmp.join("a-1.0.1.jar");
+        std::fs::write(&good, vec![0u8; 70_000]).unwrap();
+
+        assert_eq!(newest_jar_in(&tmp).unwrap(), good);
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
     use super::*;
 
     fn write_jar(dir: &Path, name: &str, modified: std::time::SystemTime) {
         std::fs::create_dir_all(dir).unwrap();
         let path = dir.join(name);
-        std::fs::write(&path, b"jar").unwrap();
+        // Plausible driver size (≥ MIN_DRIVER_JAR_BYTES) so the test JARs
+        // pass the shell-JAR filter like real downloads do.
+        std::fs::write(&path, vec![0u8; 70_000]).unwrap();
         std::fs::File::options()
             .write(true)
             .open(&path)

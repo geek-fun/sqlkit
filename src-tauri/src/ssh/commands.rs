@@ -113,7 +113,7 @@ pub async fn delete_ssh_profile(app: AppHandle, profile_id: String) -> Result<()
 /// Test an SSH connection by creating an ephemeral tunnel. `message` is a
 /// developer-facing English diagnostic; the success actors come through the
 /// structured fields so each locale renders its own wording.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct TestSshResult {
     pub success: bool,
     pub message: String,
