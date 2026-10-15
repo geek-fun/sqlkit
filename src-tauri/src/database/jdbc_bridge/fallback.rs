@@ -130,11 +130,16 @@ pub async fn try_driver(
     // A cached JAR short-circuits the RPC (and with it a Maven metadata request on
     // the Java side). Artifacts with a version cap keep the original
     // latest-then-cap fallback behaviour.
-    let cached_jar = if config.version_cap.is_none() {
-        download::cached_driver_jar(config)
-    } else {
-        None
-    };
+    // Self-heal a poisoned pinned cache before resolving (see evict_…).
+    download::evict_implausible_pinned_jar(config);
+
+    // Unconditional cache short-circuit: capped configs resolve to their
+    // pinned (known-good) version, uncapped ones to the newest plausible JAR.
+    // The old "never short-circuit for capped" rule existed to keep the
+    // latest-then-cap Java flow alive, but Maven LATEST can hand back a
+    // class-less shell JAR (seen with ojdbc11 23.26.3.0.0), which fails class
+    // loading before the cap ever gets a turn.
+    let cached_jar = download::cached_driver_jar(config);
 
     if let Some(cached) = cached_jar {
         return connect_with_jar(
@@ -413,69 +418,77 @@ pub async fn run_fallback_chain(
         download::download_bridge_plugin().await?;
     }
 
-    // Two-phase driver resolution:
-    // 1. Try LATEST (no version_cap)
-    match try_driver(
-        config,
-        host,
-        port,
-        database,
-        username,
-        password,
-        false,
-        oracle_options,
-        ssl_mode,
-        ssl_ca_cert,
-        ssl_client_cert,
-        ssl_client_key,
-        trust_server_certificate,
-    )
-    .await
-    {
-        DriverAttempt::Connected(conn_id, launcher) => {
-            return Ok(("resolved".to_string(), conn_id, launcher));
-        }
-        DriverAttempt::VersionMismatch(_) => {
-            // 2. If LATEST fails with version_incompatible and a cap exists, retry with cap
-            if config.version_cap.is_some() {
-                match try_driver(
-                    config,
-                    host,
-                    port,
-                    database,
-                    username,
-                    password,
-                    true,
-                    oracle_options,
-                    ssl_mode,
-                    ssl_ca_cert,
-                    ssl_client_cert,
-                    ssl_client_key,
-                    trust_server_certificate,
-                )
-                .await
-                {
-                    DriverAttempt::Connected(conn_id, launcher) => {
-                        return Ok(("capped".to_string(), conn_id, launcher));
-                    }
-                    DriverAttempt::VersionMismatch(msg) => Err(DbError::Connection(format!(
-                        "Could not find a compatible JDBC driver for this database version. \
-                         Error: {}",
-                        msg,
-                    ))),
-                    DriverAttempt::Fatal(e) => Err(e),
-                }
-            } else {
-                Err(DbError::Connection(
+    // Two-phase driver resolution: LATEST first, capped retry on version
+    // mismatch. Drivers with a pinned `version_cap` skip the LATEST phase
+    // entirely — its "newest" artifact can resolve to a class-less shell JAR
+    // (observed with ojdbc11 23.26.3.0.0), which then fails class loading
+    // instead of ever falling back to the cap.
+    if config.version_cap.is_none() {
+        match try_driver(
+            config,
+            host,
+            port,
+            database,
+            username,
+            password,
+            false,
+            oracle_options,
+            ssl_mode,
+            ssl_ca_cert,
+            ssl_client_cert,
+            ssl_client_key,
+            trust_server_certificate,
+        )
+        .await
+        {
+            DriverAttempt::Connected(conn_id, launcher) => {
+                return Ok(("resolved".to_string(), conn_id, launcher));
+            }
+            DriverAttempt::VersionMismatch(_) => {
+                // version_cap.is_none() here by construction — no retry tier.
+                return Err(DbError::Connection(
                     "Could not find a compatible JDBC driver for this database version. \
                      Try updating the driver in Settings → JRE & Drivers."
                         .to_string(),
-                ))
+                ));
             }
+            DriverAttempt::Fatal(e) => return Err(e),
         }
-        DriverAttempt::Fatal(e) => Err(e),
+    }
+    {
+        // Pinned driver: go straight to the cap
+        match try_driver(
+            config,
+            host,
+            port,
+            database,
+            username,
+            password,
+            true,
+            oracle_options,
+            ssl_mode,
+            ssl_ca_cert,
+            ssl_client_cert,
+            ssl_client_key,
+            trust_server_certificate,
+        )
+        .await
+        {
+            DriverAttempt::Connected(conn_id, launcher) => {
+                return Ok(("capped".to_string(), conn_id, launcher));
+            }
+            DriverAttempt::VersionMismatch(msg) => {
+                return Err(DbError::Connection(format!(
+                    "Could not find a compatible JDBC driver for this database version. \
+                     Error: {}",
+                    msg,
+                )))
+            }
+            DriverAttempt::Fatal(e) => return Err(e),
+        }
     }
 }
+
 
 fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
     match config.name.as_str() {

@@ -52,7 +52,7 @@ const isOpen = computed({
 })
 
 const isEditing = computed(() => !!props.connection?.id)
-const showAdvanced = ref(false)
+const formSectionTab = ref<'basic' | 'advanced'>('basic')
 
 const defaultPorts: Record<string, number> = {
   [DatabaseType.POSTGRESQL]: 5432,
@@ -142,9 +142,9 @@ type StepDef = {
   error?: string
 }
 const setupSteps = ref<StepDef[]>([
-  { id: 'jre', label: 'Java Runtime', status: 'pending' },
-  { id: 'bridge', label: 'Bridge JAR', status: 'pending' },
-  { id: 'driver', label: 'JDBC Driver', status: 'pending' },
+  { id: 'jre', label: 'pages.settings.jre.jreCard.title', status: 'pending' },
+  { id: 'bridge', label: 'pages.settings.jre.bridgeCard.title', status: 'pending' },
+  { id: 'driver', label: 'pages.settings.jre.driversCard.title', status: 'pending' },
 ])
 
 const showPasswords = ref<Record<string, boolean>>({})
@@ -251,6 +251,9 @@ watch(() => props.open, (open) => {
     testStatus.value = 'idle'
     testError.value = ''
     formErrors.value = {}
+    // Always open on the Basic tab — landing on Advanced carries the previous
+    // dialog's context into a new/edit session.
+    formSectionTab.value = 'basic'
     setupSteps.value.forEach((s) => {
       s.status = 'pending'
       s.progress = undefined
@@ -413,15 +416,34 @@ function switchToConnection(connection: ServerConnection) {
 
 const dbTypeI18nKeyMap: Record<string, string> = {
   MANTICORESEARCH: 'manticore',
+  OCEANBASE_ORACLE: 'oceanbase-oracle', // lang keys use hyphens, enums use underscores
 }
 
+// Most-popular engines first in the type selector (MYSQL → PG → MSSQL → ORACLE
+// → SQLITE → DB2 → H2); the rest keep their enum order after the pinned ones.
+const PREFERRED_DB_TYPE_ORDER: Partial<Record<DatabaseType, number>> = {
+  [DatabaseType.MYSQL]: 0,
+  [DatabaseType.POSTGRESQL]: 1,
+  [DatabaseType.SQLSERVER]: 2,
+  [DatabaseType.ORACLE]: 3,
+  [DatabaseType.SQLITE]: 4,
+  [DatabaseType.DB2]: 5,
+  [DatabaseType.H2]: 6,
+}
+
+const preferredTypeRank = (value: DatabaseType, index: number) =>
+  PREFERRED_DB_TYPE_ORDER[value] ?? 100 + index
+
 const databaseTypeOptions = computed(() =>
-  Object.values(DatabaseType).map((value) => {
-    const i18nKey = dbTypeI18nKeyMap[value] || value.toLowerCase()
-    const fullKey = `components.serverForm.databaseTypes.${i18nKey}`
-    const label = t(fullKey)
-    return { label: label === fullKey ? value : label, value }
-  }),
+  Object.values(DatabaseType)
+    .map((value, index) => ({ value, index }))
+    .sort((a, b) => preferredTypeRank(a.value, a.index) - preferredTypeRank(b.value, b.index))
+    .map(({ value }) => {
+      const i18nKey = dbTypeI18nKeyMap[value] || value.toLowerCase()
+      const fullKey = `components.serverForm.databaseTypes.${i18nKey}`
+      const label = t(fullKey)
+      return { label: label === fullKey ? value : label, value }
+    }),
 )
 
 // ── Oracle-specific state ──
@@ -580,10 +602,10 @@ async function browseDirectory(target: 'tns' | 'wallet') {
   }
 }
 
-function validateForm(): boolean {
+function collectValidationErrors(requireName: boolean): Record<string, string> {
   const errors: Record<string, string> = {}
 
-  if (!formData.value.name.trim()) {
+  if (requireName && !formData.value.name.trim()) {
     errors.name = t('components.serverForm.errors.nameRequired')
   }
 
@@ -634,16 +656,43 @@ function validateForm(): boolean {
     sslErrors.forEach((err) => {
       errors[`ssl.${err.field}`] = err.message
     })
+    if (sslErrors.length > 0) {
+      errors['ssl.mode'] = errors['ssl.mode']
+        ?? t('common.status.failed')
+    }
   }
 
+  return errors
+}
+
+function validateForm(): boolean {
+  const errors = collectValidationErrors(true)
+  // SSL fields live in the Advanced tab — if they fail, surface the tab
+  // showing the problem instead of blocking Save silently on Basic.
+  if (Object.keys(errors).some(k => k.startsWith('ssl.')))
+    formSectionTab.value = 'advanced'
   formErrors.value = errors
   return Object.keys(errors).length === 0
 }
 
+/**
+ * Test is strictly read-only against the DB: every required field must pass
+ *  before the button is clickable (name is optional for a test).
+ */
+const canTestConnection = computed(() =>
+  Object.keys(collectValidationErrors(false)).length === 0,
+)
+
 async function handleTestConnection() {
   if (testStatus.value === 'testing')
     return
-  if (!validateForm())
+  // Same contract as canTestConnection (name optional): the button is enabled
+  // exactly when this passes, so a click can never be silently swallowed.
+  const errors = collectValidationErrors(false)
+  if (Object.keys(errors).some(k => k.startsWith('ssl.')))
+    formSectionTab.value = 'advanced'
+  formErrors.value = errors
+  if (Object.keys(errors).length > 0)
     return
 
   testStatus.value = 'testing'
@@ -743,7 +792,7 @@ async function handleTestConnection() {
     else {
       if (driverStep)
         driverStep.status = 'error'
-      const msg = 'Connection returned not connected'
+      const msg = t('components.serverForm.ssh.testReturnedNotConnected')
       if (driverStep)
         driverStep.error = msg
       testError.value = msg
@@ -759,7 +808,7 @@ async function handleTestConnection() {
       const jreStepFound = setupSteps.value.find(s => s.id === 'jre')
       if (jreStepFound) {
         jreStepFound.status = 'error'
-        jreStepFound.error = 'JRE is missing or broken'
+        jreStepFound.error = t('components.serverForm.ssh.jreBroken')
       }
     }
     const running = setupSteps.value.find(s => s.status === 'running')
@@ -830,7 +879,7 @@ function handleSave() {
 
 <template>
   <Dialog v-model:open="isOpen">
-    <DialogContent class="sm:max-w-xl" @interact-outside="(e: Event) => { if (isPickingFile) e.preventDefault() }">
+    <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-xl" @interact-outside="(e: Event) => { if (isPickingFile) e.preventDefault() }">
       <DialogTitle>
         {{ isEditing ? t('components.serverForm.title.edit') : t('components.serverForm.title.new') }}
       </DialogTitle>
@@ -839,341 +888,378 @@ function handleSave() {
       </DialogDescription>
 
       <form class="space-y-4" @submit.prevent="handleSave">
-        <!-- Connection Name -->
-        <div class="space-y-2">
-          <Label for="name">{{ t('components.serverForm.labels.connectionName') }}<span class="text-destructive ml-0.5">*</span></Label>
-          <Input
-            id="name"
-            v-model="formData.name"
-            :placeholder="t('components.serverForm.placeholders.connectionName')"
-            :class="{ 'border-destructive': formErrors.name }"
-          />
-          <p v-if="formErrors.name" class="text-sm text-destructive">
-            {{ formErrors.name }}
-          </p>
-        </div>
+        <Tabs :model-value="formSectionTab" @update:model-value="formSectionTab = $event as 'basic' | 'advanced'">
+          <TabsList v-if="!isFileBased" class="p-0.5 h-7 w-fit">
+            <TabsTrigger value="basic" class="text-xs px-3 py-0 gap-1.5 h-6">
+              <span class="i-carbon-plug h-3.5 w-3.5" />
+              {{ t('components.serverForm.basicTab') }}
+            </TabsTrigger>
+            <TabsTrigger value="advanced" class="text-xs px-3 py-0 gap-1.5 h-6">
+              <span class="i-carbon-settings h-3.5 w-3.5" />
+              {{ t('components.serverForm.advancedTab') }}
+            </TabsTrigger>
+          </TabsList>
 
-        <!-- Database Type -->
-        <div class="space-y-2">
-          <Label for="type">{{ t('components.serverForm.labels.databaseType') }}</Label>
-          <SearchableSelect
-            :model-value="formData.type"
-            :options="databaseTypeOptions"
-            :search-threshold="5"
-            :placeholder="t('components.serverForm.placeholders.selectType')"
-            class="w-full"
-            @update:model-value="handleDatabaseTypeChange"
-          >
-            <template #selected-prepend>
-              <img
-                v-if="formData.type"
-                :src="getDatabaseIcon(formData.type as DatabaseType)"
-                alt=""
-                class="mr-2 h-5 w-5 object-contain"
-              >
-            </template>
-            <template #option="{ option }">
-              <div class="flex gap-2 items-center">
-                <img
-                  :src="getDatabaseIcon(option.value as DatabaseType)"
-                  alt=""
-                  class="h-5 w-5 object-contain"
-                >
-                {{ option.label }}
-              </div>
-            </template>
-          </SearchableSelect>
-        </div>
-
-        <!-- Host and Port on same row; Database below (non-Oracle, non-file-based) -->
-        <div v-if="!isFileBased && !isOracle" class="space-y-4">
-          <div class="gap-4 grid grid-cols-4">
-            <div class="col-span-3 space-y-2">
-              <Label for="host">{{ t('components.serverForm.labels.host') }}<span class="text-destructive ml-0.5">*</span></Label>
-              <Input
-                id="host"
-                v-model="formData.host"
-                :placeholder="t('components.serverForm.placeholders.host')"
-                :class="{ 'border-destructive': formErrors.host }"
-              />
-              <p v-if="formErrors.host" class="text-sm text-destructive">
-                {{ formErrors.host }}
-              </p>
-            </div>
+          <!-- Fixed-height scroll region so Basic and Advanced render at the
+               same height — tab switches don't reflow the dialog -->
+          <TabsContent value="basic" class="mt-2 overflow-y-auto space-y-4" :class="isFileBased ? '' : 'h-[26rem] pr-1'">
+            <!-- Connection Name -->
             <div class="space-y-2">
-              <Label for="port">{{ t('components.serverForm.labels.port') }}<span class="text-destructive ml-0.5">*</span></Label>
+              <Label for="name">{{ t('components.serverForm.labels.connectionName') }}<span class="text-destructive ml-0.5">*</span></Label>
               <Input
-                id="port"
-                v-model.number="formData.port"
-                type="number"
-                :class="{ 'border-destructive': formErrors.port }"
+                id="name"
+                v-model="formData.name"
+                :placeholder="t('components.serverForm.placeholders.connectionName')"
+                :class="{ 'border-destructive': formErrors.name }"
               />
-              <p v-if="formErrors.port" class="text-sm text-destructive">
-                {{ formErrors.port }}
+              <p v-if="formErrors.name" class="text-sm text-destructive">
+                {{ formErrors.name }}
               </p>
             </div>
-          </div>
-          <div class="space-y-2">
-            <Label for="database">
-              {{ t('components.serverForm.labels.database') }}
-              <span v-if="isDbNameRequired" class="text-destructive ml-0.5">*</span>
-            </Label>
-            <Input
-              id="database"
-              v-model="formData.database"
-              :placeholder="databasePlaceholder"
-              :class="{ 'border-destructive': formErrors.database }"
-            />
-            <p v-if="formErrors.database" class="text-sm text-destructive">
-              {{ formErrors.database }}
-            </p>
-          </div>
-        </div>
 
-        <!-- Oracle-specific fields -->
-        <div v-if="isOracle" class="space-y-4">
-          <!-- Connection Method Selector -->
-          <div class="space-y-2">
-            <Label>{{ t('components.serverForm.oracle.connectionMethod') }}</Label>
-            <Tabs :model-value="oracleMethod" @update:model-value="onOracleMethodChange">
-              <TabsList class="grid grid-cols-3 w-full">
-                <TabsTrigger value="basic">
-                  {{ t('components.serverForm.oracle.methods.basic') }}
-                </TabsTrigger>
-                <TabsTrigger value="tns">
-                  {{ t('components.serverForm.oracle.methods.tns') }}
-                </TabsTrigger>
-                <TabsTrigger value="cloud_wallet">
-                  {{ t('components.serverForm.oracle.methods.cloudWallet') }}
-                </TabsTrigger>
-              </TabsList>
+            <!-- Database Type -->
+            <div class="space-y-2">
+              <Label for="type">{{ t('components.serverForm.labels.databaseType') }}</Label>
+              <SearchableSelect
+                :model-value="formData.type"
+                :options="databaseTypeOptions"
+                :search-threshold="5"
+                :placeholder="t('components.serverForm.placeholders.selectType')"
+                class="w-full"
+                @update:model-value="handleDatabaseTypeChange"
+              >
+                <template #selected-prepend>
+                  <img
+                    v-if="formData.type"
+                    :src="getDatabaseIcon(formData.type as DatabaseType)"
+                    alt=""
+                    class="mr-2 h-5 w-5 object-contain"
+                  >
+                </template>
+                <template #option="{ option }">
+                  <div class="flex gap-2 items-center">
+                    <img
+                      :src="getDatabaseIcon(option.value as DatabaseType)"
+                      alt=""
+                      class="h-5 w-5 object-contain"
+                    >
+                    {{ option.label }}
+                  </div>
+                </template>
+              </SearchableSelect>
+            </div>
 
-              <!-- Basic Method -->
-              <TabsContent value="basic" class="mt-4 space-y-4">
-                <div class="gap-4 grid grid-cols-4">
-                  <div class="col-span-3 space-y-2">
-                    <Label for="oracle-host">{{ t('components.serverForm.labels.host') }}<span class="text-destructive ml-0.5">*</span></Label>
-                    <Input
-                      id="oracle-host"
-                      v-model="formData.host"
-                      :placeholder="t('components.serverForm.placeholders.host')"
-                      :class="{ 'border-destructive': formErrors.host }"
-                    />
-                    <p v-if="formErrors.host" class="text-sm text-destructive">
-                      {{ formErrors.host }}
-                    </p>
-                  </div>
-                  <div class="space-y-2">
-                    <Label for="oracle-port">{{ t('components.serverForm.labels.port') }}<span class="text-destructive ml-0.5">*</span></Label>
-                    <Input
-                      id="oracle-port"
-                      v-model.number="formData.port"
-                      type="number"
-                      :class="{ 'border-destructive': formErrors.port }"
-                    />
-                    <p v-if="formErrors.port" class="text-sm text-destructive">
-                      {{ formErrors.port }}
-                    </p>
-                  </div>
-                </div>
-                <div class="flex flex-wrap gap-4 items-center">
-                  <div class="flex gap-2 items-center">
-                    <Label class="min-w-fit whitespace-nowrap">{{ t('components.serverForm.oracle.identifyBy') }}</Label>
-                    <div class="flex flex-wrap gap-1.5">
-                      <button
-                        type="button"
-                        class="text-xs leading-none px-3 py-1 rounded-full cursor-pointer transition-colors" :class="[
-                          oracleSidOrService === 'service_name'
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                        ]"
-                        @click="oracleSidOrService = 'service_name'"
-                      >
-                        {{ t('components.serverForm.oracle.serviceName') }}
-                      </button>
-                      <button
-                        type="button"
-                        class="text-xs leading-none px-3 py-1 rounded-full cursor-pointer transition-colors" :class="[
-                          oracleSidOrService === 'sid'
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                        ]"
-                        @click="oracleSidOrService = 'sid'"
-                      >
-                        {{ t('components.serverForm.oracle.sid') }}
-                      </button>
-                    </div>
-                  </div>
-                  <div class="flex gap-2 items-center">
-                    <Label class="min-w-fit whitespace-nowrap">{{ t('components.serverForm.oracle.role') }}</Label>
-                    <div class="flex flex-wrap gap-1.5">
-                      <button
-                        v-for="r in ([{ v: 'NORMAL', k: 'normal' }, { v: 'SYSDBA', k: 'sysdba' }, { v: 'SYSOPER', k: 'sysoper' }] as const)"
-                        :key="r.v"
-                        type="button"
-                        class="text-xs leading-none px-3 py-1 rounded-full cursor-pointer transition-colors" :class="[
-                          oracleRole === r.v
-                            ? 'bg-primary/10 text-primary font-medium'
-                            : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-                        ]"
-                        @click="oracleRole = r.v"
-                      >
-                        {{ t(`components.serverForm.oracle.roles.${r.k}`) }}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-                <div class="space-y-2">
-                  <Label for="oracle-svc">{{ databaseLabel }}<span class="text-destructive ml-0.5">*</span></Label>
+            <!-- Host and Port on same row; Database below (non-Oracle, non-file-based) -->
+            <div v-if="!isFileBased && !isOracle" class="space-y-4">
+              <div class="gap-4 grid grid-cols-4">
+                <div class="col-span-3 space-y-2">
+                  <Label for="host">{{ t('components.serverForm.labels.host') }}<span class="text-destructive ml-0.5">*</span></Label>
                   <Input
-                    id="oracle-svc"
-                    v-model="formData.database"
-                    :placeholder="databaseLabel"
-                    :class="{ 'border-destructive': formErrors.database }"
+                    id="host"
+                    v-model="formData.host"
+                    :placeholder="t('components.serverForm.placeholders.host')"
+                    :class="{ 'border-destructive': formErrors.host }"
                   />
-                  <p v-if="formErrors.database" class="text-sm text-destructive">
-                    {{ formErrors.database }}
+                  <p v-if="formErrors.host" class="text-sm text-destructive">
+                    {{ formErrors.host }}
                   </p>
                 </div>
-              </TabsContent>
-
-              <!-- TNS Method -->
-              <TabsContent value="tns" class="mt-4 space-y-4">
                 <div class="space-y-2">
-                  <Label>{{ t('components.serverForm.oracle.tnsAdminDir') }}<span class="text-destructive ml-0.5">*</span></Label>
-                  <div class="flex gap-2 items-center">
-                    <Input
-                      v-model="oracleTnsAdminDir"
-                      :placeholder="t('components.serverForm.oracle.tnsAdminDir')"
-                      :class="{ 'border-destructive': formErrors.tnsAdminDir }"
-                      class="flex-1"
+                  <Label for="port">{{ t('components.serverForm.labels.port') }}<span class="text-destructive ml-0.5">*</span></Label>
+                  <Input
+                    id="port"
+                    v-model.number="formData.port"
+                    type="number"
+                    :class="{ 'border-destructive': formErrors.port }"
+                  />
+                  <p v-if="formErrors.port" class="text-sm text-destructive">
+                    {{ formErrors.port }}
+                  </p>
+                </div>
+              </div>
+              <div class="space-y-2">
+                <Label for="database">
+                  {{ t('components.serverForm.labels.database') }}
+                  <span v-if="isDbNameRequired" class="text-destructive ml-0.5">*</span>
+                </Label>
+                <Input
+                  id="database"
+                  v-model="formData.database"
+                  :placeholder="databasePlaceholder"
+                  :class="{ 'border-destructive': formErrors.database }"
+                />
+                <p v-if="formErrors.database" class="text-sm text-destructive">
+                  {{ formErrors.database }}
+                </p>
+              </div>
+            </div>
+
+            <!-- Oracle-specific fields -->
+            <div v-if="isOracle" class="space-y-4">
+              <!-- Connection Method Selector -->
+              <div class="space-y-2">
+                <Label>{{ t('components.serverForm.oracle.connectionMethod') }}</Label>
+                <Tabs :model-value="oracleMethod" @update:model-value="onOracleMethodChange">
+                  <TabsList class="grid grid-cols-3 w-full">
+                    <TabsTrigger value="basic">
+                      {{ t('components.serverForm.oracle.methods.basic') }}
+                    </TabsTrigger>
+                    <TabsTrigger value="tns">
+                      {{ t('components.serverForm.oracle.methods.tns') }}
+                    </TabsTrigger>
+                    <TabsTrigger value="cloud_wallet">
+                      {{ t('components.serverForm.oracle.methods.cloudWallet') }}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <!-- Basic Method -->
+                  <TabsContent value="basic" class="mt-4 space-y-4">
+                    <div class="gap-4 grid grid-cols-4">
+                      <div class="col-span-3 space-y-2">
+                        <Label for="oracle-host">{{ t('components.serverForm.labels.host') }}<span class="text-destructive ml-0.5">*</span></Label>
+                        <Input
+                          id="oracle-host"
+                          v-model="formData.host"
+                          :placeholder="t('components.serverForm.placeholders.host')"
+                          :class="{ 'border-destructive': formErrors.host }"
+                        />
+                        <p v-if="formErrors.host" class="text-sm text-destructive">
+                          {{ formErrors.host }}
+                        </p>
+                      </div>
+                      <div class="space-y-2">
+                        <Label for="oracle-port">{{ t('components.serverForm.labels.port') }}<span class="text-destructive ml-0.5">*</span></Label>
+                        <Input
+                          id="oracle-port"
+                          v-model.number="formData.port"
+                          type="number"
+                          :class="{ 'border-destructive': formErrors.port }"
+                        />
+                        <p v-if="formErrors.port" class="text-sm text-destructive">
+                          {{ formErrors.port }}
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex flex-wrap gap-4 items-center">
+                      <div class="flex gap-2 items-center">
+                        <Label class="min-w-fit whitespace-nowrap">{{ t('components.serverForm.oracle.identifyBy') }}</Label>
+                        <div class="flex flex-wrap gap-1.5">
+                          <button
+                            type="button"
+                            class="text-xs leading-none px-3 py-1 rounded-full cursor-pointer transition-colors" :class="[
+                              oracleSidOrService === 'service_name'
+                                ? 'bg-primary/10 text-primary font-medium'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                            ]"
+                            @click="oracleSidOrService = 'service_name'"
+                          >
+                            {{ t('components.serverForm.oracle.serviceName') }}
+                          </button>
+                          <button
+                            type="button"
+                            class="text-xs leading-none px-3 py-1 rounded-full cursor-pointer transition-colors" :class="[
+                              oracleSidOrService === 'sid'
+                                ? 'bg-primary/10 text-primary font-medium'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                            ]"
+                            @click="oracleSidOrService = 'sid'"
+                          >
+                            {{ t('components.serverForm.oracle.sid') }}
+                          </button>
+                        </div>
+                      </div>
+                      <div class="flex gap-2 items-center">
+                        <Label class="min-w-fit whitespace-nowrap">{{ t('components.serverForm.oracle.role') }}</Label>
+                        <div class="flex flex-wrap gap-1.5">
+                          <button
+                            v-for="r in ([{ v: 'NORMAL', k: 'normal' }, { v: 'SYSDBA', k: 'sysdba' }, { v: 'SYSOPER', k: 'sysoper' }] as const)"
+                            :key="r.v"
+                            type="button"
+                            class="text-xs leading-none px-3 py-1 rounded-full cursor-pointer transition-colors" :class="[
+                              oracleRole === r.v
+                                ? 'bg-primary/10 text-primary font-medium'
+                                : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                            ]"
+                            @click="oracleRole = r.v"
+                          >
+                            {{ t(`components.serverForm.oracle.roles.${r.k}`) }}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <Label for="oracle-svc">{{ databaseLabel }}<span class="text-destructive ml-0.5">*</span></Label>
+                      <Input
+                        id="oracle-svc"
+                        v-model="formData.database"
+                        :placeholder="databaseLabel"
+                        :class="{ 'border-destructive': formErrors.database }"
+                      />
+                      <p v-if="formErrors.database" class="text-sm text-destructive">
+                        {{ formErrors.database }}
+                      </p>
+                    </div>
+                  </TabsContent>
+
+                  <!-- TNS Method -->
+                  <TabsContent value="tns" class="mt-4 space-y-4">
+                    <div class="space-y-2">
+                      <Label>{{ t('components.serverForm.oracle.tnsAdminDir') }}<span class="text-destructive ml-0.5">*</span></Label>
+                      <div class="flex gap-2 items-center">
+                        <Input
+                          v-model="oracleTnsAdminDir"
+                          :placeholder="t('components.serverForm.oracle.tnsAdminDir')"
+                          :class="{ 'border-destructive': formErrors.tnsAdminDir }"
+                          class="flex-1"
+                        />
+                        <Button type="button" variant="outline" size="sm" @click="browseDirectory('tns')">
+                          {{ t('components.serverForm.oracle.browse') }}
+                        </Button>
+                      </div>
+                      <p v-if="formErrors.tnsAdminDir" class="text-sm text-destructive">
+                        {{ formErrors.tnsAdminDir }}
+                      </p>
+                    </div>
+                    <div class="space-y-2">
+                      <Label>{{ t('components.serverForm.oracle.tnsAlias') }}<span class="text-destructive ml-0.5">*</span></Label>
+                      <p v-if="loadingAliases" class="text-sm text-muted-foreground">
+                        {{ t('components.serverForm.oracle.loadingAliases') }}
+                      </p>
+                      <!-- Show saved alias value when aliases haven't loaded yet (edit mode) -->
+                      <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir && oracleTnsAlias" class="text-sm text-muted-foreground">
+                        {{ oracleTnsAlias }}
+                      </p>
+                      <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
+                        {{ t('components.serverForm.oracle.noAliases') }}
+                      </p>
+                      <p v-else-if="tnsAliases.length === 0" class="text-sm text-muted-foreground">
+                        {{ t('components.serverForm.oracle.tnsSelectDir') }}
+                      </p>
+                      <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
+                        <SelectTrigger :class="{ 'border-destructive': formErrors.tnsAlias }">
+                          <SelectValue :placeholder="t('components.serverForm.oracle.tnsAlias')" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem v-for="alias in tnsAliases" :key="alias" :value="alias">
+                              {{ alias }}
+                            </SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <p v-if="formErrors.tnsAlias" class="text-sm text-destructive">
+                        {{ formErrors.tnsAlias }}
+                      </p>
+                    </div>
+                  </TabsContent>
+
+                  <!-- Cloud Wallet Method -->
+                  <TabsContent value="cloud_wallet" class="mt-4 space-y-4">
+                    <div class="space-y-2">
+                      <Label>{{ t('components.serverForm.oracle.walletDir') }}<span class="text-destructive ml-0.5">*</span></Label>
+                      <div class="flex gap-2 items-center">
+                        <Input
+                          v-model="oracleTnsAdminDir"
+                          :placeholder="t('components.serverForm.oracle.walletDir')"
+                          :class="{ 'border-destructive': formErrors.tnsAdminDir }"
+                          class="flex-1"
+                        />
+                        <Button type="button" variant="outline" size="sm" @click="browseDirectory('wallet')">
+                          {{ t('components.serverForm.oracle.browse') }}
+                        </Button>
+                      </div>
+                      <p v-if="formErrors.tnsAdminDir" class="text-sm text-destructive">
+                        {{ formErrors.tnsAdminDir }}
+                      </p>
+                    </div>
+                    <div class="space-y-2">
+                      <Label>{{ t('components.serverForm.oracle.walletPassword') }}</Label>
+                      <div class="relative">
+                        <Input
+                          v-model="oracleWalletPassword"
+                          :type="showPasswords.wallet ? 'text' : 'password'"
+                          :placeholder="t('components.serverForm.oracle.walletPassword')"
+                          class="pr-8"
+                        />
+                        <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('wallet')">
+                          <span class="i-carbon-view h-4 w-4 block" />
+                        </button>
+                      </div>
+                    </div>
+                    <div class="space-y-2">
+                      <Label>{{ t('components.serverForm.oracle.tnsAlias') }}<span class="text-destructive ml-0.5">*</span></Label>
+                      <p v-if="loadingAliases" class="text-sm text-muted-foreground">
+                        {{ t('components.serverForm.oracle.loadingAliases') }}
+                      </p>
+                      <!-- Show saved alias value when aliases haven't loaded yet (edit mode) -->
+                      <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir && oracleTnsAlias" class="text-sm text-muted-foreground">
+                        {{ oracleTnsAlias }}
+                      </p>
+                      <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
+                        {{ t('components.serverForm.oracle.noAliases') }}
+                      </p>
+                      <p v-else-if="tnsAliases.length === 0" class="text-sm text-muted-foreground">
+                        {{ t('components.serverForm.oracle.walletSelectDir') }}
+                      </p>
+                      <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
+                        <SelectTrigger :class="{ 'border-destructive': formErrors.tnsAlias }">
+                          <SelectValue :placeholder="t('components.serverForm.oracle.tnsAlias')" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectGroup>
+                            <SelectItem v-for="alias in tnsAliases" :key="alias" :value="alias">
+                              {{ alias }}
+                            </SelectItem>
+                          </SelectGroup>
+                        </SelectContent>
+                      </Select>
+                      <p v-if="formErrors.tnsAlias" class="text-sm text-destructive">
+                        {{ formErrors.tnsAlias }}
+                      </p>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </div>
+
+            <!-- SQLite/SQLCipher/DuckDB-specific fields -->
+            <div v-if="isFileBased" class="space-y-4">
+              <!-- SQLite with file/in-memory tabs -->
+              <template v-if="formData.type === DatabaseType.SQLITE">
+                <Tabs v-model="sqliteTab">
+                  <TabsList class="grid grid-cols-2 w-full">
+                    <TabsTrigger value="file">
+                      {{ t('components.serverForm.sqlite.modes.file') }}
+                    </TabsTrigger>
+                    <TabsTrigger value="in-memory">
+                      {{ t('components.serverForm.sqlite.modes.inMemory') }}
+                    </TabsTrigger>
+                  </TabsList>
+
+                  <!-- File Mode -->
+                  <TabsContent value="file" class="space-y-4">
+                    <DatabaseFileField
+                      v-model="formData.host"
+                      engine="sqlite"
+                      required
+                      :label="t('components.serverForm.labels.databaseFilePath')"
+                      :placeholder="t('components.serverForm.placeholders.filePath')"
+                      :error-message="formErrors.host"
+                      @picking="isPickingFile = $event"
                     />
-                    <Button type="button" variant="outline" size="sm" @click="browseDirectory('tns')">
-                      {{ t('components.serverForm.oracle.browse') }}
-                    </Button>
-                  </div>
-                  <p v-if="formErrors.tnsAdminDir" class="text-sm text-destructive">
-                    {{ formErrors.tnsAdminDir }}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  <Label>{{ t('components.serverForm.oracle.tnsAlias') }}<span class="text-destructive ml-0.5">*</span></Label>
-                  <p v-if="loadingAliases" class="text-sm text-muted-foreground">
-                    {{ t('components.serverForm.oracle.loadingAliases') }}
-                  </p>
-                  <!-- Show saved alias value when aliases haven't loaded yet (edit mode) -->
-                  <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir && oracleTnsAlias" class="text-sm text-muted-foreground">
-                    {{ oracleTnsAlias }}
-                  </p>
-                  <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
-                    No aliases found in selected directory
-                  </p>
-                  <p v-else-if="tnsAliases.length === 0" class="text-sm text-muted-foreground">
-                    Select a TNS directory to load aliases
-                  </p>
-                  <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
-                    <SelectTrigger :class="{ 'border-destructive': formErrors.tnsAlias }">
-                      <SelectValue :placeholder="t('components.serverForm.oracle.tnsAlias')" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem v-for="alias in tnsAliases" :key="alias" :value="alias">
-                          {{ alias }}
-                        </SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <p v-if="formErrors.tnsAlias" class="text-sm text-destructive">
-                    {{ formErrors.tnsAlias }}
-                  </p>
-                </div>
-              </TabsContent>
+                  </TabsContent>
 
-              <!-- Cloud Wallet Method -->
-              <TabsContent value="cloud_wallet" class="mt-4 space-y-4">
-                <div class="space-y-2">
-                  <Label>{{ t('components.serverForm.oracle.walletDir') }}<span class="text-destructive ml-0.5">*</span></Label>
-                  <div class="flex gap-2 items-center">
-                    <Input
-                      v-model="oracleTnsAdminDir"
-                      :placeholder="t('components.serverForm.oracle.walletDir')"
-                      :class="{ 'border-destructive': formErrors.tnsAdminDir }"
-                      class="flex-1"
-                    />
-                    <Button type="button" variant="outline" size="sm" @click="browseDirectory('wallet')">
-                      {{ t('components.serverForm.oracle.browse') }}
-                    </Button>
-                  </div>
-                  <p v-if="formErrors.tnsAdminDir" class="text-sm text-destructive">
-                    {{ formErrors.tnsAdminDir }}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  <Label>{{ t('components.serverForm.oracle.walletPassword') }}</Label>
-                  <div class="relative">
-                    <Input
-                      v-model="oracleWalletPassword"
-                      :type="showPasswords.wallet ? 'text' : 'password'"
-                      :placeholder="t('components.serverForm.oracle.walletPassword')"
-                      class="pr-8"
-                    />
-                    <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('wallet')">
-                      <span class="i-carbon-view h-4 w-4 block" />
-                    </button>
-                  </div>
-                </div>
-                <div class="space-y-2">
-                  <Label>{{ t('components.serverForm.oracle.tnsAlias') }}<span class="text-destructive ml-0.5">*</span></Label>
-                  <p v-if="loadingAliases" class="text-sm text-muted-foreground">
-                    {{ t('components.serverForm.oracle.loadingAliases') }}
-                  </p>
-                  <!-- Show saved alias value when aliases haven't loaded yet (edit mode) -->
-                  <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir && oracleTnsAlias" class="text-sm text-muted-foreground">
-                    {{ oracleTnsAlias }}
-                  </p>
-                  <p v-else-if="tnsAliases.length === 0 && oracleTnsAdminDir" class="text-sm text-muted-foreground">
-                    No aliases found in selected wallet directory
-                  </p>
-                  <p v-else-if="tnsAliases.length === 0" class="text-sm text-muted-foreground">
-                    Select a wallet directory to load aliases
-                  </p>
-                  <Select v-else :model-value="oracleTnsAlias" @update:model-value="onTnsAliasChange">
-                    <SelectTrigger :class="{ 'border-destructive': formErrors.tnsAlias }">
-                      <SelectValue :placeholder="t('components.serverForm.oracle.tnsAlias')" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectGroup>
-                        <SelectItem v-for="alias in tnsAliases" :key="alias" :value="alias">
-                          {{ alias }}
-                        </SelectItem>
-                      </SelectGroup>
-                    </SelectContent>
-                  </Select>
-                  <p v-if="formErrors.tnsAlias" class="text-sm text-destructive">
-                    {{ formErrors.tnsAlias }}
-                  </p>
-                </div>
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
+                  <!-- In-Memory Mode -->
+                  <TabsContent value="in-memory">
+                    <p class="text-sm text-muted-foreground">
+                      {{ t('components.serverForm.sqlite.inMemoryHint') }}
+                    </p>
+                  </TabsContent>
+                </Tabs>
+              </template>
 
-        <!-- SQLite/SQLCipher/DuckDB-specific fields -->
-        <div v-if="isFileBased" class="space-y-4">
-          <!-- SQLite with file/in-memory tabs -->
-          <template v-if="formData.type === DatabaseType.SQLITE">
-            <Tabs v-model="sqliteTab">
-              <TabsList class="grid grid-cols-2 w-full">
-                <TabsTrigger value="file">
-                  {{ t('components.serverForm.sqlite.modes.file') }}
-                </TabsTrigger>
-                <TabsTrigger value="in-memory">
-                  {{ t('components.serverForm.sqlite.modes.inMemory') }}
-                </TabsTrigger>
-              </TabsList>
-
-              <!-- File Mode -->
-              <TabsContent value="file" class="space-y-4">
+              <!-- SQLCipher: file picker + encryption key -->
+              <template v-else-if="formData.type === DatabaseType.SQLCIPHER">
                 <DatabaseFileField
                   v-model="formData.host"
                   engine="sqlite"
@@ -1183,222 +1269,189 @@ function handleSave() {
                   :error-message="formErrors.host"
                   @picking="isPickingFile = $event"
                 />
-              </TabsContent>
+              </template>
 
-              <!-- In-Memory Mode -->
-              <TabsContent value="in-memory">
-                <p class="text-sm text-muted-foreground">
-                  {{ t('components.serverForm.sqlite.inMemoryHint') }}
-                </p>
-              </TabsContent>
-            </Tabs>
-          </template>
+              <!-- DuckDB: same File / In-Memory split as SQLite -->
+              <template v-else>
+                <Tabs v-model="duckdbTab">
+                  <TabsList class="grid grid-cols-2 w-full">
+                    <TabsTrigger value="file">
+                      {{ t('components.serverForm.sqlite.modes.file') }}
+                    </TabsTrigger>
+                    <TabsTrigger value="in-memory">
+                      {{ t('components.serverForm.sqlite.modes.inMemory') }}
+                    </TabsTrigger>
+                  </TabsList>
 
-          <!-- SQLCipher: file picker + encryption key -->
-          <template v-else-if="formData.type === DatabaseType.SQLCIPHER">
-            <DatabaseFileField
-              v-model="formData.host"
-              engine="sqlite"
-              required
-              :label="t('components.serverForm.labels.databaseFilePath')"
-              :placeholder="t('components.serverForm.placeholders.filePath')"
-              :error-message="formErrors.host"
-              @picking="isPickingFile = $event"
-            />
-          </template>
+                  <TabsContent value="file" class="space-y-4">
+                    <DatabaseFileField
+                      v-model="formData.host"
+                      engine="duckdb"
+                      required
+                      :label="t('components.serverForm.labels.databaseFilePath')"
+                      :placeholder="t('components.serverForm.placeholders.duckdbFilePath')"
+                      :error-message="formErrors.host"
+                      :suggested-name="formData.name ? `${formData.name}.duckdb` : undefined"
+                      @status="handleDuckDbFileStatus"
+                      @picking="isPickingFile = $event"
+                    />
 
-          <!-- DuckDB: same File / In-Memory split as SQLite -->
-          <template v-else>
-            <Tabs v-model="duckdbTab">
-              <TabsList class="grid grid-cols-2 w-full">
-                <TabsTrigger value="file">
-                  {{ t('components.serverForm.sqlite.modes.file') }}
-                </TabsTrigger>
-                <TabsTrigger value="in-memory">
-                  {{ t('components.serverForm.sqlite.modes.inMemory') }}
-                </TabsTrigger>
-              </TabsList>
+                    <p v-if="formData.serverVersion" class="text-xs text-muted-foreground">
+                      {{ t('components.serverForm.duckdb.engineVersion', { version: formData.serverVersion }) }}
+                    </p>
 
-              <TabsContent value="file" class="space-y-4">
-                <DatabaseFileField
-                  v-model="formData.host"
-                  engine="duckdb"
-                  required
-                  :label="t('components.serverForm.labels.databaseFilePath')"
-                  :placeholder="t('components.serverForm.placeholders.duckdbFilePath')"
-                  :error-message="formErrors.host"
-                  :suggested-name="formData.name ? `${formData.name}.duckdb` : undefined"
-                  @status="handleDuckDbFileStatus"
-                  @picking="isPickingFile = $event"
-                />
-
-                <p v-if="formData.serverVersion" class="text-xs text-muted-foreground">
-                  {{ t('components.serverForm.duckdb.engineVersion', { version: formData.serverVersion }) }}
-                </p>
-
-                <div class="space-y-2">
-                  <Label>{{ t('components.serverForm.duckdb.accessMode') }}</Label>
-                  <div class="gap-3 grid grid-cols-2" role="radiogroup">
-                    <button
-                      type="button"
-                      role="radio"
-                      :aria-checked="!formData.readOnly"
-                      class="p-3 text-left border-2 rounded-lg transition-colors" :class="[
-                        !formData.readOnly
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border bg-card hover:border-muted-foreground/50',
-                      ]"
-                      @click="formData.readOnly = false"
-                    >
-                      <div class="mb-1 flex gap-2 items-center">
-                        <div
-                          class="border-2 rounded-full flex shrink-0 h-3.5 w-3.5 items-center justify-center" :class="[
-                            !formData.readOnly ? 'border-primary' : 'border-muted-foreground',
+                    <div class="space-y-2">
+                      <Label>{{ t('components.serverForm.duckdb.accessMode') }}</Label>
+                      <div class="gap-3 grid grid-cols-2" role="radiogroup">
+                        <button
+                          type="button"
+                          role="radio"
+                          :aria-checked="!formData.readOnly"
+                          class="p-3 text-left border-2 rounded-lg transition-colors" :class="[
+                            !formData.readOnly
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border bg-card hover:border-muted-foreground/50',
                           ]"
+                          @click="formData.readOnly = false"
                         >
-                          <div v-if="!formData.readOnly" class="rounded-full bg-primary h-1.5 w-1.5" />
-                        </div>
-                        <span class="text-sm font-medium">
-                          {{ t('components.serverForm.duckdb.readWrite') }}
-                        </span>
-                      </div>
-                      <p class="text-xs text-muted-foreground leading-relaxed pl-5">
-                        {{ t('components.serverForm.duckdb.readWriteHint') }}
-                      </p>
-                    </button>
-                    <button
-                      type="button"
-                      role="radio"
-                      :aria-checked="formData.readOnly === true"
-                      class="p-3 text-left border-2 rounded-lg transition-colors" :class="[
-                        formData.readOnly
-                          ? 'border-primary bg-primary/5'
-                          : 'border-border bg-card hover:border-muted-foreground/50',
-                      ]"
-                      @click="formData.readOnly = true"
-                    >
-                      <div class="mb-1 flex gap-2 items-center">
-                        <div
-                          class="border-2 rounded-full flex shrink-0 h-3.5 w-3.5 items-center justify-center" :class="[
-                            formData.readOnly ? 'border-primary' : 'border-muted-foreground',
+                          <div class="mb-1 flex gap-2 items-center">
+                            <div
+                              class="border-2 rounded-full flex shrink-0 h-3.5 w-3.5 items-center justify-center" :class="[
+                                !formData.readOnly ? 'border-primary' : 'border-muted-foreground',
+                              ]"
+                            >
+                              <div v-if="!formData.readOnly" class="rounded-full bg-primary h-1.5 w-1.5" />
+                            </div>
+                            <span class="text-sm font-medium">
+                              {{ t('components.serverForm.duckdb.readWrite') }}
+                            </span>
+                          </div>
+                          <p class="text-xs text-muted-foreground leading-relaxed pl-5">
+                            {{ t('components.serverForm.duckdb.readWriteHint') }}
+                          </p>
+                        </button>
+                        <button
+                          type="button"
+                          role="radio"
+                          :aria-checked="formData.readOnly === true"
+                          class="p-3 text-left border-2 rounded-lg transition-colors" :class="[
+                            formData.readOnly
+                              ? 'border-primary bg-primary/5'
+                              : 'border-border bg-card hover:border-muted-foreground/50',
                           ]"
+                          @click="formData.readOnly = true"
                         >
-                          <div v-if="formData.readOnly" class="rounded-full bg-primary h-1.5 w-1.5" />
-                        </div>
-                        <span class="text-sm font-medium">
-                          {{ t('components.serverForm.duckdb.readOnly') }}
-                        </span>
+                          <div class="mb-1 flex gap-2 items-center">
+                            <div
+                              class="border-2 rounded-full flex shrink-0 h-3.5 w-3.5 items-center justify-center" :class="[
+                                formData.readOnly ? 'border-primary' : 'border-muted-foreground',
+                              ]"
+                            >
+                              <div v-if="formData.readOnly" class="rounded-full bg-primary h-1.5 w-1.5" />
+                            </div>
+                            <span class="text-sm font-medium">
+                              {{ t('components.serverForm.duckdb.readOnly') }}
+                            </span>
+                          </div>
+                          <p class="text-xs text-muted-foreground leading-relaxed pl-5">
+                            {{ t('components.serverForm.duckdb.readOnlyHint') }}
+                          </p>
+                        </button>
                       </div>
-                      <p class="text-xs text-muted-foreground leading-relaxed pl-5">
-                        {{ t('components.serverForm.duckdb.readOnlyHint') }}
-                      </p>
-                    </button>
-                  </div>
-                </div>
-
-                <div
-                  v-if="conflictingDuckDbConnection"
-                  class="text-xs text-amber-600 p-2 border border-amber-500/50 rounded-md flex gap-2 items-start dark:text-amber-500"
-                >
-                  <span class="i-carbon-warning mt-0.5 shrink-0 h-4 w-4" />
-                  <div class="flex-1 space-y-1">
-                    <p>{{ t('components.serverForm.duckdb.conflictingConnection', { name: conflictingDuckDbConnection.name }) }}</p>
-                    <div class="flex gap-2">
-                      <Button type="button" variant="outline" size="sm" class="text-xs px-2 h-6" @click="formData.readOnly = true">
-                        {{ t('components.serverForm.duckdb.openReadOnly') }}
-                      </Button>
-                      <Button type="button" variant="ghost" size="sm" class="text-xs px-2 h-6" @click="switchToConnection(conflictingDuckDbConnection)">
-                        {{ t('components.serverForm.duckdb.switchToConnection') }}
-                      </Button>
                     </div>
-                  </div>
-                </div>
 
-                <p v-else-if="sharedDuckDbConnection" class="text-xs text-muted-foreground">
-                  {{ t('components.serverForm.duckdb.sharedConnection', { name: sharedDuckDbConnection.name }) }}
-                </p>
-              </TabsContent>
+                    <div
+                      v-if="conflictingDuckDbConnection"
+                      class="text-xs text-amber-600 p-2 border border-amber-500/50 rounded-md flex gap-2 items-start dark:text-amber-500"
+                    >
+                      <span class="i-carbon-warning mt-0.5 shrink-0 h-4 w-4" />
+                      <div class="flex-1 space-y-1">
+                        <p>{{ t('components.serverForm.duckdb.conflictingConnection', { name: conflictingDuckDbConnection.name }) }}</p>
+                        <div class="flex gap-2">
+                          <Button type="button" variant="outline" size="sm" class="text-xs px-2 h-6" @click="formData.readOnly = true">
+                            {{ t('components.serverForm.duckdb.openReadOnly') }}
+                          </Button>
+                          <Button type="button" variant="ghost" size="sm" class="text-xs px-2 h-6" @click="switchToConnection(conflictingDuckDbConnection)">
+                            {{ t('components.serverForm.duckdb.switchToConnection') }}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
 
-              <!-- In-Memory Mode -->
-              <TabsContent value="in-memory" class="space-y-3">
-                <p class="text-sm text-muted-foreground">
-                  {{ t('components.serverForm.duckdb.inMemoryHint') }}
-                </p>
-                <div class="text-xs p-2 border rounded-md flex gap-2 items-center">
-                  <span class="i-carbon-data-table text-muted-foreground shrink-0 h-4 w-4" />
-                  <span class="text-muted-foreground">{{ t('components.serverForm.duckdb.inMemoryInstance') }}</span>
-                  <span class="font-mono flex-1 truncate" :title="formData.host">{{ formData.host || '-' }}</span>
-                </div>
-                <p class="text-xs text-muted-foreground">
-                  {{ t('components.serverForm.duckdb.inMemorySharedHint') }}
-                </p>
-                <p v-if="formData.serverVersion" class="text-xs text-muted-foreground">
-                  {{ t('components.serverForm.duckdb.engineVersion', { version: formData.serverVersion }) }}
-                </p>
-              </TabsContent>
-            </Tabs>
-          </template>
-        </div>
+                    <p v-else-if="sharedDuckDbConnection" class="text-xs text-muted-foreground">
+                      {{ t('components.serverForm.duckdb.sharedConnection', { name: sharedDuckDbConnection.name }) }}
+                    </p>
+                  </TabsContent>
 
-        <!-- Password (encryption key) for SQLCipher; Username and Password for others -->
-        <div v-if="isEncryptedFileDb" class="space-y-2">
-          <Label for="sqlcipher-key">{{ t('components.serverForm.labels.encryptionKey') }}<span class="text-destructive ml-0.5">*</span></Label>
-          <div class="relative">
-            <Input
-              id="sqlcipher-key"
-              v-model="formData.password"
-              :type="showPasswords.db ? 'text' : 'password'"
-              :placeholder="t('components.serverForm.placeholders.encryptionKey')"
-              autocomplete="new-password"
-              class="pr-8"
-            />
-            <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('db')">
-              <span class="i-carbon-view h-4 w-4 block" />
-            </button>
-          </div>
-        </div>
-        <div v-if="!isFileBased && !isEncryptedFileDb" class="gap-4 grid grid-cols-2">
-          <div class="space-y-2">
-            <Label for="username">{{ t('components.serverForm.labels.username') }}</Label>
-            <Input
-              id="username"
-              v-model="formData.username"
-              :placeholder="t('components.serverForm.placeholders.username')"
-              autocomplete="off"
-            />
-          </div>
-          <div class="space-y-2">
-            <Label for="password">{{ t('components.serverForm.labels.password') }}</Label>
-            <div class="relative">
-              <Input
-                id="password"
-                v-model="formData.password"
-                :type="showPasswords.db ? 'text' : 'password'"
-                :placeholder="t('components.serverForm.placeholders.password')"
-                autocomplete="new-password"
-                class="pr-8"
-              />
-              <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('db')">
-                <span class="i-carbon-view h-4 w-4 block" />
-              </button>
+                  <!-- In-Memory Mode -->
+                  <TabsContent value="in-memory" class="space-y-3">
+                    <p class="text-sm text-muted-foreground">
+                      {{ t('components.serverForm.duckdb.inMemoryHint') }}
+                    </p>
+                    <div class="text-xs p-2 border rounded-md flex gap-2 items-center">
+                      <span class="i-carbon-data-table text-muted-foreground shrink-0 h-4 w-4" />
+                      <span class="text-muted-foreground">{{ t('components.serverForm.duckdb.inMemoryInstance') }}</span>
+                      <span class="font-mono flex-1 truncate" :title="formData.host">{{ formData.host || '-' }}</span>
+                    </div>
+                    <p class="text-xs text-muted-foreground">
+                      {{ t('components.serverForm.duckdb.inMemorySharedHint') }}
+                    </p>
+                    <p v-if="formData.serverVersion" class="text-xs text-muted-foreground">
+                      {{ t('components.serverForm.duckdb.engineVersion', { version: formData.serverVersion }) }}
+                    </p>
+                  </TabsContent>
+                </Tabs>
+              </template>
             </div>
-          </div>
-        </div>
 
-        <!-- Advanced Configuration: SSL/TLS + SSH Tunnel -->
-        <div v-if="!isFileBased" class="pt-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            class="text-muted-foreground w-full justify-between"
-            @click="showAdvanced = !showAdvanced"
-          >
-            {{ t('components.serverForm.ssh.advancedConfig') }}
-            <span class="i-carbon-chevron-down h-4 w-4 transition-transform" :class="[showAdvanced ? 'rotate-180' : '']" />
-          </Button>
+            <!-- Password (encryption key) for SQLCipher; Username and Password for others -->
+            <div v-if="isEncryptedFileDb" class="space-y-2">
+              <Label for="sqlcipher-key">{{ t('components.serverForm.labels.encryptionKey') }}<span class="text-destructive ml-0.5">*</span></Label>
+              <div class="relative">
+                <Input
+                  id="sqlcipher-key"
+                  v-model="formData.password"
+                  :type="showPasswords.db ? 'text' : 'password'"
+                  :placeholder="t('components.serverForm.placeholders.encryptionKey')"
+                  autocomplete="new-password"
+                  class="pr-8"
+                />
+                <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('db')">
+                  <span class="i-carbon-view h-4 w-4 block" />
+                </button>
+              </div>
+            </div>
+            <div v-if="!isFileBased && !isEncryptedFileDb" class="gap-4 grid grid-cols-2">
+              <div class="space-y-2">
+                <Label for="username">{{ t('components.serverForm.labels.username') }}</Label>
+                <Input
+                  id="username"
+                  v-model="formData.username"
+                  :placeholder="t('components.serverForm.placeholders.username')"
+                  autocomplete="off"
+                />
+              </div>
+              <div class="space-y-2">
+                <Label for="password">{{ t('components.serverForm.labels.password') }}</Label>
+                <div class="relative">
+                  <Input
+                    id="password"
+                    v-model="formData.password"
+                    :type="showPasswords.db ? 'text' : 'password'"
+                    :placeholder="t('components.serverForm.placeholders.password')"
+                    autocomplete="new-password"
+                    class="pr-8"
+                  />
+                  <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="togglePassword('db')">
+                    <span class="i-carbon-view h-4 w-4 block" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
 
-          <div v-if="showAdvanced" class="mt-3 p-4 border rounded-md space-y-4">
+          <!-- Advanced: SSL/TLS + SSH Tunnel -->
+          <TabsContent value="advanced" class="mt-2 pr-1 h-[34rem] max-h-[calc(90vh-20rem)] overflow-y-auto space-y-4">
             <SslConfigSection
               v-if="showsStandardHostFields"
               v-model="formData.ssl"
@@ -1412,8 +1465,8 @@ function handleSave() {
               :remote-port="formData.port"
               @update:model-value="formData.sshTunnel = $event"
             />
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
 
         <!-- Test Connection Status -->
         <div
@@ -1436,7 +1489,7 @@ function handleSave() {
               <span v-else-if="step.status === 'running'" class="i-carbon-circle-dash text-blue-500 shrink-0 h-3.5 w-3.5 animate-spin" />
               <span v-else-if="step.status === 'error'" class="i-carbon-close shrink-0 h-3.5 w-3.5" />
               <span v-else class="i-carbon-circle-dash shrink-0 h-3.5 w-3.5" />
-              <span class="font-medium whitespace-nowrap">{{ step.label }}</span>
+              <span class="font-medium whitespace-nowrap">{{ t(step.label) }}</span>
               <!-- Spacer + progress bar: fill remaining space -->
               <span v-if="step.status === 'running' && step.progress" class="flex flex-1 gap-1.5 min-w-0 items-center">
                 <span class="rounded-full bg-muted flex-1 h-1 min-w-[40px]">
@@ -1449,11 +1502,11 @@ function handleSave() {
               </span>
               <!-- Error + retry button (pushed right) -->
               <span v-if="step.status === 'error'" class="flex flex-1 gap-1.5 min-w-0 items-center justify-end">
-                <span class="text-red-500 text-right max-w-[200px] truncate">{{ step.error || 'Failed' }}</span>
+                <span class="text-red-500 text-right max-w-[200px] truncate">{{ step.error || t('components.serverForm.ssh.stepFailed') }}</span>
                 <button
                   type="button"
                   class="text-muted-foreground inline-flex shrink-0 gap-0.5 cursor-pointer transition-colors items-center hover:text-foreground"
-                  :title="`Retry ${step.label}`"
+                  :title="t('common.buttons.retry')"
                   @click="retryStep(step.id)"
                 >
                   <span class="i-carbon-renew h-3.5 w-3.5" />
@@ -1482,7 +1535,7 @@ function handleSave() {
                   @click="handleTestConnection"
                 >
                   <span class="i-carbon-renew h-3 w-3" />
-                  <span class="text-xs">Retry</span>
+                  <span class="text-xs">{{ t('common.buttons.retry') }}</span>
                 </button>
               </div>
               <p v-if="testError" class="text-red-500 pl-5">
@@ -1526,7 +1579,8 @@ function handleSave() {
           <Button
             type="button"
             variant="outline"
-            :disabled="testStatus === 'testing'"
+            :title="canTestConnection ? undefined : t('components.serverForm.ssh.testDisabledHint')"
+            :disabled="canTestConnection === false || testStatus === 'testing'"
             @click="handleTestConnection"
           >
             {{ t('common.buttons.testConnection') }}

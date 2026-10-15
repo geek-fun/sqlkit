@@ -73,16 +73,26 @@ public class DriverResolver {
                 long contentLength = response.body().contentLength();
                 long totalBytes = contentLength > 0 ? contentLength : 5_000_000L;
                 long downloadedBytes = 0L;
-                try (InputStream in = new BufferedInputStream(response.body().byteStream());
-                     OutputStream out = Files.newOutputStream(destPath)) {
-                    byte[] buffer = new byte[4096];
-                    int bytesRead;
-                    while ((bytesRead = in.read(buffer)) != -1) {
-                        out.write(buffer, 0, bytesRead);
-                        downloadedBytes += bytesRead;
-                        if (progressCb != null)
-                            progressCb.onProgress(downloadedBytes, totalBytes);
+                // Write to a TEMP file first, then move atomically: writing
+                // straight to the final path lets an interrupted download
+                // leave a truncated JAR cached forever (the exists() check
+                // would then skip re-downloading on every attempt).
+                Path tmp = Files.createTempFile(destPath.getParent(), mavenArtifact + "-", ".part");
+                try {
+                    try (InputStream in = new BufferedInputStream(response.body().byteStream());
+                         OutputStream out = Files.newOutputStream(tmp)) {
+                        byte[] buffer = new byte[4096];
+                        int bytesRead;
+                        while ((bytesRead = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, bytesRead);
+                            downloadedBytes += bytesRead;
+                            if (progressCb != null)
+                                progressCb.onProgress(downloadedBytes, totalBytes);
+                        }
                     }
+                    Files.move(tmp, destPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+                } finally {
+                    Files.deleteIfExists(tmp);
                 }
             }
         }
@@ -159,17 +169,24 @@ public class DriverResolver {
             long totalBytes = contentLength > 0 ? contentLength : 5_000_000L;
             long downloadedBytes = 0L;
             
-            try (InputStream in = new BufferedInputStream(response.body().byteStream());
-                 OutputStream out = Files.newOutputStream(destPath)) {
-                byte[] buffer = new byte[4096];
-                int bytesRead;
-                while ((bytesRead = in.read(buffer)) != -1) {
-                    out.write(buffer, 0, bytesRead);
-                    downloadedBytes += bytesRead;
-                    if (progressCb != null) {
-                        progressCb.onProgress(downloadedBytes, totalBytes);
+            // temp + atomic move (see resolveDirect)
+            Path tmp = Files.createTempFile(destPath.getParent(), mavenArtifact + "-", ".part");
+            try {
+                try (InputStream in = new BufferedInputStream(response.body().byteStream());
+                     OutputStream out = Files.newOutputStream(tmp)) {
+                    byte[] buffer = new byte[4096];
+                    int bytesRead;
+                    while ((bytesRead = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, bytesRead);
+                        downloadedBytes += bytesRead;
+                        if (progressCb != null) {
+                            progressCb.onProgress(downloadedBytes, totalBytes);
+                        }
                     }
                 }
+                Files.move(tmp, destPath, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+            } finally {
+                Files.deleteIfExists(tmp);
             }
         }
         

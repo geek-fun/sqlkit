@@ -245,6 +245,18 @@ impl PostgresAdapter {
         Self { config, pool: None }
     }
 
+    /// Create a temporary adapter connected to `db` for cross-database reads.
+    ///
+    /// PostgreSQL connections are per-database, so metadata for a database other
+    /// than the one this adapter was opened with requires a separate connection.
+    async fn temp_adapter_for_db(&self, db: &str) -> DbResult<Self> {
+        let mut temp_config = self.config.clone();
+        temp_config.database = Some(db.to_string());
+        let mut temp_adapter = PostgresAdapter::new(temp_config);
+        temp_adapter.connect().await?;
+        Ok(temp_adapter)
+    }
+
     fn quote_ident(identifier: &str) -> DbResult<String> {
         if identifier.is_empty() || identifier.len() > 128 {
             return Err(DbError::InvalidQuery(format!(
@@ -301,19 +313,25 @@ impl PostgresAdapter {
     }
 
     /// Build the PostgreSQL connection string.
-    fn build_connection_string(&self) -> String {
+    ///
+    /// Values are libpq-quoted: keyword strings parse space-separated
+    /// `key=value` pairs, so raw interpolation of user-entered values (a
+    /// database named "x host=attacker", a password with spaces…) would
+    /// rewrite neighboring params and e.g. re-point the cross-database temp
+    /// connection, leaking credentials to a spoofed host.
+    fn build_connection_string(&self) -> DbResult<String> {
         let mut parts = Vec::new();
 
-        parts.push(format!("host={}", self.config.host));
+        parts.push(format!("host={}", libpq_quote(&self.config.host)));
         parts.push(format!("port={}", self.config.port));
-        parts.push(format!("user={}", self.config.username));
+        parts.push(format!("user={}", libpq_quote(&self.config.username)));
 
         if let Some(ref password) = self.config.password {
-            parts.push(format!("password={}", password));
+            parts.push(format!("password={}", libpq_quote(password)));
         }
 
         if let Some(ref database) = self.config.database {
-            parts.push(format!("dbname={}", database));
+            parts.push(format!("dbname={}", libpq_quote(database)));
         } else if matches!(self.config.db_type, DatabaseType::PostgreSQL) {
             // Real PostgreSQL servers always have a 'postgres' maintenance DB;
             // use it as the default when the user leaves the field empty.
@@ -324,7 +342,7 @@ impl PostgresAdapter {
             // is to fall back to the username-matching database, but
             // deadpool-postgres does not implement this fallback — it requires
             // an explicit dbname. Use the username as the fallback here.
-            parts.push(format!("dbname={}", self.config.username));
+            parts.push(format!("dbname={}", libpq_quote(&self.config.username)));
         }
 
         // Add SSL mode
@@ -345,10 +363,21 @@ impl PostgresAdapter {
 
         // Add additional options
         for (key, value) in &self.config.options {
-            parts.push(format!("{}={}", key, value));
+            // The keyword side cannot be quoted: reject keys with
+            // syntax-meaningful characters instead of interpolating them.
+            if !key
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+            {
+                return Err(DbError::InvalidQuery(format!(
+                    "Unsupported connection option key: {}",
+                    key
+                )));
+            }
+            parts.push(format!("{}={}", key, libpq_quote(value)));
         }
 
-        parts.join(" ")
+        Ok(parts.join(" "))
     }
 
     fn build_rustls_config(
@@ -939,12 +968,18 @@ impl PostgresAdapter {
     }
 }
 
+/// Quote a value per libpq keyword-string rules (single-quoted, doubled
+/// quotes, escaped backslashes). See `build_connection_string`.
+fn libpq_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "''"))
+}
+
 #[async_trait]
 impl DatabaseAdapter for PostgresAdapter {
     type Pool = PostgresPool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        let connection_string = self.build_connection_string();
+        let connection_string = self.build_connection_string()?;
 
         // Create deadpool configuration
         let mut pg_config = DeadpoolConfig::new();
@@ -1209,15 +1244,9 @@ impl DatabaseAdapter for PostgresAdapter {
 
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
         // If a different database is requested, create a temporary connection to it.
-        // PostgreSQL connections are per-database, so we cannot query another database's
-        // schemas through the current connection.
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_schemas(None).await;
+                return self.temp_adapter_for_db(db).await?.list_schemas(None).await;
             }
         }
 
@@ -1257,15 +1286,13 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
         // If a different database is requested, create a temporary connection to it.
-        // PostgreSQL connections are per-database, so we cannot query another database's
-        // tables through the current connection.
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_tables(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_tables(None, schema)
+                    .await;
             }
         }
 
@@ -1332,10 +1359,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list columns from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_columns(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1447,10 +1479,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<TableInfo> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot get table info from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .get_table_info(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1543,9 +1580,20 @@ impl DatabaseAdapter for PostgresAdapter {
 
     async fn get_foreign_keys(
         &self,
-        _database: Option<&str>,
-        _schema: Option<&str>,
+        database: Option<&str>,
+        schema: Option<&str>,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .get_foreign_keys(None, schema)
+                    .await;
+            }
+        }
+
         let pool = self
             .pool
             .as_ref()
@@ -1557,7 +1605,7 @@ impl DatabaseAdapter for PostgresAdapter {
             .await
             .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
 
-        let schema_filter = _schema.unwrap_or("public");
+        let schema_filter = schema.unwrap_or("public");
 
         let query = r#"
             SELECT
@@ -1631,11 +1679,11 @@ impl DatabaseAdapter for PostgresAdapter {
     ) -> DbResult<Vec<ObjectInfo>> {
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_views(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_views(None, schema)
+                    .await;
             }
         }
 
@@ -1739,11 +1787,11 @@ impl DatabaseAdapter for PostgresAdapter {
     ) -> DbResult<Vec<ObjectInfo>> {
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_procedures(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_procedures(None, schema)
+                    .await;
             }
         }
 
@@ -1806,11 +1854,11 @@ impl DatabaseAdapter for PostgresAdapter {
     ) -> DbResult<Vec<ObjectInfo>> {
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_functions(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_functions(None, schema)
+                    .await;
             }
         }
 
@@ -1878,10 +1926,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<TriggerInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list triggers from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_triggers(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1939,10 +1992,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<IndexInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list indexes from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_indexes(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2025,12 +2083,8 @@ impl DatabaseAdapter for PostgresAdapter {
         Ok(indexes)
     }
 
-    async fn list_sessions(&self, database: Option<&str>) -> DbResult<Vec<serde_json::Value>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list sessions from a different database without reconnecting".to_string(),
-            ));
-        }
+    async fn list_sessions(&self, _database: Option<&str>) -> DbResult<Vec<serde_json::Value>> {
+        // pg_stat_activity is cluster-wide, so the requested database is irrelevant.
 
         let pool = self
             .pool
@@ -2124,16 +2178,10 @@ impl DatabaseAdapter for PostgresAdapter {
 
     async fn get_slow_queries(
         &self,
-        database: Option<&str>,
+        _database: Option<&str>,
         limit: Option<u32>,
     ) -> DbResult<Vec<serde_json::Value>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list slow queries from a different database without reconnecting"
-                    .to_string(),
-            ));
-        }
-
+        // pg_stat_activity is cluster-wide, so the requested database is irrelevant.
         let limit = limit.unwrap_or(20) as i64;
 
         let pool = self
@@ -2243,11 +2291,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list foreign keys from a different database without reconnecting"
-                    .to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_foreign_keys(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2334,10 +2386,15 @@ impl DatabaseAdapter for PostgresAdapter {
         object_name: &str,
         object_type: &str,
     ) -> DbResult<String> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot get DDL from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .get_object_ddl(None, schema, object_name, object_type)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2427,10 +2484,15 @@ impl DatabaseAdapter for PostgresAdapter {
         object_name: &str,
         object_type: &str,
     ) -> DbResult<()> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot drop object from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .drop_object(None, schema, object_name, object_type)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2489,10 +2551,15 @@ impl DatabaseAdapter for PostgresAdapter {
         object_type: &str,
         new_name: &str,
     ) -> DbResult<()> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot rename object from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .rename_object(None, schema, object_name, object_type, new_name)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2573,15 +2640,15 @@ mod tests {
             .with_option("application_name", "sqlkit");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("host='localhost'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=postgres"));
-        assert!(conn_str.contains("password=password"));
-        assert!(conn_str.contains("dbname=testdb"));
+        assert!(conn_str.contains("user='postgres'"));
+        assert!(conn_str.contains("password='password'"));
+        assert!(conn_str.contains("dbname='testdb'"));
         assert!(conn_str.contains("sslmode=require"));
-        assert!(conn_str.contains("application_name=sqlkit"));
+        assert!(conn_str.contains("application_name='sqlkit'"));
     }
 
     #[test]
@@ -2600,7 +2667,7 @@ mod tests {
                     .with_ssl_mode(ssl_mode);
 
             let adapter = PostgresAdapter::new(config);
-            let conn_str = adapter.build_connection_string();
+            let conn_str = adapter.build_connection_string().unwrap();
 
             assert!(
                 conn_str.contains(expected),
@@ -2621,16 +2688,16 @@ mod tests {
                 .with_option("connect_timeout", "10");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=db.example.com"));
+        assert!(conn_str.contains("host='db.example.com'"));
         assert!(conn_str.contains("port=5433"));
-        assert!(conn_str.contains("user=admin"));
-        assert!(conn_str.contains("password=secure_pass"));
-        assert!(conn_str.contains("dbname=production"));
+        assert!(conn_str.contains("user='admin'"));
+        assert!(conn_str.contains("password='secure_pass'"));
+        assert!(conn_str.contains("dbname='production'"));
         assert!(conn_str.contains("sslmode=verify-full"));
-        assert!(conn_str.contains("application_name=sqlkit"));
-        assert!(conn_str.contains("connect_timeout=10"));
+        assert!(conn_str.contains("application_name='sqlkit'"));
+        assert!(conn_str.contains("connect_timeout='10'"));
     }
 
     #[test]
@@ -2639,13 +2706,65 @@ mod tests {
             .with_password("password");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("host='localhost'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=postgres"));
-        assert!(conn_str.contains("password=password"));
+        assert!(conn_str.contains("user='postgres'"));
+        assert!(conn_str.contains("password='password'"));
+        // the maintenance-db fallback is a literal keyword value
         assert!(conn_str.contains("dbname=postgres"));
+    }
+
+    #[test]
+    fn test_connection_string_quotes_hostile_values() {
+        // A libpq keyword string parses space-separated `key=value` pairs, so
+        // raw values could rewrite neighboring params (e.g. point the
+        // cross-database temp connection at a spoofed host). Everything the
+        // user types must land inside one quoted value instead.
+        let config = ConnectionConfig::new(
+            DatabaseType::PostgreSQL,
+            "localhost",
+            5432,
+            "postgres",
+        )
+        .with_database("x host=attacker.example")
+        .with_password("p w'ord \\");
+
+        let adapter = PostgresAdapter::new(config);
+        let conn_str = adapter.build_connection_string().unwrap();
+
+        // The hostile text survives as ONE quoted value; the only host
+        // keyword is the one the config legitimately declares.
+        assert!(
+            conn_str.contains("dbname='x host=attacker.example'"),
+            "hostile dbname must stay inside one quoted value: {}",
+            conn_str
+        );
+        assert!(
+            conn_str.starts_with("host='localhost'"),
+            "exactly one host param, the config one: {}",
+            conn_str
+        );
+        assert!(
+            conn_str.contains(r"password='p w''ord \\'"),
+            "password must be libpq-quoted: {}",
+            conn_str
+        );
+    }
+
+    #[test]
+    fn test_connection_string_rejects_hostile_option_key() {
+        let config = ConnectionConfig::new(
+            DatabaseType::PostgreSQL,
+            "localhost",
+            5432,
+            "postgres",
+        )
+        .with_option("x host=evil", "1");
+
+        let adapter = PostgresAdapter::new(config);
+        assert!(adapter.build_connection_string().is_err());
     }
 
     #[test]
@@ -2654,13 +2773,13 @@ mod tests {
             .with_password("kingbase@123");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=10.84.1.213"));
+        assert!(conn_str.contains("host='10.84.1.213'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=SYSTEM"));
+        assert!(conn_str.contains("user='SYSTEM'"));
         assert!(
-            conn_str.contains("dbname=SYSTEM"),
+            conn_str.contains("dbname='SYSTEM'"),
             "PG-wire-compat engines must fall back to username as dbname (libpq convention)"
         );
         assert!(
@@ -2675,12 +2794,12 @@ mod tests {
             .with_database("testdb");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("host='localhost'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=postgres"));
-        assert!(conn_str.contains("dbname=testdb"));
+        assert!(conn_str.contains("user='postgres'"));
+        assert!(conn_str.contains("dbname='testdb'"));
         assert!(!conn_str.contains("password="));
     }
 

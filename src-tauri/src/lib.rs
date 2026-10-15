@@ -110,6 +110,19 @@ fn consume_pending_auth(state: tauri::State<'_, PendingAuthState>) -> Option<Aut
     state.consume()
 }
 
+/// Debug-only: reads a `sqlkit://auth` link from `SQLKIT_DEV_AUTH_URL` so the
+/// deep-link login can be tested with `npm run tauri dev`, which cannot
+/// receive URL schemes on macOS (schemes are registered per app bundle).
+#[cfg(debug_assertions)]
+fn dev_injected_auth() -> Option<AuthPayload> {
+    let raw = std::env::var("SQLKIT_DEV_AUTH_URL").ok()?;
+    let payload = parse_auth_from_url(&raw);
+    if payload.is_none() {
+        eprintln!("[sqlkit] SQLKIT_DEV_AUTH_URL is set but is not a valid sqlkit://auth link");
+    }
+    payload
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     use crate::connection::guardian::ConnectionGuardian;
@@ -227,6 +240,16 @@ pub fn run() {
             use tauri::{Emitter, Listener};
 
             app.manage(PendingAuthState::default());
+
+            // macOS cannot route custom URL schemes to a `tauri dev` binary
+            // (schemes are registered per app bundle), so local testing injects
+            // the auth deep link through the environment instead:
+            //   SQLKIT_DEV_AUTH_URL='sqlkit://auth?token=…' npm run tauri dev
+            #[cfg(debug_assertions)]
+            if let Some(payload) = dev_injected_auth() {
+                eprintln!("[sqlkit] auth injected via SQLKIT_DEV_AUTH_URL");
+                app.state::<PendingAuthState>().store(payload);
+            }
 
             // Handle deep links received while the app is already running.
             // Double-write: the event reaches a loaded frontend, the pending

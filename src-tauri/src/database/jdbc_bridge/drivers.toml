@@ -67,7 +67,10 @@ maven_artifact = "jaybird"
 jdbc_url_template = "jdbc:firebirdsql://{host}:{port}/{database}"
 default_port = 3050
 min_jre_version = "11"
-version_cap = "5.0.2"
+# Maven has no plain 5.0.2 jar — only jdk-classifier variants (java8/java11).
+# A bare "5.0.2" cap resolves to a 404 and (with cap-first resolution) would
+# hard-fail every Firebird connection; pin the real artifact instead.
+version_cap = "5.0.2.java11"
 version_error_signatures = [
   "connection rejected",
   "malformed connection URL",

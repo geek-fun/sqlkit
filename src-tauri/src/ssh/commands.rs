@@ -110,11 +110,19 @@ pub async fn delete_ssh_profile(app: AppHandle, profile_id: String) -> Result<()
     Ok(())
 }
 
-/// Test an SSH connection by creating an ephemeral tunnel.
-#[derive(Serialize)]
+/// Test an SSH connection by creating an ephemeral tunnel. `message` is a
+/// developer-facing English diagnostic; the success actors come through the
+/// structured fields so each locale renders its own wording.
+#[derive(Serialize, Debug)]
 pub struct TestSshResult {
     pub success: bool,
     pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub user: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub port: Option<u16>,
 }
 
 #[tauri::command]
@@ -127,6 +135,9 @@ pub async fn test_ssh_connection(
         return TestSshResult {
             success: false,
             message: raw,
+            user: None,
+            host: None,
+            port: None,
         };
     }
     let tunnels = TunnelManager::new();
@@ -144,11 +155,17 @@ pub async fn test_ssh_connection(
                     "SSH connection to {}@{}:{} successful",
                     config.username, config.host, config.port
                 ),
+                user: Some(config.username.clone()),
+                host: Some(config.host.clone()),
+                port: Some(config.port),
             }
         }
         Err(e) => TestSshResult {
             success: false,
             message: e,
+            user: None,
+            host: None,
+            port: None,
         },
     }
 }

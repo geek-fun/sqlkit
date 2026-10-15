@@ -1,7 +1,7 @@
 import type { ServerConnection } from '@/store/connectionStore'
 import { createPinia, setActivePinia } from 'pinia'
 import { connectionApi } from '@/datasources/connectionApi'
-import { ConnectionStatus, DatabaseType, dbTypeToBackend, resolveDatabase, useConnectionStore } from '@/store/connectionStore'
+import { buildTransportLayers, ConnectionStatus, DatabaseType, dbTypeToBackend, resolveDatabase, useConnectionStore } from '@/store/connectionStore'
 
 jest.mock('@/datasources/connectionApi', () => ({
   connectionApi: {
@@ -14,6 +14,124 @@ jest.mock('@/datasources/connectionApi', () => ({
     getStatus: jest.fn(),
   },
 }))
+
+const PROFILES = [
+  { id: 'hop-1', name: 'Bastion A', host: 'bastion-a', port: 22, username: 'ops', authMethod: 'password', password: 'p', keyPath: '', keyPassphrase: '', useSshAgent: false, sshAgentSockPath: '', connectTimeoutSecs: 10, keepaliveIntervalSecs: 30, verifyHostKey: false, exposeLan: false },
+  { id: 'hop-2', name: 'Bastion B', host: 'bastion-b', port: 22, username: 'ops', authMethod: 'key', password: '', keyPath: '/keys/id_rsa', keyPassphrase: '', useSshAgent: false, sshAgentSockPath: '', connectTimeoutSecs: 10, keepaliveIntervalSecs: 30, verifyHostKey: false, exposeLan: false },
+]
+
+jest.mock('@tauri-apps/api/core', () => ({
+  invoke: jest.fn(async (cmd: string) =>
+    cmd === 'list_ssh_profiles' ? PROFILES : []),
+}))
+
+/**
+ * SSH-tunnel → transport layers: the attached system proxy must land on the
+ *  FIRST chain item in every layout (profile chain and legacy inline alike).
+ */
+describe('buildTransportLayers — system proxy is the first chain item', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    jest.clearAllMocks()
+  })
+
+  it('returns null when the tunnel is not enabled', async () => {
+    expect(await buildTransportLayers(undefined)).toBeNull()
+    expect(await buildTransportLayers({ enabled: false } as never)).toBeNull()
+  })
+
+  it('pins the proxy onto the first hop of a profile chain', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      profileIds: ['hop-1', 'hop-2'],
+      useSystemProxy: true,
+    } as never)
+    expect(layers).toHaveLength(2)
+    expect(layers?.[0].useSystemProxy).toBe(true)
+    expect(layers?.[1].useSystemProxy).toBe(false)
+  })
+
+  it('emits the Rust camelCase contract with concrete auth on profile hops', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      profileIds: ['hop-1', 'hop-2'],
+    } as never)
+    expect(layers?.[0]).toMatchObject({
+      type: 'ssh',
+      host: 'bastion-a',
+      authMethod: 'password',
+      password: 'p',
+      useSshAgent: false,
+      connectTimeoutSecs: 10,
+    })
+    expect(layers?.[1]).toMatchObject({
+      authMethod: 'key',
+      keyPath: '/keys/id_rsa',
+    })
+  })
+
+  it('normalizes legacy auto-probe (empty/none) profiles to password auth', async () => {
+    ;(PROFILES as Array<Record<string, unknown>>)[0].authMethod = ''
+    const layers = await buildTransportLayers({
+      enabled: true,
+      profileIds: ['hop-1'],
+    } as never)
+    expect(layers?.[0].authMethod).toBe('password')
+    // restore for other tests in this describe
+    ;(PROFILES as Array<Record<string, unknown>>)[0].authMethod = 'password'
+  })
+
+  it('normalizes the legacy inline privateKey method to the Rust key string', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      host: 'jump.example.com',
+      port: 22,
+      username: 'ops',
+      authMethod: 'privateKey',
+      privateKey: '/keys/id_rsa',
+      privateKeyPassphrase: 'pp',
+    } as never)
+    expect(layers?.[0]).toMatchObject({
+      authMethod: 'key',
+      keyPath: '/keys/id_rsa',
+      keyPassphrase: 'pp',
+    })
+  })
+
+  it('leaves the profile chain direct when no proxy is attached', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      profileIds: ['hop-1'],
+    } as never)
+    expect(layers?.[0].useSystemProxy).toBe(false)
+  })
+
+  it('pins the proxy onto the legacy inline single-hop layer', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      host: 'jump.example.com',
+      port: 22,
+      username: 'ops',
+      authMethod: 'password',
+      password: 'p',
+      useSystemProxy: true,
+    } as never)
+    expect(layers).toHaveLength(1)
+    expect(layers?.[0].useSystemProxy).toBe(true)
+  })
+
+  it('keeps the legacy inline single-hop layer direct without the proxy', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      host: 'jump.example.com',
+      port: 22,
+      username: 'ops',
+      authMethod: 'password',
+      password: 'p',
+    } as never)
+    expect(layers?.[0].useSystemProxy).toBe(false)
+  })
+})
 
 describe('connectionStore', () => {
   beforeEach(() => {

@@ -32,7 +32,10 @@ function selectMode(mode: SslMode) {
 <template>
   <div class="space-y-1">
     <div class="flex flex-wrap gap-3 items-center">
-      <Label class="text-sm min-w-fit whitespace-nowrap">{{ t('ssl.mode.label') }}</Label>
+      <Label class="text-sm flex gap-1.5 min-w-fit whitespace-nowrap items-center">
+        <span class="i-carbon-certificate text-muted-foreground shrink-0 h-4 w-4" />
+        {{ t('ssl.mode.label') }}
+      </Label>
       <div class="p-0.5 border border-border rounded-md bg-muted/40 inline-flex gap-px">
         <button
           v-for="mode in SSL_MODES"
@@ -51,7 +54,7 @@ function selectMode(mode: SslMode) {
       </div>
     </div>
     <p v-if="error" class="text-sm text-destructive">
-      {{ error }}
+      {{ t(error) }}
     </p>
   </div>
 </template>

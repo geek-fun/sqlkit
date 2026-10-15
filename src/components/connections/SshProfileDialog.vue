@@ -1,20 +1,14 @@
 <script setup lang="ts">
 import type { SshProfile } from '@/store/sshProfileStore'
+import { open } from '@tauri-apps/plugin-dialog'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
-import { emptySshProfile, useSshProfileStore } from '@/store/sshProfileStore'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { emptySshProfile, profileToTransportLayer, runSshTest, useSshProfileStore } from '@/store/sshProfileStore'
 
 const emit = defineEmits<{
   save: [profile: SshProfile]
@@ -22,22 +16,84 @@ const emit = defineEmits<{
 const { t } = useI18n()
 const profileStore = useSshProfileStore()
 
-const open = ref(false)
+const dialogOpen = ref(false)
 const form = ref<SshProfile>(emptySshProfile())
 const isEdit = ref(false)
 const saving = ref(false)
 const error = ref('')
+const showSecrets = ref(false)
+const testing = ref(false)
+const testResult = ref<TestSshResult | null>(null)
+
+/**
+ * The tabs cover the concrete methods only; legacy rows stored with ''/none
+ * (auto-probe) normalize to password on open like DockIt's resetForm does —
+ * and a brand-new profile starts on the password tab.
+ */
+const normalizeAuthMethod = (method?: string) =>
+  method === 'key' || method === 'agent' ? method : 'password'
 
 function show(profile?: SshProfile) {
-  form.value = profile ? { ...emptySshProfile(), ...profile } : emptySshProfile()
+  form.value = profile
+    ? { ...emptySshProfile(), ...profile, authMethod: normalizeAuthMethod(profile.authMethod) }
+    : { ...emptySshProfile(), authMethod: 'password' }
   isEdit.value = !!profile?.id
   error.value = ''
-  open.value = true
+  showSecrets.value = false
+  testResult.value = null
+  dialogOpen.value = true
 }
 
 defineExpose({ show })
 
 const valid = computed(() => !!form.value.name.trim() && !!form.value.host.trim() && form.value.port > 0)
+
+async function selectKeyFile() {
+  try {
+    const selected = await open({ multiple: false })
+    if (selected)
+      form.value.keyPath = selected
+  }
+  catch {
+    // user cancelled
+  }
+}
+
+type TestSshResult = {
+  success: boolean
+  message: string
+  /** Structured success actors from the backend — used to render localized copy */
+  user?: string
+  host?: string
+  port?: number
+}
+
+async function testProfile() {
+  if (testing.value)
+    return
+  testing.value = true
+  testResult.value = null
+  try {
+    // DockIt parity: test the bastion against itself with the same Rust-contract
+    // layer the real chain builds, so test and connect can't diverge.
+    testResult.value = await runSshTest(
+      profileToTransportLayer(form.value),
+      form.value.host,
+      form.value.port,
+    )
+  }
+  catch (err) {
+    testResult.value = {
+      success: false,
+      message: String(err).includes('ssh-test-timeout')
+        ? t('components.serverForm.ssh.testTimedOut')
+        : String(err),
+    }
+  }
+  finally {
+    testing.value = false
+  }
+}
 
 async function save() {
   if (!valid.value || saving.value)
@@ -45,9 +101,13 @@ async function save() {
   saving.value = true
   error.value = ''
   try {
-    const saved = await profileStore.save({ ...form.value, name: form.value.name.trim() })
+    const saved = await profileStore.save({
+      ...form.value,
+      name: form.value.name.trim(),
+      useSshAgent: form.value.authMethod === 'agent',
+    })
     emit('save', saved)
-    open.value = false
+    dialogOpen.value = false
   }
   catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
@@ -59,7 +119,7 @@ async function save() {
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="open = $event">
+  <Dialog :open="dialogOpen" @update:open="dialogOpen = $event">
     <DialogContent class="max-w-md">
       <DialogHeader>
         <DialogTitle>{{ isEdit ? t('components.serverForm.ssh.editProfile') : t('components.serverForm.ssh.newProfile') }}</DialogTitle>
@@ -87,46 +147,84 @@ async function save() {
           </div>
         </div>
 
-        <div class="space-y-1.5">
+        <div class="space-y-2">
           <Label>{{ t('components.serverForm.ssh.authMethod') }}</Label>
-          <Select v-model="form.authMethod">
-            <SelectTrigger>
-              <SelectValue :placeholder="t('components.serverForm.ssh.authAuto')" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="password">
-                  {{ t('components.serverForm.ssh.password') }}
-                </SelectItem>
-                <SelectItem value="key">
-                  {{ t('components.serverForm.ssh.privateKey') }}
-                </SelectItem>
-                <SelectItem value="agent">
-                  {{ t('components.serverForm.ssh.sshAgent') }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <Tabs :model-value="form.authMethod" @update:model-value="form.authMethod = $event as SshProfile['authMethod']">
+            <TabsList class="w-full">
+              <TabsTrigger value="password" class="flex-1">
+                {{ t('components.serverForm.ssh.password') }}
+              </TabsTrigger>
+              <TabsTrigger value="key" class="flex-1">
+                {{ t('components.serverForm.ssh.privateKey') }}
+              </TabsTrigger>
+              <TabsTrigger value="agent" class="flex-1">
+                {{ t('components.serverForm.ssh.sshAgent') }}
+              </TabsTrigger>
+            </TabsList>
+
+            <!-- min-height absorbs the differences between the three tabs so
+                 switching never jiggles the dialog height -->
+            <div class="min-h-36">
+              <TabsContent value="password" class="mt-3 space-y-1.5">
+                <Label for="profile-password">{{ t('components.serverForm.ssh.sshPassword') }}</Label>
+                <div class="relative">
+                  <Input id="profile-password" v-model="form.password" :type="showSecrets ? 'text' : 'password'" autocomplete="off" class="pr-8" />
+                  <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="showSecrets = !showSecrets">
+                    <span class="i-carbon-view h-4 w-4 block" />
+                  </button>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="key" class="mt-3 space-y-3">
+                <div class="space-y-1.5">
+                  <Label for="profile-key">{{ t('components.serverForm.ssh.privateKeyPath') }}</Label>
+                  <div class="flex gap-2">
+                    <div class="flex-1 min-w-0">
+                      <Input id="profile-key" v-model="form.keyPath" placeholder="/path/to/id_rsa" />
+                    </div>
+                    <Button variant="outline" size="icon" type="button" class="shrink-0" :title="t('common.browse')" @click="selectKeyFile">
+                      <span class="i-carbon-folder h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+                <div class="space-y-1.5">
+                  <Label for="profile-passphrase">{{ t('components.serverForm.ssh.passphraseOptional') }}</Label>
+                  <div class="relative">
+                    <Input id="profile-passphrase" v-model="form.keyPassphrase" :type="showSecrets ? 'text' : 'password'" autocomplete="off" class="pr-8" />
+                    <button type="button" class="text-muted-foreground right-2 top-1/2 absolute hover:text-foreground -translate-y-1/2" @click="showSecrets = !showSecrets">
+                      <span class="i-carbon-view h-4 w-4 block" />
+                    </button>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="agent" class="mt-3 space-y-1.5">
+                <Label for="profile-agent-sock">{{ t('components.serverForm.ssh.agentSockPath') }}</Label>
+                <Input id="profile-agent-sock" v-model="form.sshAgentSockPath" placeholder="$SSH_AUTH_SOCK" />
+                <p class="text-xs text-muted-foreground">
+                  {{ t('components.serverForm.ssh.agentHelpText') }}
+                </p>
+              </TabsContent>
+            </div>
+          </Tabs>
         </div>
 
-        <div v-if="form.authMethod === 'password'" class="space-y-1.5">
-          <Label for="profile-password">{{ t('components.serverForm.ssh.sshPassword') }}</Label>
-          <Input id="profile-password" v-model="form.password" type="password" autocomplete="off" />
-        </div>
-
-        <template v-if="form.authMethod === 'key'">
-          <div class="space-y-1.5">
-            <Label for="profile-key">{{ t('components.serverForm.ssh.privateKeyPath') }}</Label>
-            <Input id="profile-key" v-model="form.keyPath" placeholder="/path/to/id_rsa" />
-          </div>
-          <div class="space-y-1.5">
-            <Label for="profile-passphrase">{{ t('components.serverForm.ssh.passphraseOptional') }}</Label>
-            <Input id="profile-passphrase" v-model="form.keyPassphrase" type="password" autocomplete="off" />
-          </div>
-        </template>
-
-        <p v-if="form.authMethod === 'agent'" class="text-sm text-muted-foreground">
-          {{ t('components.serverForm.ssh.agentHelpText') }}
+        <!-- Test result: success is localized from structured actors; failure
+             keeps the backend diagnostic and wraps so details stay readable -->
+        <p
+          v-if="testResult"
+          class="text-xs leading-relaxed flex gap-1.5 break-words items-start"
+          :class="testResult.success ? 'text-green-600 dark:text-green-400' : 'text-destructive'"
+        >
+          <span v-if="testing" class="i-carbon-circle-dash mt-0.5 shrink-0 h-3.5 w-3.5 animate-spin" />
+          <span v-else class="i-carbon-network-3 mt-0.5 shrink-0 h-3.5 w-3.5" />
+          <span class="min-w-0">{{ testResult.success && testResult.user && testResult.host && testResult.port
+            ? t('components.serverForm.ssh.testSuccess', {
+              user: testResult.user,
+              host: testResult.host,
+              port: testResult.port,
+            })
+            : testResult.message }}</span>
         </p>
 
         <p v-if="error" class="text-sm text-destructive">
@@ -135,7 +233,17 @@ async function save() {
       </div>
 
       <DialogFooter>
-        <Button variant="outline" @click="open = false">
+        <Button
+          variant="outline"
+          type="button"
+          :disabled="testing || !valid"
+          @click="testProfile"
+        >
+          <span v-if="testing" class="i-carbon-circle-dash text-blue-500 h-3.5 w-3.5 animate-spin" />
+          <span v-else class="i-carbon-network-3 h-3.5 w-3.5" />
+          {{ t('common.buttons.testConnection') }}
+        </Button>
+        <Button variant="outline" @click="dialogOpen = false">
           {{ t('common.buttons.cancel') }}
         </Button>
         <Button :disabled="!valid || saving" @click="save">

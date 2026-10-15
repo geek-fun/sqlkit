@@ -1,21 +1,32 @@
 import { invoke } from '@tauri-apps/api/core'
 
-export type SshAuthMethod
-  = | { method: 'password', password: string }
-    | { method: 'privateKey', private_key_path: string, passphrase?: string | null }
-    | { method: 'agent' }
-
-// Matches Rust's internally-tagged serde enum:
-// #[serde(tag = "type")] → { "type": "ssh", "host": "...", ... } (flattened)
+/**
+ * Matches Rust's internally-tagged serde enum flattened into SshTunnelConfig,
+ * which is `#[serde(rename_all = "camelCase")]`: EVERY multi-word field must
+ * be sent camelCase or serde treats it as unknown and silently DROPS it —
+ * auth_method/port timeouts/the system proxy flag all died this way once.
+ * Keep this shape in lockstep with src-tauri/src/ssh/config.rs.
+ */
 export type TransportLayerConfig = {
   type: 'ssh'
+  enabled: boolean
   host: string
   port: number
   username: string
-  auth_method: SshAuthMethod
-  enabled: boolean
-  connect_timeout_secs: number
-  keepalive_interval_secs: number
+  /**
+   * Rust matches these exact strings; page-level names (privateKey/none/'')
+   *  are normalized to password/key/agent before send.
+   */
+  authMethod: 'password' | 'key' | 'agent'
+  password: string
+  keyPath: string
+  keyPassphrase: string
+  useSshAgent: boolean
+  sshAgentSockPath: string
+  /** Routed through the OS system proxy — valid on the FIRST chain item only. */
+  useSystemProxy: boolean
+  connectTimeoutSecs: number
+  keepaliveIntervalSecs: number
 }
 
 export type OracleConnectionOptions = {

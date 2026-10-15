@@ -563,12 +563,13 @@ mod tests {
             "Derby should have version_cap = 10.16.1.1"
         );
 
-        // Firebird has a version cap
+        // Firebird has a version cap — a classifier variant: Maven has NO
+        // plain 5.0.2 artifact (404), only 5.0.2.java8 / 5.0.2.java11.
         let firebird = registry.databases.get("firebird").unwrap();
         assert_eq!(
             firebird.version_cap.as_deref(),
-            Some("5.0.2"),
-            "Firebird should have version_cap = 5.0.2"
+            Some("5.0.2.java11"),
+            "Firebird should have version_cap = 5.0.2.java11"
         );
 
         // DuckDB does NOT have a version cap

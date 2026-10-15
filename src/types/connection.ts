@@ -168,7 +168,7 @@ export function validateSslConfig(sslConfig: SslConfig, dbType: string): SslVali
   const errors: SslValidationError[] = []
 
   if (!isValidSslMode(sslConfig.mode)) {
-    errors.push({ field: 'mode', message: 'Invalid SSL mode' })
+    errors.push({ field: 'mode', message: 'ssl.errors.invalidMode' })
     return errors
   }
 
@@ -178,20 +178,20 @@ export function validateSslConfig(sslConfig: SslConfig, dbType: string): SslVali
 
   if (needsCertFields(dbType, sslConfig.mode)) {
     if (!sslConfig.caCertPath?.trim()) {
-      errors.push({ field: 'caCertPath', message: 'CA certificate path is required for verify-ca/verify-full modes' })
+      errors.push({ field: 'caCertPath', message: 'ssl.errors.caCertRequired' })
     }
   }
 
   if (sslConfig.caCertPath && !isValidCertPath(sslConfig.caCertPath)) {
-    errors.push({ field: 'caCertPath', message: 'Invalid CA certificate path' })
+    errors.push({ field: 'caCertPath', message: 'ssl.errors.invalidCaPath' })
   }
 
   if (sslConfig.clientCertPath && !isValidCertPath(sslConfig.clientCertPath)) {
-    errors.push({ field: 'clientCertPath', message: 'Invalid client certificate path' })
+    errors.push({ field: 'clientCertPath', message: 'ssl.errors.invalidCertPath' })
   }
 
   if (sslConfig.clientKeyPath && !isValidCertPath(sslConfig.clientKeyPath)) {
-    errors.push({ field: 'clientKeyPath', message: 'Invalid client private key path' })
+    errors.push({ field: 'clientKeyPath', message: 'ssl.errors.invalidKeyPath' })
   }
 
   return errors

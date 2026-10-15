@@ -190,6 +190,40 @@ impl SshTunnelConfig {
 mod tests {
     use super::*;
 
+    /// Regression pin for the frontend contract: `SshTunnelConfig` is
+    /// `#[serde(rename_all = "camelCase")]`, so the JSON the web layer sends
+    /// for chain transport layers MUST use camelCase multi-word keys —
+    /// snake_case keys (`auth_method`, `connectTimeoutSecs` opposites) are
+    /// silently dropped by serde and `auth_method` fell back to "" at
+    /// connect time. If this test fails, the TS side drifted off contract.
+    #[test]
+    fn test_transport_layer_deserializes_camelcased_frontend_payload() {
+        let payload = r#"{
+            "type": "ssh",
+            "enabled": true,
+            "host": "bastion.local",
+            "port": 2223,
+            "username": "tester",
+            "authMethod": "password",
+            "password": "secret",
+            "keyPath": "",
+            "keyPassphrase": "",
+            "useSshAgent": false,
+            "sshAgentSockPath": "",
+            "useSystemProxy": true,
+            "connectTimeoutSecs": 10,
+            "keepaliveIntervalSecs": 30
+        }"#;
+        let layer: TransportLayerConfig =
+            serde_json::from_str(payload).expect("frontend chain payload must deserialize");
+        let TransportLayerConfig::Ssh(tunnel) = layer;
+        assert_eq!(tunnel.auth_method, "password");
+        assert_eq!(tunnel.password, "secret");
+        assert!(tunnel.use_system_proxy);
+        assert_eq!(tunnel.connect_timeout_secs, 10);
+        assert_eq!(tunnel.keepalive_interval_secs, 30);
+    }
+
     #[test]
     fn test_ssh_profile_serde_roundtrip() {
         let profile = SshProfile {
