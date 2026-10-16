@@ -429,6 +429,7 @@ export type ServerConnection = {
   isConnected?: boolean
   lastUsed?: Date
   serverVersion?: string
+  prompt?: string
 }
 
 type ConnectionStoreState = {
@@ -665,6 +666,7 @@ export const useConnectionStore = defineStore('connectionStore', {
               ?? extractSshTunnelFromTransport(item.transport_layers),
             oracleOptions: extractOracleOptions(item.oracle_options),
             readOnly: (item.read_only as boolean | undefined) ?? false,
+            prompt: item.prompt as string | undefined,
             isConnected: prev?.isConnected ?? (item.is_connected as boolean | undefined),
             lastUsed: item.last_used ? new Date(item.last_used as string) : undefined,
             serverVersion: prev?.serverVersion,
@@ -699,6 +701,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           sshTunnel: connection.sshTunnel ?? null,
           oracle_options: buildOracleOptions(connection.oracleOptions),
           read_only: connection.readOnly ?? false,
+          prompt: connection.prompt || null,
         }
 
         const resultId = await connectionApi.save(serverConfig)

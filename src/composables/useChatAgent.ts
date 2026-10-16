@@ -4,8 +4,11 @@ import type { AgentToolCall, AgentToolCallStatus, ConfirmationRule } from '@/sto
 import type { ChatContextConfig, ChatMessage, ChatMessageStatus, ChatPermissions, ChatSession, ChatSessionStatus, SendMessageOptions } from '@/types/chat'
 import { ulid } from 'ulidx'
 import { computed, ref } from 'vue'
+import { assembleSystemPrompt } from '@/common'
 import { agentApi } from '@/datasources/agentApi'
+import { useConnectionStore } from '@/store/connectionStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -315,15 +318,45 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const autoMode = config.autoMode?.value ?? false
       const permissionsMode = autoMode ? 'AUTO' : 'ASK'
 
+      const { useAppStore } = await import('@/store/appStore')
+      const appStore = useAppStore()
+      const entitlementStore = useEntitlementStore()
+      const canUseCustomPrompts = entitlementStore.isLocalUltimate
+      const connectionStore = useConnectionStore()
+      const hasConnections = Object.keys(contextSnapshot?.connections ?? {}).length > 0
+
+      const connectionPrompts = canUseCustomPrompts
+        ? Object.entries(contextSnapshot?.connections ?? {}).flatMap(([alias, conn]) => {
+            const connection = connectionStore.getConnectionById(String(conn.connectionId))
+            const prompt = connection?.prompt?.trim()
+            return prompt ? [{ alias, prompt }] : []
+          })
+        : []
+
+      const activePanel = contextSnapshot?.activePanel
+      const sidebarContext = config.feature === 'sidebarAssistant' && activePanel
+        ? [
+            activePanel.connectionType && `Connection type: ${activePanel.connectionType}`,
+            activePanel.indexName && `Index: ${activePanel.indexName}`,
+            activePanel.tableName && `Table: ${activePanel.tableName}`,
+            activePanel.editorContent && `Current editor content:\n${activePanel.editorContent}`,
+          ].filter(Boolean).join('\n')
+        : undefined
+
       const systemPrompt = buildSystemPrompt({
         schema: schemaContext || contextSnapshot?.schema,
         sources,
         permissionsMode,
       })
 
+      const assembledSystemPrompt = assembleSystemPrompt({
+        base: systemPrompt,
+        userGlobal: hasConnections && canUseCustomPrompts ? appStore.llmSettings.chat.systemPrompt : undefined,
+        connectionPrompts,
+        sidebarContext,
+      })
+
       // Get provider+model config from app store (handles dynamic import inline)
-      const { useAppStore } = await import('@/store/appStore')
-      const appStore = useAppStore()
       const modelConfig = await appStore.getFeatureModelConfig(config.feature)
 
       // Get runtime tools
@@ -342,7 +375,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
         : {}
 
       const settings: Record<string, unknown> = {
-        systemPrompt,
+        systemPrompt: assembledSystemPrompt,
         provider: modelConfig.provider.name,
         model: modelConfig.model.label,
         baseUrl: modelConfig.provider.baseUrl,

@@ -7,6 +7,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { shouldStripSshTunnel, UPGRADE_URL } from '@/common'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -21,6 +22,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ProBadge } from '@/components/upgrade'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { useDownloadEvents } from '@/composables/useDownloadEvents'
 import { toast } from '@/composables/useNotifications'
@@ -30,6 +32,7 @@ import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, Datab
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import { buildMemoryDatabaseHost, createMemoryDatabaseLabel, isMemoryDatabaseHost, isSameDatabaseFile, memoryDatabaseLabel } from '@/utils/databaseFiles'
 import { classifyDuckDbFailure } from '@/utils/duckdbErrors'
+import ConnectionPromptDialog from './ConnectionPromptDialog.vue'
 import DatabaseFileField from './DatabaseFileField.vue'
 import SshTunnelConfigPanel from './SshTunnelConfigPanel.vue'
 import SslConfigSection from './ssl/SslConfigSection.vue'
@@ -211,6 +214,14 @@ const duckdbFileStatus = ref<DatabaseFileAssessment | null>(null)
 
 const connectionStore = useConnectionStore()
 const entitlementStore = useEntitlementStore()
+const isPromptGated = computed(() => !entitlementStore.isLocalUltimate)
+const promptDialogRef = ref<InstanceType<typeof ConnectionPromptDialog> | null>(null)
+const promptValue = computed(() => formData.value.prompt ?? '')
+
+const editPrompt = () => promptDialogRef.value?.show(promptValue.value)
+const savePrompt = (value: string) => {
+  formData.value.prompt = value.trim() || undefined
+}
 const { platform } = usePlatform()
 
 watch(() => props.open, (open) => {
@@ -906,7 +917,7 @@ function handleSave() {
 
       <form class="space-y-4" @submit.prevent="handleSave">
         <Tabs :model-value="formSectionTab" @update:model-value="formSectionTab = $event as 'basic' | 'advanced'">
-          <TabsList v-if="!isFileBased" class="p-0.5 h-7 w-fit">
+          <TabsList class="p-0.5 h-7 w-fit">
             <TabsTrigger value="basic" class="text-xs px-3 py-0 gap-1.5 h-6">
               <span class="i-carbon-plug h-3.5 w-3.5" />
               {{ t('components.serverForm.basicTab') }}
@@ -1482,8 +1493,38 @@ function handleSave() {
               :remote-port="formData.port"
               @update:model-value="formData.sshTunnel = $event"
             />
+
+            <button
+              v-if="isPromptGated"
+              type="button"
+              class="px-3 py-2.5 text-left border rounded-lg border-dashed flex gap-2.5 w-full cursor-pointer transition-colors items-center hover:bg-accent/50"
+              @click="openUpgrade"
+            >
+              <ProBadge size="xs" />
+              <span class="text-sm text-muted-foreground">{{ t('connection.prompt.ultimateOnly') }}</span>
+              <span class="text-xs text-primary font-medium ml-auto px-2 py-1 rounded-md bg-primary/10 shrink-0">{{ t('plan.upgrade.cta') }}</span>
+            </button>
+            <div v-else class="p-3 border rounded-lg space-y-2">
+              <div class="flex gap-2 items-center">
+                <Label>{{ t('connection.prompt.label') }}</Label>
+                <Badge v-if="promptValue" variant="secondary">
+                  {{ t('connection.prompt.configured') }}
+                </Badge>
+                <Button type="button" variant="outline" size="sm" class="ml-auto" @click="editPrompt">
+                  {{ promptValue ? t('connection.prompt.edit') : t('connection.prompt.add') }}
+                </Button>
+              </div>
+              <p class="text-xs text-muted-foreground">
+                {{ t('connection.prompt.help') }}
+              </p>
+              <p v-if="promptValue" class="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-2">
+                {{ promptValue }}
+              </p>
+            </div>
           </TabsContent>
         </Tabs>
+
+        <ConnectionPromptDialog ref="promptDialogRef" @save="savePrompt" />
 
         <!-- Test Connection Status -->
         <div
