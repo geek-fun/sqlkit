@@ -11,6 +11,11 @@ pub async fn invoke_capability(
     connection_id: Option<String>,
     app: AppHandle,
 ) -> Result<String, String> {
+    // The same gate the agent loop this capability surface serves is under.
+    crate::entitlement::ensure_local_ultimate(
+        &app.state::<crate::entitlement::EntitlementState>(),
+        "AI",
+    )?;
     let config = match connection_id {
         Some(ref id) => Some(resolve_connection_config(&app, id).await?),
         None => None,

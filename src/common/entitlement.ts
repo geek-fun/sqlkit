@@ -1,5 +1,6 @@
 export const ENTITLEMENT_ERROR_TYPE = 'ENTITLEMENT_REQUIRED'
 export const SESSION_REJECTED_ERROR_TYPE = 'SESSION_REJECTED'
+export const SSH_TUNNEL_STRIPPED_ERROR_TYPE = 'SSH_TUNNEL_STRIPPED'
 
 export const UPGRADE_URL = 'https://www.geekfun.club/pricing'
 
@@ -15,6 +16,8 @@ export type EntitlementView = {
   cancelScheduledAt: string | null
   cached: boolean
   fetchedAtMs: number | null
+  /** Structured session verdict from the last refresh — see common/sessionPhase. */
+  sessionPhase: string | null
   lastError: string | null
 }
 
@@ -48,4 +51,34 @@ export function isEntitlementError(error: unknown): boolean {
  */
 export function isSessionRejected(error: unknown): boolean {
   return errorCarriesType(error, SESSION_REJECTED_ERROR_TYPE)
+}
+
+/**
+ * SSH tunnelling is Ultimate-only. A saved tunnel must never dead-end a
+ * connection on a free plan: the tunnel is dropped and the database is
+ * reached directly instead. The tunnel config itself stays untouched on disk.
+ */
+export function shouldStripSshTunnel(
+  sshTunnelEnabled: boolean | undefined,
+  localUltimate: boolean,
+): boolean {
+  return sshTunnelEnabled === true && !localUltimate
+}
+
+/**
+ * Tag a connect failure as "the saved SSH tunnel was dropped for this attempt".
+ * A fresh Error is returned so the caller's error is left untouched.
+ */
+export function markSshTunnelStripped(error: Error): Error {
+  return Object.assign(new Error(error.message), {
+    errorType: SSH_TUNNEL_STRIPPED_ERROR_TYPE,
+  })
+}
+
+/**
+ * The attempt failed only after the saved SSH tunnel was dropped for lack of
+ * entitlement — the UI must explain that instead of blaming the database host.
+ */
+export function isSshTunnelStrippedError(error: unknown): boolean {
+  return errorCarriesType(error, SSH_TUNNEL_STRIPPED_ERROR_TYPE)
 }

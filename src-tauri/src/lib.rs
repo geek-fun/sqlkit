@@ -207,34 +207,7 @@ pub fn run() {
                     app_data_dir.clone(),
                 ));
                 app.manage(crate::session::SessionState::default());
-                let config = crate::mcp_bridge::McpConfig::load(&app_data_dir);
-                let mcp_entitled = app
-                    .state::<crate::entitlement::EntitlementState>()
-                    .local_entitled();
-                if config.auto_start && mcp_entitled {
-                    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
-                    let server_handle: tauri::State<'_, crate::mcp_bridge::McpServerHandle> =
-                        app.state();
-                    {
-                        let mut tx = server_handle.shutdown_tx.lock().unwrap();
-                        *tx = Some(shutdown_tx);
-                    }
-                    let bridge_handle = app.handle().clone();
-                    let data_dir = app_data_dir.clone();
-                    let preferred = config.port.unwrap_or(9121);
-                    tauri::async_runtime::spawn(async move {
-                        if let Err(e) = crate::mcp_bridge::start(
-                            bridge_handle,
-                            data_dir,
-                            preferred,
-                            shutdown_rx,
-                        )
-                        .await
-                        {
-                            log::error!("MCP bridge failed to start: {}", e);
-                        }
-                    });
-                }
+                // The MCP bridge starts from the entitlement path, never at setup (cache-only).
             }
 
             use tauri::{Emitter, Listener};

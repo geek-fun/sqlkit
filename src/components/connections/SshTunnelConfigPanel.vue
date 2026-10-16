@@ -2,10 +2,12 @@
 import type { SSHTunnelConfig } from '@/store/connectionStore'
 import type { SshProfile } from '@/store/sshProfileStore'
 import { invoke } from '@tauri-apps/api/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { Pencil, Plus } from 'lucide-vue-next'
 import Sortable from 'sortablejs'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { UPGRADE_URL } from '@/common'
 import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
@@ -19,7 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { openUpgradeDialog, ProBadge } from '@/components/upgrade'
+import { ProBadge } from '@/components/upgrade'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import { emptySshProfile, profileToTransportLayer, runSshTest, useSshProfileStore } from '@/store/sshProfileStore'
 
@@ -32,6 +34,10 @@ const props = defineProps<{
 const emit = defineEmits<{
   'update:modelValue': [value: SSHTunnelConfig | undefined]
 }>()
+
+const openUpgrade = () => {
+  void openUrl(UPGRADE_URL)
+}
 
 const { t } = useI18n()
 const entitlementStore = useEntitlementStore()
@@ -302,14 +308,12 @@ onMounted(detectProxy)
 
 <template>
   <div class="space-y-4">
-    <!-- Gated: the strip replaces the whole SSH config, covering pre-existing connections too.
-         Opens the in-app upgrade dialog so the whole tunnel feature goes through ONE upsell
-         journey (same as the profile cards on the connections page). -->
+    <!-- Gated: the strip replaces the whole SSH config, covering pre-existing connections too. -->
     <button
       v-if="isGated"
       type="button"
       class="group px-3 py-2.5 text-left border rounded-lg border-dashed flex gap-2.5 w-full cursor-pointer transition-colors items-center hover:bg-accent/50"
-      @click="openUpgradeDialog('ssh_tunnel')"
+      @click="openUpgrade"
     >
       <ProBadge size="xs" />
       <span class="text-sm text-muted-foreground truncate transition-colors group-hover:text-foreground/80">

@@ -9,6 +9,7 @@
 //! `ultimateActive` regardless of the version lock.
 
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -31,6 +32,11 @@ pub const APP_RELEASE_DATE: &str = match option_env!("APP_RELEASE_DATE") {
 pub const REFRESH_MIN_INTERVAL_MS: i64 = 5 * 60 * 1000;
 
 pub const ENTITLEMENT_ERROR_TYPE: &str = "ENTITLEMENT_REQUIRED";
+
+/// Session health carried on every view: `signed-in`, `expired` or `anonymous`.
+pub const SESSION_PHASE_SIGNED_IN: &str = "signed-in";
+pub const SESSION_PHASE_EXPIRED: &str = "expired";
+pub const SESSION_PHASE_ANONYMOUS: &str = "anonymous";
 
 enum SubscriptionsError {
     /// 401 — the access token expired; a session refresh may recover.
@@ -172,6 +178,8 @@ pub struct EntitlementView {
     /// of a fresh network response (offline / degraded / throttled).
     pub cached: bool,
     pub fetched_at_ms: Option<i64>,
+    /// Session health verdict (`SESSION_PHASE_*`) — see the constant docs.
+    pub session_phase: &'static str,
     pub last_error: Option<String>,
 }
 
@@ -202,6 +210,8 @@ pub struct EntitlementState {
     cache: Mutex<Option<SubscriptionCache>>,
     last_success_ms: Mutex<i64>,
     cache_path: Mutex<Option<PathBuf>>,
+    /// A persisted cache proves nothing about the current session.
+    session_confirmed: AtomicBool,
 }
 
 impl EntitlementState {
@@ -215,7 +225,16 @@ impl EntitlementState {
             cache: Mutex::new(cache),
             last_success_ms: Mutex::new(0),
             cache_path: Mutex::new(cache_path),
+            session_confirmed: AtomicBool::new(false),
         }
+    }
+
+    pub fn confirm_session(&self) {
+        self.session_confirmed.store(true, Ordering::SeqCst);
+    }
+
+    pub fn session_confirmed(&self) -> bool {
+        self.session_confirmed.load(Ordering::SeqCst)
     }
 
     fn set_cache(&self, cache: SubscriptionCache) {
@@ -233,7 +252,12 @@ impl EntitlementState {
             .unwrap_or_else(|e| e.into_inner()) = now_unix_ms();
     }
 
-    pub fn view(&self, cached: bool, last_error: Option<String>) -> EntitlementView {
+    pub fn view(
+        &self,
+        cached: bool,
+        last_error: Option<String>,
+        session_phase: &'static str,
+    ) -> EntitlementView {
         let binding = self.cache.lock().unwrap_or_else(|e| e.into_inner());
         let decision = compute_entitlement(binding.as_ref(), now_unix_ms());
         EntitlementView {
@@ -248,12 +272,14 @@ impl EntitlementState {
             cancel_scheduled_at: binding.as_ref().and_then(|c| c.cancel_scheduled_at.clone()),
             cached,
             fetched_at_ms: binding.as_ref().map(|c| c.fetched_at_ms),
+            session_phase,
             last_error,
         }
     }
 
     pub fn local_entitled(&self) -> bool {
-        self.view(true, None).local_ultimate
+        self.view(true, None, SESSION_PHASE_SIGNED_IN)
+            .local_ultimate
     }
 
     /// Wipe the cached entitlement (logout): memory + persisted cache file.
@@ -263,6 +289,7 @@ impl EntitlementState {
             .last_success_ms
             .lock()
             .unwrap_or_else(|e| e.into_inner()) = 0;
+        self.session_confirmed.store(false, Ordering::SeqCst);
         if let Ok(path) = self.cache_path.lock() {
             if let Some(path) = path.as_ref() {
                 let _ = std::fs::remove_file(path);
@@ -362,10 +389,85 @@ async fn fetch_subscriptions(token: &str) -> Result<SubscriptionCache, Subscript
     })
 }
 
-/// Refresh entitlements from the server. Network/5xx failures degrade to the
-/// cached view (contract rule 5). A 401 triggers one lease-rotation recovery
-/// when the frontend supplied a refresh token; a rejected lease surfaces the
-/// structured `SESSION_REJECTED` error so the frontend drops it.
+/// No session means no entitlement: drop the cache rather than serve it.
+fn anonymous_view(state: &EntitlementState) -> EntitlementView {
+    state.clear();
+    state.view(
+        true,
+        Some("not logged in".to_string()),
+        SESSION_PHASE_ANONYMOUS,
+    )
+}
+
+/// Classifies the network outcome onto a view; a rotated successor rides back
+/// for the command layer to broadcast. Tauri-runtime-free for the exit tests.
+async fn refresh_entitlement_core(
+    token: &str,
+    refresh_token: Option<&str>,
+    force: bool,
+    state: &EntitlementState,
+    session_state: &crate::session::SessionState,
+    identity: &crate::device_activation::DeviceIdentityState,
+) -> Result<(EntitlementView, Option<crate::session::RefreshedSession>), String> {
+    if token.trim().is_empty() {
+        return Ok((anonymous_view(state), None));
+    }
+    state.confirm_session();
+    if !force && state.refresh_throttled() {
+        return Ok((state.view(true, None, SESSION_PHASE_SIGNED_IN), None));
+    }
+    match fetch_subscriptions(token.trim()).await {
+        Ok(cache) => {
+            state.set_cache(cache);
+            Ok((state.view(false, None, SESSION_PHASE_SIGNED_IN), None))
+        }
+        Err(SubscriptionsError::Unauthorized) => {
+            let lease = refresh_token.unwrap_or("").trim();
+            if lease.is_empty() {
+                return Ok((
+                    state.view(
+                        true,
+                        Some("session expired".to_string()),
+                        SESSION_PHASE_EXPIRED,
+                    ),
+                    None,
+                ));
+            }
+            match crate::session::rotate_session(session_state, lease, &identity.payload()).await {
+                Ok(refreshed) => match fetch_subscriptions(&refreshed.access_token).await {
+                    Ok(cache) => {
+                        state.set_cache(cache);
+                        Ok((
+                            state.view(false, None, SESSION_PHASE_SIGNED_IN),
+                            Some(refreshed),
+                        ))
+                    }
+                    Err(_) => Ok((
+                        state.view(
+                            true,
+                            Some("session refresh failed".to_string()),
+                            SESSION_PHASE_SIGNED_IN,
+                        ),
+                        Some(refreshed),
+                    )),
+                },
+                Err(err) => {
+                    if err.contains(crate::session::SESSION_REJECTED_ERROR_TYPE) {
+                        Err(err)
+                    } else {
+                        Ok((state.view(true, Some(err), SESSION_PHASE_SIGNED_IN), None))
+                    }
+                }
+            }
+        }
+        Err(SubscriptionsError::Other(err)) => {
+            Ok((state.view(true, Some(err), SESSION_PHASE_SIGNED_IN), None))
+        }
+    }
+}
+
+/// Refresh entitlements from the server; network failures degrade to the cached
+/// view (contract rule 5).
 #[tauri::command]
 pub async fn refresh_entitlement(
     token: String,
@@ -376,55 +478,43 @@ pub async fn refresh_entitlement(
     identity: State<'_, crate::device_activation::DeviceIdentityState>,
     app: AppHandle,
 ) -> Result<EntitlementView, String> {
-    if token.trim().is_empty() {
-        return Ok(state.view(true, Some("not logged in".to_string())));
+    let (view, rotated) = refresh_entitlement_core(
+        &token,
+        refresh_token.as_deref(),
+        force,
+        &state,
+        &session_state,
+        &identity,
+    )
+    .await?;
+    if let Some(refreshed) = rotated {
+        let _ = app.emit(
+            "session-refreshed",
+            json!({
+                "accessToken": refreshed.access_token,
+                "refreshToken": refreshed.refresh_token,
+            }),
+        );
     }
-    if !force && state.refresh_throttled() {
-        return Ok(state.view(true, None));
+    if view.session_phase != SESSION_PHASE_EXPIRED {
+        crate::mcp_bridge::sync_with_entitlement(&app);
     }
-    match fetch_subscriptions(token.trim()).await {
-        Ok(cache) => {
-            state.set_cache(cache);
-            Ok(state.view(false, None))
-        }
-        Err(SubscriptionsError::Unauthorized) => {
-            let lease = refresh_token.as_deref().unwrap_or("").trim();
-            if lease.is_empty() {
-                return Ok(state.view(true, Some("session expired".to_string())));
-            }
-            match crate::session::rotate_session(&session_state, lease, &identity.payload()).await {
-                Ok(refreshed) => {
-                    let _ = app.emit(
-                        "session-refreshed",
-                        json!({
-                            "accessToken": refreshed.access_token,
-                            "refreshToken": refreshed.refresh_token,
-                        }),
-                    );
-                    match fetch_subscriptions(&refreshed.access_token).await {
-                        Ok(cache) => {
-                            state.set_cache(cache);
-                            Ok(state.view(false, None))
-                        }
-                        Err(_) => Ok(state.view(true, Some("session refresh failed".to_string()))),
-                    }
-                }
-                Err(err) => {
-                    if err.contains(crate::session::SESSION_REJECTED_ERROR_TYPE) {
-                        Err(err)
-                    } else {
-                        Ok(state.view(true, Some(err)))
-                    }
-                }
-            }
-        }
-        Err(SubscriptionsError::Other(err)) => Ok(state.view(true, Some(err))),
-    }
+    Ok(view)
 }
 
 #[tauri::command]
-pub fn get_entitlement(state: State<'_, EntitlementState>) -> EntitlementView {
-    state.view(true, None)
+pub fn get_entitlement(
+    token_present: Option<bool>,
+    state: State<'_, EntitlementState>,
+    app: AppHandle,
+) -> EntitlementView {
+    if token_present == Some(true) {
+        state.confirm_session();
+        crate::mcp_bridge::sync_with_entitlement(&app);
+    }
+    // Cached read without a session verdict — the frontend derives the phase
+    // from token facts and the next refresh corrects it.
+    state.view(true, None, SESSION_PHASE_SIGNED_IN)
 }
 
 /// Seed the entitlement cache from the login handoff so the plan shows
@@ -458,16 +548,18 @@ fn seed_cache(
             cancel_scheduled_at,
         });
     }
-    state.view(true, None)
+    state.view(true, None, SESSION_PHASE_SIGNED_IN)
 }
 
 /// Called on logout — entitlements are account-scoped, so the cached state
 /// must not outlive the session (a different account on the same machine
-/// must not inherit the previous account's version lock).
+/// must not inherit the previous account's version lock) — and stops the paid
+/// MCP bridge with it.
 #[tauri::command]
-pub fn clear_entitlement(state: State<'_, EntitlementState>) -> EntitlementView {
+pub fn clear_entitlement(state: State<'_, EntitlementState>, app: AppHandle) -> EntitlementView {
     state.clear();
-    state.view(true, None)
+    crate::mcp_bridge::sync_with_entitlement(&app);
+    state.view(true, None, SESSION_PHASE_ANONYMOUS)
 }
 
 #[cfg(test)]
@@ -575,6 +667,77 @@ mod tests {
         dir
     }
 
+    /// One shared mock server; each test keys its mocks uniquely.
+    async fn console_server() -> &'static wiremock::MockServer {
+        use tokio::sync::OnceCell;
+        static SERVER: OnceCell<&'static wiremock::MockServer> = OnceCell::const_new();
+        SERVER
+            .get_or_init(|| async {
+                let server = wiremock::MockServer::start().await;
+                std::env::set_var("SQLKIT_CONSOLE_API_URL", server.uri());
+                let leaked: &'static wiremock::MockServer = &*Box::leak(Box::new(server));
+                leaked
+            })
+            .await
+    }
+
+    fn identity_state(tag: &str) -> crate::device_activation::DeviceIdentityState {
+        crate::device_activation::DeviceIdentityState::load(temp_dir(tag))
+    }
+
+    fn mock_refresh_lease(lease: &str, status: u16, body: serde_json::Value) -> wiremock::Mock {
+        struct BodyContains(String);
+        impl wiremock::Match for BodyContains {
+            fn matches(&self, request: &wiremock::Request) -> bool {
+                let needle = self.0.as_bytes();
+                request
+                    .body
+                    .as_slice()
+                    .windows(needle.len())
+                    .any(|window| window == needle)
+            }
+        }
+        wiremock::Mock::given(wiremock::matchers::method("POST"))
+            .and(wiremock::matchers::path("/api/v1/auth/refresh"))
+            .and(BodyContains(lease.to_string()))
+            .respond_with(wiremock::ResponseTemplate::new(status).set_body_json(body))
+    }
+
+    fn mock_subscriptions(token: &str, status: u16, body: serde_json::Value) -> wiremock::Mock {
+        wiremock::Mock::given(wiremock::matchers::method("GET"))
+            .and(wiremock::matchers::path("/api/v1/subscriptions"))
+            .and(wiremock::matchers::header(
+                "Authorization",
+                format!("Bearer {token}"),
+            ))
+            .respond_with(wiremock::ResponseTemplate::new(status).set_body_json(body))
+    }
+
+    #[test]
+    fn views_carry_the_derived_session_phase() {
+        let state = EntitlementState::load(None);
+        assert_eq!(
+            state
+                .view(true, None, SESSION_PHASE_SIGNED_IN)
+                .session_phase,
+            SESSION_PHASE_SIGNED_IN
+        );
+        assert_eq!(
+            state.view(true, None, SESSION_PHASE_EXPIRED).session_phase,
+            SESSION_PHASE_EXPIRED
+        );
+        assert_eq!(
+            state
+                .view(
+                    true,
+                    Some("not logged in".to_string()),
+                    SESSION_PHASE_ANONYMOUS
+                )
+                .session_phase,
+            SESSION_PHASE_ANONYMOUS
+        );
+    }
+
     #[test]
     fn seed_without_snapshot_fields_leaves_the_cache_empty() {
         let state = EntitlementState::load(None);
@@ -602,5 +765,235 @@ mod tests {
         let reloaded = EntitlementState::load(Some(path));
         assert!(reloaded.local_entitled(), "seeded cache survives a restart");
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_persisted_cache_alone_is_not_a_session() {
+        let dir = temp_dir("session-claim");
+        let path = dir.join("cache.json");
+        let state = EntitlementState::load(Some(path.clone()));
+        seed_cache(
+            &state,
+            Some("2999-01-01T00:00:00.000Z".to_string()),
+            None,
+            None,
+        );
+
+        assert!(state.local_entitled());
+        assert!(!state.session_confirmed());
+
+        state.confirm_session();
+        assert!(state.session_confirmed());
+
+        let view = anonymous_view(&state);
+        assert!(!state.session_confirmed());
+        assert!(!view.local_ultimate);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn anonymous_refresh_drops_a_leftover_cache() {
+        let dir = temp_dir("anonymous");
+        let path = dir.join("cache.json");
+        let state = EntitlementState::load(Some(path.clone()));
+        seed_cache(
+            &state,
+            Some("2999-01-01T00:00:00.000Z".to_string()),
+            Some("2020-01-01T00:00:00.000Z".to_string()),
+            None,
+        );
+        assert!(state.local_entitled());
+        assert!(path.exists());
+
+        let view = anonymous_view(&state);
+
+        assert!(!view.local_ultimate, "no session must mean no entitlement");
+        assert_eq!(view.last_error.as_deref(), Some("not logged in"));
+        assert!(!state.local_entitled());
+        assert!(
+            !path.exists(),
+            "the leftover cache must not outlive the account session"
+        );
+
+        let reloaded = EntitlementState::load(Some(path));
+        assert!(!reloaded.local_entitled());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[tokio::test]
+    async fn refresh_without_bearer_reports_anonymous() {
+        let state = EntitlementState::load(None);
+        let (view, rotated) = refresh_entitlement_core(
+            " ",
+            None,
+            true,
+            &state,
+            &crate::session::SessionState::default(),
+            &identity_state("identity-anon"),
+        )
+        .await
+        .expect("no-bearer refresh resolves");
+
+        assert_eq!(view.session_phase, SESSION_PHASE_ANONYMOUS);
+        assert_eq!(view.last_error, Some("not logged in".to_string()));
+        assert!(rotated.is_none());
+        assert!(
+            !state.session_confirmed(),
+            "no bearer means this run has no session to claim"
+        );
+    }
+
+    #[tokio::test]
+    async fn refresh_maps_a_successful_check_to_signed_in() {
+        if !cfg!(debug_assertions) {
+            return; // the console base URL is fixed to prod in release builds
+        }
+        let server = console_server().await;
+        let token = format!("bearer-ok-{}", uuid::Uuid::new_v4().simple());
+        mock_subscriptions(
+            &token,
+            200,
+            json!({ "code": 2000, "data": { "ultimateExpiresAt": "2999-01-01T00:00:00.000Z" } }),
+        )
+        .mount(server)
+        .await;
+
+        let state = EntitlementState::load(None);
+        let (view, rotated) = refresh_entitlement_core(
+            &token,
+            None,
+            true,
+            &state,
+            &crate::session::SessionState::default(),
+            &identity_state("identity-ok"),
+        )
+        .await
+        .expect("successful check resolves");
+
+        assert!(view.ultimate_active);
+        assert_eq!(view.session_phase, SESSION_PHASE_SIGNED_IN);
+        assert!(rotated.is_none());
+        assert!(
+            state.session_confirmed(),
+            "a bearer marks this run as having a session"
+        );
+    }
+
+    #[tokio::test]
+    async fn refresh_maps_an_expired_bearer_without_lease_to_expired() {
+        if !cfg!(debug_assertions) {
+            return;
+        }
+        let server = console_server().await;
+        let token = format!("bearer-dead-{}", uuid::Uuid::new_v4().simple());
+        mock_subscriptions(&token, 401, json!({}))
+            .mount(server)
+            .await;
+
+        let state = EntitlementState::load(None);
+        let (view, rotated) = refresh_entitlement_core(
+            &token,
+            None,
+            true,
+            &state,
+            &crate::session::SessionState::default(),
+            &identity_state("identity-dead"),
+        )
+        .await
+        .expect("a 401 without a lease still resolves to a view");
+
+        assert_eq!(view.session_phase, SESSION_PHASE_EXPIRED);
+        assert_eq!(view.last_error, Some("session expired".to_string()));
+        assert!(rotated.is_none());
+    }
+
+    #[tokio::test]
+    async fn refresh_propagates_a_deliberate_rotation_rejection() {
+        if !cfg!(debug_assertions) {
+            return;
+        }
+        let server = console_server().await;
+        let token = format!("bearer-rot-reject-{}", uuid::Uuid::new_v4().simple());
+        let lease = format!("lease-reject-{}", uuid::Uuid::new_v4().simple());
+        mock_subscriptions(&token, 401, json!({}))
+            .mount(server)
+            .await;
+        mock_refresh_lease(
+            &lease,
+            401,
+            json!({ "code": 4010, "messages": ["lease revoked"] }),
+        )
+        .mount(server)
+        .await;
+
+        let state = EntitlementState::load(None);
+        let result = refresh_entitlement_core(
+            &token,
+            Some(&lease),
+            true,
+            &state,
+            &crate::session::SessionState::default(),
+            &identity_state("identity-rot-reject"),
+        )
+        .await;
+
+        let err = result.expect_err("a deliberate rejection must propagate");
+        assert!(err.contains(crate::session::SESSION_REJECTED_ERROR_TYPE));
+    }
+
+    #[tokio::test]
+    async fn refresh_broadcasts_a_rotated_session_and_retries_the_check() {
+        if !cfg!(debug_assertions) {
+            return;
+        }
+        let server = console_server().await;
+        let token = format!("bearer-rot-ok-{}", uuid::Uuid::new_v4().simple());
+        let lease = format!("lease-rot-ok-{}", uuid::Uuid::new_v4().simple());
+        let rotated_token = format!("bearer-rot-ok-next-{}", uuid::Uuid::new_v4().simple());
+        mock_subscriptions(&token, 401, json!({}))
+            .mount(server)
+            .await;
+        mock_refresh_lease(
+            &lease,
+            200,
+            json!({
+                "code": 2000,
+                "data": {
+                    "access_token": rotated_token,
+                    "refresh_token": format!("{lease}-next"),
+                },
+            }),
+        )
+        .mount(server)
+        .await;
+        mock_subscriptions(
+            &rotated_token,
+            200,
+            json!({ "code": 2000, "data": { "ultimateExpiresAt": "2999-01-01T00:00:00.000Z" } }),
+        )
+        .mount(server)
+        .await;
+
+        let state = EntitlementState::load(None);
+        let (view, rotated) = refresh_entitlement_core(
+            &token,
+            Some(&lease),
+            true,
+            &state,
+            &crate::session::SessionState::default(),
+            &identity_state("identity-rot-ok"),
+        )
+        .await
+        .expect("rotated retry resolves");
+
+        assert!(
+            view.ultimate_active,
+            "rotated retry lost the entitlement: {:?}",
+            view.last_error
+        );
+        assert_eq!(view.session_phase, SESSION_PHASE_SIGNED_IN);
+        let rotated = rotated.expect("a rotated session rides back");
+        assert_eq!(rotated.access_token, rotated_token);
+        assert_eq!(rotated.refresh_token, format!("{lease}-next"));
     }
 }

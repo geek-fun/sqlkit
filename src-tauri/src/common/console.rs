@@ -34,8 +34,11 @@ pub fn api_base_url() -> &'static str {
 pub fn client() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
     CLIENT.get_or_init(|| {
-        reqwest::Client::builder()
-            .timeout(Duration::from_secs(10))
+        let builder = reqwest::Client::builder().timeout(Duration::from_secs(10));
+        // A pooled socket outlives its tokio test runtime; never keep idle sockets.
+        #[cfg(test)]
+        let builder = builder.pool_max_idle_per_host(0);
+        builder
             .build()
             .expect("reqwest client with static configuration")
     })

@@ -3,6 +3,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use axum::extract::State;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Json;
 use data_studio_agent::capabilities::permissions::McpPolicy;
@@ -173,11 +175,36 @@ fn tools_payload(policy: &McpPolicy) -> Value {
     })
 }
 
-async fn handle_tools(State(state): State<Arc<BridgeState>>) -> Json<Value> {
+fn entitlement_denied_for(session_confirmed: bool, local_entitled: bool) -> bool {
+    !(session_confirmed && local_entitled)
+}
+
+fn entitlement_denied(state: &BridgeState) -> Option<String> {
+    let entitlement: tauri::State<'_, crate::entitlement::EntitlementState> = state.handle.state();
+    if entitlement_denied_for(
+        entitlement.session_confirmed(),
+        entitlement.local_entitled(),
+    ) {
+        return Some("MCP Server requires an active Ultimate subscription".to_string());
+    }
+    None
+}
+
+async fn handle_tools(State(state): State<Arc<BridgeState>>) -> Response {
+    if let Some(reason) = entitlement_denied(&state) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({
+                "error_type": crate::entitlement::ENTITLEMENT_ERROR_TYPE,
+                "message": reason,
+            })),
+        )
+            .into_response();
+    }
     let policy = state.policy.read().await;
     let mut result = tools_payload(&policy);
     result["connections"] = list_allowed_connections(&policy);
-    Json(result)
+    Json(result).into_response()
 }
 
 /// List saved connections from the store — id/name/db_type only, no credentials.
@@ -290,6 +317,9 @@ async fn handle_invoke(
     State(state): State<Arc<BridgeState>>,
     Json(payload): Json<InvokeRequest>,
 ) -> Json<InvokeResponse> {
+    if let Some(reason) = entitlement_denied(&state) {
+        return Json(InvokeResponse::error(403, reason));
+    }
     // Snapshot so an in-flight request keeps its policy if the user hot-swaps
     // permissions mid-request.
     let policy = state.policy.read().await.clone();
@@ -405,6 +435,70 @@ async fn send_shutdown(handle: &AppHandle) -> Option<tokio::task::JoinHandle<()>
     }
     let mut task = server_handle.server_task.lock().unwrap();
     task.take()
+}
+
+/// The bridge only runs for a session confirmed in this app run.
+pub fn sync_with_entitlement(handle: &AppHandle) {
+    use tauri::Manager;
+
+    let entitled = {
+        let entitlement: tauri::State<'_, crate::entitlement::EntitlementState> = handle.state();
+        entitlement.session_confirmed() && entitlement.local_entitled()
+    };
+    if entitled {
+        auto_start_if_entitled(handle);
+        return;
+    }
+    let handle = handle.clone();
+    tauri::async_runtime::spawn(async move {
+        shutdown_if_running(&handle).await;
+    });
+}
+
+fn auto_start_if_entitled(handle: &AppHandle) {
+    use tauri::Manager;
+
+    let Ok(app_data_dir) = handle.path().app_data_dir() else {
+        return;
+    };
+    let config = McpConfig::load(&app_data_dir);
+    if !config.auto_start {
+        return;
+    }
+    {
+        let entitlement: tauri::State<'_, crate::entitlement::EntitlementState> = handle.state();
+        if !entitlement.session_confirmed() || !entitlement.local_entitled() {
+            return;
+        }
+    }
+
+    // Claiming the slot is what keeps concurrent triggers from double-starting.
+    let shutdown_rx = {
+        let server_handle: tauri::State<'_, McpServerHandle> = handle.state();
+        let mut tx = server_handle.shutdown_tx.lock().unwrap();
+        if tx.is_some() {
+            return;
+        }
+        let (sender, receiver) = tokio::sync::oneshot::channel();
+        *tx = Some(sender);
+        receiver
+    };
+
+    let bridge_handle = handle.clone();
+    let retry_handle = handle.clone();
+    let preferred = config.port.unwrap_or(get_default_port());
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = start(bridge_handle, app_data_dir, preferred, shutdown_rx).await {
+            log::error!("MCP bridge failed to start: {}", e);
+            let _ = send_shutdown(&retry_handle).await;
+        }
+    });
+}
+
+async fn shutdown_if_running(handle: &AppHandle) {
+    if let Some(task) = send_shutdown(handle).await {
+        let _ = task.await;
+    }
 }
 
 pub async fn start(
@@ -562,10 +656,8 @@ pub async fn save_mcp_config(
     app: AppHandle,
 ) -> Result<String, String> {
     use tauri::Manager;
-    crate::entitlement::ensure_local_ultimate(
-        &app.state::<crate::entitlement::EntitlementState>(),
-        "MCP Server",
-    )?;
+    let entitlement: tauri::State<'_, crate::entitlement::EntitlementState> = app.state();
+    crate::entitlement::ensure_local_ultimate(&entitlement, "MCP Server")?;
     let app_data_dir = app
         .path()
         .app_data_dir()
@@ -584,6 +676,9 @@ pub async fn save_mcp_config(
     // Explicit restart starts now without persisting a change to auto_start.
     let should_start = auto_start || restart.unwrap_or(false);
     if should_start {
+        if !entitlement.session_confirmed() {
+            return Err(crate::entitlement::entitlement_required_error("MCP Server"));
+        }
         // Shut down the current server first and await its full exit (including
         // port file cleanup) to prevent the new server's port file from being
         // deleted by stale cleanup.
@@ -650,6 +745,14 @@ mod tests {
     #[test]
     fn test_default_port_is_9121() {
         assert_eq!(get_default_port(), 9121);
+    }
+
+    #[test]
+    fn test_requests_are_denied_unless_a_session_and_a_plan_are_both_present() {
+        assert!(!entitlement_denied_for(true, true));
+        assert!(entitlement_denied_for(true, false));
+        assert!(entitlement_denied_for(false, true));
+        assert!(entitlement_denied_for(false, false));
     }
 
     #[test]

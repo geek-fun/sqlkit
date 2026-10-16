@@ -3,7 +3,10 @@ import {
   ENTITLEMENT_ERROR_TYPE,
   isEntitlementError,
   isSessionRejected,
+  isSshTunnelStrippedError,
+  markSshTunnelStripped,
   SESSION_REJECTED_ERROR_TYPE,
+  shouldStripSshTunnel,
 } from '@/common'
 
 function view(overrides: Partial<EntitlementView> = {}): EntitlementView {
@@ -17,6 +20,7 @@ function view(overrides: Partial<EntitlementView> = {}): EntitlementView {
     cancelScheduledAt: null,
     cached: false,
     fetchedAtMs: null,
+    sessionPhase: null,
     lastError: null,
     ...overrides,
   }
@@ -75,5 +79,27 @@ describe('entitlement view defaults', () => {
     const locked = view({ versionLocked: true, localUltimate: true })
     expect(locked.localUltimate).toBe(true)
     expect(locked.ultimateActive).toBe(false)
+  })
+})
+
+describe('ssh tunnel entitlement fallback', () => {
+  it('strips an enabled tunnel only for non-Ultimate plans', () => {
+    expect(shouldStripSshTunnel(true, false)).toBe(true)
+    expect(shouldStripSshTunnel(true, true)).toBe(false)
+    expect(shouldStripSshTunnel(false, false)).toBe(false)
+    expect(shouldStripSshTunnel(undefined, false)).toBe(false)
+  })
+
+  it('marks a failure as tunnel-stripped while keeping the original message', () => {
+    const failure = markSshTunnelStripped(new Error('Failed to connect: timeout'))
+    expect(isSshTunnelStrippedError(failure)).toBe(true)
+    expect(failure.message).toBe('Failed to connect: timeout')
+  })
+
+  it('never conflates a stripped tunnel with an entitlement rejection', () => {
+    const failure = markSshTunnelStripped(new Error('Failed to connect'))
+    expect(isEntitlementError(failure)).toBe(false)
+    expect(isSshTunnelStrippedError(new Error('Failed to connect'))).toBe(false)
+    expect(isSshTunnelStrippedError(undefined)).toBe(false)
   })
 })

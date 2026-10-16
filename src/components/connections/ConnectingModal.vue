@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { UPGRADE_URL } from '@/common'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
@@ -11,6 +13,7 @@ const { t } = useI18n()
 const showModal = ref(false)
 const connectionName = ref('')
 const errorMessage = ref('')
+const errorHint = ref('')
 const warningMessage = ref('')
 const cancelCallback = ref<(() => void) | null>(null)
 const retryCallback = ref<(() => void) | null>(null)
@@ -21,6 +24,7 @@ function show(name: string, onCancel: () => void, onRetry: () => void, warning =
   cancelCallback.value = onCancel
   retryCallback.value = onRetry
   errorMessage.value = ''
+  errorHint.value = ''
   warningMessage.value = warning
   showModal.value = true
 }
@@ -29,13 +33,19 @@ function hide() {
   showModal.value = false
   connectionName.value = ''
   errorMessage.value = ''
+  errorHint.value = ''
   warningMessage.value = ''
   cancelCallback.value = null
   retryCallback.value = null
 }
 
-function showError(error: string) {
+function showError(error: string, hint = '') {
   errorMessage.value = error
+  errorHint.value = hint
+}
+
+function openUpgrade() {
+  void openUrl(UPGRADE_URL)
 }
 
 function handleDialogOpenChange(open: boolean) {
@@ -49,11 +59,13 @@ function handleCancel() {
     cancelCallback.value()
   }
   errorMessage.value = ''
+  errorHint.value = ''
   hide()
 }
 
 function handleRetry() {
   errorMessage.value = ''
+  errorHint.value = ''
   if (retryCallback.value) {
     retryCallback.value()
   }
@@ -136,6 +148,23 @@ defineExpose({
                 <path d="m6 6 12 12" />
               </svg>
             </button>
+          </div>
+        </div>
+
+        <div
+          v-if="errorMessage && errorHint"
+          class="text-sm text-amber-700 p-4 border border-amber-500/40 rounded-md bg-amber-500/10 w-full dark:text-amber-400"
+        >
+          <div class="flex gap-3 items-start">
+            <span class="i-carbon-warning mt-0.5 flex-shrink-0 h-5 w-5" />
+            <div class="flex-1">
+              <p class="opacity-90">
+                {{ errorHint }}
+              </p>
+              <Button size="sm" class="mt-3" @click="openUpgrade">
+                {{ t('plan.upgrade.cta') }}
+              </Button>
+            </div>
           </div>
         </div>
 

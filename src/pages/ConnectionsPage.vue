@@ -2,12 +2,11 @@
 import type { ServerConnection } from '@/store'
 import type { SshProfile } from '@/store/sshProfileStore'
 import { invoke } from '@tauri-apps/api/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { Pencil, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { UPGRADE_URL } from '@/common'
+import { isSshTunnelStrippedError, shouldStripSshTunnel } from '@/common'
 import { ServerCard, ServerFormDialog } from '@/components/connections'
 import ConnectingModal from '@/components/connections/ConnectingModal.vue'
 import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
@@ -48,6 +47,7 @@ const connectError = ref<string | null>(null)
 const connectionCancelled = ref(false)
 const profileDeleteOpen = ref(false)
 const profileToDelete = ref<SshProfile | null>(null)
+const profileUsers = ref<ServerConnection[]>([])
 
 const profileAuthLabel = (profile: SshProfile) => {
   switch (profile.authMethod) {
@@ -60,16 +60,37 @@ const profileAuthLabel = (profile: SshProfile) => {
   }
 }
 
+const profileDeleteDetail = computed(() => {
+  const names = profileUsers.value.map(connection => connection.name)
+  if (names.length === 0)
+    return t('components.destructiveDialog.deleteProfile.detail')
+  return `${t('components.destructiveDialog.deleteProfile.detail')} ${t('components.destructiveDialog.deleteProfile.inUse', {
+    count: names.length,
+    names: names.join(', '),
+  })}`
+})
+
 function openProfileDelete(profile: SshProfile) {
+  if (!guardSshProfileManagement())
+    return
   profileToDelete.value = profile
+  profileUsers.value = connectionStore.connectionsUsingProfile(profile.id)
   profileDeleteOpen.value = true
 }
 
 async function confirmProfileDelete() {
-  if (profileToDelete.value) {
-    await sshProfileStore.remove(profileToDelete.value.id)
+  const profile = profileToDelete.value
+  if (!profile)
+    return
+  try {
+    await connectionStore.detachSshProfile(profile.id)
+    await sshProfileStore.remove(profile.id)
     profileToDelete.value = null
+    profileUsers.value = []
     profileDeleteOpen.value = false
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : String(error))
   }
 }
 const connectingModal = ref<InstanceType<typeof ConnectingModal> | null>(null)
@@ -104,9 +125,6 @@ function handleAddConnection() {
 }
 
 function handleEditConnection(connection: ServerConnection) {
-  if (!guardSshConnection(connection)) {
-    return
-  }
   editingConnection.value = connection
   isFormDialogOpen.value = true
 }
@@ -138,6 +156,11 @@ const systemProxyWarning = async (connection: ServerConnection): Promise<string 
   }
 }
 
+const sshTunnelSkippedWarning = (connection: ServerConnection): string | undefined =>
+  shouldStripSshTunnel(connection.sshTunnel?.enabled, entitlementStore.isLocalUltimate)
+    ? t('components.connectingModal.sshTunnelSkipped')
+    : undefined
+
 async function establishConnection(connection: ServerConnection, navigateOnSuccess = true) {
   if (!connection.id) {
     return
@@ -146,8 +169,7 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
   connectionCancelled.value = false
 
   // Show the modal first (instant click feedback), then resolve the async
-  // system-proxy diagnostic and patch the warning in — `setWarning` tolerates
-  // the modal having closed meanwhile.
+  // diagnostic and patch the warning in; a dropped tunnel outranks the proxy probe.
   connectingModal.value?.show(
     connection.name,
     () => {
@@ -155,8 +177,9 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
     },
     () => establishConnection(connection, navigateOnSuccess),
   )
-  const proxyWarning = await systemProxyWarning(connection)
-  connectingModal.value?.setWarning(proxyWarning ?? null)
+  const tunnelWarning = sshTunnelSkippedWarning(connection)
+  const proxyWarning = tunnelWarning ? undefined : await systemProxyWarning(connection)
+  connectingModal.value?.setWarning(tunnelWarning ?? proxyWarning ?? null)
 
   const startTime = Date.now()
 
@@ -202,17 +225,11 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
     }
 
     const errorMessage = err instanceof Error ? err.message : String(err)
-    connectingModal.value?.showError(errorMessage)
+    connectingModal.value?.showError(
+      errorMessage,
+      isSshTunnelStrippedError(err) ? t('components.connectingModal.sshTunnelStripped') : '',
+    )
   }
-}
-
-// an SSH-bound saved connection is only operable with Ultimate — instead of
-// attempting a connect that dies with a raw 403, route to the pricing site
-function guardSshConnection(connection: ServerConnection): boolean {
-  if (entitlementStore.isLocalUltimate || !connection.sshTunnel?.enabled)
-    return true
-  openUrl(UPGRADE_URL)
-  return false
 }
 
 // SSH profile management is Ultimate-only — the modal carries pricing + trial
@@ -231,9 +248,6 @@ function openProfileEdit(profile: SshProfile) {
 
 async function handleConnect(connection: ServerConnection) {
   connectError.value = null
-  if (!guardSshConnection(connection)) {
-    return
-  }
   if (!connection.id) {
     return
   }
@@ -254,9 +268,6 @@ async function handleConnect(connection: ServerConnection) {
 
 async function handleDoubleClick(connection: ServerConnection) {
   connectError.value = null
-  if (!guardSshConnection(connection)) {
-    return
-  }
   if (!connection.id) {
     return
   }
@@ -275,9 +286,6 @@ async function handleDoubleClick(connection: ServerConnection) {
 }
 
 function handleDeleteConnection(connection: ServerConnection) {
-  if (!guardSshConnection(connection)) {
-    return
-  }
   connectionToDelete.value = connection
   deleteDialogOpen.value = true
 }
@@ -291,9 +299,6 @@ async function confirmDelete() {
 }
 
 function handleDuplicateConnection(connection: ServerConnection) {
-  if (!guardSshConnection(connection)) {
-    return
-  }
   editingConnection.value = {
     ...connection,
     id: undefined,
@@ -649,7 +654,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
       v-model:open="profileDeleteOpen"
       :title="t('components.destructiveDialog.deleteProfile.title')"
       :message="t('components.destructiveDialog.deleteProfile.message', { name: profileToDelete?.name })"
-      :detail="t('components.destructiveDialog.deleteProfile.detail')"
+      :detail="profileDeleteDetail"
       :confirm-label="t('components.destructiveDialog.deleteProfile.confirm')"
       @confirm="confirmProfileDelete"
     />

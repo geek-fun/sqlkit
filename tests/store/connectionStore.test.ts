@@ -1,7 +1,9 @@
 import type { ServerConnection } from '@/store/connectionStore'
 import { createPinia, setActivePinia } from 'pinia'
+import { isSshTunnelStrippedError } from '@/common'
 import { connectionApi } from '@/datasources/connectionApi'
 import { buildTransportLayers, ConnectionStatus, DatabaseType, dbTypeToBackend, resolveDatabase, useConnectionStore } from '@/store/connectionStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 
 jest.mock('@/datasources/connectionApi', () => ({
   connectionApi: {
@@ -533,6 +535,59 @@ describe('connectionStore', () => {
       })
     })
 
+    describe('detachSshProfile', () => {
+      const tunnelled = (id: string, name: string, profileIds: string[]): ServerConnection => ({
+        ...createMockConnection({ id, name }),
+        sshTunnel: { enabled: true, host: 'bastion', port: 22, username: 'ops', authMethod: 'password', profileIds },
+      })
+
+      it('reports the connections that hop through a profile', () => {
+        const store = useConnectionStore()
+        store.connections = [
+          tunnelled('conn-1', 'Prod', ['hop-1', 'hop-2']),
+          tunnelled('conn-2', 'Dev', ['hop-2']),
+          createMockConnection({ id: 'conn-3', name: 'Plain' }),
+        ]
+
+        expect(store.connectionsUsingProfile('hop-1').map(c => c.id)).toEqual(['conn-1'])
+        expect(store.connectionsUsingProfile('hop-2').map(c => c.id)).toEqual(['conn-1', 'conn-2'])
+        expect(store.connectionsUsingProfile('unused')).toEqual([])
+      })
+
+      it('saves every user of the profile without it', async () => {
+        connectionApi.save.mockImplementation(async (config: { id: string }) => config.id)
+
+        const store = useConnectionStore()
+        store.connections = [
+          tunnelled('conn-1', 'Prod', ['hop-1', 'hop-2']),
+          tunnelled('conn-2', 'Dev', ['hop-2']),
+          createMockConnection({ id: 'conn-3', name: 'Plain' }),
+        ]
+
+        await store.detachSshProfile('hop-2')
+
+        const savedProfilesById = Object.fromEntries(
+          connectionApi.save.mock.calls.map(([config]) => {
+            const saved = config as { sshTunnel?: { profileIds?: string[] }, id: string }
+            return [saved.id, saved.sshTunnel?.profileIds]
+          }),
+        )
+        expect(connectionApi.save).toHaveBeenCalledTimes(2)
+        expect(savedProfilesById).toEqual({ 'conn-1': ['hop-1'], 'conn-2': [] })
+        expect(store.connections[0].sshTunnel?.profileIds).toEqual(['hop-1'])
+        expect(store.connections[2].sshTunnel).toBeUndefined()
+      })
+
+      it('raises the save failure so the caller can keep the profile', async () => {
+        connectionApi.save.mockRejectedValue(new Error('disk full'))
+
+        const store = useConnectionStore()
+        store.connections = [tunnelled('conn-1', 'Prod', ['hop-1'])]
+
+        await expect(store.detachSshProfile('hop-1')).rejects.toThrow('disk full')
+      })
+    })
+
     describe('testConnection', () => {
       it('should return true when connection succeeds', async () => {
         connectionApi.test.mockResolvedValue({ is_connected: true })
@@ -647,6 +702,74 @@ describe('connectionStore', () => {
         await store.connect('conn-1')
 
         expect(store.connections[0].lastUsed).toBeInstanceOf(Date)
+      })
+    })
+
+    describe('connect — Ultimate-only SSH tunnel fallback', () => {
+      const sshConnection = (): ServerConnection => ({
+        id: 'conn-1',
+        name: 'Bastioned',
+        type: DatabaseType.POSTGRESQL,
+        host: 'db.internal',
+        port: 5432,
+        ssl: false,
+        sshTunnel: { enabled: true, host: 'bastion', port: 22, username: 'ops', authMethod: 'password', profileIds: ['hop-1'] },
+      })
+
+      it('drops the tunnel and connects directly on a free plan', async () => {
+        connectionApi.connect.mockResolvedValue({ is_connected: true })
+
+        const store = useConnectionStore()
+        store.connections = [sshConnection()]
+
+        await store.connect('conn-1')
+
+        expect(connectionApi.connect).toHaveBeenCalledTimes(1)
+        expect(connectionApi.connect.mock.calls[0][0]).toMatchObject({
+          host: 'db.internal',
+          transport_layers: null,
+        })
+        expect(store.connectionStatus['conn-1']).toBe(ConnectionStatus.CONNECTED)
+      })
+
+      it('keeps the tunnel for Ultimate plans', async () => {
+        useEntitlementStore().view = { localUltimate: true } as never
+        connectionApi.connect.mockResolvedValue({ is_connected: true })
+
+        const store = useConnectionStore()
+        store.connections = [sshConnection()]
+
+        await store.connect('conn-1')
+
+        const sent = connectionApi.connect.mock.calls[0][0] as { transport_layers: unknown[] }
+        expect(sent.transport_layers).toHaveLength(1)
+      })
+
+      it('reports a failure as tunnel-stripped when the direct attempt dies', async () => {
+        connectionApi.connect.mockRejectedValue(new Error('Connection refused'))
+
+        const store = useConnectionStore()
+        store.connections = [sshConnection()]
+
+        const failure = await store.connect('conn-1').catch(err => err)
+
+        expect(failure).toBeInstanceOf(Error)
+        expect((failure as Error).message).toContain('Failed to connect')
+        expect(isSshTunnelStrippedError(failure)).toBe(true)
+        expect(store.connectionStatus['conn-1']).toBe(ConnectionStatus.ERROR)
+      })
+
+      it('leaves a plain failure unmarked when no tunnel was involved', async () => {
+        connectionApi.connect.mockRejectedValue(new Error('Connection refused'))
+
+        const store = useConnectionStore()
+        store.connections = [
+          { id: 'conn-1', name: 'Plain', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: false },
+        ]
+
+        const failure = await store.connect('conn-1').catch(err => err)
+
+        expect(isSshTunnelStrippedError(failure)).toBe(false)
       })
     })
 

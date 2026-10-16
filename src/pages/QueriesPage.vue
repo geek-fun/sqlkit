@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { isSshTunnelStrippedError, shouldStripSshTunnel } from '@/common'
 import { DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/components/database-browser'
 import ListingTab from '@/components/database-browser/ListingTab.vue'
 import ErDiagramView from '@/components/er-diagram/ErDiagramView.vue'
@@ -134,6 +135,11 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
     return
   }
 
+  const connection = connectionStore.getConnectionById(newConnId)
+  if (shouldStripSshTunnel(connection?.sshTunnel?.enabled, entitlementStore.isLocalUltimate)) {
+    toast.warning(t('components.connectingModal.sshTunnelSkipped'))
+  }
+
   try {
     await connectionStore.connect(newConnId)
     connectionStore.setActiveConnection(newConnId)
@@ -142,6 +148,9 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
   }
   catch (error) {
     console.error('Failed to connect:', error)
+    if (isSshTunnelStrippedError(error)) {
+      toast.warning(t('components.connectingModal.sshTunnelStripped'))
+    }
   }
 })
 

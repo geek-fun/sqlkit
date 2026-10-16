@@ -49,6 +49,8 @@ export const useAccountStore = defineStore('account', {
       this.refreshToken = ''
       this.username = ''
       this.email = ''
+      this.userId = ''
+      this.avatar = ''
     },
   },
 })

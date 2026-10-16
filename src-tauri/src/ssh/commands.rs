@@ -80,12 +80,62 @@ pub async fn save_ssh_profile(app: AppHandle, profile: SshProfile) -> Result<Ssh
     Ok(profile)
 }
 
-/// Delete an SSH profile by ID.
+/// Names of the connections whose SSH chain still lists `profile_id`.
+fn profile_users(connections: &[serde_json::Value], profile_id: &str) -> Vec<String> {
+    connections
+        .iter()
+        .filter(|connection| {
+            connection
+                .get("sshTunnel")
+                .and_then(|tunnel| tunnel.get("profileIds"))
+                .and_then(|ids| ids.as_array())
+                .is_some_and(|ids| ids.iter().any(|id| id.as_str() == Some(profile_id)))
+        })
+        .filter_map(|connection| {
+            connection
+                .get("name")
+                .and_then(|name| name.as_str())
+                .map(str::to_string)
+        })
+        .collect()
+}
+
+/// Delete-time guard: the connections that still reference `profile_id`.
+fn connections_using_profile(
+    store: &tauri_plugin_store::Store<tauri::Wry>,
+    profile_id: &str,
+) -> Option<Vec<String>> {
+    let connections = store
+        .get("connections")
+        .and_then(|value| value.as_array().cloned())
+        .unwrap_or_default();
+    let users = profile_users(&connections, profile_id);
+    if users.is_empty() {
+        None
+    } else {
+        Some(users)
+    }
+}
+
+/// Delete an SSH profile by ID. Refused while any connection still references
+/// it — the callers detach it there first, so an in-use tunnel is never
+/// silently broken.
 #[tauri::command]
 pub async fn delete_ssh_profile(app: AppHandle, profile_id: String) -> Result<(), String> {
+    crate::entitlement::ensure_local_ultimate(
+        &app.state::<crate::entitlement::EntitlementState>(),
+        "SSH tunnel",
+    )?;
     let store = app
         .store(".store.dat")
         .map_err(|e| format!("Failed to open store: {}", e))?;
+
+    if let Some(users) = connections_using_profile(&store, &profile_id) {
+        return Err(format!(
+            "SSH profile is still used by: {}",
+            users.join(", ")
+        ));
+    }
 
     let mut profiles: Vec<SshProfile> = store
         .get("sshProfiles")
@@ -175,4 +225,27 @@ pub async fn test_ssh_connection(
 pub async fn list_ssh_config_hosts() -> Result<Vec<crate::ssh::config::SshConfigHostEntry>, String>
 {
     read_ssh_config()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn profile_users_lists_only_the_connections_that_reference_it() {
+        let connections = vec![
+            json!({ "name": "prod", "sshTunnel": { "profileIds": ["p1", "p2"] } }),
+            json!({ "name": "dev", "sshTunnel": { "profileIds": ["p2"] } }),
+            json!({ "name": "plain", "sshTunnel": null }),
+            json!({ "name": "other", "sshTunnel": { "profileIds": [] } }),
+        ];
+
+        assert_eq!(profile_users(&connections, "p1"), vec!["prod".to_string()]);
+        assert_eq!(
+            profile_users(&connections, "p2"),
+            vec!["prod".to_string(), "dev".to_string()]
+        );
+        assert!(profile_users(&connections, "unused").is_empty());
+    }
 }

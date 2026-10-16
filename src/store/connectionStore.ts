@@ -1,8 +1,10 @@
 import type { SslConfig } from '@/types/connection'
 import { listen } from '@tauri-apps/api/event'
 import { defineStore } from 'pinia'
+import { markSshTunnelStripped, shouldStripSshTunnel } from '@/common'
 import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
 import { connectionApi } from '../datasources'
+import { useEntitlementStore } from './entitlementStore'
 import { profileToTransportLayer, useSshProfileStore } from './sshProfileStore'
 
 export enum DatabaseType {
@@ -694,6 +696,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? false,
           transport_layers: transportLayers,
+          sshTunnel: connection.sshTunnel ?? null,
           oracle_options: buildOracleOptions(connection.oracleOptions),
           read_only: connection.readOnly ?? false,
         }
@@ -722,6 +725,34 @@ export const useConnectionStore = defineStore('connectionStore', {
 
       await connectionApi.delete(connection.id)
       this.connections = this.connections.filter(c => c.id !== connection.id)
+    },
+
+    connectionsUsingProfile(profileId: string): ServerConnection[] {
+      return this.connections.filter(connection =>
+        connection.sshTunnel?.profileIds?.includes(profileId),
+      )
+    },
+
+    async detachSshProfile(profileId: string): Promise<void> {
+      const detach = (connection: ServerConnection): ServerConnection =>
+        connection.sshTunnel
+          ? {
+              ...connection,
+              sshTunnel: {
+                ...connection.sshTunnel,
+                profileIds: connection.sshTunnel.profileIds?.filter(id => id !== profileId) ?? [],
+              },
+            }
+          : connection
+
+      const results = await Promise.all(
+        this.connectionsUsingProfile(profileId).map(connection =>
+          this.saveConnection(detach(connection)),
+        ),
+      )
+      const failure = results.find(result => !result.success)
+      if (failure)
+        throw new Error(failure.message)
     },
 
     async testConnection(connection: ServerConnection): Promise<boolean> {
@@ -769,8 +800,15 @@ export const useConnectionStore = defineStore('connectionStore', {
 
       this.connectionStatus[connectionId] = ConnectionStatus.CONNECTING
 
+      // A free plan drops the saved tunnel for this attempt; the config is untouched.
+      const sshTunnelStripped = shouldStripSshTunnel(
+        connection.sshTunnel?.enabled,
+        useEntitlementStore().isLocalUltimate,
+      )
+
       try {
-        const transportLayers = await buildTransportLayers(connection.sshTunnel)
+        const transportLayers
+          = sshTunnelStripped ? null : await buildTransportLayers(connection.sshTunnel)
 
         const serverConfig = {
           id: connection.id!,
@@ -810,7 +848,8 @@ export const useConnectionStore = defineStore('connectionStore', {
       }
       catch (error) {
         this.connectionStatus[connectionId] = ConnectionStatus.ERROR
-        throw new Error(`Failed to connect: ${error}`)
+        const failure = new Error(`Failed to connect: ${error}`)
+        throw sshTunnelStripped ? markSshTunnelStripped(failure) : failure
       }
     },
 

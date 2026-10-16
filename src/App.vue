@@ -11,10 +11,12 @@ import AppNotifications from '@/components/ui/notification/AppNotifications.vue'
 import UpdateNotification from '@/components/UpdateNotification.vue'
 import UpgradeDialog from '@/components/upgrade/UpgradeDialog.vue'
 import { useAppUpdater } from '@/composables/useAppUpdater'
+import { toast } from '@/composables/useNotifications'
 import { useAccountStore } from '@/store/accountStore'
 import { useAppStore } from '@/store/appStore'
 import { useDeviceStore } from '@/store/deviceStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
+import { lang } from './lang'
 
 type AuthPayload = {
   token: string
@@ -81,6 +83,10 @@ onMounted(async () => {
     // geekfun#59: entitlement-activation point — register/verify this device.
     deviceStore.ensureActivated()
   }
+  else {
+    // A cached plan must not outlive the session.
+    void entitlementStore.clearCachedEntitlement()
+  }
 
   // Listeners must exist before the pending-auth pull below.
   unlistenAuth = await listen<AuthPayload>('sqlkit://auth', ({ payload }) => {
@@ -111,6 +117,16 @@ onUnmounted(() => {
   unlistenAuth?.()
   unlistenSessionRefresh?.()
 })
+
+// The store resolves the loss; surface the single notice.
+watch(
+  () => entitlementStore.sessionLostNotice,
+  (noticeAt) => {
+    if (!noticeAt)
+      return
+    toast.warning(lang.global.t('plan.section.sessionLostSignedOut'))
+  },
+)
 </script>
 
 <template>

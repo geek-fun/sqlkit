@@ -3,8 +3,10 @@ import type { OracleConnectionOptions, ServerConnection } from '@/store'
 import type { DatabaseFileAssessment } from '@/utils/databaseFiles'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { shouldStripSshTunnel, UPGRADE_URL } from '@/common'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -24,7 +26,7 @@ import { useDownloadEvents } from '@/composables/useDownloadEvents'
 import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
 import { jdbcApi } from '@/datasources/jdbcApi'
-import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase, useConnectionStore } from '@/store'
+import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase, useConnectionStore, useEntitlementStore } from '@/store'
 import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import { buildMemoryDatabaseHost, createMemoryDatabaseLabel, isMemoryDatabaseHost, isSameDatabaseFile, memoryDatabaseLabel } from '@/utils/databaseFiles'
 import { classifyDuckDbFailure } from '@/utils/duckdbErrors'
@@ -41,6 +43,10 @@ const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'save', connection: ServerConnection): void
 }>()
+
+const openUpgrade = () => {
+  void openUrl(UPGRADE_URL)
+}
 
 const { t } = useI18n()
 const { getDatabaseIcon } = useDatabaseIcon()
@@ -129,6 +135,8 @@ const defaultConnection: ServerConnection = {
 const formData = ref<ServerConnection>({ ...defaultConnection })
 const testStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
 const testError = ref<string>('')
+/** The last test ran without the saved SSH tunnel (Ultimate-only feature). */
+const testSshTunnelStripped = ref(false)
 const formErrors = ref<Record<string, string>>({})
 const isPickingFile = ref(false)
 
@@ -202,6 +210,7 @@ const duckdbMemoryLabel = ref<string>('')
 const duckdbFileStatus = ref<DatabaseFileAssessment | null>(null)
 
 const connectionStore = useConnectionStore()
+const entitlementStore = useEntitlementStore()
 const { platform } = usePlatform()
 
 watch(() => props.open, (open) => {
@@ -250,6 +259,7 @@ watch(() => props.open, (open) => {
     }
     testStatus.value = 'idle'
     testError.value = ''
+    testSshTunnelStripped.value = false
     formErrors.value = {}
     // Always open on the Basic tab — landing on Advanced carries the previous
     // dialog's context into a new/edit session.
@@ -698,6 +708,11 @@ async function handleTestConnection() {
   testStatus.value = 'testing'
   testError.value = ''
 
+  testSshTunnelStripped.value = shouldStripSshTunnel(
+    formData.value.sshTunnel?.enabled,
+    entitlementStore.isLocalUltimate,
+  )
+
   // Reset steps to pending — checks will promote to done or running
   setupSteps.value.forEach((s) => {
     s.status = 'pending'
@@ -771,7 +786,9 @@ async function handleTestConnection() {
       ssl_client_cert: formData.value.ssl.clientCertPath || null,
       ssl_client_key: formData.value.ssl.clientKeyPath || null,
       trust_server_certificate: formData.value.ssl.trustServerCertificate ?? null,
-      transport_layers: await buildTransportLayers(formData.value.sshTunnel),
+      transport_layers: testSshTunnelStripped.value
+        ? null
+        : await buildTransportLayers(formData.value.sshTunnel),
       oracle_options: buildOracleOptions(formData.value.oracleOptions),
       read_only: formData.value.readOnly ?? false,
     }
@@ -902,7 +919,7 @@ function handleSave() {
 
           <!-- Fixed-height scroll region so Basic and Advanced render at the
                same height — tab switches don't reflow the dialog -->
-          <TabsContent value="basic" class="mt-2 overflow-y-auto space-y-4" :class="isFileBased ? '' : 'h-[26rem] pr-1'">
+          <TabsContent value="basic" class="mt-2 overflow-y-auto space-y-4" :class="isFileBased ? '' : 'h-[32rem] max-h-[calc(90vh-20rem)] pr-1'">
             <!-- Connection Name -->
             <div class="space-y-2">
               <Label for="name">{{ t('components.serverForm.labels.connectionName') }}<span class="text-destructive ml-0.5">*</span></Label>
@@ -1451,7 +1468,7 @@ function handleSave() {
           </TabsContent>
 
           <!-- Advanced: SSL/TLS + SSH Tunnel -->
-          <TabsContent value="advanced" class="mt-2 pr-1 h-[34rem] max-h-[calc(90vh-20rem)] overflow-y-auto space-y-4">
+          <TabsContent value="advanced" class="mt-2 pr-1 h-[32rem] max-h-[calc(90vh-20rem)] overflow-y-auto space-y-4">
             <SslConfigSection
               v-if="showsStandardHostFields"
               v-model="formData.ssl"
@@ -1570,6 +1587,23 @@ function handleSave() {
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="testSshTunnelStripped"
+          class="text-sm text-amber-700 mt-2 p-4 border border-amber-500/40 rounded-md bg-amber-500/10 dark:text-amber-400"
+        >
+          <div class="flex gap-3 items-start">
+            <span class="i-carbon-warning mt-0.5 flex-shrink-0 h-5 w-5" />
+            <div class="flex-1">
+              <p class="opacity-90">
+                {{ t('components.serverForm.ssh.tunnelSkippedHint') }}
+              </p>
+              <Button size="sm" class="mt-3" @click="openUpgrade">
+                {{ t('plan.upgrade.cta') }}
+              </Button>
             </div>
           </div>
         </div>
