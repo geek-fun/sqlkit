@@ -1,53 +1,79 @@
-# SQLKit PostgreSQL Stress-Test Suite
+# SQLKit 多数据库压测套件
 
-Realistic e-commerce business data (users, merchants, products, orders,
-payments, reviews, coupons) designed to exercise every SQLKit feature panel
-against a complex PostgreSQL setup.
+同一套电商业务域（用户 / 商户 / 分类树 / 商品 / 订单 / 明细 / 支付 / 评价 / 优惠券 /
+库存预留 / 审计日志）覆盖 **PostgreSQL、MySQL、SQL Server、Oracle** 四个数据库，
+用来把 SQLKit 的元数据面板和查询编辑器在复杂结构上跑一遍 —— 不是单元测试，
+而是**手工验证用的压测脚本 + 期望行为清单**。
 
-**Target:** the docker ssh-tunnel test stack — `pg-test:5432/testdb`
-(`tester` / `testpass`), reachable through the bastion at `localhost:2223`.
+四个引擎的目录结构完全对称，便于横向对比同一功能在各家的落地方式：
 
-Execute the files **in order**:
+```
+docs/sql-test/
+├── postgres/   01_schema.sql  02_seed.sql  03_complex_queries.sql  README.md
+├── mysql/      01_schema.sql  02_seed.sql  03_complex_queries.sql  README.md
+├── sqlserver/  01_schema.sql  02_seed.sql  03_complex_queries.sql  README.md
+└── oracle/     01_schema.sql  02_seed.sql  03_complex_queries.sql  README.md
+```
 
-| File | What it does |
-|------|--------------|
-| `01_schema.sql` | Creates 3 schemas (`store` / `analytics` / `billing`), enums + domains + composite types, 12+ tables (partitioned orders, composite PK/FK, generated column, EXCLUDE constraints, deferrable unique), views (updatable / `WITH CHECK OPTION` / security barrier), a materialized view, functions (overloaded, cross-schema same name), procedures, and row/statement-level triggers. |
-| `02_seed.sql` | Generates deterministic business data: 400 users, 10 merchants, 60 products, 500 orders across the Q1 partitions, ~1,200 line items, payments, reviews, coupons, audit rows. Ends with a per-table count card so you can verify the load. |
-| `03_complex_queries.sql` | A 19-section query playground: multi-CTE reports, `WITH RECURSIVE` category tree, `LATERAL` top-N, window functions (moving average / lag / lead / RANGE frames), `GROUPING SETS` + `FILTER`, `FULL OUTER JOIN` / `INTERSECT` / `EXCEPT`, `DISTINCT ON`, `ON CONFLICT` upserts with `RETURNING`, `MERGE`, transactions with `SAVEPOINT` rollback, `DO` blocks, `CALL` procedures, `EXPLAIN (ANALYZE, BUFFERS)` + partition pruning, `UPDATE FROM` / `DELETE USING`, deferred-constraint swaps. |
+三个文件的固定分工：
 
-Each section in `03_complex_queries.sql` is separated by banner comments —
-run them one at a time (or select-and-execute) to test the query editor,
-result grid, large result sets, multi-statement execution, and error paths.
+| 文件 | 职责 |
+|------|------|
+| `01_schema.sql` | 清场 + 建对象全景：多 schema/库、全类型覆盖、主外键、各类索引、分区、视图、物化视图/索引视图、函数、过程、触发器、序列/生成列。**幂等**，可反复执行。 |
+| `02_seed.sql` | 确定性灌数（400 用户 / 10 商户 / 60 商品 / 500 订单 / ~1200 明细 + 支付/评价/券），结尾输出计数卡片。**幂等**。 |
+| `03_complex_queries.sql` | 按字母分段的查询演练场（递归 CTE、窗口函数、聚合集、JSON、UPSERT、事务与保存点、执行计划、分区裁剪等），**逐段执行**验证编辑器与结果网格。 |
+| `README.md` | 该引擎的目标实例与凭据、面板检查清单、与 PostgreSQL 的方言差异、已知限制。 |
 
-## Suggested SQLKit checks
+## 覆盖的 SQLKit 面板
 
-- **Schemas panel** — 3 schemas should list and switch.
-- **Tables / Columns / Table Info** — partitioned parent vs leaf partitions,
-  composite PKs, generated columns, `COMMENT ON` metadata.
-- **Indexes panel** — expression / partial / trigram GIN / BRIN / covering indexes.
-- **Foreign Keys panel** — named & unnamed (default) constraints, composite FK,
-  `ON DELETE CASCADE / SET NULL / RESTRICT`.
-- **Triggers / Views / Procedures / Functions panels** — including the
-  same-name functions in `store` vs `analytics` schemas (schema-scoping check).
-- **DDL preview** on tables, views, materialized views, partitioned tables.
-- **Drop / Rename** on throwaway objects (e.g. the temp-style tables).
-- **Query editor** — run `03_complex_queries.sql` section 1..19, each should
-  execute / produce a meaningful result grid / clean error.
+四个套件都刻意准备了对应用例，用于验证：
 
-## Notes
+- **Schemas** —— PG 的三 schema、MySQL 的三 database、SQL Server 的多 schema、Oracle 的单用户 schema
+- **Tables / Columns / Table Info** —— 复合主键、生成列/虚拟列、分区表、注释元数据
+- **Indexes** —— 唯一/复合/部分（或等效）/全文/空间/函数/位图等各家专属索引类型
+- **Foreign Keys** —— 命名与默认命名约束、复合外键、`CASCADE / SET NULL / RESTRICT`
+- **Triggers / Views / Procedures / Functions** —— 行级与语句级触发器、可更新视图、物化/索引视图、重载函数
+- **DDL 预览 / Drop / Rename** —— 表、视图、物化视图、分区表
+- **Query editor** —— 逐段执行 `03_*`，观察结果网格、行数、耗时与报错路径
 
-- Everything is idempotent: `01_schema.sql` drops and recreates all objects;
-  `02_seed.sql` truncates first. Re-running the suite resets to a fresh state.
-- `03_complex_queries.sql` contains exactly one expected error: section I
-  intentionally violates the `reservations_no_overlap` EXCLUDE constraint and
-  immediately rescues the transaction with `ROLLBACK TO SAVEPOINT`. Any other
-  error means something needs fixing (run with `ON_ERROR_STOP` when debugging).
-- `adminpack` may not be available on newer PostgreSQL builds — if the
-  `CREATE EXTENSION adminpack` line errors, delete just that line; the rest
-  of the suite does not depend on it.
-- The `tester` user in the docker stack is a superuser, so extension creation
-  works. On a managed cluster you may need `pg_trgm` / `btree_gist` privileges
-  or DBA cooperation.
-- Trigger-driven audit rows accumulate in `store.audit_log` — its content is
-  a good way to verify that SQLKit-issued INSERT/UPDATE/DELETE statements
-  really hit the database behind the tunnel.
+## 四个引擎的测试实例
+
+四个库都跑在同一套 docker ssh-tunnel 测试栈里（compose 文件在
+`event-search/docker-compose-sqlkit-ssh-tunnel.yml`），**只在内部网络**，
+经堡垒机 `localhost:2223` 转发访问（堡垒机 `tester` / `testpass`）。
+
+| 引擎 | 堡垒机内侧地址 | 凭据 | 套件使用的对象 |
+|---|---|---|---|
+| PostgreSQL 17 | `pg-test:5432` | `tester` / `testpass` / `testdb` | 库 `testdb`，schema `store` / `analytics` / `billing` |
+| MySQL 8.4 | `mysql-test:3306` | `root` / `testpass`（`tester` 同密码） | 库 `sqlkit-demo` + `sqlkit-analytics` + `sqlkit-billing` |
+| SQL Server 2022 | `sqlserver-test:1433` | `sa` / `TestPass!2024` | 库 `testdb` |
+| Oracle 23ai Free | `oracle-test:1521` | `sqlkit` / `testpass` / 服务名 `FREEPDB1` | 用户 schema `SQLKIT` |
+
+> MySQL 套件单独建库是因为栈内 `tester` 只被授权 `testdb.*`；若坚持用 `tester`，
+> 先 `GRANT ALL PRIVILEGES ON \`sqlkit-demo\`.* TO 'tester'@'%';`。
+> 详见 [mysql/README.md](mysql/README.md)。
+
+## 为什么不能只写一份通用 SQL
+
+四个引擎在「同一件事」上的语法差异很大，套件刻意保留这些差异而不是回避，
+这样才真正压到 SQLKit 的方言分支。最典型的几处：
+
+| 能力 | PostgreSQL | MySQL | SQL Server | Oracle |
+|---|---|---|---|---|
+| 生成序列 | `generate_series()` | 递归 CTE | 递归 CTE / 数字表 | `CONNECT BY LEVEL` |
+| UPSERT | `ON CONFLICT ... DO UPDATE` | `ON DUPLICATE KEY UPDATE` | `MERGE` | `MERGE`（**不支持** `ON DUPLICATE KEY UPDATE`，实测 ORA-03048） |
+| 分区表 + 外键 | 支持 | **不支持**（分区表禁外键） | 支持（分区函数 + 方案） | 支持（含 INTERVAL 分区） |
+| 可延迟约束 | `DEFERRABLE` | 不支持 | 不支持 | 支持 |
+| 条件聚合 | `FILTER (WHERE ...)` | 无，用 `CASE WHEN` | 有 | 有 |
+| 物化视图 | `MATERIALIZED VIEW` | 无 | 索引视图（`SCHEMABINDING`） | `MATERIALIZED VIEW` |
+| 部分索引 | `WHERE` 部分索引 | 无 | 筛选索引（filtered index） | 无 |
+| 数组/网络/范围类型 | 原生 `text[]` `inet` `range` | JSON / VARBINARY | JSON / 无 | JSON / 无 |
+
+各引擎 README 里有完整的逐项对照表。
+
+## 使用建议
+
+1. 先在 SQLKit 里按对应 README 的凭据建立连接（经 SSH 隧道）。
+2. 顺序执行 `01_schema.sql` → `02_seed.sql`，确认结尾计数卡片符合 README 预期。
+3. 逐段执行 `03_complex_queries.sql`，对照 README 的面板检查清单过一遍 UI。
+4. 想复现干净状态时重跑 `01` + `02` 即可（全部幂等）。

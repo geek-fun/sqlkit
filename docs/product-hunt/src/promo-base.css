@@ -1,0 +1,114 @@
+/* SqlKit Product Hunt — shared promo design system.
+   Dark #0B0F16 -> #10151E, orange #F97316 / #FB923C, hairline borders,
+   18px radius, system font stack, chip pills, uppercase micro-labels.
+   Canvases are fixed-size (set per asset); left/right content keeps >=110px edge padding. */
+
+:root {
+  --bg0: #0a0e15;
+  --bg1: #0e141d;
+  --accent: #f97316;
+  --accent2: #fb923c;
+  --accent-deep: #c2410c;
+  --ink: #f4f7fb;
+  --ink-2: #e2e8f0;
+  --muted: #94a3b8;
+  --muted-2: rgba(255, 255, 255, 0.55);
+  --hairline: rgba(255, 255, 255, 0.08);
+  --tile-fill: linear-gradient(180deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.015));
+  --radius: 18px;
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto,
+    "Helvetica Neue", Arial, "PingFang SC", "Microsoft YaHei", "Noto Sans SC", sans-serif;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  overflow: hidden;
+  background: var(--bg0);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+body {
+  font-family: var(--font);
+  color: var(--ink);
+}
+
+/* Full-canvas stage with SqlKit dark radial/linear wash */
+.stage {
+  position: relative;
+  background:
+    radial-gradient(1500px 1050px at 2% -12%, rgba(249, 115, 22, 0.16), transparent 62%),
+    radial-gradient(1200px 950px at 112% 120%, rgba(249, 115, 22, 0.09), transparent 58%),
+    radial-gradient(1600px 900px at 55% 118%, rgba(56, 88, 150, 0.10), transparent 60%),
+    linear-gradient(123deg, #090d14 0%, #0e141e 50%, #0a0f16 100%);
+  overflow: hidden;
+}
+
+/* Top accent glow line */
+.topglow {
+  position: absolute; left: 0; top: 0; width: 100%; height: 2px;
+  background: linear-gradient(90deg, transparent 6%, rgba(251, 146, 60, 0.85) 28%,
+    rgba(251, 146, 60, 0.55) 50%, transparent 74%);
+}
+
+/* Vertical divider between left copy and right visual */
+.divider {
+  position: absolute; width: 1px;
+  background: linear-gradient(180deg, transparent 0%, rgba(255, 255, 255, 0.10) 18%,
+    rgba(251, 146, 60, 0.35) 50%, rgba(255, 255, 255, 0.10) 82%, transparent 100%);
+}
+.divider-dot {
+  position: absolute; width: 15px; height: 15px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ffc089, #f97316 60%, #c2410c);
+  box-shadow: 0 0 24px rgba(249, 115, 22, 0.85), 0 0 56px rgba(249, 115, 22, 0.32);
+}
+
+/* ---------- brand row ---------- */
+.brand { display: flex; align-items: center; gap: 18px; }
+.brand img {
+  border-radius: 15px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+.brand-name { font-size: 34px; font-weight: 800; letter-spacing: -0.01em; color: var(--ink); line-height: 1; }
+.brand-sub { font-size: 15px; font-weight: 600; letter-spacing: 0.24em; color: var(--accent2); margin-top: 6px; }
+
+/* ---------- typography ---------- */
+.eyebrow {
+  font-size: 24px; font-weight: 700; letter-spacing: 0.22em;
+  color: var(--accent); text-transform: uppercase;
+}
+.headline { font-weight: 800; letter-spacing: -0.02em; color: #eef2f8; line-height: 1.02; }
+.headline .accent {
+  background: linear-gradient(180deg, #ffe0bd 0%, #ffb469 32%, #fb923c 68%, #f97316 92%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.sub { font-size: 30px; line-height: 1.45; font-weight: 450; color: rgba(255, 255, 255, 0.65); }
+
+/* ---------- chips ---------- */
+.chips { display: flex; gap: 16px; flex-wrap: wrap; }
+.chip {
+  font-size: 20px; font-weight: 600; color: #cbd5e1;
+  padding: 12px 22px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+}
+.chip b { color: var(--accent2); font-weight: 700; }
+
+/* ---------- tiles ---------- */
+.tile {
+  border-radius: var(--radius);
+  background: var(--tile-fill);
+  border: 1px solid var(--hairline);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 10px 24px rgba(0, 0, 0, 0.18);
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.tile-logo { display: flex; align-items: center; justify-content: center; }
+.tile-logo img, .tile-logo svg { display: block; }
+.tile-name {
+  font-size: 13px; font-weight: 600; line-height: 1.1;
+  color: var(--ink-2); letter-spacing: -0.005em; text-align: center;
+}
+.tile-name.small { font-size: 12px; }
+
+/* ---------- misc ---------- */
+.note { font-size: 18px; color: rgba(255, 255, 255, 0.45); line-height: 1.4; }
+.caption { font-size: 17px; color: rgba(255, 255, 255, 0.55); letter-spacing: 0.02em; }
