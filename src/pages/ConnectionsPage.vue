@@ -47,6 +47,7 @@ const connectError = ref<string | null>(null)
 const connectionCancelled = ref(false)
 const profileDeleteOpen = ref(false)
 const profileToDelete = ref<SshProfile | null>(null)
+const profileUsers = ref<ServerConnection[]>([])
 
 const profileAuthLabel = (profile: SshProfile) => {
   switch (profile.authMethod) {
@@ -59,16 +60,37 @@ const profileAuthLabel = (profile: SshProfile) => {
   }
 }
 
+const profileDeleteDetail = computed(() => {
+  const names = profileUsers.value.map(connection => connection.name)
+  if (names.length === 0)
+    return t('components.destructiveDialog.deleteProfile.detail')
+  return `${t('components.destructiveDialog.deleteProfile.detail')} ${t('components.destructiveDialog.deleteProfile.inUse', {
+    count: names.length,
+    names: names.join(', '),
+  })}`
+})
+
 function openProfileDelete(profile: SshProfile) {
+  if (!guardSshProfileManagement())
+    return
   profileToDelete.value = profile
+  profileUsers.value = connectionStore.connectionsUsingProfile(profile.id)
   profileDeleteOpen.value = true
 }
 
 async function confirmProfileDelete() {
-  if (profileToDelete.value) {
-    await sshProfileStore.remove(profileToDelete.value.id)
+  const profile = profileToDelete.value
+  if (!profile)
+    return
+  try {
+    await connectionStore.detachSshProfile(profile.id)
+    await sshProfileStore.remove(profile.id)
     profileToDelete.value = null
+    profileUsers.value = []
     profileDeleteOpen.value = false
+  }
+  catch (error) {
+    toast.error(error instanceof Error ? error.message : String(error))
   }
 }
 const connectingModal = ref<InstanceType<typeof ConnectingModal> | null>(null)
@@ -632,7 +654,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
       v-model:open="profileDeleteOpen"
       :title="t('components.destructiveDialog.deleteProfile.title')"
       :message="t('components.destructiveDialog.deleteProfile.message', { name: profileToDelete?.name })"
-      :detail="t('components.destructiveDialog.deleteProfile.detail')"
+      :detail="profileDeleteDetail"
       :confirm-label="t('components.destructiveDialog.deleteProfile.confirm')"
       @confirm="confirmProfileDelete"
     />

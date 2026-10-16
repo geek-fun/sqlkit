@@ -535,6 +535,59 @@ describe('connectionStore', () => {
       })
     })
 
+    describe('detachSshProfile', () => {
+      const tunnelled = (id: string, name: string, profileIds: string[]): ServerConnection => ({
+        ...createMockConnection({ id, name }),
+        sshTunnel: { enabled: true, host: 'bastion', port: 22, username: 'ops', authMethod: 'password', profileIds },
+      })
+
+      it('reports the connections that hop through a profile', () => {
+        const store = useConnectionStore()
+        store.connections = [
+          tunnelled('conn-1', 'Prod', ['hop-1', 'hop-2']),
+          tunnelled('conn-2', 'Dev', ['hop-2']),
+          createMockConnection({ id: 'conn-3', name: 'Plain' }),
+        ]
+
+        expect(store.connectionsUsingProfile('hop-1').map(c => c.id)).toEqual(['conn-1'])
+        expect(store.connectionsUsingProfile('hop-2').map(c => c.id)).toEqual(['conn-1', 'conn-2'])
+        expect(store.connectionsUsingProfile('unused')).toEqual([])
+      })
+
+      it('saves every user of the profile without it', async () => {
+        connectionApi.save.mockImplementation(async (config: { id: string }) => config.id)
+
+        const store = useConnectionStore()
+        store.connections = [
+          tunnelled('conn-1', 'Prod', ['hop-1', 'hop-2']),
+          tunnelled('conn-2', 'Dev', ['hop-2']),
+          createMockConnection({ id: 'conn-3', name: 'Plain' }),
+        ]
+
+        await store.detachSshProfile('hop-2')
+
+        const savedProfilesById = Object.fromEntries(
+          connectionApi.save.mock.calls.map(([config]) => {
+            const saved = config as { sshTunnel?: { profileIds?: string[] }, id: string }
+            return [saved.id, saved.sshTunnel?.profileIds]
+          }),
+        )
+        expect(connectionApi.save).toHaveBeenCalledTimes(2)
+        expect(savedProfilesById).toEqual({ 'conn-1': ['hop-1'], 'conn-2': [] })
+        expect(store.connections[0].sshTunnel?.profileIds).toEqual(['hop-1'])
+        expect(store.connections[2].sshTunnel).toBeUndefined()
+      })
+
+      it('raises the save failure so the caller can keep the profile', async () => {
+        connectionApi.save.mockRejectedValue(new Error('disk full'))
+
+        const store = useConnectionStore()
+        store.connections = [tunnelled('conn-1', 'Prod', ['hop-1'])]
+
+        await expect(store.detachSshProfile('hop-1')).rejects.toThrow('disk full')
+      })
+    })
+
     describe('testConnection', () => {
       it('should return true when connection succeeds', async () => {
         connectionApi.test.mockResolvedValue({ is_connected: true })

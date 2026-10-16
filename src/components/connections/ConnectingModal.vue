@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { UPGRADE_URL } from '@/common'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
@@ -40,6 +42,10 @@ function hide() {
 function showError(error: string, hint = '') {
   errorMessage.value = error
   errorHint.value = hint
+}
+
+function openUpgrade() {
+  void openUrl(UPGRADE_URL)
 }
 
 function handleDialogOpenChange(open: boolean) {
@@ -120,9 +126,6 @@ defineExpose({
               <p class="mt-1 opacity-90">
                 {{ errorMessage }}
               </p>
-              <p v-if="errorHint" class="text-xs mt-2 opacity-90">
-                {{ errorHint }}
-              </p>
               <p v-if="failureHint" class="text-xs mt-2 opacity-90">
                 {{ t(failureHint.messageKey) }}
               </p>
@@ -145,6 +148,23 @@ defineExpose({
                 <path d="m6 6 12 12" />
               </svg>
             </button>
+          </div>
+        </div>
+
+        <div
+          v-if="errorMessage && errorHint"
+          class="text-sm text-amber-700 p-4 border border-amber-500/40 rounded-md bg-amber-500/10 w-full dark:text-amber-400"
+        >
+          <div class="flex gap-3 items-start">
+            <span class="i-carbon-warning mt-0.5 flex-shrink-0 h-5 w-5" />
+            <div class="flex-1">
+              <p class="opacity-90">
+                {{ errorHint }}
+              </p>
+              <Button size="sm" class="mt-3" @click="openUpgrade">
+                {{ t('plan.upgrade.cta') }}
+              </Button>
+            </div>
           </div>
         </div>
 
