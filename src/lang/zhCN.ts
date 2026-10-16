@@ -128,7 +128,7 @@ export const zhCN = {
       description: '为 AI 代理补充此连接的上下文。',
       help: '此连接附加到代理时会发送这段提示词，排在全局系统提示词之后。',
       placeholder: '描述数据的业务含义、命名约定或常用查询。',
-      ultimateOnly: '代理提示词是 Ultimate 功能，点击升级',
+      ultimateOnly: 'Agent Prompt 是 Ultimate 功能',
       configured: '已配置',
       add: '添加',
       edit: '编辑',

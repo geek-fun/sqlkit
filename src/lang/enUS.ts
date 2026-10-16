@@ -128,7 +128,7 @@ export const enUS = {
       description: 'Add context about this connection for the AI agent.',
       help: 'Sent to the agent whenever this connection is attached, after the global system prompt.',
       placeholder: 'Describe the business meaning of the data, naming conventions, or common queries.',
-      ultimateOnly: 'Agent Prompt is an Ultimate feature — click to upgrade',
+      ultimateOnly: 'Agent Prompt is an Ultimate feature',
       configured: 'Configured',
       add: 'Add',
       edit: 'Edit',
