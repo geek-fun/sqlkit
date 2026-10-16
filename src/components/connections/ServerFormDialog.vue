@@ -3,9 +3,10 @@ import type { OracleConnectionOptions, ServerConnection } from '@/store'
 import type { DatabaseFileAssessment } from '@/utils/databaseFiles'
 import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { shouldStripSshTunnel } from '@/common'
+import { shouldStripSshTunnel, UPGRADE_URL } from '@/common'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
@@ -42,6 +43,10 @@ const emit = defineEmits<{
   (e: 'update:open', value: boolean): void
   (e: 'save', connection: ServerConnection): void
 }>()
+
+const openUpgrade = () => {
+  void openUrl(UPGRADE_URL)
+}
 
 const { t } = useI18n()
 const { getDatabaseIcon } = useDatabaseIcon()
@@ -1553,9 +1558,6 @@ function handleSave() {
               <p v-if="testError" class="text-red-500 pl-5">
                 {{ testError }}
               </p>
-              <p v-if="testSshTunnelStripped" class="text-xs text-amber-600 pl-5 dark:text-amber-500">
-                {{ t('components.serverForm.ssh.tunnelSkippedHint') }}
-              </p>
               <div
                 v-if="testFailureHint"
                 class="text-xs text-amber-600 pl-5 flex gap-2 items-start dark:text-amber-500"
@@ -1585,6 +1587,23 @@ function handleSave() {
                   </Button>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          v-if="testSshTunnelStripped"
+          class="text-sm text-amber-700 mt-2 p-4 border border-amber-500/40 rounded-md bg-amber-500/10 dark:text-amber-400"
+        >
+          <div class="flex gap-3 items-start">
+            <span class="i-carbon-warning mt-0.5 flex-shrink-0 h-5 w-5" />
+            <div class="flex-1">
+              <p class="opacity-90">
+                {{ t('components.serverForm.ssh.tunnelSkippedHint') }}
+              </p>
+              <Button size="sm" class="mt-3" @click="openUpgrade">
+                {{ t('plan.upgrade.cta') }}
+              </Button>
             </div>
           </div>
         </div>
