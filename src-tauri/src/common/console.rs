@@ -35,9 +35,7 @@ pub fn client() -> &'static reqwest::Client {
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
     CLIENT.get_or_init(|| {
         let builder = reqwest::Client::builder().timeout(Duration::from_secs(10));
-        // Tests: a pooled socket outlives the `#[tokio::test]` runtime that
-        // created it, so the next test checking it out gets `DispatchGone`
-        // ("runtime dropped the dispatch task"). Never pool idle sockets there.
+        // A pooled socket outlives its tokio test runtime; never keep idle sockets.
         #[cfg(test)]
         let builder = builder.pool_max_idle_per_host(0);
         builder

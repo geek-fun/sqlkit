@@ -134,8 +134,6 @@ const systemProxyWarning = async (connection: ServerConnection): Promise<string 
   }
 }
 
-// Ultimate-only SSH tunnels are dropped for free plans (see connectionStore),
-// so name that up front instead of letting a silent direct connect confuse.
 const sshTunnelSkippedWarning = (connection: ServerConnection): string | undefined =>
   shouldStripSshTunnel(connection.sshTunnel?.enabled, entitlementStore.isLocalUltimate)
     ? t('components.connectingModal.sshTunnelSkipped')
@@ -149,9 +147,7 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
   connectionCancelled.value = false
 
   // Show the modal first (instant click feedback), then resolve the async
-  // diagnostic and patch the warning in — `setWarning` tolerates the modal
-  // having closed meanwhile. A dropped SSH tunnel is the more consequential
-  // heads-up, so it replaces the system-proxy probe entirely.
+  // diagnostic and patch the warning in; a dropped tunnel outranks the proxy probe.
   connectingModal.value?.show(
     connection.name,
     () => {

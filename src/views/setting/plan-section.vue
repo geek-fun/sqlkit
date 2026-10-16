@@ -37,8 +37,6 @@ const versionStateText = computed(() => {
 })
 
 const expiryText = computed(() => {
-  // Hide the "active until" banner while the session is dead — the cached
-  // benefit must not contradict the re-login instruction next to it.
   if (entitlementStore.sessionExpired)
     return ''
   const expiresAt = entitlementStore.view?.ultimateExpiresAt
@@ -74,9 +72,6 @@ async function handleStartFree() {
   await openRegisterUrl()
 }
 
-// Entitlements are account-scoped: the cached view, profile identity and device
-// lease must never outlive the account session on this machine. The shared
-// teardown revokes the lease server-side best-effort.
 async function handleLogout() {
   await entitlementStore.clearSessionState()
 }

@@ -32,11 +32,9 @@ function unknownView(lastError: string, sessionPhase: SessionPhase): Entitlement
 export const useEntitlementStore = defineStore('entitlement', {
   state: (): {
     view: EntitlementView | null
-    // Timestamp of the last definite session loss (set by handleSessionLoss);
-    // App.vue surfaces the signed-out toast from it.
+    // Last definite session loss; App.vue toasts from it.
     sessionLostNotice: number
-    // Consecutive deliberate rotation rejections before a session loss is
-    // resolved — one rejection lands degraded, two in a row clear.
+    // Consecutive deliberate rejections before the session is torn down.
     sessionRejections: number
   } => ({
     view: null,
@@ -63,9 +61,6 @@ export const useEntitlementStore = defineStore('entitlement', {
     },
     cancelScheduled: (state): boolean => Boolean(state.view?.cancelScheduledAt),
     hasEntitlementError: (state): boolean => Boolean(state.view?.lastError),
-    // Single session-health derivation (token facts + the structured server
-    // verdict) — every login-CTA / degraded-plan consumer reads this instead
-    // of matching lastError strings.
     sessionPhase: (state): SessionPhase => {
       const accountStore = useAccountStore()
       return sessionPhaseFromTokens(
@@ -79,10 +74,6 @@ export const useEntitlementStore = defineStore('entitlement', {
     },
   },
   actions: {
-    // Shared teardown for an account session — cached entitlements, profile
-    // identity, device registration, and a best-effort server-side lease
-    // revocation. Local teardown is instant so the UI flips immediately; the
-    // revocation is a deliberate no-op on failure and never blocks it.
     async clearSessionState(): Promise<void> {
       const accountStore = useAccountStore()
       const lease = accountStore.refreshToken || null
@@ -91,9 +82,6 @@ export const useEntitlementStore = defineStore('entitlement', {
       useDeviceStore().$reset()
       void invoke('revoke_session', { refreshToken: lease }).catch(() => {})
     },
-    // The session is definitively unrenewable (the server rejected the lease,
-    // or the bearer is dead with no lease to rotate): wipe local state so the
-    // UI returns to the logged-out look; App.vue toasts from the notice.
     async handleSessionLoss(): Promise<void> {
       const accountStore = useAccountStore()
       const hadIdentity = accountStore.isLoggedIn
@@ -103,10 +91,6 @@ export const useEntitlementStore = defineStore('entitlement', {
         this.sessionLostNotice = Date.now()
       }
     },
-    // A deliberate rotation rejection is server policy, not transient — but a
-    // single one only lands on the degraded login-CTA state; two in a row
-    // resolve the whole session (guards against a brief auth-gateway
-    // misclassification wiping a healthy account). Success resets the count.
     async resolveSessionRejection(): Promise<void> {
       this.sessionRejections += 1
       this.view = unknownView('session expired', 'expired')
@@ -115,11 +99,6 @@ export const useEntitlementStore = defineStore('entitlement', {
       }
       await this.handleSessionLoss()
     },
-    // Active recovery for a degraded session: rotate the lease while one
-    // exists, then force an entitlement refresh. A deliberate rotation
-    // rejection (or a still-expired phase afterwards) is a definite loss and
-    // resolves the whole session; transient errors leave the cached state for
-    // the caller's retry CTA.
     async attemptSessionRecovery(): Promise<'recovered' | 'lost'> {
       const accountStore = useAccountStore()
       const lease = accountStore.refreshToken || ''
@@ -138,8 +117,6 @@ export const useEntitlementStore = defineStore('entitlement', {
             await this.resolveSessionRejection()
             return 'lost'
           }
-          // transient — the entitlement refresh below still tries the
-          // existing bearer before falling back to the reactive rotation
         }
       }
       return (await this.refreshEntitlement(true)) === 'lost' ? 'lost' : 'recovered'
@@ -165,25 +142,16 @@ export const useEntitlementStore = defineStore('entitlement', {
     },
     // only a real server answer (fetchedAtMs) may surface as a confirmed plan
     async hydrate(): Promise<void> {
-      // Entitlements are account-scoped: without a session there is nothing to
-      // restore, so a leftover device cache must not be surfaced as a plan.
       if (!useAccountStore().isLoggedIn) {
         this.view = null
         return
       }
-      // `tokenPresent` is the session claim: it is this app run's earliest
-      // honest "someone is logged in", which is what lets the Rust side
-      // (re)start the paid MCP bridge from a cache it may already hold.
       const cached = await invoke<EntitlementView>('get_entitlement', { tokenPresent: true }).catch(() => null)
       if (cached?.fetchedAtMs != null)
         this.view = cached
     },
     async refreshEntitlement(force = false): Promise<'ok' | 'lost'> {
       const accountStore = useAccountStore()
-      // No account session ⇒ no entitlements. The Rust cache is offline
-      // tolerance for a logged-in session, never a substitute for one —
-      // otherwise a cache left behind by a previous session would keep local
-      // Ultimate features (Data Studio, SSH tunnel, ER diagram…) unlocked.
       if (!accountStore.isLoggedIn) {
         await this.clearCachedEntitlement()
         return 'ok'
@@ -197,8 +165,6 @@ export const useEntitlementStore = defineStore('entitlement', {
           })
           this.view = view
           if (view.sessionPhase === 'expired') {
-            // A dead lease the Rust side could not rotate — never recoverable
-            // client-side; resolve the session to the logged-out look.
             await this.handleSessionLoss()
             return 'lost'
           }
@@ -207,8 +173,6 @@ export const useEntitlementStore = defineStore('entitlement', {
         }
         catch (e) {
           if (isSessionRejected(e)) {
-            // dead lease — the next login starts clean, and a second
-            // consecutive rejection resolves the whole session
             await this.resolveSessionRejection()
             return 'lost'
           }

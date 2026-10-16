@@ -20,8 +20,6 @@ const planBadge = computed(() => {
   if (recovering.value)
     return { label: t('plan.state.checking'), cls: 'bg-muted text-muted-foreground border-transparent' }
   const s = entitlementStore.planState
-  // A dead session degrades the badge — the cached entitlement is no longer a
-  // verified server answer, the login CTA is the primary action.
   if (entitlementStore.sessionExpired)
     return { label: t(`plan.state.${s}`), cls: 'bg-muted text-muted-foreground border-transparent' }
   if (s === 'ultimate')
@@ -34,7 +32,6 @@ const planBadge = computed(() => {
 })
 
 const expiryText = computed(() => {
-  // A stale cached benefit must never contradict the re-login instruction.
   if (entitlementStore.sessionExpired)
     return ''
   const expiresAt = entitlementStore.view?.ultimateExpiresAt
@@ -53,9 +50,6 @@ async function handleRefresh() {
   }
 }
 
-// One silent recovery attempt per panel open while the session is degraded:
-// rotate the lease / re-verify entitlements, and if the session is
-// definitively unrenewable the store resolves it to the logged-out look.
 async function runRecovery() {
   recovering.value = true
   try {
@@ -78,9 +72,6 @@ watch(open, (isOpen) => {
   }
 })
 
-// Entitlements are account-scoped: the cached view, profile identity and device
-// lease must never outlive the account session on this machine. The shared
-// teardown revokes the lease server-side best-effort.
 async function handleLogout() {
   open.value = false
   await entitlementStore.clearSessionState()

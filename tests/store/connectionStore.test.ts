@@ -652,8 +652,6 @@ describe('connectionStore', () => {
       })
     })
 
-    // SSH tunnels are Ultimate-only: a saved tunnel must never dead-end a
-    // free-plan connection — it is dropped and the database is reached directly.
     describe('connect — Ultimate-only SSH tunnel fallback', () => {
       const sshConnection = (): ServerConnection => ({
         id: 'conn-1',

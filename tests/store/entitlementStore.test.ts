@@ -56,18 +56,12 @@ function rejected(errorType: string, message: string) {
 describe('entitlementStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
-    // the accountStore mutators are file-level fns shared by the mock — keep
-    // each case's assertions independent of previous call records
     jest.clearAllMocks()
     mockInvoke = jest.fn()
-    // void-commands (revoke/clear) default to a resolved promise;
-    // each test overrides per invocation name/value.
     mockInvoke.mockResolvedValue(undefined)
     mockLoggedIn = true
   })
 
-  // A cached plan must never outlive the account session: without a login the
-  // app is community, no matter what a previous session left on disk.
   describe('no account session', () => {
     it('never hydrates a leftover cache', async () => {
       mockLoggedIn = false
@@ -128,8 +122,6 @@ describe('entitlementStore', () => {
 
       await store.hydrate()
 
-      // `tokenPresent` is what lets Rust start the paid MCP bridge: the disk
-      // cache alone must never be enough on a signed-out launch.
       expect(mockInvoke).toHaveBeenCalledWith('get_entitlement', { tokenPresent: true })
     })
   })
@@ -280,9 +272,6 @@ describe('entitlementStore', () => {
     })
 
     it('resolves an unrenewable bearer (401 with no lease) to a full sign-out', async () => {
-      // Rust answers Ok with a degraded view when the lease is gone and the
-      // bearer can no longer serve — the store must not leave a half-dead
-      // session behind.
       mockInvoke.mockImplementation((name: string) => {
         if (name === 'refresh_entitlement')
           return Promise.resolve(view({ lastError: 'session expired', sessionPhase: 'expired' }))
@@ -399,7 +388,6 @@ describe('entitlementStore', () => {
     it('derives the phase from token facts and the structured verdict', () => {
       const store = useEntitlementStore()
 
-      // token + lease present, no verdict yet → signed-in
       expect(store.sessionPhase).toBe('signed-in')
 
       store.$patch({ view: view({ lastError: 'network error: timeout' }) })
@@ -411,7 +399,6 @@ describe('entitlementStore', () => {
       expect(store.sessionPhase).toBe('expired')
       expect(store.sessionExpired).toBe(true)
 
-      // a stale cached benefit no longer string-matches its way to "expired"
       store.$patch({ view: view({ localUltimate: true, sessionPhase: 'signed-in' }) })
       expect(store.sessionExpired).toBe(false)
 

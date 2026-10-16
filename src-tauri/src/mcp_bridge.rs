@@ -175,15 +175,10 @@ fn tools_payload(policy: &McpPolicy) -> Value {
     })
 }
 
-/// Pure form of the per-request gate: the session claim and the plan must both
-/// still hold. Split out so the decision is testable without a Tauri runtime.
 fn entitlement_denied_for(session_confirmed: bool, local_entitled: bool) -> bool {
     !(session_confirmed && local_entitled)
 }
 
-/// The paid MCP surface must not serve once the entitlement — or the session
-/// that justified starting the bridge — is gone. Reading in-memory entitlement
-/// state costs nothing per request and needs no I/O.
 fn entitlement_denied(state: &BridgeState) -> Option<String> {
     let entitlement: tauri::State<'_, crate::entitlement::EntitlementState> = state.handle.state();
     if entitlement_denied_for(
@@ -196,8 +191,6 @@ fn entitlement_denied(state: &BridgeState) -> Option<String> {
 }
 
 async fn handle_tools(State(state): State<Arc<BridgeState>>) -> Response {
-    // Tool discovery is part of the paid surface: a client that cannot be
-    // served must be told so explicitly instead of seeing an empty toolbox.
     if let Some(reason) = entitlement_denied(&state) {
         return (
             StatusCode::FORBIDDEN,
@@ -324,9 +317,6 @@ async fn handle_invoke(
     State(state): State<Arc<BridgeState>>,
     Json(payload): Json<InvokeRequest>,
 ) -> Json<InvokeResponse> {
-    // Request-level entitlement gate: the bridge may already be running from a
-    // session that has since ended, and "entitled at start" is not "entitled
-    // now". The MCP policy below is a permission setting, not a paid gate.
     if let Some(reason) = entitlement_denied(&state) {
         return Json(InvokeResponse::error(403, reason));
     }
@@ -447,10 +437,7 @@ async fn send_shutdown(handle: &AppHandle) -> Option<tokio::task::JoinHandle<()>
     task.take()
 }
 
-/// Reconcile the paid bridge with the entitlement state: bring it up when this
-/// app run has a session and an active plan, take it down otherwise. Called
-/// from the entitlement resolution path — never at process setup, where only a
-/// disk cache exists and nothing is known about the current session.
+/// The bridge only runs for a session confirmed in this app run.
 pub fn sync_with_entitlement(handle: &AppHandle) {
     use tauri::Manager;
 
@@ -468,11 +455,6 @@ pub fn sync_with_entitlement(handle: &AppHandle) {
     });
 }
 
-/// Start the bridge when — and only when — this app run can justify it: a live
-/// account session plus an active plan. The persisted entitlement cache alone
-/// is never enough, so a cold start with a leftover cache from a previous
-/// session cannot bring the paid bridge up before the frontend says who is
-/// logged in. Idempotent.
 fn auto_start_if_entitled(handle: &AppHandle) {
     use tauri::Manager;
 
@@ -490,8 +472,7 @@ fn auto_start_if_entitled(handle: &AppHandle) {
         }
     }
 
-    // Claim the shutdown slot synchronously: it doubles as the
-    // running-or-starting flag, so concurrent triggers cannot double-start.
+    // Claiming the slot is what keeps concurrent triggers from double-starting.
     let shutdown_rx = {
         let server_handle: tauri::State<'_, McpServerHandle> = handle.state();
         let mut tx = server_handle.shutdown_tx.lock().unwrap();
@@ -509,14 +490,11 @@ fn auto_start_if_entitled(handle: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         if let Err(e) = start(bridge_handle, app_data_dir, preferred, shutdown_rx).await {
             log::error!("MCP bridge failed to start: {}", e);
-            // Release the claim so a later trigger can retry.
             let _ = send_shutdown(&retry_handle).await;
         }
     });
 }
 
-/// Stop the bridge if it is running (entitlement revoked). Safe — and cheap —
-/// when nothing is running.
 async fn shutdown_if_running(handle: &AppHandle) {
     if let Some(task) = send_shutdown(handle).await {
         let _ = task.await;
@@ -698,8 +676,6 @@ pub async fn save_mcp_config(
     // Explicit restart starts now without persisting a change to auto_start.
     let should_start = auto_start || restart.unwrap_or(false);
     if should_start {
-        // A background server may only run for a session this app run has
-        // actually seen — a leftover disk cache is not a login.
         if !entitlement.session_confirmed() {
             return Err(crate::entitlement::entitlement_required_error("MCP Server"));
         }
@@ -773,11 +749,8 @@ mod tests {
 
     #[test]
     fn test_requests_are_denied_unless_a_session_and_a_plan_are_both_present() {
-        // A live session with a plan is the only serving combination…
         assert!(!entitlement_denied_for(true, true));
-        // …a lapsed plan is denied…
         assert!(entitlement_denied_for(true, false));
-        // …and so is a leftover entitlement cache with no session this run.
         assert!(entitlement_denied_for(false, true));
         assert!(entitlement_denied_for(false, false));
     }

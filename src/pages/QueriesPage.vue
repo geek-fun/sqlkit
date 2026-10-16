@@ -143,8 +143,6 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
   }
   catch (error) {
     console.error('Failed to connect:', error)
-    // A free plan drops the saved SSH tunnel before connecting; if that direct
-    // attempt fails, say why instead of leaving only a console line.
     if (isSshTunnelStrippedError(error)) {
       toast.warning(t('components.connectingModal.sshTunnelStripped'))
     }

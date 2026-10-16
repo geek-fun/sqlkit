@@ -703,9 +703,6 @@ async function handleTestConnection() {
   testStatus.value = 'testing'
   testError.value = ''
 
-  // Ultimate-only SSH tunnel: a free plan tests the database directly, the
-  // same way connect() does, instead of dying on a raw 403. The saved tunnel
-  // config itself is untouched.
   testSshTunnelStripped.value = shouldStripSshTunnel(
     formData.value.sshTunnel?.enabled,
     entitlementStore.isLocalUltimate,

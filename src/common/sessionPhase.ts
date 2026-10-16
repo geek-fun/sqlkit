@@ -1,22 +1,12 @@
 import { parseJwtExpMs } from './sessionExpiry'
 
-/**
- * Session health phases — the single source of truth the account UI derives
- * every login/logout CTA and the plan display from.
- * - `signed-in`: the token/lease pair is believed to still serve.
- * - `expired`: re-login required — the server refused the lease, or the
- *   access token cannot serve and no lease exists to renew it.
- * - `anonymous`: no access token at all.
- */
+/** Session health: a serving token/lease pair, re-login required, or no token. */
 export type SessionPhase = 'signed-in' | 'expired' | 'anonymous'
 
 export type SessionPhaseInput = {
   hasAccessToken: boolean
   hasLease: boolean
-  /**
-   * Structured verdict from the last entitlement refresh (`sessionPhase`
-   * on the view); only an `expired` verdict can demote the phase.
-   */
+  /** Last refresh verdict; only `expired` demotes the phase. */
   serverPhase: string | null | undefined
   accessTokenExpMs: number | null
   now?: number

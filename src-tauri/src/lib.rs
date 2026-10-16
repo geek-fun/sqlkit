@@ -207,12 +207,7 @@ pub fn run() {
                     app_data_dir.clone(),
                 ));
                 app.manage(crate::session::SessionState::default());
-                // The MCP bridge is NOT auto-started here: at process setup the
-                // only entitlement evidence is a disk cache, which says nothing
-                // about who is logged in right now (a leftover cache used to
-                // bring the paid bridge up on a signed-out launch). It starts
-                // from the entitlement resolution path instead —
-                // `mcp_bridge::auto_start_if_entitled`.
+                // The MCP bridge starts from the entitlement path, never at setup (cache-only).
             }
 
             use tauri::{Emitter, Listener};

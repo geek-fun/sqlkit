@@ -771,9 +771,7 @@ export const useConnectionStore = defineStore('connectionStore', {
 
       this.connectionStatus[connectionId] = ConnectionStatus.CONNECTING
 
-      // Ultimate-only SSH tunnel: on a free plan the saved tunnel is dropped
-      // for this attempt so the database can still be reached directly. The
-      // saved config is never rewritten — an upgrade restores the tunnel.
+      // A free plan drops the saved tunnel for this attempt; the config is untouched.
       const sshTunnelStripped = shouldStripSshTunnel(
         connection.sshTunnel?.enabled,
         useEntitlementStore().isLocalUltimate,
@@ -822,8 +820,6 @@ export const useConnectionStore = defineStore('connectionStore', {
       catch (error) {
         this.connectionStatus[connectionId] = ConnectionStatus.ERROR
         const failure = new Error(`Failed to connect: ${error}`)
-        // Distinguish "failed without the tunnel we had to drop" from a plain
-        // connection error so the UI can name the real cause.
         throw sshTunnelStripped ? markSshTunnelStripped(failure) : failure
       }
     },

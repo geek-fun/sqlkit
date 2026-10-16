@@ -33,13 +33,7 @@ pub const REFRESH_MIN_INTERVAL_MS: i64 = 5 * 60 * 1000;
 
 pub const ENTITLEMENT_ERROR_TYPE: &str = "ENTITLEMENT_REQUIRED";
 
-/// Session health carried on every view — the single source the frontend
-/// derives the login CTA and degraded plan display from (replacing lastError
-/// string matching):
-/// - `signed-in`: the lease/token pair is believed to still serve.
-/// - `expired`: the server or the dead token+leaseless combination says
-///   re-login is required.
-/// - `anonymous`: no credentials at all in this session store.
+/// Session health carried on every view: `signed-in`, `expired` or `anonymous`.
 pub const SESSION_PHASE_SIGNED_IN: &str = "signed-in";
 pub const SESSION_PHASE_EXPIRED: &str = "expired";
 pub const SESSION_PHASE_ANONYMOUS: &str = "anonymous";
@@ -216,10 +210,7 @@ pub struct EntitlementState {
     cache: Mutex<Option<SubscriptionCache>>,
     last_success_ms: Mutex<i64>,
     cache_path: Mutex<Option<PathBuf>>,
-    /// True once this app run has actually seen an account session (a
-    /// token-bearing entitlement resolution). A persisted cache loaded at
-    /// startup proves nothing about the current session, so background
-    /// entitlements — the MCP bridge auto-start above all — must wait for it.
+    /// A persisted cache proves nothing about the current session.
     session_confirmed: AtomicBool,
 }
 
@@ -238,9 +229,6 @@ impl EntitlementState {
         }
     }
 
-    /// Record that this run has a live account session. Called from every
-    /// token-bearing entitlement resolution, before any network call, so an
-    /// offline session still counts.
     pub fn confirm_session(&self) {
         self.session_confirmed.store(true, Ordering::SeqCst);
     }
@@ -295,8 +283,6 @@ impl EntitlementState {
     }
 
     /// Wipe the cached entitlement (logout): memory + persisted cache file.
-    /// The session claim is dropped with it — nothing may stay entitled once
-    /// the account session is gone.
     pub fn clear(&self) {
         *self.cache.lock().unwrap_or_else(|e| e.into_inner()) = None;
         *self
@@ -403,10 +389,7 @@ async fn fetch_subscriptions(token: &str) -> Result<SubscriptionCache, Subscript
     })
 }
 
-/// Anonymous refresh: there is no account session, so there is no entitlement.
-/// The persisted cache is offline tolerance for a logged-in session, never a
-/// substitute for one — it is dropped so a leftover cache (previous account,
-/// previous install, cleared login store) can never outlive the session.
+/// No session means no entitlement: drop the cache rather than serve it.
 fn anonymous_view(state: &EntitlementState) -> EntitlementView {
     state.clear();
     state.view(
@@ -416,12 +399,8 @@ fn anonymous_view(state: &EntitlementState) -> EntitlementView {
     )
 }
 
-/// Transport-level entitlement refresh: classify the network outcome and
-/// resolve it onto a view. A transparent rotation never blocks the caller —
-/// the rotated successor rides back as `Some(session)` so the command layer
-/// can broadcast it to the frontend session store. Deliberate lease
-/// rejections propagate as the structured `SESSION_REJECTED` error.
-/// Tauri-runtime-free so the phase exits stay unit-testable over wiremock.
+/// Classifies the network outcome onto a view; a rotated successor rides back
+/// for the command layer to broadcast. Tauri-runtime-free for the exit tests.
 async fn refresh_entitlement_core(
     token: &str,
     refresh_token: Option<&str>,
@@ -433,8 +412,6 @@ async fn refresh_entitlement_core(
     if token.trim().is_empty() {
         return Ok((anonymous_view(state), None));
     }
-    // A bearer means this run has a session — record it before the network so
-    // offline degradation (and the bridge auto-start) still sees it.
     state.confirm_session();
     if !force && state.refresh_throttled() {
         return Ok((state.view(true, None, SESSION_PHASE_SIGNED_IN), None));
@@ -489,10 +466,8 @@ async fn refresh_entitlement_core(
     }
 }
 
-/// Refresh entitlements from the server. Network/5xx failures degrade to the
-/// cached view (contract rule 5); a 401 triggers one transparent session
-/// refresh (rotating the stored lease) before giving up — only then does the
-/// cached view carry the error.
+/// Refresh entitlements from the server; network failures degrade to the cached
+/// view (contract rule 5).
 #[tauri::command]
 pub async fn refresh_entitlement(
     token: String,
@@ -521,10 +496,6 @@ pub async fn refresh_entitlement(
             }),
         );
     }
-    // A live (non-expired) session reconciles the paid bridge — see
-    // mcp_bridge::sync_with_entitlement for why this never happens at process
-    // setup, where only a disk cache exists. An expired verdict leaves the
-    // teardown to the frontend's definite-loss path (clear_entitlement).
     if view.session_phase != SESSION_PHASE_EXPIRED {
         crate::mcp_bridge::sync_with_entitlement(&app);
     }
@@ -537,8 +508,6 @@ pub fn get_entitlement(
     state: State<'_, EntitlementState>,
     app: AppHandle,
 ) -> EntitlementView {
-    // The first call a logged-in app makes (hydrate) — the earliest honest
-    // point to claim a session, and with it to reconcile the paid bridge.
     if token_present == Some(true) {
         state.confirm_session();
         crate::mcp_bridge::sync_with_entitlement(&app);
@@ -584,14 +553,11 @@ fn seed_cache(
 
 /// Called on logout — entitlements are account-scoped, so the cached state
 /// must not outlive the session (a different account on the same machine
-/// must not inherit the previous account's version lock). Revoking the
-/// entitlement also stops the paid MCP bridge: a server left running after
-/// logout would keep serving without a session.
+/// must not inherit the previous account's version lock) — and stops the paid
+/// MCP bridge with it.
 #[tauri::command]
 pub fn clear_entitlement(state: State<'_, EntitlementState>, app: AppHandle) -> EntitlementView {
     state.clear();
-    // Clearing drops the session claim too, so the reconciliation takes the
-    // paid bridge down with the entitlement.
     crate::mcp_bridge::sync_with_entitlement(&app);
     state.view(true, None, SESSION_PHASE_ANONYMOUS)
 }
@@ -701,9 +667,7 @@ mod tests {
         dir
     }
 
-    /// One shared mock server per test binary — each test registers its own
-    /// mocks keyed by a unique bearer token (or refresh-lease body), so
-    /// registrations never cross-match.
+    /// One shared mock server; each test keys its mocks uniquely.
     async fn console_server() -> &'static wiremock::MockServer {
         use tokio::sync::OnceCell;
         static SERVER: OnceCell<&'static wiremock::MockServer> = OnceCell::const_new();
@@ -815,17 +779,12 @@ mod tests {
             None,
         );
 
-        // The cache entitles local features, but nothing may start in the
-        // background until this run has actually seen an account session —
-        // otherwise a leftover cache would bring the paid MCP bridge up on a
-        // signed-out launch.
         assert!(state.local_entitled());
         assert!(!state.session_confirmed());
 
         state.confirm_session();
         assert!(state.session_confirmed());
 
-        // Logout / session loss drops the claim together with the entitlement.
         let view = anonymous_view(&state);
         assert!(!state.session_confirmed());
         assert!(!view.local_ultimate);
@@ -837,7 +796,6 @@ mod tests {
         let dir = temp_dir("anonymous");
         let path = dir.join("cache.json");
         let state = EntitlementState::load(Some(path.clone()));
-        // A previous (or another account's) session left an Ultimate plan behind.
         seed_cache(
             &state,
             Some("2999-01-01T00:00:00.000Z".to_string()),
@@ -857,7 +815,6 @@ mod tests {
             "the leftover cache must not outlive the account session"
         );
 
-        // A fresh read of the same location stays free.
         let reloaded = EntitlementState::load(Some(path));
         assert!(!reloaded.local_entitled());
         let _ = std::fs::remove_dir_all(&dir);

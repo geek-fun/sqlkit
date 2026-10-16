@@ -84,9 +84,7 @@ onMounted(async () => {
     deviceStore.ensureActivated()
   }
   else {
-    // Entitlements must never outlive the account session: a cached plan left
-    // by a previous (or another account's) session would unlock local Ultimate
-    // features on a freshly launched, logged-out app.
+    // A cached plan must not outlive the session.
     void entitlementStore.clearCachedEntitlement()
   }
 
@@ -120,8 +118,7 @@ onUnmounted(() => {
   unlistenSessionRefresh?.()
 })
 
-// Definite session loss (lease rejected, or bearer dead without a lease) is
-// resolved to the logged-out look in the store — surface the single notice.
+// The store resolves the loss; surface the single notice.
 watch(
   () => entitlementStore.sessionLostNotice,
   (noticeAt) => {
