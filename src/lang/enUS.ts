@@ -817,7 +817,7 @@ export const enUS = {
           systemPromptSave: 'Save',
           systemPromptCancel: 'Cancel',
           systemPromptSaveFailed: 'Could not save the system prompt.',
-          systemPromptUltimateOnly: 'Custom system prompts are an Ultimate feature — click to upgrade',
+          systemPromptUltimateOnly: 'Agent Prompt is an Ultimate feature',
         },
       },
       updates: {

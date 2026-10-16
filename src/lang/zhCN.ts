@@ -817,7 +817,7 @@ export const zhCN = {
           systemPromptSave: '保存',
           systemPromptCancel: '取消',
           systemPromptSaveFailed: '无法保存系统提示词。',
-          systemPromptUltimateOnly: '自定义系统提示词是 Ultimate 功能，点击升级',
+          systemPromptUltimateOnly: 'Agent Prompt 是 Ultimate 功能',
         },
       },
       updates: {
