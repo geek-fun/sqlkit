@@ -257,16 +257,6 @@ Open an issue on <a href="https://github.com/geek-fun/sqlkit/issues">GitHub Issu
   <a href="https://github.com/sponsors/geek-fun"><img src="https://img.shields.io/badge/GitHub_Sponsors-%E2%9D%A4_Support-EA4AAA?logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" /></a>
 </p>
 
-## Star History
-
-<a href="https://www.star-history.com/?repos=geek-fun%2Fsqlkit&type=date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=geek-fun/sqlkit&type=date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=geek-fun/sqlkit&type=date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=geek-fun/sqlkit&type=date" />
-  </picture>
-</a>
-
 ## License
 
 [Apache 2.0](LICENSE) © GEEKFUN
