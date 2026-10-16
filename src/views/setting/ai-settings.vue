@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { LlmProvider } from '@/store/appStore'
 import { storeToRefs } from 'pinia'
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -16,6 +17,43 @@ const { llmSettings } = storeToRefs(appStore)
 
 const showFormDialog = ref(false)
 const editingProvider = ref<LlmProvider | undefined>(undefined)
+const isEditingPrompt = ref(false)
+const draftPrompt = ref('')
+const promptSaveError = ref('')
+const systemPrompt = computed(() => llmSettings.value.chat.systemPrompt ?? '')
+const hasPromptChanges = computed(() => draftPrompt.value !== systemPrompt.value)
+
+const startEditPrompt = () => {
+  draftPrompt.value = systemPrompt.value
+  promptSaveError.value = ''
+  isEditingPrompt.value = true
+}
+
+const cancelEditPrompt = () => {
+  draftPrompt.value = ''
+  isEditingPrompt.value = false
+}
+
+const savePrompt = async () => {
+  if (!hasPromptChanges.value)
+    return
+  const result = await appStore.saveChatSettings({ systemPrompt: draftPrompt.value })
+  if (result.success)
+    isEditingPrompt.value = false
+  else
+    promptSaveError.value = result.error ?? t('pages.settings.ai.chat.systemPromptSaveFailed')
+}
+
+const deletePrompt = async () => {
+  const result = await appStore.saveChatSettings({ systemPrompt: '' })
+  if (result.success) {
+    draftPrompt.value = ''
+    isEditingPrompt.value = false
+  }
+  else {
+    promptSaveError.value = result.error ?? t('pages.settings.ai.chat.systemPromptSaveFailed')
+  }
+}
 
 function handleAdd() {
   editingProvider.value = undefined
@@ -53,6 +91,53 @@ function handleCloseDialog() {
           </h3>
           <p class="text-sm text-muted-foreground">
             {{ t('pages.settings.ai.chat.description') }}
+          </p>
+        </div>
+
+        <div class="p-4 border border-border/70 rounded-xl bg-card/70 space-y-3">
+          <div class="flex gap-4 items-start justify-between">
+            <div class="space-y-1">
+              <p class="font-semibold">
+                {{ t('pages.settings.ai.chat.systemPromptLabel') }}
+              </p>
+              <p class="text-sm text-muted-foreground">
+                {{ t('pages.settings.ai.chat.systemPromptDescription') }}
+              </p>
+            </div>
+            <div v-if="!isEditingPrompt" class="flex shrink-0 gap-1">
+              <Button v-if="!systemPrompt" variant="outline" size="sm" @click="startEditPrompt">
+                {{ t('pages.settings.ai.chat.systemPromptAdd') }}
+              </Button>
+              <template v-else>
+                <Button variant="ghost" size="sm" @click="startEditPrompt">
+                  {{ t('pages.settings.ai.chat.systemPromptEdit') }}
+                </Button>
+                <Button variant="ghost" size="sm" class="text-destructive" @click="deletePrompt">
+                  {{ t('pages.settings.ai.chat.systemPromptDelete') }}
+                </Button>
+              </template>
+            </div>
+          </div>
+          <textarea
+            v-if="isEditingPrompt"
+            v-model="draftPrompt"
+            autocomplete="off"
+            class="text-sm px-3 py-2 border border-input rounded-md bg-background min-h-28 w-full resize-y"
+            :placeholder="t('pages.settings.ai.chat.systemPromptLabel')"
+          />
+          <p v-else class="text-sm text-muted-foreground whitespace-pre-wrap line-clamp-3">
+            {{ systemPrompt || t('pages.settings.ai.chat.systemPromptEmpty') }}
+          </p>
+          <div v-if="isEditingPrompt" class="flex gap-2 justify-end">
+            <Button variant="outline" size="sm" @click="cancelEditPrompt">
+              {{ t('pages.settings.ai.chat.systemPromptCancel') }}
+            </Button>
+            <Button size="sm" :disabled="!hasPromptChanges" @click="savePrompt">
+              {{ t('pages.settings.ai.chat.systemPromptSave') }}
+            </Button>
+          </div>
+          <p v-if="promptSaveError" class="text-sm text-destructive" role="alert">
+            {{ promptSaveError }}
           </p>
         </div>
 

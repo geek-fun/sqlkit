@@ -53,6 +53,7 @@ export type ChatRuntimeConfig = {
   maxIterations: number
   wallClockBudgetMin: number
   tokenBudget: number
+  systemPrompt?: string
 }
 
 export type ModelRef = {
@@ -73,6 +74,7 @@ const CHAT_RUNTIME_DEFAULTS: ChatRuntimeConfig = {
   maxIterations: 200,
   wallClockBudgetMin: 30,
   tokenBudget: 20_000_000,
+  systemPrompt: '',
 }
 
 function createModelRef(providerId: string, providerKind: string, modelLabel: string): ModelRef {
@@ -147,6 +149,7 @@ function mergeLlmSettings(stored: {
       maxIterations: stored.chat?.maxIterations ?? CHAT_RUNTIME_DEFAULTS.maxIterations,
       wallClockBudgetMin: stored.chat?.wallClockBudgetMin ?? CHAT_RUNTIME_DEFAULTS.wallClockBudgetMin,
       tokenBudget: stored.chat?.tokenBudget ?? CHAT_RUNTIME_DEFAULTS.tokenBudget,
+      systemPrompt: stored.chat?.systemPrompt ?? '',
     },
   }
 }
@@ -517,6 +520,19 @@ export const useAppStore = defineStore('app', {
       this.llmSettings = {
         ...this.llmSettings,
         chat: { ...this.llmSettings.chat, tokenBudget },
+      }
+    },
+
+    async saveChatSettings(chat: Partial<ChatRuntimeConfig>): Promise<{ success: boolean, error?: string }> {
+      const previous = { ...this.llmSettings.chat }
+      this.llmSettings = { ...this.llmSettings, chat: { ...this.llmSettings.chat, ...chat } }
+      try {
+        await this.persistLlmSettings()
+        return { success: true }
+      }
+      catch (error) {
+        this.llmSettings = { ...this.llmSettings, chat: previous }
+        return { success: false, error: error instanceof Error ? error.message : String(error) }
       }
     },
   },

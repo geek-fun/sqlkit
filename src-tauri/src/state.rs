@@ -98,6 +98,9 @@ pub struct ServerConfig {
     /// because a read-write instance holds an exclusive file lock.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub read_only: bool,
+    /// Optional context for AI agents using this connection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt: Option<String>,
 }
 
 fn default_timeout_10() -> u64 {
@@ -138,6 +141,7 @@ impl ServerConfig {
             query_timeout_secs: default_timeout_30(),
             transport_layers: None,
             read_only: false,
+            prompt: None,
         }
     }
 
@@ -393,6 +397,43 @@ mod tests {
         );
         config.read_only = read_only;
         config
+    }
+
+    #[test]
+    fn server_config_prompt_survives_store_serialization_round_trip() {
+        let mut config = ServerConfig::new(
+            "analytics".into(),
+            "PostgreSQL".into(),
+            "localhost".into(),
+            5432,
+            "user".into(),
+        );
+        config.prompt = Some("Revenue values are stored in cents.".into());
+
+        let stored = serde_json::to_value(&config).unwrap();
+        let reopened: ServerConfig = serde_json::from_value(stored).unwrap();
+
+        assert_eq!(
+            reopened.prompt.as_deref(),
+            Some("Revenue values are stored in cents.")
+        );
+    }
+
+    #[test]
+    fn server_config_without_prompt_remains_compatible() {
+        let config = ServerConfig::new(
+            "analytics".into(),
+            "PostgreSQL".into(),
+            "localhost".into(),
+            5432,
+            "user".into(),
+        );
+
+        let mut stored = serde_json::to_value(config).unwrap();
+        stored.as_object_mut().unwrap().remove("prompt");
+        let reopened: ServerConfig = serde_json::from_value(stored).unwrap();
+
+        assert!(reopened.prompt.is_none());
     }
 
     #[test]
