@@ -208,9 +208,6 @@ onUnmounted(() => {
               <Button variant="outline" size="sm" @click="handleLogin">
                 {{ $t('plan.section.loginLink') }}
               </Button>
-              <Button variant="outline" size="sm" @click="handleUpgrade">
-                {{ $t('plan.upgrade.viewPricing') }}
-              </Button>
               <ShimmerButton size="sm" class="flex-1" @click="handleStartFree">
                 {{ $t('plan.upgrade.startFree') }}
               </ShimmerButton>

@@ -95,7 +95,6 @@ export const enUS = {
       cta: 'Upgrade',
       refresh: 'Refresh entitlements',
       startFree: 'Start free',
-      viewPricing: 'View pricing',
       versionPermanent: 'Subscribed versions are permanently usable, even offline.',
       versionLockedOut: 'This release requires an active subscription to unlock. Renew to unlock it permanently.',
     },

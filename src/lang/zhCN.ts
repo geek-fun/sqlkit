@@ -95,7 +95,6 @@ export const zhCN = {
       cta: '升级',
       refresh: '刷新权益',
       startFree: '免费开始',
-      viewPricing: '查看定价',
       versionPermanent: '订阅期内发布的版本永久可用，支持离线。',
       versionLockedOut: '当前版本需要有效订阅解锁，续订后可永久解锁。',
     },
