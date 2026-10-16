@@ -1,8 +1,10 @@
 import type { SslConfig } from '@/types/connection'
 import { listen } from '@tauri-apps/api/event'
 import { defineStore } from 'pinia'
+import { markSshTunnelStripped, shouldStripSshTunnel } from '@/common'
 import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
 import { connectionApi } from '../datasources'
+import { useEntitlementStore } from './entitlementStore'
 import { profileToTransportLayer, useSshProfileStore } from './sshProfileStore'
 
 export enum DatabaseType {
@@ -769,8 +771,17 @@ export const useConnectionStore = defineStore('connectionStore', {
 
       this.connectionStatus[connectionId] = ConnectionStatus.CONNECTING
 
+      // Ultimate-only SSH tunnel: on a free plan the saved tunnel is dropped
+      // for this attempt so the database can still be reached directly. The
+      // saved config is never rewritten — an upgrade restores the tunnel.
+      const sshTunnelStripped = shouldStripSshTunnel(
+        connection.sshTunnel?.enabled,
+        useEntitlementStore().isLocalUltimate,
+      )
+
       try {
-        const transportLayers = await buildTransportLayers(connection.sshTunnel)
+        const transportLayers
+          = sshTunnelStripped ? null : await buildTransportLayers(connection.sshTunnel)
 
         const serverConfig = {
           id: connection.id!,
@@ -810,7 +821,10 @@ export const useConnectionStore = defineStore('connectionStore', {
       }
       catch (error) {
         this.connectionStatus[connectionId] = ConnectionStatus.ERROR
-        throw new Error(`Failed to connect: ${error}`)
+        const failure = new Error(`Failed to connect: ${error}`)
+        // Distinguish "failed without the tunnel we had to drop" from a plain
+        // connection error so the UI can name the real cause.
+        throw sshTunnelStripped ? markSshTunnelStripped(failure) : failure
       }
     },
 

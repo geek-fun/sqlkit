@@ -11,6 +11,7 @@ const { t } = useI18n()
 const showModal = ref(false)
 const connectionName = ref('')
 const errorMessage = ref('')
+const errorHint = ref('')
 const warningMessage = ref('')
 const cancelCallback = ref<(() => void) | null>(null)
 const retryCallback = ref<(() => void) | null>(null)
@@ -21,6 +22,7 @@ function show(name: string, onCancel: () => void, onRetry: () => void, warning =
   cancelCallback.value = onCancel
   retryCallback.value = onRetry
   errorMessage.value = ''
+  errorHint.value = ''
   warningMessage.value = warning
   showModal.value = true
 }
@@ -29,13 +31,15 @@ function hide() {
   showModal.value = false
   connectionName.value = ''
   errorMessage.value = ''
+  errorHint.value = ''
   warningMessage.value = ''
   cancelCallback.value = null
   retryCallback.value = null
 }
 
-function showError(error: string) {
+function showError(error: string, hint = '') {
   errorMessage.value = error
+  errorHint.value = hint
 }
 
 function handleDialogOpenChange(open: boolean) {
@@ -49,11 +53,13 @@ function handleCancel() {
     cancelCallback.value()
   }
   errorMessage.value = ''
+  errorHint.value = ''
   hide()
 }
 
 function handleRetry() {
   errorMessage.value = ''
+  errorHint.value = ''
   if (retryCallback.value) {
     retryCallback.value()
   }
@@ -113,6 +119,9 @@ defineExpose({
               </p>
               <p class="mt-1 opacity-90">
                 {{ errorMessage }}
+              </p>
+              <p v-if="errorHint" class="text-xs mt-2 opacity-90">
+                {{ errorHint }}
               </p>
               <p v-if="failureHint" class="text-xs mt-2 opacity-90">
                 {{ t(failureHint.messageKey) }}

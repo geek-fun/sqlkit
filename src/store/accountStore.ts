@@ -49,6 +49,10 @@ export const useAccountStore = defineStore('account', {
       this.refreshToken = ''
       this.username = ''
       this.email = ''
+      // Identity must not survive the session either — a different account on
+      // this machine must never inherit the previous profile or avatar.
+      this.userId = ''
+      this.avatar = ''
     },
   },
 })

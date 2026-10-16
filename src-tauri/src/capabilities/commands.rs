@@ -11,6 +11,14 @@ pub async fn invoke_capability(
     connection_id: Option<String>,
     app: AppHandle,
 ) -> Result<String, String> {
+    // Capability execution is the AI agent's tool surface (its only caller) —
+    // it must not be reachable without the entitlement that gates the agent
+    // loop itself. The loop's own executor calls the registry directly, so this
+    // gate only closes the IPC route.
+    crate::entitlement::ensure_local_ultimate(
+        &app.state::<crate::entitlement::EntitlementState>(),
+        "AI",
+    )?;
     let config = match connection_id {
         Some(ref id) => Some(resolve_connection_config(&app, id).await?),
         None => None,

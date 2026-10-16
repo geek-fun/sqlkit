@@ -2,12 +2,11 @@
 import type { ServerConnection } from '@/store'
 import type { SshProfile } from '@/store/sshProfileStore'
 import { invoke } from '@tauri-apps/api/core'
-import { openUrl } from '@tauri-apps/plugin-opener'
 import { Pencil, Trash2 } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { UPGRADE_URL } from '@/common'
+import { isSshTunnelStrippedError, shouldStripSshTunnel } from '@/common'
 import { ServerCard, ServerFormDialog } from '@/components/connections'
 import ConnectingModal from '@/components/connections/ConnectingModal.vue'
 import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
@@ -104,9 +103,6 @@ function handleAddConnection() {
 }
 
 function handleEditConnection(connection: ServerConnection) {
-  if (!guardSshConnection(connection)) {
-    return
-  }
   editingConnection.value = connection
   isFormDialogOpen.value = true
 }
@@ -138,6 +134,13 @@ const systemProxyWarning = async (connection: ServerConnection): Promise<string 
   }
 }
 
+// Ultimate-only SSH tunnels are dropped for free plans (see connectionStore),
+// so name that up front instead of letting a silent direct connect confuse.
+const sshTunnelSkippedWarning = (connection: ServerConnection): string | undefined =>
+  shouldStripSshTunnel(connection.sshTunnel?.enabled, entitlementStore.isLocalUltimate)
+    ? t('components.connectingModal.sshTunnelSkipped')
+    : undefined
+
 async function establishConnection(connection: ServerConnection, navigateOnSuccess = true) {
   if (!connection.id) {
     return
@@ -146,8 +149,9 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
   connectionCancelled.value = false
 
   // Show the modal first (instant click feedback), then resolve the async
-  // system-proxy diagnostic and patch the warning in — `setWarning` tolerates
-  // the modal having closed meanwhile.
+  // diagnostic and patch the warning in — `setWarning` tolerates the modal
+  // having closed meanwhile. A dropped SSH tunnel is the more consequential
+  // heads-up, so it replaces the system-proxy probe entirely.
   connectingModal.value?.show(
     connection.name,
     () => {
@@ -155,8 +159,9 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
     },
     () => establishConnection(connection, navigateOnSuccess),
   )
-  const proxyWarning = await systemProxyWarning(connection)
-  connectingModal.value?.setWarning(proxyWarning ?? null)
+  const tunnelWarning = sshTunnelSkippedWarning(connection)
+  const proxyWarning = tunnelWarning ? undefined : await systemProxyWarning(connection)
+  connectingModal.value?.setWarning(tunnelWarning ?? proxyWarning ?? null)
 
   const startTime = Date.now()
 
@@ -202,17 +207,11 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
     }
 
     const errorMessage = err instanceof Error ? err.message : String(err)
-    connectingModal.value?.showError(errorMessage)
+    connectingModal.value?.showError(
+      errorMessage,
+      isSshTunnelStrippedError(err) ? t('components.connectingModal.sshTunnelStripped') : '',
+    )
   }
-}
-
-// an SSH-bound saved connection is only operable with Ultimate — instead of
-// attempting a connect that dies with a raw 403, route to the pricing site
-function guardSshConnection(connection: ServerConnection): boolean {
-  if (entitlementStore.isLocalUltimate || !connection.sshTunnel?.enabled)
-    return true
-  openUrl(UPGRADE_URL)
-  return false
 }
 
 // SSH profile management is Ultimate-only — the modal carries pricing + trial
@@ -231,9 +230,6 @@ function openProfileEdit(profile: SshProfile) {
 
 async function handleConnect(connection: ServerConnection) {
   connectError.value = null
-  if (!guardSshConnection(connection)) {
-    return
-  }
   if (!connection.id) {
     return
   }
@@ -254,9 +250,6 @@ async function handleConnect(connection: ServerConnection) {
 
 async function handleDoubleClick(connection: ServerConnection) {
   connectError.value = null
-  if (!guardSshConnection(connection)) {
-    return
-  }
   if (!connection.id) {
     return
   }
@@ -275,9 +268,6 @@ async function handleDoubleClick(connection: ServerConnection) {
 }
 
 function handleDeleteConnection(connection: ServerConnection) {
-  if (!guardSshConnection(connection)) {
-    return
-  }
   connectionToDelete.value = connection
   deleteDialogOpen.value = true
 }
@@ -291,9 +281,6 @@ async function confirmDelete() {
 }
 
 function handleDuplicateConnection(connection: ServerConnection) {
-  if (!guardSshConnection(connection)) {
-    return
-  }
   editingConnection.value = {
     ...connection,
     id: undefined,

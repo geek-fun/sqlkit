@@ -115,6 +115,7 @@ pageant = "0.2"
 [dev-dependencies]
 mockall = "0.13"
 tempfile = "3"
+wiremock = "0.6"
 
 [features]
 default = [ "rusqlite/bundled" ]

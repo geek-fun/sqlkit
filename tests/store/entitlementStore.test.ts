@@ -10,14 +10,25 @@ jest.mock('@tauri-apps/api/core', () => ({
   invoke: (...args: unknown[]) => mockInvoke(...args),
 }))
 
+const mockSetToken = jest.fn()
 const mockSetRefreshToken = jest.fn()
+const mockClearAuth = jest.fn()
+let mockLoggedIn = true
 
 jest.mock('@/store/accountStore', () => ({
   useAccountStore: () => ({
-    isLoggedIn: true,
-    token: 'token-1',
-    refreshToken: 'lease-1',
+    get isLoggedIn() {
+      return mockLoggedIn
+    },
+    get token() {
+      return mockLoggedIn ? 'token-1' : ''
+    },
+    get refreshToken() {
+      return mockLoggedIn ? 'lease-1' : ''
+    },
+    setToken: mockSetToken,
     setRefreshToken: mockSetRefreshToken,
+    clearAuth: mockClearAuth,
   }),
 }))
 
@@ -32,6 +43,7 @@ function view(overrides: Partial<EntitlementView> = {}): EntitlementView {
     cancelScheduledAt: null,
     cached: true,
     fetchedAtMs: 123,
+    sessionPhase: null,
     lastError: null,
     ...overrides,
   }
@@ -44,7 +56,45 @@ function rejected(errorType: string, message: string) {
 describe('entitlementStore', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+    // the accountStore mutators are file-level fns shared by the mock — keep
+    // each case's assertions independent of previous call records
+    jest.clearAllMocks()
     mockInvoke = jest.fn()
+    // void-commands (revoke/clear) default to a resolved promise;
+    // each test overrides per invocation name/value.
+    mockInvoke.mockResolvedValue(undefined)
+    mockLoggedIn = true
+  })
+
+  // A cached plan must never outlive the account session: without a login the
+  // app is community, no matter what a previous session left on disk.
+  describe('no account session', () => {
+    it('never hydrates a leftover cache', async () => {
+      mockLoggedIn = false
+      mockInvoke.mockResolvedValue(view({ localUltimate: true, fetchedAtMs: 42 }))
+      const store = useEntitlementStore()
+
+      await store.hydrate()
+
+      expect(mockInvoke).not.toHaveBeenCalled()
+      expect(store.view).toBeNull()
+      expect(store.isLocalUltimate).toBe(false)
+      expect(store.sessionPhase).toBe('anonymous')
+    })
+
+    it('drops the cached plan instead of refreshing anonymously', async () => {
+      mockLoggedIn = false
+      mockInvoke.mockResolvedValue(view({ fetchedAtMs: null }))
+      const store = useEntitlementStore()
+      store.$patch({ view: view({ localUltimate: true, fetchedAtMs: 42 }) })
+
+      await store.refreshEntitlement(true)
+
+      expect(mockInvoke).toHaveBeenCalledWith('clear_entitlement')
+      expect(mockInvoke).not.toHaveBeenCalledWith('refresh_entitlement', expect.anything())
+      expect(store.view).toBeNull()
+      expect(store.isLocalUltimate).toBe(false)
+    })
   })
 
   describe('hydrate', () => {
@@ -70,6 +120,17 @@ describe('entitlementStore', () => {
 
       await expect(store.hydrate()).resolves.toBeUndefined()
       expect(store.view).toBeNull()
+    })
+
+    it('claims the session so background entitlements may reconcile', async () => {
+      mockInvoke.mockResolvedValue(view({ fetchedAtMs: 42 }))
+      const store = useEntitlementStore()
+
+      await store.hydrate()
+
+      // `tokenPresent` is what lets Rust start the paid MCP bridge: the disk
+      // cache alone must never be enough on a signed-out launch.
+      expect(mockInvoke).toHaveBeenCalledWith('get_entitlement', { tokenPresent: true })
     })
   })
 
@@ -112,11 +173,12 @@ describe('entitlementStore', () => {
 
   describe('refreshEntitlement', () => {
     it('stores the fresh view', async () => {
-      mockInvoke.mockResolvedValue(view({ localUltimate: true }))
+      mockInvoke.mockResolvedValue(view({ localUltimate: true, sessionPhase: 'signed-in' }))
       const store = useEntitlementStore()
 
-      await store.refreshEntitlement(true)
+      const outcome = await store.refreshEntitlement(true)
 
+      expect(outcome).toBe('ok')
       expect(mockInvoke).toHaveBeenCalledWith('refresh_entitlement', {
         token: 'token-1',
         refreshToken: 'lease-1',
@@ -124,16 +186,47 @@ describe('entitlementStore', () => {
       })
       expect(store.isLocalUltimate).toBe(true)
       expect(store.planState).toBe('ultimate')
+      expect(store.sessionExpired).toBe(false)
     })
 
-    it('drops the lease immediately on session rejection — no retry', async () => {
+    it('graces the first deliberately rejected lease, resolves on the second', async () => {
       mockInvoke.mockRejectedValue(rejected(SESSION_REJECTED_ERROR_TYPE, 'lease expired'))
       const store = useEntitlementStore()
 
-      await store.refreshEntitlement(false)
+      const first = await store.refreshEntitlement(false)
 
-      expect(mockInvoke).toHaveBeenCalledTimes(1)
-      expect(mockSetRefreshToken).toHaveBeenCalledWith('')
+      const refreshCalls = () =>
+        mockInvoke.mock.calls.filter(([name]) => name === 'refresh_entitlement')
+      expect(first).toBe('lost')
+      expect(refreshCalls()).toHaveLength(1)
+      expect(mockClearAuth).not.toHaveBeenCalled()
+      expect(store.sessionLostNotice).toBe(0)
+      expect(store.sessionExpired).toBe(true)
+
+      const second = await store.refreshEntitlement(false)
+
+      expect(second).toBe('lost')
+      expect(refreshCalls()).toHaveLength(2)
+      expect(mockInvoke).toHaveBeenCalledWith('revoke_session', { refreshToken: 'lease-1' })
+      expect(mockInvoke).toHaveBeenCalledWith('clear_entitlement')
+      expect(mockClearAuth).toHaveBeenCalled()
+      expect(store.view).toBeNull()
+      expect(store.sessionLostNotice).toBeGreaterThan(0)
+    })
+
+    it('resets the rejection grace after a healthy refresh', async () => {
+      mockInvoke
+        .mockRejectedValueOnce(rejected(SESSION_REJECTED_ERROR_TYPE, 'lease expired'))
+        .mockResolvedValueOnce(view({ sessionPhase: 'signed-in' }))
+        .mockRejectedValue(rejected(SESSION_REJECTED_ERROR_TYPE, 'lease expired'))
+      const store = useEntitlementStore()
+
+      await store.refreshEntitlement(false) // grace: degraded, no wipe
+      await store.refreshEntitlement(false) // healthy → counter reset
+      await store.refreshEntitlement(false) // a fresh single rejection
+
+      expect(mockClearAuth).not.toHaveBeenCalled()
+      expect(store.sessionLostNotice).toBe(0)
       expect(store.sessionExpired).toBe(true)
     })
 
@@ -141,7 +234,7 @@ describe('entitlementStore', () => {
       jest.useFakeTimers()
       mockInvoke
         .mockRejectedValueOnce('network error: timeout')
-        .mockResolvedValueOnce(view({ ultimateActive: true, localUltimate: true }))
+        .mockResolvedValueOnce(view({ ultimateActive: true, localUltimate: true, sessionPhase: 'signed-in' }))
       const store = useEntitlementStore()
 
       const pending = store.refreshEntitlement(false)
@@ -186,6 +279,27 @@ describe('entitlementStore', () => {
       expect(store.hasEntitlementError).toBe(false)
     })
 
+    it('resolves an unrenewable bearer (401 with no lease) to a full sign-out', async () => {
+      // Rust answers Ok with a degraded view when the lease is gone and the
+      // bearer can no longer serve — the store must not leave a half-dead
+      // session behind.
+      mockInvoke.mockImplementation((name: string) => {
+        if (name === 'refresh_entitlement')
+          return Promise.resolve(view({ lastError: 'session expired', sessionPhase: 'expired' }))
+        return Promise.resolve(undefined)
+      })
+      const store = useEntitlementStore()
+
+      const outcome = await store.refreshEntitlement(false)
+
+      expect(outcome).toBe('lost')
+      expect(mockInvoke).toHaveBeenCalledWith('revoke_session', { refreshToken: 'lease-1' })
+      expect(mockInvoke).toHaveBeenCalledWith('clear_entitlement')
+      expect(mockClearAuth).toHaveBeenCalled()
+      expect(store.view).toBeNull()
+      expect(store.sessionLostNotice).toBeGreaterThan(0)
+    })
+
     it('resolves with Unknown for a definitive entitlement answer', async () => {
       jest.useFakeTimers()
       mockInvoke.mockRejectedValue(rejected(ENTITLEMENT_ERROR_TYPE, 'requires Ultimate'))
@@ -200,7 +314,111 @@ describe('entitlementStore', () => {
     })
   })
 
-  describe('plan classification', () => {
+  describe('attemptSessionRecovery', () => {
+    it('rotates the lease first, then a successful refresh recovers', async () => {
+      mockInvoke.mockImplementation((name: string) => {
+        if (name === 'rotate_session_now')
+          return Promise.resolve({ access_token: 'token-2', refresh_token: 'lease-2' })
+        if (name === 'refresh_entitlement')
+          return Promise.resolve(view({ localUltimate: true, sessionPhase: 'signed-in' }))
+        return Promise.resolve(undefined)
+      })
+      const store = useEntitlementStore()
+
+      const outcome = await store.attemptSessionRecovery()
+
+      expect(outcome).toBe('recovered')
+      expect(mockInvoke).toHaveBeenCalledWith('rotate_session_now', { refreshToken: 'lease-1' })
+      expect(mockSetToken).toHaveBeenCalledWith('token-2')
+      expect(mockSetRefreshToken).toHaveBeenCalledWith('lease-2')
+    })
+
+    it('graces the first rejected rotation, resolves on the second — without re-checking', async () => {
+      mockInvoke.mockImplementation((name: string) => {
+        if (name === 'rotate_session_now')
+          return Promise.reject(rejected(SESSION_REJECTED_ERROR_TYPE, 'reuse detected'))
+        return Promise.resolve(undefined)
+      })
+      const store = useEntitlementStore()
+
+      const first = await store.attemptSessionRecovery()
+
+      expect(first).toBe('lost')
+      expect(mockClearAuth).not.toHaveBeenCalled()
+      expect(store.sessionLostNotice).toBe(0)
+      const refreshCalls = () =>
+        mockInvoke.mock.calls.filter(([name]) => name === 'refresh_entitlement')
+      expect(refreshCalls()).toHaveLength(0) // no pointless re-check between rejections
+
+      const second = await store.attemptSessionRecovery()
+
+      expect(second).toBe('lost')
+      expect(mockClearAuth).toHaveBeenCalled()
+      expect(store.sessionLostNotice).toBeGreaterThan(0)
+      expect(refreshCalls()).toHaveLength(0)
+    })
+
+    it('treats a transient rotation failure as recoverable — falls back to the existing bearer', async () => {
+      mockInvoke.mockImplementation((name: string) => {
+        if (name === 'rotate_session_now')
+          return Promise.reject(new Error('network error: timeout'))
+        if (name === 'refresh_entitlement')
+          return Promise.resolve(view({ localUltimate: true, sessionPhase: 'signed-in' }))
+        return Promise.resolve(undefined)
+      })
+      const store = useEntitlementStore()
+
+      const outcome = await store.attemptSessionRecovery()
+
+      expect(outcome).toBe('recovered')
+      expect(mockSetToken).not.toHaveBeenCalled()
+      expect(mockInvoke).toHaveBeenCalledWith('refresh_entitlement', {
+        token: 'token-1',
+        refreshToken: 'lease-1',
+        force: true,
+      })
+    })
+
+    it('resolves an expired re-verification answer to a definite loss', async () => {
+      mockInvoke.mockImplementation((name: string) => {
+        if (name === 'refresh_entitlement')
+          return Promise.resolve(view({ lastError: 'session expired', sessionPhase: 'expired' }))
+        return Promise.resolve(undefined)
+      })
+      const store = useEntitlementStore()
+
+      const outcome = await store.attemptSessionRecovery()
+
+      expect(outcome).toBe('lost')
+      expect(mockClearAuth).toHaveBeenCalled()
+      expect(store.view).toBeNull()
+    })
+  })
+
+  describe('session phase classification', () => {
+    it('derives the phase from token facts and the structured verdict', () => {
+      const store = useEntitlementStore()
+
+      // token + lease present, no verdict yet → signed-in
+      expect(store.sessionPhase).toBe('signed-in')
+
+      store.$patch({ view: view({ lastError: 'network error: timeout' }) })
+      expect(store.sessionPhase).toBe('signed-in')
+      expect(store.sessionExpired).toBe(false)
+      expect(store.hasEntitlementError).toBe(true)
+
+      store.$patch({ view: view({ sessionPhase: 'expired', lastError: 'session expired' }) })
+      expect(store.sessionPhase).toBe('expired')
+      expect(store.sessionExpired).toBe(true)
+
+      // a stale cached benefit no longer string-matches its way to "expired"
+      store.$patch({ view: view({ localUltimate: true, sessionPhase: 'signed-in' }) })
+      expect(store.sessionExpired).toBe(false)
+
+      store.$patch({ view: view({ lastError: 'not logged in' }) })
+      expect(store.sessionExpired).toBe(false)
+    })
+
     it('marks checking before any server answer, unknown on a failed check', () => {
       const store = useEntitlementStore()
 
@@ -208,18 +426,10 @@ describe('entitlementStore', () => {
 
       store.$patch({ view: view({ lastError: 'network error: timeout' }) })
       expect(store.planState).toBe('unknown')
-      expect(store.sessionExpired).toBe(false)
       expect(store.hasEntitlementError).toBe(true)
-
-      store.$patch({ view: view({ lastError: 'session expired' }) })
-      expect(store.sessionExpired).toBe(true)
-
-      store.$patch({ view: view({ lastError: 'not logged in' }) })
-      expect(store.sessionExpired).toBe(true)
 
       store.$patch({ view: view() })
       expect(store.planState).toBe('community')
-      expect(store.sessionExpired).toBe(false)
     })
 
     it('resets the view on clearCachedEntitlement', async () => {
@@ -232,6 +442,19 @@ describe('entitlementStore', () => {
       await store.clearCachedEntitlement()
 
       expect(mockInvoke).toHaveBeenCalledWith('clear_entitlement')
+      expect(store.view).toBeNull()
+    })
+
+    it('clearSessionState tears down identity, device state and the cache', async () => {
+      mockInvoke.mockResolvedValue(view({ localUltimate: true }))
+      const store = useEntitlementStore()
+      await store.refreshEntitlement(false)
+
+      await store.clearSessionState()
+
+      expect(mockInvoke).toHaveBeenCalledWith('clear_entitlement')
+      expect(mockInvoke).toHaveBeenCalledWith('revoke_session', { refreshToken: 'lease-1' })
+      expect(mockClearAuth).toHaveBeenCalled()
       expect(store.view).toBeNull()
     })
   })

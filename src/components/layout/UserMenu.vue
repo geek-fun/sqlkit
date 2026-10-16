@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { Loader2, LogOut, RefreshCw, Settings, UserRound } from 'lucide-vue-next'
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import DefaultAvatar from '@/components/DefaultAvatar.vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -14,9 +13,17 @@ const { t } = useI18n()
 const accountStore = useAccountStore()
 const entitlementStore = useEntitlementStore()
 const refreshing = ref(false)
+const recovering = ref(false)
+const open = ref(false)
 
 const planBadge = computed(() => {
+  if (recovering.value)
+    return { label: t('plan.state.checking'), cls: 'bg-muted text-muted-foreground border-transparent' }
   const s = entitlementStore.planState
+  // A dead session degrades the badge — the cached entitlement is no longer a
+  // verified server answer, the login CTA is the primary action.
+  if (entitlementStore.sessionExpired)
+    return { label: t(`plan.state.${s}`), cls: 'bg-muted text-muted-foreground border-transparent' }
   if (s === 'ultimate')
     return { label: t('plan.state.ultimate'), cls: 'bg-primary/15 text-primary border-primary/30' }
   if (s === 'community')
@@ -27,6 +34,9 @@ const planBadge = computed(() => {
 })
 
 const expiryText = computed(() => {
+  // A stale cached benefit must never contradict the re-login instruction.
+  if (entitlementStore.sessionExpired)
+    return ''
   const expiresAt = entitlementStore.view?.ultimateExpiresAt
   if (!expiresAt || !entitlementStore.isCloudUltimate)
     return ''
@@ -43,18 +53,42 @@ async function handleRefresh() {
   }
 }
 
-// Entitlements are account-scoped: the cached view must never outlive the
-// account session on this machine. Server-side revocation is best-effort —
-// the local session clears even when the network or an older backend says no.
+// One silent recovery attempt per panel open while the session is degraded:
+// rotate the lease / re-verify entitlements, and if the session is
+// definitively unrenewable the store resolves it to the logged-out look.
+async function runRecovery() {
+  recovering.value = true
+  try {
+    await entitlementStore.attemptSessionRecovery()
+  }
+  finally {
+    recovering.value = false
+  }
+}
+
+function recoveryNeeded() {
+  if (entitlementStore.sessionPhase === 'anonymous')
+    return false
+  return entitlementStore.sessionExpired || entitlementStore.hasEntitlementError
+}
+
+watch(open, (isOpen) => {
+  if (isOpen && recoveryNeeded()) {
+    void runRecovery()
+  }
+})
+
+// Entitlements are account-scoped: the cached view, profile identity and device
+// lease must never outlive the account session on this machine. The shared
+// teardown revokes the lease server-side best-effort.
 async function handleLogout() {
-  await invoke('revoke_session', { refreshToken: accountStore.refreshToken || null }).catch(() => {})
-  await entitlementStore.clearCachedEntitlement()
-  accountStore.clearAuth()
+  open.value = false
+  await entitlementStore.clearSessionState()
 }
 </script>
 
 <template>
-  <DropdownMenu>
+  <DropdownMenu v-model:open="open">
     <DropdownMenuTrigger as-child>
       <button
         class="mx-auto rounded-md flex h-8 w-8 cursor-pointer transition-transform items-center justify-center relative hover:scale-105"
@@ -103,38 +137,56 @@ async function handleLogout() {
             :class="planBadge.cls"
           >
             <Loader2
-              v-if="entitlementStore.planState === 'checking'"
+              v-if="recovering || entitlementStore.planState === 'checking'"
               class="mr-1 h-2.5 w-2.5 animate-spin"
             />
             {{ planBadge.label }}
           </span>
-          <p v-if="expiryText" class="text-[11px] text-muted-foreground mt-1">
-            {{ expiryText }}
-          </p>
+          <!-- The re-login instruction outranks any cached benefit copy: the
+               session verdict is the only verified fact while degraded. -->
           <p v-if="entitlementStore.sessionExpired" class="text-[11px] text-amber-500 mt-1">
             {{ t('plan.section.sessionExpired') }}
+          </p>
+          <p v-else-if="expiryText" class="text-[11px] text-muted-foreground mt-1">
+            {{ expiryText }}
           </p>
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           v-if="entitlementStore.sessionExpired"
+          :disabled="recovering"
           @click="openLoginUrl()"
         >
           {{ t('plan.section.loginLink') }}
         </DropdownMenuItem>
-        <DropdownMenuItem v-else @click="openUrl(`${CONSOLE_BASE_URL}/subscribe`)">
+        <DropdownMenuItem v-else :disabled="recovering" @click="openUrl(`${CONSOLE_BASE_URL}/subscribe`)">
           {{ t('plan.tab') }}
         </DropdownMenuItem>
-        <DropdownMenuItem v-if="!entitlementStore.sessionExpired" :disabled="refreshing" @click="handleRefresh">
+        <DropdownMenuItem
+          v-if="!recovering && !entitlementStore.sessionExpired && entitlementStore.hasEntitlementError"
+          @click="runRecovery"
+        >
+          <RefreshCw class="mr-2 h-3.5 w-3.5" />
+          {{ t('plan.section.refresh') }}
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          v-else-if="!entitlementStore.sessionExpired"
+          :disabled="refreshing || recovering"
+          @click="handleRefresh"
+        >
           <RefreshCw class="mr-2 h-3.5 w-3.5" :class="{ 'animate-spin': refreshing }" />
           {{ t('plan.section.refresh') }}
         </DropdownMenuItem>
-        <DropdownMenuItem @click="openUrl(`${CONSOLE_BASE_URL}`)">
+        <DropdownMenuItem :disabled="recovering" @click="openUrl(`${CONSOLE_BASE_URL}`)">
           <Settings class="mr-2 h-3.5 w-3.5" />
           {{ t('plan.section.manage') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem class="text-destructive focus:text-destructive" @click="handleLogout">
+        <DropdownMenuItem
+          class="text-destructive focus:text-destructive"
+          :disabled="recovering"
+          @click="handleLogout"
+        >
           <LogOut class="mr-2 h-3.5 w-3.5" />
           {{ t('plan.section.logout') }}
         </DropdownMenuItem>

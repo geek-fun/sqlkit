@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
 import { Check, Loader2, LogOut, RefreshCw, X } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -38,6 +37,10 @@ const versionStateText = computed(() => {
 })
 
 const expiryText = computed(() => {
+  // Hide the "active until" banner while the session is dead — the cached
+  // benefit must not contradict the re-login instruction next to it.
+  if (entitlementStore.sessionExpired)
+    return ''
   const expiresAt = entitlementStore.view?.ultimateExpiresAt
   if (!expiresAt || !entitlementStore.isCloudUltimate)
     return ''
@@ -71,15 +74,11 @@ async function handleStartFree() {
   await openRegisterUrl()
 }
 
-// Entitlements are account-scoped: the cached view and the device lease must
-// never outlive the account session on this machine. Server-side revocation
-// is best-effort — the local session clears even when the network or an
-// older backend says no.
+// Entitlements are account-scoped: the cached view, profile identity and device
+// lease must never outlive the account session on this machine. The shared
+// teardown revokes the lease server-side best-effort.
 async function handleLogout() {
-  await invoke('revoke_session', { refreshToken: accountStore.refreshToken || null }).catch(() => {})
-  await entitlementStore.clearCachedEntitlement()
-  accountStore.clearAuth()
-  deviceStore.$reset()
+  await entitlementStore.clearSessionState()
 }
 </script>
 
@@ -87,7 +86,7 @@ async function handleLogout() {
   <Card>
     <CardContent class="px-5 py-4 space-y-4">
       <div class="flex flex-wrap gap-3 items-center">
-        <Badge :variant="entitlementStore.isLocalUltimate ? 'default' : 'secondary'">
+        <Badge :variant="entitlementStore.isLocalUltimate && !entitlementStore.sessionExpired ? 'default' : 'secondary'">
           <Loader2 v-if="entitlementStore.planState === 'checking'" class="mr-1 h-3 w-3 animate-spin" />
           {{ t(`plan.state.${entitlementStore.planState}`) }}
         </Badge>
