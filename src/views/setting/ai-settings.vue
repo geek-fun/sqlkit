@@ -1,18 +1,23 @@
 <script setup lang="ts">
 import type { LlmProvider } from '@/store/appStore'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { UPGRADE_URL } from '@/common'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { ProBadge } from '@/components/upgrade'
 import { useAppStore } from '@/store/appStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 import ProviderFormDialog from './provider-form-dialog.vue'
 import ProviderList from './provider-list.vue'
 
 const { t } = useI18n()
 const appStore = useAppStore()
+const entitlementStore = useEntitlementStore()
 const { llmSettings } = storeToRefs(appStore)
 
 const showFormDialog = ref(false)
@@ -21,7 +26,11 @@ const isEditingPrompt = ref(false)
 const draftPrompt = ref('')
 const promptSaveError = ref('')
 const systemPrompt = computed(() => llmSettings.value.chat.systemPrompt ?? '')
+const isPromptGated = computed(() => !entitlementStore.isLocalUltimate)
 const hasPromptChanges = computed(() => draftPrompt.value !== systemPrompt.value)
+const openUpgrade = () => {
+  void openUrl(UPGRADE_URL)
+}
 
 const startEditPrompt = () => {
   draftPrompt.value = systemPrompt.value
@@ -94,7 +103,17 @@ function handleCloseDialog() {
           </p>
         </div>
 
-        <div class="p-4 border border-border/70 rounded-xl bg-card/70 space-y-3">
+        <button
+          v-if="isPromptGated"
+          type="button"
+          class="px-3 py-2.5 text-left border rounded-lg border-dashed flex gap-2.5 w-full cursor-pointer transition-colors items-center hover:bg-accent/50"
+          @click="openUpgrade"
+        >
+          <ProBadge size="xs" />
+          <span class="text-sm text-muted-foreground">{{ t('pages.settings.ai.chat.systemPromptUltimateOnly') }}</span>
+          <span class="text-xs text-primary font-medium ml-auto px-2 py-1 rounded-md bg-primary/10 shrink-0">{{ t('plan.upgrade.cta') }}</span>
+        </button>
+        <div v-else class="p-4 border border-border/70 rounded-xl bg-card/70 space-y-3">
           <div class="flex gap-4 items-start justify-between">
             <div class="space-y-1">
               <p class="font-semibold">

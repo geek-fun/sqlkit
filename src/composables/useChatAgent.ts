@@ -8,6 +8,7 @@ import { assembleSystemPrompt } from '@/common'
 import { agentApi } from '@/datasources/agentApi'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -319,14 +320,18 @@ export function useChatAgent(config: UseChatAgentConfig) {
 
       const { useAppStore } = await import('@/store/appStore')
       const appStore = useAppStore()
+      const entitlementStore = useEntitlementStore()
+      const canUseCustomPrompts = entitlementStore.isLocalUltimate
       const connectionStore = useConnectionStore()
       const hasConnections = Object.keys(contextSnapshot?.connections ?? {}).length > 0
 
-      const connectionPrompts = Object.entries(contextSnapshot?.connections ?? {}).flatMap(([alias, conn]) => {
-        const connection = connectionStore.getConnectionById(String(conn.connectionId))
-        const prompt = connection?.prompt?.trim()
-        return prompt ? [{ alias, prompt }] : []
-      })
+      const connectionPrompts = canUseCustomPrompts
+        ? Object.entries(contextSnapshot?.connections ?? {}).flatMap(([alias, conn]) => {
+            const connection = connectionStore.getConnectionById(String(conn.connectionId))
+            const prompt = connection?.prompt?.trim()
+            return prompt ? [{ alias, prompt }] : []
+          })
+        : []
 
       const activePanel = contextSnapshot?.activePanel
       const sidebarContext = config.feature === 'sidebarAssistant' && activePanel
@@ -346,7 +351,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
 
       const assembledSystemPrompt = assembleSystemPrompt({
         base: systemPrompt,
-        userGlobal: hasConnections ? appStore.llmSettings.chat.systemPrompt : undefined,
+        userGlobal: hasConnections && canUseCustomPrompts ? appStore.llmSettings.chat.systemPrompt : undefined,
         connectionPrompts,
         sidebarContext,
       })
