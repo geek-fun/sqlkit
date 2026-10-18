@@ -33,6 +33,9 @@ fn bridge_dir() -> PathBuf {
 
 /// Get the path to the current version's bridge JAR (`~/.sqlkit/jdbc-bridge/jdbc-bridge-{ver}.jar`).
 pub fn bridge_jar_path() -> PathBuf {
+    if let Some(path) = std::env::var_os("SQLKIT_JDBC_BRIDGE_JAR") {
+        return PathBuf::from(path);
+    }
     bridge_dir().join(format!(
         "{}{}{}",
         BRIDGE_JAR_PREFIX, APP_VERSION, BRIDGE_JAR_SUFFIX

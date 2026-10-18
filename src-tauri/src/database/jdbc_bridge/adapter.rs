@@ -125,8 +125,8 @@ impl JdbcBridgeAdapter {
                                 QueryValue::String(n.to_string())
                             }
                         }
-                        serde_json::Value::Bool(b) => QueryValue::String(b.to_string()),
-                        _ => QueryValue::String(String::new()),
+                        serde_json::Value::Bool(b) => QueryValue::Bool(b),
+                        _ => QueryValue::String(val.to_string()),
                     };
                     map.insert(col_name, qv);
                 }
@@ -224,7 +224,10 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
 
     async fn execute_query(&self, query: &str) -> DbResult<QueryResult> {
         let launcher = self.launcher()?;
-        let statements = split_sql_statements(query);
+        let statements = split_sql_statements_for_dialect(
+            query,
+            self.config.db_type == super::super::DatabaseType::Oracle,
+        );
         if statements.is_empty() {
             return Ok(QueryResult {
                 columns: Vec::new(),
@@ -609,7 +612,32 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
 /// - `/* ... */` block comments
 /// - Trailing semicolons and whitespace
 /// - Empty statements are skipped
+#[cfg(test)]
 fn split_sql_statements(sql: &str) -> Vec<String> {
+    split_sql_statements_for_dialect(sql, false)
+}
+
+fn is_oracle_block(sql: &str) -> bool {
+    let words: Vec<String> = sql
+        .split_whitespace()
+        .take(6)
+        .map(str::to_ascii_uppercase)
+        .collect();
+    if matches!(words.first().map(String::as_str), Some("BEGIN" | "DECLARE")) {
+        return true;
+    }
+    if words.first().map(String::as_str) != Some("CREATE") {
+        return false;
+    }
+    words.iter().skip(1).any(|word| {
+        matches!(
+            word.as_str(),
+            "FUNCTION" | "PROCEDURE" | "PACKAGE" | "TRIGGER" | "TYPE"
+        )
+    })
+}
+
+fn split_sql_statements_for_dialect(sql: &str, oracle: bool) -> Vec<String> {
     let mut statements: Vec<String> = Vec::new();
     let mut current = String::new();
     let chars: Vec<char> = sql.chars().collect();
@@ -618,8 +646,51 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
     while i < chars.len() {
         let c = chars[i];
 
+        if oracle
+            && c == '/'
+            && (current.trim().is_empty() || is_oracle_block(current.trim()))
+            && current
+                .rsplit_once('\n')
+                .map(|(_, tail)| tail.trim().is_empty())
+                .unwrap_or(current.trim().is_empty())
+            && chars[i + 1..]
+                .iter()
+                .take_while(|c| **c != '\n')
+                .all(|c| c.is_whitespace())
+        {
+            let trimmed = current.trim().to_string();
+            if !trimmed.is_empty() {
+                statements.push(trimmed);
+            }
+            current.clear();
+        }
+        // Oracle alternative quoted literals may contain both quotes and semicolons.
+        else if oracle
+            && matches!(c, 'q' | 'Q')
+            && chars.get(i + 1) == Some(&'\'')
+            && i + 2 < chars.len()
+        {
+            let close = match chars[i + 2] {
+                '[' => ']',
+                '(' => ')',
+                '{' => '}',
+                '<' => '>',
+                c => c,
+            };
+            current.extend(&chars[i..i + 3]);
+            i += 3;
+            while i < chars.len() {
+                current.push(chars[i]);
+                if chars[i] == close && chars.get(i + 1) == Some(&'\'') {
+                    current.push('\'');
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+        }
         // Single-quoted string literal
-        if c == '\'' {
+        else if c == '\'' {
             current.push(c);
             i += 1;
             while i < chars.len() {
@@ -660,6 +731,8 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
             while i < chars.len() && chars[i] != '\n' {
                 i += 1;
             }
+            current.push(' ');
+            continue;
         }
         // Block comment
         else if c == '/' && i + 1 < chars.len() && chars[i + 1] == '*' {
@@ -671,9 +744,11 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
                 }
                 i += 1;
             }
+            current.push(' ');
+            continue;
         }
         // Statement separator
-        else if c == ';' {
+        else if c == ';' && !(oracle && is_oracle_block(current.trim())) {
             let trimmed = current.trim().to_string();
             if !trimmed.is_empty() {
                 statements.push(trimmed);
@@ -698,6 +773,51 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn comments_preserve_token_boundaries() {
+        assert_eq!(
+            split_sql_statements("SELECT/*gap*/1; SELECT--gap\n2;"),
+            ["SELECT 1", "SELECT \n2"]
+        );
+        assert_eq!(split_sql_statements("SELECT 1/*gap*/+2"), ["SELECT 1 +2"]);
+    }
+
+    #[test]
+    fn oracle_blocks_keep_internal_semicolons_and_strip_slash() {
+        let sql = "CREATE OR REPLACE PROCEDURE p AS\nBEGIN\n NULL;\nEND;\n/\nSELECT 1 FROM dual;";
+        let statements = split_sql_statements_for_dialect(sql, true);
+        assert_eq!(statements.len(), 2);
+        assert!(statements[0].ends_with("END;"));
+        assert_eq!(statements[1], "SELECT 1 FROM dual");
+        assert_eq!(
+            split_sql_statements_for_dialect("BEGIN NULL; END;", true),
+            ["BEGIN NULL; END;"]
+        );
+    }
+
+    #[test]
+    fn oracle_alternative_quotes_and_types_are_preserved() {
+        let statements = split_sql_statements_for_dialect("SELECT q'[it's;a;value]' FROM dual; CREATE TYPE price AS OBJECT(n NUMBER);\n/\nSELECT 2 FROM dual;", true);
+        assert_eq!(statements.len(), 3);
+        assert!(statements[0].contains("it's;a;value"));
+        assert!(statements[1].ends_with("NUMBER);"));
+    }
+
+    #[test]
+    fn bridge_values_preserve_booleans_and_structured_data() {
+        let result = JdbcBridgeAdapter::parse_query_result(serde_json::json!({
+            "columns": ["flag", "data", "missing"],
+            "rows": [[true, {"city": "杭州"}, null]],
+        }))
+        .unwrap();
+        assert_eq!(result.rows[0]["flag"], QueryValue::Bool(true));
+        assert_eq!(
+            result.rows[0]["data"],
+            QueryValue::String("{\"city\":\"杭州\"}".into())
+        );
+        assert_eq!(result.rows[0]["missing"], QueryValue::Null);
+    }
 
     #[test]
     fn test_split_single_statement() {

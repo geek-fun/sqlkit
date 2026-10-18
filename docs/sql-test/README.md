@@ -77,3 +77,8 @@ docs/sql-test/
 2. 顺序执行 `01_schema.sql` → `02_seed.sql`，确认结尾计数卡片符合 README 预期。
 3. 逐段执行 `03_complex_queries.sql`，对照 README 的面板检查清单过一遍 UI。
 4. 想复现干净状态时重跑 `01` + `02` 即可（全部幂等）。
+
+## 自动化回归
+
+现在也可以通过 SQLKit 的真实 Rust 适配器和 Java JDBC 桥自动执行这套用例。
+运行入口、覆盖范围和限制见 [AUTOMATED_TESTING.md](AUTOMATED_TESTING.md)。

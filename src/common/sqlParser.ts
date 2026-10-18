@@ -10,7 +10,7 @@ export type Selection = {
   endColumn: number
 }
 
-export function extractStatementAtCursor(sql: string, cursorPosition?: CursorPosition, selection?: Selection): string {
+export const extractStatementAtCursor = (sql: string, cursorPosition?: CursorPosition, selection?: Selection): string => {
   if (selection) {
     const lines = sql.split('\n')
     const selectedLines = lines.slice(
@@ -47,14 +47,13 @@ export function extractStatementAtCursor(sql: string, cursorPosition?: CursorPos
     .slice(0, cursorPosition.lineNumber - 1)
     .reduce((acc, line) => acc + line.length + 1, cursorPosition.column - 1)
 
-  const beforeCursor = sql.substring(0, offset)
-  const afterCursor = sql.substring(offset)
-
-  const lastSemicolon = beforeCursor.lastIndexOf(';')
-  const nextSemicolon = afterCursor.indexOf(';')
-
-  const start = lastSemicolon === -1 ? 0 : lastSemicolon + 1
-  const end = nextSemicolon === -1 ? sql.length : offset + nextSemicolon
+  // eslint-disable-next-line regexp/use-ignore-case -- PostgreSQL dollar-quote tags are case-sensitive.
+  const tokens = /--[^\r\n]*|\/\*[\s\S]*?\*\/|'(?:''|\\[\s\S]|[^'\\])*'|"(?:""|[^"])*"|`(?:``|[^`])*`|\[(?:\]\]|[^\]])*\]|(?<dollar>\$(?:[A-Za-z_]\w*)?\$)[\s\S]*?\k<dollar>|;/g
+  const separators = Array.from(sql.matchAll(tokens))
+    .filter(match => match[0] === ';')
+    .map(match => match.index!)
+  const start = separators.reduce((start, position) => position < offset ? position + 1 : start, 0)
+  const end = separators.find(position => position >= offset) ?? sql.length
 
   const statement = sql.substring(start, end).trim()
   return statement || sql.trim()

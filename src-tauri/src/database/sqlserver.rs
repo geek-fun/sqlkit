@@ -15,11 +15,13 @@ use crate::database::{
 };
 use async_trait::async_trait;
 use chrono::{NaiveDate, NaiveDateTime, NaiveTime};
+use futures::TryStreamExt;
 use rust_decimal::Decimal;
+use sqlparser::{ast::Statement, dialect::MsSqlDialect, parser::Parser};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tiberius::{AuthMethod, Client, Config, EncryptionLevel, Row};
+use tiberius::{AuthMethod, Client, Config, EncryptionLevel, QueryItem, Row};
 use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use uuid;
@@ -238,10 +240,10 @@ impl SqlServerAdapter {
 
     /// Get the current client connection.
     async fn get_client(&self) -> DbResult<Arc<tokio::sync::Mutex<Client<Compat<TcpStream>>>>> {
-        if let Some(ref pool) = self.pool {
-            pool.get_client().await
-        } else if let Some(ref client) = self.client {
+        if let Some(ref client) = self.client {
             Ok(client.clone())
+        } else if let Some(ref pool) = self.pool {
+            pool.get_client().await
         } else {
             Err(DbError::Connection("Not connected".to_string()))
         }
@@ -496,87 +498,64 @@ impl DatabaseAdapter for SqlServerAdapter {
             .and_then(|v| v.parse::<u64>().ok())
             .map(Duration::from_millis);
 
-        // Execute query with optional timeout
-        let mut stream = if let Some(timeout_duration) = timeout {
-            tokio::time::timeout(timeout_duration, client.simple_query(query))
-                .await
-                .map_err(|_| {
-                    DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
-                })?
-                .map_err(|e| DbError::QueryExecution(e.to_string()))?
-        } else {
-            client
+        let execute = async {
+            let count_only = Parser::parse_sql(&MsSqlDialect {}, query)
+                .ok()
+                .filter(|statements| statements.len() == 1)
+                .and_then(|statements| statements.into_iter().next())
+                .is_some_and(|statement| match statement {
+                    Statement::Insert(insert) => insert.output.is_none(),
+                    Statement::Update(update) => update.output.is_none(),
+                    Statement::Delete(delete) => delete.output.is_none(),
+                    Statement::Merge(merge) => merge.output.is_none(),
+                    _ => false,
+                });
+            if count_only {
+                let count = client
+                    .execute(query, &[])
+                    .await
+                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .total();
+                return Ok(QueryResult::affected(count));
+            }
+            let mut stream = client
                 .simple_query(query)
                 .await
+                .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            let mut result = QueryResult::affected(0);
+            while let Some(item) = stream
+                .try_next()
+                .await
                 .map_err(|e| DbError::QueryExecution(e.to_string()))?
-        };
-
-        // Collect results
-        // QueryStream::columns() forwards to the first result-set metadata
-        // without consuming rows, so column names survive even when the result
-        // set is empty — an empty SELECT must still render its columns rather
-        // than looking like a DML statement.
-        let stream_columns = stream
-            .columns()
-            .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?
-            .map(|cols| {
-                cols.iter()
-                    .map(|col| (col.name().to_string(), format!("{:?}", col.column_type())))
-                    .collect::<Vec<_>>()
-            });
-
-        let results = stream
-            .into_results()
-            .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
-
-        let execution_time = start.elapsed().as_millis() as u64;
-
-        // Process results
-        if results.is_empty() {
-            // No result set (e.g., INSERT, UPDATE, DELETE)
-            // Get rows affected from the last operation
-            let affected = results.len() as u64;
-            Ok(QueryResult::affected(affected).with_execution_time(execution_time))
-        } else {
-            let result_set = &results[0];
-
-            // Fall back to the first row for column names when the stream
-            // metadata is unavailable (should not happen in practice).
-            let columns: Vec<String> = stream_columns
-                .as_ref()
-                .map(|cols| cols.iter().map(|(name, _)| name.clone()).collect())
-                .or_else(|| {
-                    result_set.first().map(|row| {
-                        row.columns()
-                            .iter()
-                            .map(|col| col.name().to_string())
-                            .collect()
-                    })
-                })
-                .unwrap_or_default();
-            let column_types: Vec<String> = stream_columns
-                .as_ref()
-                .map(|cols| cols.iter().map(|(_, ty)| ty.clone()).collect())
-                .or_else(|| {
-                    result_set.first().map(|row| {
-                        row.columns()
-                            .iter()
-                            .map(|col| format!("{:?}", col.column_type()))
-                            .collect()
-                    })
-                })
-                .unwrap_or_default();
-
-            let mut query_result = QueryResult::with_columns(columns, column_types);
-            for row in result_set {
-                let query_row = Self::row_to_query_row(row)?;
-                query_result.add_row(query_row);
+            {
+                match item {
+                    QueryItem::Metadata(metadata) => {
+                        result = QueryResult::with_columns(
+                            metadata
+                                .columns()
+                                .iter()
+                                .map(|c| c.name().to_string())
+                                .collect(),
+                            metadata
+                                .columns()
+                                .iter()
+                                .map(|c| format!("{:?}", c.column_type()))
+                                .collect(),
+                        );
+                    }
+                    QueryItem::Row(row) => result.add_row(Self::row_to_query_row(&row)?),
+                }
             }
-
-            Ok(query_result.with_execution_time(execution_time))
-        }
+            Ok::<_, DbError>(result)
+        };
+        let result = if let Some(duration) = timeout {
+            tokio::time::timeout(duration, execute)
+                .await
+                .map_err(|_| DbError::Timeout(format!("Query timed out after {:?}", duration)))??
+        } else {
+            execute.await?
+        };
+        Ok(result.with_execution_time(start.elapsed().as_millis() as u64))
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
@@ -784,9 +763,10 @@ impl DatabaseAdapter for SqlServerAdapter {
                 c.name as column_name,
                 t.name as data_type,
                 c.is_nullable,
-                c.max_length,
-                c.precision,
-                c.scale,
+                CAST(CASE WHEN t.name IN ('nvarchar', 'nchar') AND c.max_length > 0
+                    THEN c.max_length / 2 ELSE c.max_length END AS INT) AS max_length,
+                CAST(c.precision AS INT) AS precision,
+                CAST(c.scale AS INT) AS scale,
                 CASE WHEN pk.column_id IS NOT NULL THEN 1 ELSE 0 END as is_primary_key,
                 c.is_identity as is_auto_increment,
                 dc.definition as default_value
@@ -794,8 +774,6 @@ impl DatabaseAdapter for SqlServerAdapter {
             INNER JOIN sys.tables tbl ON c.object_id = tbl.object_id
             INNER JOIN sys.schemas s ON tbl.schema_id = s.schema_id
             INNER JOIN sys.types t ON c.user_type_id = t.user_type_id
-            LEFT JOIN sys.index_columns ic ON ic.object_id = c.object_id AND ic.column_id = c.column_id
-            LEFT JOIN sys.indexes i ON ic.object_id = i.object_id AND ic.index_id = i.index_id AND i.is_primary_key = 1
             LEFT JOIN (
                 SELECT ic.object_id, ic.column_id
                 FROM sys.index_columns ic
@@ -949,7 +927,7 @@ impl DatabaseAdapter for SqlServerAdapter {
             return Err(DbError::TableNotFound(format!(
                 "Table {}.{} not found",
                 Self::escape_literal(&schema_filter),
-            Self::escape_literal(&table)
+                Self::escape_literal(&table)
             )));
         }
 
@@ -1777,10 +1755,10 @@ impl DatabaseAdapter for SqlServerAdapter {
         let qualified = format!("{}.{}", schema_filter, object_name);
 
         let sql = format!(
-                "EXEC sp_rename N'{}', N'{}'",
-                Self::escape_literal(&qualified),
-                Self::escape_literal(new_name)
-            );
+            "EXEC sp_rename N'{}', N'{}'",
+            Self::escape_literal(&qualified),
+            Self::escape_literal(new_name)
+        );
 
         let client = self.get_client().await?;
         let mut client = client.lock().await;

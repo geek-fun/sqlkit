@@ -122,9 +122,15 @@ public class MetadataProvider {
                 c.put("default_value", rs.getString("COLUMN_DEF"));
                 c.put("is_primary_key", false); // filled below
                 c.put("is_auto_increment", "YES".equalsIgnoreCase(rs.getString("IS_AUTOINCREMENT")));
-                c.put("max_length", rs.getInt("COLUMN_SIZE"));
-                c.put("precision", rs.getInt("DECIMAL_DIGITS"));
-                c.put("scale", rs.getInt("DECIMAL_DIGITS"));
+                int jdbcType = rs.getInt("DATA_TYPE");
+                boolean numeric = Set.of(Types.NUMERIC, Types.DECIMAL, Types.INTEGER, Types.BIGINT,
+                    Types.SMALLINT, Types.TINYINT, Types.FLOAT, Types.REAL, Types.DOUBLE).contains(jdbcType);
+                boolean sized = Set.of(Types.CHAR, Types.VARCHAR, Types.NCHAR, Types.NVARCHAR,
+                    Types.BINARY, Types.VARBINARY).contains(jdbcType);
+                c.put("max_length", sized ? rs.getInt("COLUMN_SIZE") : null);
+                c.put("precision", numeric ? rs.getInt("COLUMN_SIZE") : null);
+                c.put("scale", numeric ? rs.getInt("DECIMAL_DIGITS") : null);
+                c.put("description", rs.getString("REMARKS"));
                 columns.add(c);
             }
         }
@@ -679,6 +685,25 @@ public class MetadataProvider {
                                                    String objectName,
                                                    String objectType) throws Exception {
         String schemaPattern = (schema != null && !schema.isEmpty()) ? schema : "";
+
+        if (isOracle(conn)) {
+            String type = objectType.toUpperCase(Locale.ROOT).replace(' ', '_');
+            if (!Set.of("TABLE", "VIEW", "MATERIALIZED_VIEW", "PROCEDURE", "FUNCTION",
+                    "TRIGGER", "SEQUENCE", "TYPE", "PACKAGE", "PACKAGE_BODY").contains(type)) {
+                throw new SQLException("Unsupported Oracle DDL object type: " + objectType);
+            }
+            try (PreparedStatement stmt = conn.prepareStatement(
+                    "SELECT DBMS_METADATA.GET_DDL(?, ?, COALESCE(?, USER)) FROM DUAL")) {
+                stmt.setString(1, type);
+                stmt.setString(2, objectName);
+                stmt.setString(3, schemaPattern.isEmpty() ? null : schemaPattern);
+                try (ResultSet rs = stmt.executeQuery()) {
+                    Map<String, Object> result = new LinkedHashMap<>();
+                    result.put("ddl", rs.next() ? rs.getString(1) : null);
+                    return result;
+                }
+            }
+        }
 
         String ddl = null;
         if ("VIEW".equalsIgnoreCase(objectType)) {
