@@ -373,6 +373,7 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
       </template>
       <div class="flex-1" />
       <div v-if="displayResults && activeOutputView === 'results'" class="text-xs text-muted-foreground flex gap-2 items-center">
+        <span v-if="database && displayResults.columns.length === 0">{{ t('pages.queries.status.database') }}: {{ database }}</span>
         <span v-if="displayResults.columns.length > 0">{{ t('components.queryResult.rows', { count: displayResults.rows.length }) }}</span>
         <span v-else-if="displayResults.rowsAffected !== undefined">{{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}</span>
         <span v-if="formattedTime">• {{ t('components.queryResult.time', { time: formattedTime }) }}</span>

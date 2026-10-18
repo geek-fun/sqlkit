@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { TableViewSubPage } from '@/store'
 import { invoke } from '@tauri-apps/api/core'
 import { save as showSaveDialog } from '@tauri-apps/plugin-dialog'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
@@ -60,6 +61,7 @@ const props = defineProps<{
   database: string
   schema?: string
   tableName: string
+  initialSubPage?: TableViewSubPage
 }>()
 
 const { t } = useI18n()
@@ -68,8 +70,8 @@ const ROWS_PER_PAGE_OPTIONS = [100, 500, 1000] as const
 type RowsPerPage = (typeof ROWS_PER_PAGE_OPTIONS)[number]
 
 // Sub-page navigation
-type SubPage = 'data' | 'schema' | 'indexes' | 'foreign_keys' | 'triggers'
-const activeSubPage = ref<SubPage>('data')
+type SubPage = TableViewSubPage
+const activeSubPage = ref<SubPage>(props.initialSubPage ?? 'data')
 const subPages: { id: SubPage, label: string }[] = [
   { id: 'data', label: 'Data' },
   { id: 'schema', label: 'Schema' },
@@ -77,6 +79,11 @@ const subPages: { id: SubPage, label: string }[] = [
   { id: 'foreign_keys', label: 'Foreign Keys' },
   { id: 'triggers', label: 'Triggers' },
 ]
+
+watch(() => props.initialSubPage, (subPage) => {
+  if (subPage)
+    activeSubPage.value = subPage
+})
 
 const currentPage = ref(1)
 const rowsPerPage = ref<RowsPerPage>(100)
@@ -837,8 +844,8 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.connectionId, props.tableName, props.schema] as const,
-  async ([newConnId, _newTable, _newSchema], [oldConnId]) => {
+  () => [props.connectionId, props.database, props.tableName, props.schema] as const,
+  async ([newConnId, _newDatabase, _newTable, _newSchema], [oldConnId]) => {
     currentPage.value = 1
     appliedFilter.value = ''
     filterInput.value = ''
@@ -1223,6 +1230,9 @@ watch(
       <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex shrink-0 gap-3 items-center overflow-hidden">
         <!-- Left: stats -->
         <div class="flex flex-shrink-0 gap-3 items-center">
+          <span v-if="props.database" class="tabular-nums">
+            {{ t('pages.queries.status.database') }}: {{ props.database }}
+          </span>
           <span v-if="totalCount > 0" class="tabular-nums">
             {{ totalCount.toLocaleString() }} rows
           </span>

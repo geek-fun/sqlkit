@@ -846,14 +846,15 @@ watch(sortableColumns, (columns) => {
       />
 
       <!-- Status Bar -->
-      <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex flex-shrink-0 gap-3 items-center">
-        <span class="tabular-nums">{{ statusText }}</span>
-        <span v-if="formattedTime" class="text-muted-foreground/70">{{ formattedTime }}</span>
+      <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex flex-shrink-0 gap-3 items-center overflow-hidden">
+        <span v-if="database" class="flex-shrink-0 tabular-nums">{{ $t('pages.queries.status.database') }}: {{ database }}</span>
+        <span class="flex-shrink-0 tabular-nums">{{ statusText }}</span>
+        <span v-if="formattedTime" class="text-muted-foreground/70 flex-shrink-0">{{ formattedTime }}</span>
         <div class="flex-1" />
-        <span v-if="sortSummary" class="text-primary tabular-nums">
+        <span v-if="sortSummary" class="text-primary flex-shrink-0 tabular-nums">
           {{ sortSummary }}
         </span>
-        <span v-if="filter.hasActiveFilters.value" class="text-blue-500 tabular-nums">
+        <span v-if="filter.hasActiveFilters.value" class="text-blue-500 flex-shrink-0 tabular-nums">
           {{ filter.filters.value.length }} {{ $t('components.dataGrid.filter.activeFilters') }}
         </span>
       </div>

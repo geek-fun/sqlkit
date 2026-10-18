@@ -22,10 +22,13 @@ export type ErDiagramMeta = {
   schema?: string
 }
 
+export type TableViewSubPage = 'data' | 'schema' | 'indexes' | 'foreign_keys' | 'triggers'
+
 export type TableViewMeta = {
   tableName: string
   database: string
   schema?: string
+  subPage?: TableViewSubPage
 }
 
 export type ListingTabMeta = {
@@ -115,7 +118,13 @@ export const useTabStore = defineStore('tabs', {
       return tab
     },
 
-    openTableViewTab(connectionId: string, database: string, tableName: string, schema?: string): QueryTab {
+    openTableViewTab(
+      connectionId: string,
+      database: string,
+      tableName: string,
+      schema?: string,
+      subPage: TableViewSubPage = 'data',
+    ): QueryTab {
       const existing = this.tabs.find(
         t => t.tableView
           && t.tableView.tableName === tableName
@@ -125,6 +134,7 @@ export const useTabStore = defineStore('tabs', {
           && !t.orphanFromConnectionId,
       )
       if (existing) {
+        existing.tableView = { ...existing.tableView!, subPage }
         this.activeTabId = existing.id
         return existing
       }
@@ -138,7 +148,7 @@ export const useTabStore = defineStore('tabs', {
         schema,
         isExecuting: false,
         hasUnsavedChanges: false,
-        tableView: { tableName, database, schema },
+        tableView: { tableName, database, schema, subPage },
       }
       this.tabs = [...this.tabs, tab]
       this.activeTabId = tab.id

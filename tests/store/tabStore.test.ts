@@ -85,10 +85,29 @@ describe('tabStore', () => {
       const tab = store.openTableViewTab('conn-1', 'mydb', 'users', 'public')
 
       expect(tab.name).toBe('users')
-      expect(tab.tableView).toEqual({ tableName: 'users', database: 'mydb', schema: 'public' })
+      expect(tab.tableView).toEqual({ tableName: 'users', database: 'mydb', schema: 'public', subPage: 'data' })
       expect(tab.connectionId).toBe('conn-1')
       expect(tab.database).toBe('mydb')
       expect(store.activeTabId).toBe('tab-1')
+    })
+
+    it('opens a table view tab on the requested sub-page', () => {
+      const store = useTabStore()
+
+      const tab = store.openTableViewTab('conn-1', 'mydb', 'users', 'public', 'schema')
+
+      expect(tab.tableView?.subPage).toBe('schema')
+    })
+
+    it('switches an existing table view tab to the requested sub-page', () => {
+      const store = useTabStore()
+      const tab = store.openTableViewTab('conn-1', 'mydb', 'users', 'public')
+      expect(tab.tableView?.subPage).toBe('data')
+
+      const reopened = store.openTableViewTab('conn-1', 'mydb', 'users', 'public', 'schema')
+
+      expect(reopened.id).toBe(tab.id)
+      expect(reopened.tableView?.subPage).toBe('schema')
     })
 
     it('switches to existing table view tab', () => {
