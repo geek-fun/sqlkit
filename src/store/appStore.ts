@@ -314,7 +314,7 @@ export const useAppStore = defineStore('app', {
     async addProvider(provider: LlmProvider) {
       this.llmSettings = {
         ...this.llmSettings,
-        providers: [...this.llmSettings.providers, provider],
+        providers: [...this.llmSettings.providers.filter(p => p.id !== provider.id), provider],
       }
       await this.persistLlmSettings()
     },
@@ -432,29 +432,23 @@ export const useAppStore = defineStore('app', {
     async syncProviderModels(providerId: string) {
       const idx = this.llmSettings.providers.findIndex(p => p.id === providerId)
       if (idx === -1)
-        return
+        throw new Error('Provider not found')
       const provider = this.llmSettings.providers[idx]
-      if (!provider.apiKey)
-        return
 
-      try {
-        const { invoke } = await import('@tauri-apps/api/core')
-        const models = await invoke<string[]>('list_llm_models', {
-          provider: provider.apiCompatibility,
-          apiKey: provider.apiKey,
-          baseUrl: provider.baseUrl || null,
-          httpProxy: provider.proxy || null,
-          proxyMode: provider.proxyMode || 'none',
-        })
-        if (models.length > 0) {
-          const updated = [...this.llmSettings.providers]
-          updated[idx] = { ...updated[idx], models }
-          this.llmSettings = { ...this.llmSettings, providers: updated }
-        }
+      const { invoke } = await import('@tauri-apps/api/core')
+      const models = await invoke<string[]>('list_llm_models', {
+        provider: provider.apiCompatibility,
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl || null,
+        httpProxy: provider.proxy || null,
+        proxyMode: provider.proxyMode || 'none',
+      })
+      if (models.length > 0) {
+        const updated = [...this.llmSettings.providers]
+        updated[idx] = { ...updated[idx], models }
+        this.llmSettings = { ...this.llmSettings, providers: updated }
       }
-      catch {
-        // Silently fail - models remain as defaults
-      }
+      await this.persistLlmSettings()
     },
 
     async testProviderConnection(providerId: string): Promise<{ success: boolean, error?: string }> {
