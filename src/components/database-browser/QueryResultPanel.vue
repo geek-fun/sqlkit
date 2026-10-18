@@ -372,12 +372,6 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         </TooltipProvider>
       </template>
       <div class="flex-1" />
-      <div v-if="displayResults && activeOutputView === 'results'" class="text-xs text-muted-foreground flex gap-2 items-center">
-        <span v-if="database && displayResults.columns.length === 0">{{ t('pages.queries.status.database') }}: {{ database }}</span>
-        <span v-if="displayResults.columns.length > 0">{{ t('components.queryResult.rows', { count: displayResults.rows.length }) }}</span>
-        <span v-else-if="displayResults.rowsAffected !== undefined">{{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}</span>
-        <span v-if="formattedTime">• {{ t('components.queryResult.time', { time: formattedTime }) }}</span>
-      </div>
       <Button
         variant="ghost"
         size="icon"
@@ -450,12 +444,6 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
             <p class="text-sm font-medium">
               {{ t('components.queryResult.success') }}
             </p>
-            <p v-if="displayResults.rowsAffected !== undefined" class="text-xs mt-1">
-              {{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}
-            </p>
-            <p v-else class="text-xs mt-1">
-              {{ t('components.queryResult.commandCompleted') }}
-            </p>
           </div>
         </div>
 
@@ -477,6 +465,21 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         :loading="isExplaining || false"
         :error="explainError"
       />
+    </div>
+
+    <!-- Status footer for statements without a result grid -->
+    <div
+      v-if="activeOutputView === 'results' && displayResults && displayResults.columns.length === 0"
+      class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex shrink-0 gap-3 items-center overflow-hidden"
+    >
+      <span v-if="database" class="tabular-nums">{{ t('pages.queries.status.database') }}: {{ database }}</span>
+      <span v-if="displayResults.rowsAffected !== undefined" class="tabular-nums">
+        {{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}
+      </span>
+      <span v-else class="tabular-nums">{{ t('components.queryResult.commandCompleted') }}</span>
+      <span v-if="formattedTime" class="text-muted-foreground/70 tabular-nums">
+        {{ t('components.queryResult.time', { time: formattedTime }) }}
+      </span>
     </div>
   </div>
 </template>
