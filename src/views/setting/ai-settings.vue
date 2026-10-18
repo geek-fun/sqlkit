@@ -2,7 +2,7 @@
 import type { LlmProvider } from '@/store/appStore'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { storeToRefs } from 'pinia'
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UPGRADE_URL } from '@/common'
 import { SettingsFeedback } from '@/components/settings'
@@ -20,6 +20,7 @@ const { t } = useI18n()
 const appStore = useAppStore()
 const entitlementStore = useEntitlementStore()
 const { llmSettings } = storeToRefs(appStore)
+const settingsLoaded = ref(false)
 
 const showFormDialog = ref(false)
 const editingProvider = ref<LlmProvider | undefined>(undefined)
@@ -65,7 +66,20 @@ const deletePrompt = async () => {
   }
 }
 
-const chatFeedback = ref<{ state: 'idle' | 'pending' | 'success' | 'error', label: string, detail?: string }>({ state: 'idle', label: '' })
+const chatFeedback = ref<{ state: 'idle' | 'pending' | 'success' | 'error', label: string, detail?: string }>({ state: 'pending', label: t('pages.settings.feedback.loading') })
+const loadSettings = async () => {
+  chatFeedback.value = { state: 'pending', label: t('pages.settings.feedback.loading') }
+  try {
+    await appStore.fetchLlmSettings()
+    settingsLoaded.value = true
+    chatFeedback.value = { state: 'idle', label: '' }
+  }
+  catch (error) {
+    chatFeedback.value = { state: 'error', label: t('pages.settings.feedback.loadFailed'), detail: error instanceof Error ? error.message : String(error) }
+  }
+}
+onMounted(loadSettings)
+
 let saveQueue: Promise<void> = Promise.resolve()
 let saveRevision = 0
 const saveChat = async (change: () => void) => {
@@ -107,13 +121,17 @@ function handleCloseDialog() {
     </CardHeader>
     <CardContent class="space-y-8">
       <ProviderList
+        v-if="settingsLoaded"
         @add="handleAdd"
         @edit="handleEdit"
       />
 
       <SettingsFeedback v-bind="chatFeedback" />
+      <Button v-if="!settingsLoaded && chatFeedback.state === 'error'" variant="outline" size="sm" @click="loadSettings">
+        {{ t('pages.settings.feedback.retry') }}
+      </Button>
       <!-- Agent Config -->
-      <section class="space-y-4">
+      <section v-if="settingsLoaded" class="space-y-4">
         <div class="space-y-1">
           <h3 class="text-lg font-semibold">
             {{ t('pages.settings.ai.chat.title') }}
@@ -259,6 +277,7 @@ function handleCloseDialog() {
       </section>
 
       <ProviderFormDialog
+        v-if="settingsLoaded"
         :open="showFormDialog"
         :provider="editingProvider ?? null"
         @close="handleCloseDialog"
