@@ -207,7 +207,7 @@ async fn handle_tools(State(state): State<Arc<BridgeState>>) -> Response {
     Json(result).into_response()
 }
 
-/// List saved connections from the store — id/name/db_type only, no credentials.
+/// List safe connection metadata and agent context from the store, without credentials.
 fn list_connections() -> Value {
     let handle = match crate::APP_HANDLE.get() {
         Some(h) => h,
@@ -221,23 +221,23 @@ fn list_connections() -> Value {
     let connections = store.get("connections").unwrap_or(json!([]));
     let safe_list: Vec<Value> = connections
         .as_array()
-        .map(|arr| {
-            arr.iter()
-                .map(|c| {
-                    json!({
-                        "id": c.get("id"),
-                        "name": c.get("name"),
-                        "type": c.get("db_type"),
-                        // First discovery tool an agent should call for this
-                        // connection type to learn its objects before querying.
-                        "discover": json!(discover_tool_for(&db_type_str(c))),
-                    })
-                })
-                .collect()
-        })
+        .map(|arr| arr.iter().map(safe_connection_summary).collect())
         .unwrap_or_default();
 
     json!(safe_list)
+}
+
+fn safe_connection_summary(connection: &Value) -> Value {
+    let mut summary = json!({
+        "id": connection.get("id"),
+        "name": connection.get("name"),
+        "type": connection.get("db_type"),
+        "discover": discover_tool_for(&db_type_str(connection)),
+    });
+    if let Some(prompt) = connection.get("prompt").filter(|value| !value.is_null()) {
+        summary["prompt"] = prompt.clone();
+    }
+    summary
 }
 
 /// The SQL discovery entry point for a connection type: list tables first,
@@ -810,6 +810,29 @@ mod tests {
     #[test]
     fn test_list_connections_empty_without_app_handle() {
         assert_eq!(list_connections(), json!([]));
+    }
+
+    #[test]
+    fn test_safe_connection_summary_includes_prompt_but_excludes_credentials() {
+        let summary = safe_connection_summary(&json!({
+            "id": "connection-1",
+            "name": "analytics",
+            "db_type": "PostgreSQL",
+            "prompt": "Revenue is stored in cents.",
+            "password": "secret",
+            "apiKey": "secret-key"
+        }));
+
+        assert_eq!(
+            summary,
+            json!({
+                "id": "connection-1",
+                "name": "analytics",
+                "type": "PostgreSQL",
+                "discover": "sqlkit__list_tables",
+                "prompt": "Revenue is stored in cents."
+            })
+        );
     }
 
     #[test]

@@ -57,6 +57,7 @@ export type ServerConfig = {
   sshTunnel?: Record<string, unknown> | null
   oracle_options?: OracleConnectionOptions | null
   read_only?: boolean | null
+  prompt?: string | null
 }
 
 export type ConnectionStatus = {
