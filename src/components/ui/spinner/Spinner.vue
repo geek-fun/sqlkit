@@ -37,3 +37,7 @@ const sizeClasses: Record<SpinnerSize, string> = {
     />
   </svg>
 </template>
+
+<style scoped>
+@media (prefers-reduced-motion: reduce) { svg { animation: none; } }
+</style>

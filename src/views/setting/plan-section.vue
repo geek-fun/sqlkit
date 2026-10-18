@@ -2,6 +2,7 @@
 import { Check, Loader2, LogOut, RefreshCw, X } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { SettingsFeedback } from '@/components/settings'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -54,27 +55,29 @@ const compareRows = [
   { key: 'plan.compare.versionLock' },
 ]
 
-async function handleRefresh() {
+const accountFeedback = ref<{ state: 'idle' | 'pending' | 'success' | 'error', label: string, detail?: string }>({ state: 'idle', label: '' })
+const runAccountAction = async (operation: () => Promise<void>, label: string, success: string) => {
+  if (refreshing.value)
+    return
   refreshing.value = true
+  accountFeedback.value = { state: 'pending', label }
   try {
-    await entitlementStore.refreshEntitlement(true)
+    await operation()
+    accountFeedback.value = { state: 'success', label: success }
   }
+  catch (error) { accountFeedback.value = { state: 'error', label: t('pages.settings.feedback.failed'), detail: error instanceof Error ? error.message : String(error) } }
   finally {
     refreshing.value = false
   }
 }
-
-async function handleLogin() {
-  await openLoginUrl()
-}
-
-async function handleStartFree() {
-  await openRegisterUrl()
-}
-
-async function handleLogout() {
-  await entitlementStore.clearSessionState()
-}
+const handleRefresh = () => runAccountAction(async () => {
+  const result = await entitlementStore.refreshEntitlement(true)
+  if (result === 'lost' || entitlementStore.hasEntitlementError)
+    throw new Error(t('plan.section.checkFailed'))
+}, t('pages.settings.feedback.refreshing'), t('pages.settings.feedback.refreshed'))
+const handleLogin = () => runAccountAction(openLoginUrl, t('pages.settings.feedback.opening'), t('pages.settings.feedback.opened'))
+const handleStartFree = () => runAccountAction(openRegisterUrl, t('pages.settings.feedback.opening'), t('pages.settings.feedback.opened'))
+const handleLogout = () => runAccountAction(() => entitlementStore.clearSessionState(), t('pages.settings.feedback.saving'), t('pages.settings.feedback.signedOut'))
 </script>
 
 <template>
@@ -114,7 +117,7 @@ async function handleLogout() {
         </span>
         <span v-if="!accountStore.isLoggedIn" class="text-xs text-muted-foreground">
           {{ t('plan.section.notLoggedIn') }}
-          <button class="text-primary underline cursor-pointer hover:opacity-80" @click="handleLogin">
+          <button class="text-primary underline cursor-pointer hover:opacity-80" :disabled="refreshing" @click="handleLogin">
             {{ t('plan.section.loginLink') }}
           </button>
         </span>
@@ -122,7 +125,7 @@ async function handleLogout() {
           <Button
             v-if="entitlementStore.sessionExpired"
             size="sm"
-            @click="handleLogin"
+            :disabled="refreshing" @click="handleLogin"
           >
             {{ t('plan.section.loginLink') }}
           </Button>
@@ -144,10 +147,10 @@ async function handleLogout() {
             {{ t('plan.upgrade.cta') }}
           </Button>
           <template v-if="!accountStore.isLoggedIn">
-            <Button variant="outline" size="sm" @click="handleLogin">
+            <Button variant="outline" size="sm" :disabled="refreshing" @click="handleLogin">
               Log in
             </Button>
-            <Button size="sm" @click="handleStartFree">
+            <Button size="sm" :disabled="refreshing" @click="handleStartFree">
               Register
             </Button>
           </template>
@@ -155,7 +158,7 @@ async function handleLogout() {
             v-if="accountStore.isLoggedIn"
             variant="ghost"
             size="sm"
-            @click="handleLogout"
+            :disabled="refreshing" @click="handleLogout"
           >
             <LogOut class="mr-2 h-4 w-4" />
             {{ t('plan.section.logout') }}
@@ -163,6 +166,7 @@ async function handleLogout() {
         </div>
       </div>
 
+      <SettingsFeedback v-bind="accountFeedback" />
       <div class="compare-wrap">
         <div class="compare-grid">
           <div class="compare-head compare-cell">

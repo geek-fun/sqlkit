@@ -3,6 +3,7 @@ import type { LlmProvider } from '@/store/appStore'
 import { ulid } from 'ulidx'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { SettingsFeedback } from '@/components/settings'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from '@/composables/useNotifications'
 import { useAppStore } from '@/store/appStore'
 
 const props = defineProps<{
@@ -213,7 +215,12 @@ function validateForm(): boolean {
   return Object.keys(errors).length === 0
 }
 
-function handleSave() {
+const saving = ref(false)
+const saveError = ref('')
+
+const handleSave = async () => {
+  if (saving.value)
+    return
   if (!validateForm())
     return
 
@@ -232,28 +239,40 @@ function handleSave() {
     contextWindowOverride: draft.value.contextWindowOverride || undefined,
   }
 
-  if (isEdit.value) {
-    appStore.updateProvider(draft.value.id, { ...cleaned })
-  }
-  else {
-    appStore.addProvider(cleaned)
-  }
+  saving.value = true
+  saveError.value = ''
+  try {
+    if (isEdit.value) {
+      await appStore.updateProvider(draft.value.id, { ...cleaned })
+    }
+    else {
+      await appStore.addProvider(cleaned)
+    }
 
-  emit('close')
+    toast.success(t('pages.settings.feedback.saved'))
+    emit('close')
+  }
+  catch (error) {
+    saveError.value = error instanceof Error ? error.message : String(error)
+  }
+  finally {
+    saving.value = false
+  }
 }
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
 
 watch(() => props.open, (open) => {
   if (open) {
+    saveError.value = ''
     resetForm(props.provider)
-    // Always start with key masked; user must click eye icon to reveal
+    // Always start with the key masked.
   }
 })
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="$emit('close')">
+  <Dialog :open="open" @update:open="!saving && $emit('close')">
     <DialogContent class="sm:max-w-[480px]">
       <DialogTitle>
         {{ isEdit ? t('pages.settings.ai.form.editTitle') : t('pages.settings.ai.form.addTitle') }}
@@ -446,11 +465,12 @@ watch(() => props.open, (open) => {
         </div>
       </div>
 
+      <SettingsFeedback v-if="saving || saveError" :state="saveError ? 'error' : 'pending'" :label="t(`pages.settings.feedback.${saveError ? 'failed' : 'saving'}`)" :detail="saveError" />
       <DialogFooter>
-        <Button variant="outline" @click="$emit('close')">
+        <Button variant="outline" :disabled="saving" @click="$emit('close')">
           {{ t('common.buttons.cancel') }}
         </Button>
-        <Button @click="handleSave">
+        <Button :disabled="saving" :aria-busy="saving" @click="handleSave">
           {{ isEdit ? t('common.buttons.save') : t('pages.settings.ai.form.save') }}
         </Button>
       </DialogFooter>

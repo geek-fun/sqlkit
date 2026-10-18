@@ -1,5 +1,8 @@
+import { invoke } from '@tauri-apps/api/core'
 import { createPinia, setActivePinia } from 'pinia'
 import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
+
+jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }))
 
 // Mock window and document for Node.js environment
 const mockMediaQuery = {
@@ -289,6 +292,14 @@ describe('appStore', () => {
   }
 
   describe('addProvider', () => {
+    it('can retry a failed provider save without duplicating the provider', async () => {
+      const store = useAppStore()
+      mockSetSecret.mockRejectedValueOnce(new Error('Storage unavailable'))
+      await expect(store.addProvider({ ...sampleProvider, kind: 'openai' })).rejects.toThrow('Storage unavailable')
+      await store.addProvider({ ...sampleProvider, kind: 'openai' })
+      expect(store.llmSettings.providers.filter(p => p.id === 'openai')).toHaveLength(1)
+    })
+
     it('should add a provider to the list', () => {
       const store = useAppStore()
       const initialCount = store.llmSettings.providers.length
@@ -517,6 +528,26 @@ describe('appStore', () => {
       const available = await store.verifyModelAvailability('openai::gpt-4o')
 
       expect(available).toBe(false)
+    })
+  })
+  describe('syncProviderModels', () => {
+    it('surfaces network failures so settings can offer a retry', async () => {
+      const store = useAppStore()
+      await store.addProvider({ ...sampleProvider, kind: 'openai' })
+      jest.mocked(invoke).mockRejectedValueOnce(new Error('Model server unavailable'))
+      await expect(store.syncProviderModels('openai')).rejects.toThrow('Model server unavailable')
+      expect(store.llmSettings.providers[0].models).toEqual(sampleProvider.models)
+    })
+
+    it('persists model lists from providers that do not require an API key', async () => {
+      const store = useAppStore()
+      await store.addProvider({ ...sampleProvider, kind: 'openai' })
+      jest.mocked(invoke).mockResolvedValueOnce(['local-model'])
+      await store.syncProviderModels('openai')
+      expect(store.llmSettings.providers[0].models).toEqual(['local-model'])
+      expect(mockSetSecret).toHaveBeenLastCalledWith('llmSettings', expect.objectContaining({
+        providers: [expect.objectContaining({ models: ['local-model'] })],
+      }))
     })
   })
 })
