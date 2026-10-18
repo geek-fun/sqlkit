@@ -93,7 +93,7 @@ suppresses affected-row counts; the explicit row-count probe turns it off.
 
 On 2026-10-17, the existing SSH stack passed all four live suites: PostgreSQL 20 query sections,
 MySQL 24, SQL Server 20, and Oracle 20 (84 sections total), after recreating and
-seeding all fixtures through SQLKit. The full Rust test command passed 550 tests
+seeding all fixtures through SQLKit. The full Rust test command passed 547 tests
 with live tests ignored by default; the explicit live run passed all four suites.
 On 2026-10-18, the standalone fix passed 668 frontend tests. Java: 10 tests passed. Frontend production build passed;
 ESLint reported zero errors and one existing UnoCSS ordering warning in
