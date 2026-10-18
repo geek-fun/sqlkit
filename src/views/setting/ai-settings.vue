@@ -5,6 +5,7 @@ import { storeToRefs } from 'pinia'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { UPGRADE_URL } from '@/common'
+import { SettingsFeedback } from '@/components/settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -64,6 +65,24 @@ const deletePrompt = async () => {
   }
 }
 
+const chatFeedback = ref<{ state: 'idle' | 'pending' | 'success' | 'error', label: string, detail?: string }>({ state: 'idle', label: '' })
+let saveQueue: Promise<void> = Promise.resolve()
+let saveRevision = 0
+const saveChat = async (change: () => void) => {
+  change()
+  const revision = ++saveRevision
+  chatFeedback.value = { state: 'pending', label: t('pages.settings.feedback.saving') }
+  saveQueue = saveQueue.catch(() => {}).then(() => appStore.persistLlmSettings())
+  try {
+    await saveQueue
+    if (revision === saveRevision)
+      chatFeedback.value = { state: 'success', label: t('pages.settings.feedback.saved') }
+  }
+  catch (error) {
+    if (revision === saveRevision)
+      chatFeedback.value = { state: 'error', label: t('pages.settings.feedback.failed'), detail: error instanceof Error ? error.message : String(error) }
+  }
+}
 function handleAdd() {
   editingProvider.value = undefined
   showFormDialog.value = true
@@ -92,6 +111,7 @@ function handleCloseDialog() {
         @edit="handleEdit"
       />
 
+      <SettingsFeedback v-bind="chatFeedback" />
       <!-- Agent Config -->
       <section class="space-y-4">
         <div class="space-y-1">
@@ -173,7 +193,7 @@ function handleCloseDialog() {
           <Checkbox
             class="shrink-0"
             :checked="llmSettings.chat.autoCompact"
-            @update:checked="(val: boolean | string) => appStore.setAutoCompact(val === true || val === 'true')"
+            @update:checked="(val: boolean | string) => saveChat(() => appStore.setAutoCompact(val === true || val === 'true'))"
           />
         </div>
 
@@ -193,7 +213,7 @@ function handleCloseDialog() {
             max="1000"
             class="w-32"
             :model-value="llmSettings.chat.maxIterations"
-            @update:model-value="val => appStore.setMaxIterations(Number(val))"
+            @update:model-value="val => saveChat(() => appStore.setMaxIterations(Number(val)))"
           />
         </div>
 
@@ -213,7 +233,7 @@ function handleCloseDialog() {
             max="240"
             class="w-32"
             :model-value="llmSettings.chat.wallClockBudgetMin"
-            @update:model-value="val => appStore.setWallClockBudgetMin(Number(val))"
+            @update:model-value="val => saveChat(() => appStore.setWallClockBudgetMin(Number(val)))"
           />
         </div>
 
@@ -233,7 +253,7 @@ function handleCloseDialog() {
             step="1000"
             class="w-40"
             :model-value="llmSettings.chat.tokenBudget"
-            @update:model-value="val => appStore.setTokenBudget(Number(val))"
+            @update:model-value="val => saveChat(() => appStore.setTokenBudget(Number(val)))"
           />
         </div>
       </section>

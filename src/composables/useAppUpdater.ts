@@ -40,6 +40,7 @@ export function useAppUpdater() {
 
     try {
       isChecking.value = true
+      updateError.value = ''
       const update = await check()
 
       if (update && update.version !== skipVersion.value) {
@@ -63,6 +64,8 @@ export function useAppUpdater() {
     }
     catch (error) {
       console.error('Failed to check for updates:', error)
+      if (showToast)
+        updateError.value = error instanceof Error ? error.message : String(error)
       if (showToast) {
         toast.error(t('updater.checkFailed'), {
           description: error instanceof Error ? error.message : String(error),
@@ -84,14 +87,13 @@ export function useAppUpdater() {
     downloadedBytes.value = 0
     contentLength.value = 0
 
-    const freshUpdate = await check()
-    if (!freshUpdate) {
-      isDownloading.value = false
-      return
-    }
-    updateInfo.value = freshUpdate
-
     try {
+      const freshUpdate = await check()
+      if (!freshUpdate) {
+        isDownloading.value = false
+        return
+      }
+      updateInfo.value = freshUpdate
       await freshUpdate.downloadAndInstall((event: DownloadEvent) => {
         if (event.event === 'Started') {
           contentLength.value = event.data.contentLength ?? 0

@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { invoke } from '@tauri-apps/api/core'
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
+import { SettingsFeedback } from '@/components/settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -20,7 +21,7 @@ import PlanSection from '@/views/setting/plan-section.vue'
 
 const appStore = useAppStore()
 const { t, locale: _locale } = useI18n()
-const { checkForUpdates, downloadAndInstall, isChecking, isDownloading, isInstalling, updateAvailable, updateInfo, downloadProgress } = useAppUpdater()
+const { checkForUpdates, downloadAndInstall, isChecking, isDownloading, isInstalling, updateAvailable, updateInfo, downloadProgress, updateError, isRestarting } = useAppUpdater()
 
 const version = ref('')
 const entitlementStore = useEntitlementStore()
@@ -34,6 +35,10 @@ onMounted(async () => {
   }
 })
 
+const preferencesSaved = ref(false)
+watch(() => [appStore.themeType, appStore.editorConfig, appStore.queryConfig], () => {
+  preferencesSaved.value = true
+}, { deep: true })
 // --- Theme ---
 const currentTheme = computed(() => appStore.themeType)
 
@@ -173,6 +178,7 @@ async function handleCheckUpdates() {
           </h1>
           <span class="text-muted-foreground">|</span>
           <span class="text-sm text-muted-foreground">{{ t('pages.settings.subtitle') }}</span>
+          <span v-if="preferencesSaved" class="text-xs text-muted-foreground ml-auto flex gap-1.5 items-center" role="status"><span class="i-lucide-circle-check text-success h-3.5 w-3.5" aria-hidden="true" />{{ t('pages.settings.feedback.saved') }}</span>
         </div>
       </div>
 
@@ -182,7 +188,7 @@ async function handleCheckUpdates() {
         class="px-6 py-4 flex-1 overflow-y-auto"
       >
         <div class="mx-auto max-w-4xl">
-          <TabsList class="mb-6">
+          <TabsList class="mb-6 flex-wrap h-auto max-w-full justify-start">
             <TabsTrigger value="appearance">
               {{ t('pages.settings.appearance.title') }}
             </TabsTrigger>
@@ -314,7 +320,7 @@ async function handleCheckUpdates() {
                     <Button
                       variant="outline"
                       size="sm"
-                      :disabled="isChecking || isInstalling"
+                      :disabled="isChecking || isDownloading || isInstalling || isRestarting"
                       @click="handleCheckUpdates"
                     >
                       <!-- Spinning circle while checking or installing -->
@@ -322,27 +328,18 @@ async function handleCheckUpdates() {
                         v-if="isChecking || isInstalling"
                         class="i-carbon-circle-dash mr-2 shrink-0 h-4 w-4 animate-spin"
                       />
-                      <!-- Circular progress ring while downloading -->
-                      <svg
-                        v-else-if="isDownloading && downloadProgress !== null"
-                        class="mr-2 shrink-0 h-4 w-4 -rotate-90"
-                        viewBox="0 0 16 16"
-                      >
-                        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" opacity="0.15" />
-                        <circle
-                          cx="8" cy="8" r="6"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-dasharray="37.6991"
-                          :stroke-dashoffset="37.6991 * (1 - downloadProgress / 100)"
-                          stroke-linecap="round"
-                        />
-                      </svg>
+
                       {{ isChecking ? t('pages.settings.updates.checking') : isDownloading && downloadProgress !== null ? `${t('pages.settings.updates.downloading')} ${downloadProgress}%` : isInstalling ? t('pages.settings.updates.installing') : updateAvailable ? t('pages.settings.updates.updateAvailable') : t('pages.settings.updates.check') }}
                     </Button>
                   </div>
                 </div>
+                <SettingsFeedback
+                  v-if="isChecking || isDownloading || isInstalling || isRestarting || updateError"
+                  :state="updateError ? 'error' : 'pending'"
+                  :label="isRestarting ? t('updater.restarting') : t(`pages.settings.feedback.${updateError ? 'failed' : isInstalling ? 'installing' : isDownloading ? 'downloading' : 'checking'}`)"
+                  :detail="updateError"
+                  :progress="downloadProgress"
+                />
               </CardContent>
             </Card>
           </TabsContent>

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-10-18
+
 ### Added
 
 - **DuckDB failure diagnosis and file-format reporting** — DuckDB connection failures are translated into an explanation with the fix attached: file lock held by another process or connection, instance-configuration conflict, and storage-format incompatibility each get their own message, and the two lock cases offer **retry as read-only** inline in the connection form (the connecting modal shows the same explanation on connect). `probe_database_file` additionally reports the DuckDB storage-format version (header bytes 12..20, mapped to the oldest release that can open the file) and whether a sibling `.wal` write-ahead log is present, both shown under the file path.
@@ -18,10 +20,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Opper provider preset in AI settings (OpenAI compatible, base URL `https://api.opper.ai/v3/compat`)
 - API Route provider preset in AI settings (OpenAI compatible, base URL `https://global.api-route.com/v1`)
 
+- **SSH tunnels for any connection** — connect through a bastion, with multi-hop chains, reusable SSH profiles, an optional proxy hop, password or key auth (ED25519/RSA, optional passphrase), and trust-on-first-use host-key pinning plus an unpin command for when a server key changes.
+
+- **Cross-database browsing without reconnecting** — table, column, index, foreign-key, view, routine and trigger panels can inspect any database on the server; PostgreSQL and SQL Server route through a short-lived connection instead of asking you to reconnect.
+
+- **Instant result-grid sorting** — sorting runs in the frontend over the rows already returned, so clicking a header no longer re-runs the query; primitive columns sort consistently even when one column mixes numbers, dates, booleans and text.
+
+- **Settings report what is happening** — JRE/driver installs, provider sync, update checks and other settings actions show pending, success and failure inline with progress and retry, replacing silent no-ops.
+
 ### Changed
 
 - **JDBC connections are much faster (DuckDB "Test connection" above all)** — measured per connect before: an Adoptium JRE update check (1.4-2.5 s, on *every* connect), two Maven Central metadata round trips (0.6-0.8 s each), a fresh bridge JVM (DuckDB maps a ~107 MB native library, ~1.4 s) and a new driver class loader per connection. Now: the JRE check is memoised for 6 hours, a cached driver JAR skips the Maven resolution on the Rust side (the Java side follows in the next bridge build), bridge downloads use a shared HTTP client with a bounded connect timeout instead of `reqwest::get` (which had none), the bridge process is shared across connections (`shared_launcher`), and a connection releases only its own pool through the `disconnect` RPC instead of killing the process. Verified with `src-tauri/tests/duckdb_bridge_integration.rs`: a warm connect went from ~4.3 s to **5.5 ms** with a bridge build that also caches the driver class loader; with the currently released bridge the same test measures ~1.4 s per warm connect.
 
+
+- **Result grids use the available width** — data columns stretch to fill spare space and the Actions column stays pinned to the right edge.
 
 ### Fixed
 
@@ -36,6 +48,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DuckDB connections fail with "The following options were not recognized: ssl" (issue #158)** — embedded/file-based engines (DuckDB, SQLite, SQLCipher, Access) have no SSL settings in the UI, so their stored ssl mode is just the `Prefer` default; the JDBC bridge now receives no ssl mode for such types instead of injecting `ssl=true`, which DuckDB's driver rejects as an unknown option; the bridge's property mapper also stops blindly setting `ssl=true` for drivers without explicit SSL support (H2 and Firebird previously fell into that fallback).
 
 - **Deep-link sign-in on cold start** — a `sqlkit://auth` link that launches the app no longer drops the token: the payload is parked in a pending-auth slot during startup and the frontend pulls it via `consume_pending_auth` once mounted; running-instance links double-write the same slot, closing the startup window too.
+
+- **Complex queries across all four databases** — PostgreSQL multi-statement batches keep their result sets and exotic types (arrays, JSON, ranges, geometry); MySQL and SQL Server keep sessions across requests and preserve later or empty result sets, row counts and errors; Oracle keeps PL/SQL definitions and slash delimiters and returns complete DDL. MySQL functional-index crashes and numeric/binary conversion, SQL Server duplicate columns and missing precision, and Oracle JSON, timestamp and object-type conversion are fixed.
+
+- **Statements that start with a comment or end in RETURNING** — these were classified as non-row statements, so the UI showed "N row(s) affected" and an empty grid; they now return rows.
+
+- **Numeric column headers line up with their values** — headers take the same alignment as their cells, the sort indicator stays after the column name, and sort-priority numbers appear only for multi-column sorts.
+
+- **The DDL panel's close button no longer overlaps Copy** — the header reserves the space the dialog close button occupies.
+
+- **AI providers update instead of duplicating** — adding an existing provider updates it in place, and a failed model sync reports the error instead of silently leaving the default model list.
+
+- **DuckDB native-load warnings** — the bridge JVM starts with native access enabled, so JDK 24+ no longer prints restricted-method warnings into connection error messages.
+
+- **Themed default avatar** — accounts without a picture get a deterministic gradient initial derived from the account name instead of the flat ink block.
 
 ## [0.8.7] - 2026-08-17
 

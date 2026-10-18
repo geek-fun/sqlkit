@@ -75,10 +75,26 @@ public class QueryExecutor {
      * Extract a value from a ResultSet at the given column index, converting to
      * a JSON-friendly Java type.
      */
-    private static Object getValue(ResultSet rs, int index) throws SQLException {
+    static Object getValue(ResultSet rs, int index) throws SQLException {
+        ResultSetMetaData metadata = rs.getMetaData();
+        int type = metadata.getColumnType(index);
+        String typeName = metadata.getColumnTypeName(index);
+        // Read through JDBC accessors before getObject can expose vendor objects.
+        if (type == Types.DATE || type == Types.TIME || type == Types.TIMESTAMP
+                || type == Types.TIME_WITH_TIMEZONE || type == Types.TIMESTAMP_WITH_TIMEZONE
+                || "JSON".equalsIgnoreCase(typeName)) {
+            return rs.getString(index);
+        }
         Object val = rs.getObject(index);
         if (val == null) {
             return null;
+        }
+        if (val instanceof Struct struct) {
+            List<String> attributes = new ArrayList<>();
+            for (Object attribute : struct.getAttributes()) {
+                attributes.add(attribute == null ? "NULL" : attribute.toString());
+            }
+            return struct.getSQLTypeName() + "(" + String.join(", ", attributes) + ")";
         }
         // Convert specific JDBC types to plain Java types
         if (val instanceof Blob) {
@@ -118,7 +134,10 @@ public class QueryExecutor {
             }
             return String.join(",", elements);
         }
-        // Return as-is for simple types (String, Integer, Long, Double, Boolean)
-        return val;
+        if (val instanceof String || val instanceof Number || val instanceof Boolean) {
+            return val;
+        }
+        // Oracle intervals, XML and other vendor values must not reach Jackson.
+        return rs.getString(index);
     }
 }

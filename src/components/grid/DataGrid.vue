@@ -27,6 +27,7 @@ import { useDataGridFilter } from '@/composables/useDataGridFilter'
 import { useDataGridSelection } from '@/composables/useDataGridSelection'
 import { useDataGridSort } from '@/composables/useDataGridSort'
 import { toast } from '@/composables/useNotifications'
+import { getAlignmentClass, getColumnAlignment } from '@/utils/gridAlignment'
 import { collectSortableColumns, formatSortState, sortRowsByState } from '@/utils/gridSort'
 import BatchActionBar from './BatchActionBar.vue'
 import CellContextMenu from './CellContextMenu.vue'
@@ -74,6 +75,9 @@ const emit = defineEmits<DataGridEmits>()
 
 const { t } = useI18n({ useScope: 'global' })
 const sort = useDataGridSort()
+// Priority numbers only mean something when several columns are sorted; showing
+// "1" for a single sort just adds an indicator chip that shifts the header label.
+const isMultiSort = computed(() => sort.sortState.value.length > 1)
 const filter = useDataGridFilter()
 const selection = useDataGridSelection()
 const copyUtil = useDataGridCopy()
@@ -437,15 +441,9 @@ function formatBlobSize(v: unknown): string {
 }
 
 function getCellClass(type?: string): string {
-  if (!type)
-    return 'text-xs'
-  const t = type.toUpperCase()
-  if (/^(?:INT|BIGINT|SMALLINT|TINYINT|SERIAL|BIGSERIAL|FLOAT|DOUBLE|REAL|DECIMAL|NUMERIC|MONEY)/.test(t)) {
-    return 'text-xs tabular-nums justify-end'
-  }
-  if (/^(?:BOOL|BIT)/.test(t))
-    return 'text-xs justify-center'
-  return 'text-xs'
+  const alignmentClass = getAlignmentClass(type)
+  const base = getColumnAlignment(type) === 'end' ? 'text-xs tabular-nums' : 'text-xs'
+  return alignmentClass ? `${base} ${alignmentClass}` : base
 }
 
 function getCellTooltip(v: unknown): string {
@@ -611,38 +609,52 @@ watch(sortableColumns, (columns) => {
           >
             <button
               v-if="isSortable(col)"
-              class="px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 items-center"
-              :class="sort.getSortDirection(col) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'"
+              class="px-3 py-1.5 flex flex-1 min-w-0 items-center"
+              :class="[
+                sort.getSortDirection(col) ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+                getAlignmentClass(columnTypes?.[col]),
+                getColumnAlignment(columnTypes?.[col]) === 'end' ? 'gap-0' : 'gap-1',
+              ]"
               @click="handleHeaderSort(col, ($event as MouseEvent).shiftKey)"
             >
               <span class="text-xs font-medium truncate">{{ col }}</span>
+              <!-- Sort/filter indicators always follow the column name. For
+                   right-aligned columns the group is pulled into the cell's right
+                   padding so the label — not the icon — ends on the same edge as
+                   the values. -->
               <span
-                v-if="sort.getSortDirection(col) === 'ASC'"
-                class="i-carbon-arrow-up flex-shrink-0 h-3 w-3"
-              />
-              <span
-                v-else-if="sort.getSortDirection(col) === 'DESC'"
-                class="i-carbon-arrow-down flex-shrink-0 h-3 w-3"
-              />
-              <span
-                v-else
-                class="i-carbon-chevron-sort opacity-0 flex-shrink-0 h-3 w-3 transition-opacity group-hover:opacity-40"
-              />
-              <!-- Multi-sort priority -->
-              <span
-                v-if="sort.getSortPriority(col)"
-                class="text-[10px] text-primary leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
-              >{{ sort.getSortPriority(col) }}</span>
-              <!-- Filter indicator -->
-              <span
-                v-if="filter.hasFilter(col)"
-                class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
-              />
+                class="flex flex-shrink-0 gap-1 items-center"
+                :class="getColumnAlignment(columnTypes?.[col]) === 'end' ? '-mr-3' : ''"
+              >
+                <span
+                  v-if="sort.getSortDirection(col) === 'ASC'"
+                  class="i-carbon-arrow-up flex-shrink-0 h-3 w-3"
+                />
+                <span
+                  v-else-if="sort.getSortDirection(col) === 'DESC'"
+                  class="i-carbon-arrow-down flex-shrink-0 h-3 w-3"
+                />
+                <span
+                  v-else
+                  class="i-carbon-chevron-sort opacity-0 flex-shrink-0 h-3 w-3 transition-opacity group-hover:opacity-40"
+                />
+                <!-- Multi-sort priority -->
+                <span
+                  v-if="isMultiSort && sort.getSortPriority(col)"
+                  class="text-[10px] text-primary leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
+                >{{ sort.getSortPriority(col) }}</span>
+                <!-- Filter indicator -->
+                <span
+                  v-if="filter.hasFilter(col)"
+                  class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
+                />
+              </span>
             </button>
             <!-- Non-primitive columns (JSON/array/BLOB) cannot be sorted client-side -->
             <div
               v-else
-              class="text-muted-foreground px-3 py-1.5 text-left flex flex-1 gap-1 min-w-0 cursor-default items-center"
+              class="text-muted-foreground px-3 py-1.5 flex flex-1 gap-1 min-w-0 cursor-default items-center"
+              :class="getAlignmentClass(columnTypes?.[col])"
               :title="$t('components.dataGrid.sort.unsortable')"
             >
               <span class="text-xs font-medium truncate">{{ col }}</span>
