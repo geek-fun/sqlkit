@@ -284,6 +284,17 @@ defineExpose({ getValue, setValue, handleFormat })
   position: relative;
 }
 
+/* Match the app's thin native scrollbars (assets/index.css). */
+:deep(.monaco-scrollable-element > .scrollbar > .slider) {
+  border-radius: 3px;
+  background: hsl(var(--muted-foreground) / 0.25);
+}
+
+:deep(.monaco-scrollable-element > .scrollbar > .slider:hover),
+:deep(.monaco-scrollable-element > .scrollbar > .slider.active) {
+  background: hsl(var(--muted-foreground) / 0.4);
+}
+
 .sql-context-menu {
   position: fixed;
   background-color: hsl(var(--background));
