@@ -80,6 +80,13 @@ const activeConnection = computed(() => {
 
 const activeTab = computed(() => tabStore.activeTab)
 
+// Single source of truth for the database shown next to a result: the tab's
+// execution database, falling back to the sidebar selection while the tab is
+// still being created/synced.
+const activeDatabase = computed<string | undefined>(() =>
+  activeTab.value?.database || selectedDatabase.value || undefined,
+)
+
 const editorContent = computed({
   get: () => activeTab.value?.content || '',
   set: (value: string) => {
@@ -581,20 +588,11 @@ function handleSelectTopN(table: TableInfo, database: string, schema?: string, n
 }
 
 function handleViewStructure(table: TableInfo, database: string, schema?: string) {
-  const query = `-- Table structure for ${table.name}
--- Database: ${database}${schema ? `\n-- Schema: ${schema}` : ''}
-
--- View columns
-SELECT column_name, data_type, is_nullable, column_default
-FROM information_schema.columns
-WHERE table_name = '${table.name}'${schema ? ` AND table_schema = '${schema}'` : ''};`
-
   const connId = getActiveConnectionId()
-  if (connId) {
-    const tab = tabStore.createTab(connId, database, schema)
-    tabStore.updateTabContent(tab.id, query)
-    tabStore.updateTabName(tab.id, `STRUCTURE_${table.name}`)
-  }
+  if (!connId)
+    return
+  ensureDatabaseContext(connId, database)
+  tabStore.openTableViewTab(connId, database, table.name, schema, 'schema')
 }
 
 function handleExportData(_table: TableInfo, _database: string, _schema?: string) {
@@ -667,17 +665,21 @@ async function handleDestructiveConfirm() {
   }
 }
 
-function handleSelectTable(table: TableInfo, database: string, schema?: string) {
-  const connId = getActiveConnectionId()
-  if (!connId)
-    return
-  // Execute USE database to set the backend connection's database context.
-  // The Rust get_table_data MySQL branch ignores query.database, requiring
-  // the connection to already have a database selected.
+// Execute USE database to set the backend connection's database context.
+// The Rust get_table_data MySQL branch ignores query.database, requiring
+// the connection to already have a database selected.
+function ensureDatabaseContext(connId: string, database: string) {
   const escapedDb = database.replace(/`/g, '``')
   invoke('execute_query', { connectionId: connId, sql: `USE \`${escapedDb}\`` }).catch(() => {
     // Best-effort: some databases don't support USE (e.g. SQLite)
   })
+}
+
+function handleSelectTable(table: TableInfo, database: string, schema?: string) {
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+  ensureDatabaseContext(connId, database)
   tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
@@ -1202,6 +1204,7 @@ function closeResultPanel() {
             :database="activeTab.tableView.database"
             :schema="activeTab.tableView.schema"
             :table-name="activeTab.tableView.tableName"
+            :initial-sub-page="activeTab.tableView.subPage ?? 'data'"
             class="flex-1"
           />
 
@@ -1355,7 +1358,7 @@ function closeResultPanel() {
               <!-- Status info -->
               <div v-if="activeTab" class="text-xs text-muted-foreground flex gap-2 items-center">
                 <span v-if="activeConnection" class="font-medium">{{ activeConnection.name }}</span>
-                <span v-if="activeConnection?.database">/ {{ activeConnection.database }}</span>
+                <span v-if="activeDatabase">/ {{ activeDatabase }}</span>
               </div>
             </div>
 
@@ -1434,7 +1437,7 @@ function closeResultPanel() {
               :execution-time="activeTab?.executionTime"
               :sql="activeTab?.lastExecutedSql ?? activeTab?.content"
               :connection-id="getConnectionId() ?? undefined"
-              :database="activeTab?.database"
+              :database="activeDatabase"
               :explain-plan="activeTab?.explainPlan ?? null"
               :is-explaining="activeTab?.isExplaining ?? false"
               :explain-error="activeTab?.explainError ?? null"
@@ -1442,26 +1445,6 @@ function closeResultPanel() {
               @refresh="handleNewTab"
             />
           </template>
-        </div>
-      </div>
-
-      <!-- Status bar -->
-      <div class="text-xs text-muted-foreground px-3 py-1 border-t bg-muted/30 flex items-center justify-between">
-        <div class="flex gap-4 items-center">
-          <span v-if="activeConnection?.database">
-            {{ t('pages.queries.status.database') }}: {{ activeConnection.database }}
-          </span>
-        </div>
-        <div class="flex gap-4 items-center">
-          <span v-if="activeTab?.results">
-            {{ t('pages.queries.status.rows') }}: {{ activeTab.results.rows.length }}
-          </span>
-          <span v-if="activeTab?.executionTime">
-            {{ t('pages.queries.status.time') }}: {{ activeTab.executionTime }}ms
-          </span>
-          <span v-if="activeTab?.isExecuting" class="text-primary">
-            {{ t('pages.queries.status.executing') }}
-          </span>
         </div>
       </div>
     </div>

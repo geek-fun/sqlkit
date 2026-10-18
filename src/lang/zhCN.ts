@@ -1436,6 +1436,7 @@ export const zhCN = {
         invalidResponse: '服务器响应无效',
       },
       contextMenu: {
+        viewData: '查看数据',
         selectTopN: '查询前100条',
         viewStructure: '查看结构',
         createScript: 'CREATE脚本',

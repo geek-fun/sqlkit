@@ -204,15 +204,16 @@ async function refreshDatabase(dbName: string) {
 }
 
 // Context menu action handler
-type ContextAction = 'selectTopN' | 'viewStructure' | 'createScript' | 'exportData' | 'showErDiagram' | 'dropTable' | 'truncateTable'
+type ContextAction = 'viewData' | 'viewStructure' | 'selectTopN' | 'createScript' | 'exportData' | 'showErDiagram' | 'dropTable' | 'truncateTable'
 
 function handleContextAction(action: ContextAction) {
   if (!contextMenuTable.value)
     return
   const { table, database, schema } = contextMenuTable.value
   const handlers: Record<ContextAction, () => void> = {
-    selectTopN: () => emit('selectTopN', table, database, schema, 100),
+    viewData: () => emit('selectTable', table, database, schema),
     viewStructure: () => emit('viewStructure', table, database, schema),
+    selectTopN: () => emit('selectTopN', table, database, schema, 100),
     createScript: () => emit('createScript', table, database, schema),
     exportData: () => emit('exportData', table, database, schema),
     showErDiagram: () => emit('showErDiagram', database, schema),
@@ -752,10 +753,10 @@ defineExpose({ refresh })
       <div class="p-1">
         <div
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
-          @click="handleContextAction('selectTopN')"
+          @click="handleContextAction('viewData')"
         >
-          <span class="i-carbon-arrow-down mr-2 h-3.5 w-3.5" />
-          {{ t('components.databaseBrowser.contextMenu.selectTopN') }}
+          <span class="i-carbon-data-table mr-2 h-3.5 w-3.5" />
+          {{ t('components.databaseBrowser.contextMenu.viewData') }}
         </div>
         <div
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
@@ -763,6 +764,13 @@ defineExpose({ refresh })
         >
           <span class="i-carbon-table mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.contextMenu.viewStructure') }}
+        </div>
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleContextAction('selectTopN')"
+        >
+          <span class="i-carbon-arrow-down mr-2 h-3.5 w-3.5" />
+          {{ t('components.databaseBrowser.contextMenu.selectTopN') }}
         </div>
         <div
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"

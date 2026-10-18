@@ -1436,6 +1436,7 @@ export const enUS = {
         invalidResponse: 'Invalid response from server',
       },
       contextMenu: {
+        viewData: 'View Data',
         selectTopN: 'Select Top 100',
         viewStructure: 'View Structure',
         createScript: 'CREATE Script',
