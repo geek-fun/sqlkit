@@ -43,6 +43,9 @@ export type MonacoEditorOptions = {
   wordWrap?: boolean
 }
 
+/** Match the app's native 5px scrollbars (see assets/index.css). */
+const SCROLLBAR_SIZE = 5
+
 type ExecuteGutterCallback = (lineNumber: number) => void
 type ExecuteQueryCallback = (result: StatementToExecute) => void
 type StatementNotFoundCallback = () => void
@@ -111,6 +114,13 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
       formatOnPaste: true,
       formatOnType: true,
       suggest: { showKeywords: true, showSnippets: true },
+      scrollbar: {
+        verticalScrollbarSize: SCROLLBAR_SIZE,
+        horizontalScrollbarSize: SCROLLBAR_SIZE,
+        verticalSliderSize: SCROLLBAR_SIZE,
+        horizontalSliderSize: SCROLLBAR_SIZE,
+        useShadows: false,
+      },
     })
 
     refreshGutterDecorations()
