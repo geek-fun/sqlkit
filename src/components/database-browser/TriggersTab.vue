@@ -14,6 +14,10 @@ const props = defineProps<{
   tableName: string
 }>()
 
+const emit = defineEmits<{
+  (e: 'countChange', count: number | undefined): void
+}>()
+
 const { t } = useI18n()
 
 const triggers = ref<TriggerInfo[]>([])
@@ -28,16 +32,20 @@ const ddlContent = ref('')
 async function fetchTriggers() {
   loading.value = true
   error.value = null
+  emit('countChange', undefined)
   try {
-    triggers.value = await browseApi.listTriggers(
+    const result = await browseApi.listTriggers(
       props.connectionId,
       props.database,
       props.schema,
       props.tableName,
     )
+    triggers.value = result
+    emit('countChange', result.length)
   }
   catch (err) {
     error.value = String(err)
+    emit('countChange', undefined)
   }
   finally {
     loading.value = false

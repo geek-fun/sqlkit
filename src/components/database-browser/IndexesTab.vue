@@ -12,6 +12,10 @@ const props = defineProps<{
   tableName: string
 }>()
 
+const emit = defineEmits<{
+  (e: 'countChange', count: number | undefined): void
+}>()
+
 const { t } = useI18n()
 
 const indexes = ref<IndexInfo[]>([])
@@ -21,16 +25,20 @@ const error = ref<string | null>(null)
 async function fetchIndexes() {
   loading.value = true
   error.value = null
+  emit('countChange', undefined)
   try {
-    indexes.value = await browseApi.listIndexes(
+    const result = await browseApi.listIndexes(
       props.connectionId,
       props.database,
       props.schema,
       props.tableName,
     )
+    indexes.value = result
+    emit('countChange', result.length)
   }
   catch (err) {
     error.value = String(err)
+    emit('countChange', undefined)
   }
   finally {
     loading.value = false
