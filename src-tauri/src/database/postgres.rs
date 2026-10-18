@@ -8,7 +8,6 @@ use crate::database::{
     config::{ConnectionConfig, DatabaseType, SslMode},
     error::{DbError, DbResult},
     pool::ConnectionPool,
-    sql_classification::statement_returns_rows,
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
         QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
@@ -21,7 +20,10 @@ use deadpool_postgres::{
 };
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
 use rustls::ClientConfig;
-use sqlparser::dialect::PostgreSqlDialect;
+use sqlparser::{
+    dialect::PostgreSqlDialect,
+    tokenizer::{Token, Tokenizer},
+};
 use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
@@ -968,6 +970,102 @@ impl PostgresAdapter {
     }
 }
 
+fn split_postgres_statements(sql: &str) -> Vec<&str> {
+    let Ok(tokens) = Tokenizer::new(&PostgreSqlDialect {}, sql).tokenize_with_location() else {
+        return vec![sql];
+    };
+    let lines: Vec<&str> = sql.split_inclusive('\n').collect();
+    let mut start = 0;
+    let mut statements = Vec::new();
+    let mut has_sql = false;
+    for token in tokens {
+        if token.token == Token::SemiColon {
+            let line = token.span.start.line as usize - 1;
+            let offset = lines.iter().take(line).map(|s| s.len()).sum::<usize>()
+                + lines[line]
+                    .char_indices()
+                    .nth(token.span.start.column as usize - 1)
+                    .map(|(i, _)| i)
+                    .unwrap_or(lines[line].len());
+            if has_sql {
+                statements.push(&sql[start..offset]);
+            }
+            start = offset + 1;
+            has_sql = false;
+        } else if !matches!(token.token, Token::Whitespace(_)) {
+            has_sql = true;
+        }
+    }
+    if has_sql {
+        statements.push(&sql[start..]);
+    }
+    statements
+}
+
+fn needs_text_format(ty: &Type) -> bool {
+    match ty.kind() {
+        Kind::Enum(_) => false,
+        Kind::Array(inner) => !matches!(
+            *inner,
+            Type::TEXT
+                | Type::VARCHAR
+                | Type::BPCHAR
+                | Type::NAME
+                | Type::INT4
+                | Type::INT8
+                | Type::FLOAT8
+                | Type::BOOL
+        ),
+        _ => !matches!(
+            *ty,
+            Type::BOOL
+                | Type::INT2
+                | Type::INT4
+                | Type::INT8
+                | Type::FLOAT4
+                | Type::FLOAT8
+                | Type::VARCHAR
+                | Type::TEXT
+                | Type::BPCHAR
+                | Type::NAME
+                | Type::BYTEA
+                | Type::UUID
+                | Type::JSON
+                | Type::JSONB
+                | Type::TIMESTAMP
+                | Type::TIMESTAMPTZ
+                | Type::DATE
+                | Type::TIME
+        ),
+    }
+}
+
+fn text_query_value(value: Option<&str>, ty: &Type) -> QueryValue {
+    let Some(value) = value else {
+        return QueryValue::Null;
+    };
+    match *ty {
+        Type::BOOL => QueryValue::Bool(value == "t"),
+        Type::INT2 | Type::INT4 | Type::INT8 => value
+            .parse()
+            .map(QueryValue::Int)
+            .unwrap_or_else(|_| QueryValue::String(value.into())),
+        Type::FLOAT4 | Type::FLOAT8 => value
+            .parse()
+            .map(QueryValue::Float)
+            .unwrap_or_else(|_| QueryValue::String(value.into())),
+        Type::BYTEA => value
+            .strip_prefix("\\x")
+            .and_then(|v| hex::decode(v).ok())
+            .map(QueryValue::Bytes)
+            .unwrap_or_else(|| QueryValue::String(value.into())),
+        Type::TIMESTAMP | Type::TIMESTAMPTZ | Type::DATE | Type::TIME => {
+            QueryValue::DateTime(value.into())
+        }
+        _ => QueryValue::String(value.into()),
+    }
+}
+
 /// Quote a value per libpq keyword-string rules (single-quoted, doubled
 /// quotes, escaped backslashes). See `build_connection_string`.
 fn libpq_quote(value: &str) -> String {
@@ -1087,113 +1185,75 @@ impl DatabaseAdapter for PostgresAdapter {
             .and_then(|v| v.parse::<u64>().ok())
             .map(Duration::from_millis);
 
-        // Determine if this is a query that returns rows or a statement
-        let is_select = statement_returns_rows(
-            query,
-            &["SELECT", "WITH", "SHOW", "EXPLAIN", "TABLE"],
-            &PostgreSqlDialect {},
-        );
-
-        let execution_time;
-
-        if is_select {
-            // Prepare first so column metadata is available even when the
-            // result set is empty — an empty SELECT must still render its
-            // columns (empty table) rather than looking like a DML statement.
-            let statement = if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, client.prepare(query))
+        let execute = async {
+            let mut result = QueryResult::affected(0);
+            let mut affected = 0;
+            for sql in split_postgres_statements(query) {
+                let statement = client
+                    .prepare(sql)
                     .await
-                    .map_err(|_| {
-                        DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
-                    })?
-                    .map_err(postgres_error_to_db_error)?
-            } else {
-                client
-                    .prepare(query)
-                    .await
-                    .map_err(postgres_error_to_db_error)?
-            };
-
-            // A WITH-prefixed statement may be data-modifying — PostgreSQL runs
-            // `WITH … INSERT/UPDATE/DELETE` (no RETURNING) as a query that
-            // exposes zero columns, so a plain query() would silently swallow
-            // the writes. Route column-less statements through execute() so
-            // callers receive a rows_affected count instead of an empty result.
-            if statement.columns().is_empty() {
-                let affected = if let Some(timeout_duration) = timeout {
-                    tokio::time::timeout(timeout_duration, client.execute(&statement, &[]))
-                        .await
-                        .map_err(|_| {
-                            DbError::Timeout(format!(
-                                "Query timed out after {:?}",
-                                timeout_duration
-                            ))
-                        })?
-                        .map_err(postgres_error_to_db_error)?
-                } else {
-                    client
+                    .map_err(postgres_error_to_db_error)?;
+                if statement.columns().is_empty() {
+                    affected += client
                         .execute(&statement, &[])
                         .await
+                        .map_err(postgres_error_to_db_error)?;
+                    continue;
+                }
+                let columns = statement.columns();
+                let mut current = QueryResult::with_columns(
+                    columns.iter().map(|c| c.name().to_string()).collect(),
+                    columns
+                        .iter()
+                        .map(|c| c.type_().name().to_string())
+                        .collect(),
+                );
+                // Exotic PostgreSQL types use binary wire formats that are not
+                // UTF-8. Ask the server for text rather than displaying raw bytes.
+                if columns.iter().any(|c| needs_text_format(c.type_())) {
+                    for message in client
+                        .simple_query(sql)
+                        .await
                         .map_err(postgres_error_to_db_error)?
-                };
-                return Ok(QueryResult::affected(affected)
-                    .with_execution_time(start.elapsed().as_millis() as u64));
+                    {
+                        if let tokio_postgres::SimpleQueryMessage::Row(row) = message {
+                            let values = columns
+                                .iter()
+                                .enumerate()
+                                .map(|(i, c)| {
+                                    (
+                                        c.name().to_string(),
+                                        text_query_value(row.get(i), c.type_()),
+                                    )
+                                })
+                                .collect();
+                            current.add_row(values);
+                        }
+                    }
+                } else {
+                    for row in client
+                        .query(&statement, &[])
+                        .await
+                        .map_err(postgres_error_to_db_error)?
+                    {
+                        current.add_row(Self::row_to_query_row(&row)?);
+                    }
+                }
+                result = current;
             }
-
-            let result = if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, client.query(&statement, &[]))
-                    .await
-                    .map_err(|_| {
-                        DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
-                    })?
-                    .map_err(postgres_error_to_db_error)?
-            } else {
-                client
-                    .query(&statement, &[])
-                    .await
-                    .map_err(postgres_error_to_db_error)?
-            };
-
-            execution_time = start.elapsed().as_millis() as u64;
-
-            let columns: Vec<String> = statement
-                .columns()
-                .iter()
-                .map(|col| col.name().to_string())
-                .collect();
-            let column_types: Vec<String> = statement
-                .columns()
-                .iter()
-                .map(|col| col.type_().name().to_string())
-                .collect();
-
-            let mut query_result = QueryResult::with_columns(columns, column_types);
-            for row in &result {
-                let query_row = Self::row_to_query_row(row)?;
-                query_result.add_row(query_row);
+            if result.columns.is_empty() {
+                result.rows_affected = Some(affected);
             }
-
-            Ok(query_result.with_execution_time(execution_time))
+            Ok::<_, DbError>(result)
+        };
+        let result = if let Some(duration) = timeout {
+            tokio::time::timeout(duration, execute)
+                .await
+                .map_err(|_| DbError::Timeout(format!("Query timed out after {:?}", duration)))??
         } else {
-            // For INSERT, UPDATE, DELETE, etc.
-            let affected = if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, client.execute(query, &[]))
-                    .await
-                    .map_err(|_| {
-                        DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
-                    })?
-                    .map_err(postgres_error_to_db_error)?
-            } else {
-                client
-                    .execute(query, &[])
-                    .await
-                    .map_err(postgres_error_to_db_error)?
-            };
-
-            execution_time = start.elapsed().as_millis() as u64;
-
-            Ok(QueryResult::affected(affected).with_execution_time(execution_time))
-        }
+            execute.await?
+        };
+        Ok(result.with_execution_time(start.elapsed().as_millis() as u64))
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
@@ -1391,7 +1451,8 @@ impl DatabaseAdapter for PostgresAdapter {
                     SELECT 1 FROM pg_catalog.pg_type t
                     JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid
                     WHERE t.typname = c.udt_name AND n.nspname = c.udt_schema AND t.typtype = 'e'
-                ) THEN true ELSE false END as is_enum
+                ) THEN true ELSE false END as is_enum,
+                c.is_identity, c.is_generated, c.generation_expression
             FROM information_schema.columns c
             LEFT JOIN (
                 SELECT ku.table_schema, ku.table_name, ku.column_name
@@ -1438,10 +1499,11 @@ impl DatabaseAdapter for PostgresAdapter {
                 let is_primary_key: bool = row.get(9);
                 let is_enum: bool = row.get(10);
 
-                let is_auto_increment = default_value
-                    .as_ref()
-                    .map(|d| d.contains("nextval"))
-                    .unwrap_or(false);
+                let is_auto_increment = row.get::<_, String>(11) == "YES"
+                    || default_value
+                        .as_ref()
+                        .map(|d| d.contains("nextval"))
+                        .unwrap_or(false);
 
                 let actual_type = if data_type == "USER-DEFINED" {
                     udt_name
@@ -1450,6 +1512,12 @@ impl DatabaseAdapter for PostgresAdapter {
                 };
 
                 let mut metadata = HashMap::new();
+                if row.get::<_, String>(12) == "ALWAYS" {
+                    metadata.insert("is_generated".to_string(), "true".to_string());
+                    if let Some(expression) = row.get::<_, Option<String>>(13) {
+                        metadata.insert("generation_expression".to_string(), expression);
+                    }
+                }
                 if is_enum {
                     metadata.insert("is_enum".to_string(), "true".to_string());
                 }
@@ -1559,7 +1627,10 @@ impl DatabaseAdapter for PostgresAdapter {
             if !stats_rows.is_empty() {
                 let row_count: i64 = stats_rows[0].get(0);
                 let size_bytes: i64 = stats_rows[0].get(1);
-                (Some(row_count as u64), Some(size_bytes as u64))
+                (
+                    Some(row_count.max(0) as u64),
+                    Some(size_bytes.max(0) as u64),
+                )
             } else {
                 (None, None)
             }
@@ -1621,12 +1692,15 @@ impl DatabaseAdapter for PostgresAdapter {
             JOIN information_schema.key_column_usage kcu
                 ON tc.constraint_name = kcu.constraint_name
                 AND tc.table_schema = kcu.table_schema
-            JOIN information_schema.constraint_column_usage ccu
-                ON tc.constraint_name = ccu.constraint_name
-                AND tc.table_schema = ccu.table_schema
+                AND tc.table_name = kcu.table_name
             JOIN information_schema.referential_constraints rc
                 ON tc.constraint_name = rc.constraint_name
                 AND tc.table_schema = rc.constraint_schema
+            JOIN information_schema.key_column_usage ccu
+                ON ccu.constraint_catalog = rc.unique_constraint_catalog
+                AND ccu.constraint_schema = rc.unique_constraint_schema
+                AND ccu.constraint_name = rc.unique_constraint_name
+                AND ccu.ordinal_position = kcu.position_in_unique_constraint
             WHERE tc.constraint_type = 'FOREIGN KEY'
             AND tc.table_schema = $1
             ORDER BY tc.constraint_name, kcu.ordinal_position
@@ -2006,14 +2080,16 @@ impl DatabaseAdapter for PostgresAdapter {
         let schema_filter = schema.unwrap_or("public");
 
         let query = r#"
-            SELECT
-                indexname,
-                indexdef,
-                tablename
-            FROM pg_indexes
-            WHERE schemaname = $1
-            AND tablename = $2
-            ORDER BY indexname
+            SELECT ci.relname, am.amname, i.indisunique, i.indisprimary,
+                ARRAY(SELECT pg_get_indexdef(i.indexrelid, n, true)
+                      FROM generate_series(1, i.indnatts) AS n ORDER BY n)
+            FROM pg_index i
+            JOIN pg_class ct ON ct.oid = i.indrelid
+            JOIN pg_namespace ns ON ns.oid = ct.relnamespace
+            JOIN pg_class ci ON ci.oid = i.indexrelid
+            JOIN pg_am am ON am.oid = ci.relam
+            WHERE ns.nspname = $1 AND ct.relname = $2
+            ORDER BY ci.relname
         "#;
 
         let pool = self
@@ -2034,49 +2110,12 @@ impl DatabaseAdapter for PostgresAdapter {
 
         let indexes = rows
             .iter()
-            .map(|row| {
-                let name: String = row.get(0);
-                let indexdef: String = row.get(2);
-
-                // Extract index type from definition
-                let index_type =
-                    if indexdef.contains("USING BTREE") || indexdef.contains("USING btree") {
-                        "BTREE"
-                    } else if indexdef.contains("USING HASH") || indexdef.contains("USING hash") {
-                        "HASH"
-                    } else if indexdef.contains("USING GIN") || indexdef.contains("USING gin") {
-                        "GIN"
-                    } else if indexdef.contains("USING GIST") || indexdef.contains("USING gist") {
-                        "GIST"
-                    } else {
-                        "BTREE"
-                    };
-
-                let is_unique = indexdef.to_uppercase().contains("UNIQUE");
-                let is_primary = indexdef.to_uppercase().contains("PRIMARY KEY");
-
-                // Extract columns from definition
-                let columns = if let Some(idx) = indexdef.find('(') {
-                    let rest = &indexdef[idx + 1..];
-                    if let Some(end) = rest.rfind(')') {
-                        rest[..end]
-                            .split(',')
-                            .map(|c| c.trim().trim_matches('"').to_string())
-                            .collect()
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![]
-                };
-
-                IndexInfo {
-                    name,
-                    columns,
-                    index_type: index_type.to_string(),
-                    is_unique,
-                    is_primary,
-                }
+            .map(|row| IndexInfo {
+                name: row.get(0),
+                index_type: row.get::<_, String>(1).to_uppercase(),
+                is_unique: row.get(2),
+                is_primary: row.get(3),
+                columns: row.get(4),
             })
             .collect();
 
@@ -2317,12 +2356,15 @@ impl DatabaseAdapter for PostgresAdapter {
             JOIN information_schema.key_column_usage kcu
                 ON tc.constraint_name = kcu.constraint_name
                 AND tc.table_schema = kcu.table_schema
-            JOIN information_schema.constraint_column_usage ccu
-                ON tc.constraint_name = ccu.constraint_name
-                AND tc.table_schema = ccu.table_schema
+                AND tc.table_name = kcu.table_name
             JOIN information_schema.referential_constraints rc
                 ON tc.constraint_name = rc.constraint_name
                 AND tc.table_schema = rc.constraint_schema
+            JOIN information_schema.key_column_usage ccu
+                ON ccu.constraint_catalog = rc.unique_constraint_catalog
+                AND ccu.constraint_schema = rc.unique_constraint_schema
+                AND ccu.constraint_name = rc.unique_constraint_name
+                AND ccu.ordinal_position = kcu.position_in_unique_constraint
             WHERE tc.constraint_type = 'FOREIGN KEY'
             AND tc.table_schema = $1
             AND tc.table_name = $2
@@ -2621,6 +2663,43 @@ mod tests {
     use crate::database::DatabaseType;
 
     #[test]
+    fn split_preserves_quoted_blocks_comments_and_unicode() {
+        let sql =
+            "-- 杭州;\r\nDO $body$ BEGIN PERFORM 'it''s;ok'; END; $body$; SELECT '你好;'; -- tail";
+        assert_eq!(
+            split_postgres_statements(sql),
+            [
+                "-- 杭州;\r\nDO $body$ BEGIN PERFORM 'it''s;ok'; END; $body$",
+                " SELECT '你好;'"
+            ]
+        );
+        assert!(split_postgres_statements("; /* comments only; */ -- done").is_empty());
+    }
+
+    #[test]
+    fn text_protocol_preserves_types_and_nulls() {
+        assert_eq!(text_query_value(None, &Type::INET), QueryValue::Null);
+        assert_eq!(
+            text_query_value(Some("t"), &Type::BOOL),
+            QueryValue::Bool(true)
+        );
+        assert_eq!(
+            text_query_value(Some("42"), &Type::INT8),
+            QueryValue::Int(42)
+        );
+        assert_eq!(
+            text_query_value(Some("\\x00ff"), &Type::BYTEA),
+            QueryValue::Bytes(vec![0, 255])
+        );
+        assert_eq!(
+            text_query_value(Some("(300,CNY)"), &Type::TEXT),
+            QueryValue::String("(300,CNY)".into())
+        );
+        assert!(needs_text_format(&Type::INET));
+        assert!(needs_text_format(&Type::TSTZ_RANGE));
+    }
+
+    #[test]
     fn test_postgres_adapter_creation() {
         let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
             .with_database("testdb")
@@ -2722,14 +2801,9 @@ mod tests {
         // raw values could rewrite neighboring params (e.g. point the
         // cross-database temp connection at a spoofed host). Everything the
         // user types must land inside one quoted value instead.
-        let config = ConnectionConfig::new(
-            DatabaseType::PostgreSQL,
-            "localhost",
-            5432,
-            "postgres",
-        )
-        .with_database("x host=attacker.example")
-        .with_password("p w'ord \\");
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+            .with_database("x host=attacker.example")
+            .with_password("p w'ord \\");
 
         let adapter = PostgresAdapter::new(config);
         let conn_str = adapter.build_connection_string().unwrap();
@@ -2755,13 +2829,8 @@ mod tests {
 
     #[test]
     fn test_connection_string_rejects_hostile_option_key() {
-        let config = ConnectionConfig::new(
-            DatabaseType::PostgreSQL,
-            "localhost",
-            5432,
-            "postgres",
-        )
-        .with_option("x host=evil", "1");
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+            .with_option("x host=evil", "1");
 
         let adapter = PostgresAdapter::new(config);
         assert!(adapter.build_connection_string().is_err());

@@ -8,7 +8,6 @@ use crate::database::{
     config::{ConnectionConfig, SslMode},
     error::{DbError, DbResult},
     pool::ConnectionPool,
-    sql_classification::statement_returns_rows,
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
         QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
@@ -17,10 +16,9 @@ use crate::database::{
 use async_trait::async_trait;
 use log;
 use mysql_async::{
-    prelude::*, ClientIdentity, Conn, OptsBuilder, Pool, PoolConstraints, PoolOpts, Row, SslOpts,
-    Value,
+    consts::ColumnType, prelude::*, ClientIdentity, Conn, OptsBuilder, Pool, PoolConstraints,
+    PoolOpts, Row, SslOpts, Value,
 };
-use sqlparser::dialect::MySqlDialect;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -172,6 +170,7 @@ pub struct MySQLAdapter {
     pool: Option<Arc<MySQLPool>>,
     // Store the raw pool for internal use
     raw_pool: Option<Pool>,
+    session: tokio::sync::Mutex<Option<Conn>>,
 }
 
 impl MySQLAdapter {
@@ -181,6 +180,7 @@ impl MySQLAdapter {
             config,
             pool: None,
             raw_pool: None,
+            session: tokio::sync::Mutex::new(None),
         }
     }
 
@@ -316,14 +316,48 @@ impl MySQLAdapter {
         match value {
             Value::NULL => Ok(QueryValue::Null),
             Value::Bytes(bytes) => {
-                // Try to convert to UTF-8 string first, fallback to bytes
+                let column = &row.columns_ref()[idx];
+                let kind = column.column_type();
+                if column.character_set() == 63
+                    && matches!(
+                        kind,
+                        ColumnType::MYSQL_TYPE_BLOB
+                            | ColumnType::MYSQL_TYPE_TINY_BLOB
+                            | ColumnType::MYSQL_TYPE_MEDIUM_BLOB
+                            | ColumnType::MYSQL_TYPE_LONG_BLOB
+                            | ColumnType::MYSQL_TYPE_STRING
+                            | ColumnType::MYSQL_TYPE_VAR_STRING
+                            | ColumnType::MYSQL_TYPE_VARCHAR
+                            | ColumnType::MYSQL_TYPE_GEOMETRY
+                    )
+                {
+                    return Ok(QueryValue::Bytes(bytes));
+                }
                 match String::from_utf8(bytes.clone()) {
-                    Ok(s) => Ok(QueryValue::String(s)),
+                    Ok(text) => {
+                        let numeric = match kind {
+                            ColumnType::MYSQL_TYPE_TINY
+                            | ColumnType::MYSQL_TYPE_SHORT
+                            | ColumnType::MYSQL_TYPE_LONG
+                            | ColumnType::MYSQL_TYPE_LONGLONG
+                            | ColumnType::MYSQL_TYPE_INT24
+                            | ColumnType::MYSQL_TYPE_YEAR => {
+                                text.parse::<i64>().ok().map(QueryValue::Int)
+                            }
+                            ColumnType::MYSQL_TYPE_FLOAT | ColumnType::MYSQL_TYPE_DOUBLE => {
+                                text.parse::<f64>().ok().map(QueryValue::Float)
+                            }
+                            _ => None,
+                        };
+                        Ok(numeric.unwrap_or(QueryValue::String(text)))
+                    }
                     Err(_) => Ok(QueryValue::Bytes(bytes)),
                 }
             }
             Value::Int(i) => Ok(QueryValue::Int(i)),
-            Value::UInt(u) => Ok(QueryValue::Int(u as i64)),
+            Value::UInt(u) => Ok(i64::try_from(u)
+                .map(QueryValue::Int)
+                .unwrap_or_else(|_| QueryValue::String(u.to_string()))),
             Value::Float(f) => Ok(QueryValue::Float(f as f64)),
             Value::Double(d) => Ok(QueryValue::Float(d)),
             Value::Date(year, month, day, hour, minute, second, micros) => {
@@ -475,12 +509,12 @@ impl DatabaseAdapter for MySQLAdapter {
 
     async fn connect(&mut self) -> DbResult<()> {
         let opts = self.build_connection_opts()?;
-        let pool = Pool::new(opts);
+        let pool = Pool::new(opts.clone());
         let conn_timeout = Duration::from_secs(self.config.connect_timeout_secs);
 
         // mysql_async removed tcp_connect_timeout in v0.34, so we wrap the
         // connection ourselves to prevent hanging on unresponsive hosts
-        let mut conn = match tokio::time::timeout(conn_timeout, pool.get_conn()).await {
+        let mut conn = match tokio::time::timeout(conn_timeout, Conn::new(opts)).await {
             Ok(Ok(conn)) => conn,
             Ok(Err(e)) if self.config.ssl_mode == SslMode::Prefer && is_ssl_error(&e) => {
                 log::warn!(
@@ -492,8 +526,8 @@ impl DatabaseAdapter for MySQLAdapter {
                 let fallback_opts = self.build_connection_opts()?;
                 self.config.ssl_mode = SslMode::Prefer;
 
-                let fallback_pool = Pool::new(fallback_opts);
-                let mut conn = tokio::time::timeout(conn_timeout, fallback_pool.get_conn())
+                let fallback_pool = Pool::new(fallback_opts.clone());
+                let mut conn = tokio::time::timeout(conn_timeout, Conn::new(fallback_opts))
                     .await
                     .map_err(|_| {
                         DbError::Connection(format!(
@@ -518,7 +552,7 @@ impl DatabaseAdapter for MySQLAdapter {
                     })?
                     .map_err(mysql_connection_error_to_db_error)?;
 
-                drop(conn);
+                *self.session.get_mut() = Some(conn);
 
                 self.raw_pool = Some(fallback_pool.clone());
                 self.pool = Some(Arc::new(MySQLPool {
@@ -546,7 +580,7 @@ impl DatabaseAdapter for MySQLAdapter {
             })?
             .map_err(mysql_connection_error_to_db_error)?;
 
-        drop(conn);
+        *self.session.get_mut() = Some(conn);
 
         self.raw_pool = Some(pool.clone());
         self.pool = Some(Arc::new(MySQLPool { pool }));
@@ -555,6 +589,11 @@ impl DatabaseAdapter for MySQLAdapter {
     }
 
     async fn disconnect(&mut self) -> DbResult<()> {
+        if let Some(conn) = self.session.get_mut().take() {
+            conn.disconnect()
+                .await
+                .map_err(mysql_connection_error_to_db_error)?;
+        }
         if let Some(pool) = self.pool.take() {
             pool.close().await?;
         }
@@ -611,7 +650,10 @@ impl DatabaseAdapter for MySQLAdapter {
     }
 
     async fn execute_query(&self, query: &str) -> DbResult<QueryResult> {
-        let mut conn = self.get_conn().await?;
+        let mut session = self.session.lock().await;
+        let conn = session
+            .as_mut()
+            .ok_or_else(|| DbError::Connection("Not connected".into()))?;
         let start = Instant::now();
 
         // Check if we have a query timeout configured
@@ -622,76 +664,56 @@ impl DatabaseAdapter for MySQLAdapter {
             .and_then(|v| v.parse::<u64>().ok())
             .map(Duration::from_millis);
 
-        // Determine if this is a query that returns rows
-        let is_select = statement_returns_rows(
-            query,
-            &["SELECT", "SHOW", "DESCRIBE", "EXPLAIN", "WITH"],
-            &MySqlDialect {},
-        );
-
-        let execution_time;
-
-        if is_select {
-            // Use query_iter so column metadata is available even when the
-            // result set is empty — an empty SELECT must still render its
-            // columns (empty table) rather than looking like a DML statement.
-            let mut result = if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, conn.query_iter(query))
-                    .await
-                    .map_err(|_| {
-                        DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
-                    })?
-                    .map_err(mysql_error_to_db_error)?
-            } else {
-                conn.query_iter(query)
-                    .await
-                    .map_err(mysql_error_to_db_error)?
-            };
-
-            execution_time = start.elapsed().as_millis() as u64;
-
-            let columns: Vec<String> = result
-                .columns()
-                .map(|cols| cols.iter().map(|col| col.name_str().to_string()).collect())
-                .unwrap_or_default();
-            let column_types: Vec<String> = result
-                .columns()
-                .map(|cols| {
-                    cols.iter()
-                        .map(|col| format!("{:?}", col.column_type()))
-                        .collect()
-                })
-                .unwrap_or_default();
-
-            let mut query_result = QueryResult::with_columns(columns, column_types);
-            while let Some(row) = result.next().await.map_err(mysql_error_to_db_error)? {
-                let query_row = Self::row_to_query_row(row)?;
-                query_result.add_row(query_row);
+        let execute = async {
+            let mut stream = conn
+                .query_iter(query)
+                .await
+                .map_err(mysql_error_to_db_error)?;
+            let mut result = QueryResult::affected(0);
+            let mut affected = 0;
+            loop {
+                let columns = stream.columns().unwrap_or_default();
+                if columns.is_empty() {
+                    affected += stream.affected_rows();
+                } else {
+                    let mut current = QueryResult::with_columns(
+                        columns.iter().map(|c| c.name_str().to_string()).collect(),
+                        columns
+                            .iter()
+                            .map(|c| format!("{:?}", c.column_type()))
+                            .collect(),
+                    );
+                    while let Some(row) = stream.next().await.map_err(mysql_error_to_db_error)? {
+                        current.add_row(Self::row_to_query_row(row)?);
+                    }
+                    result = current;
+                    if stream.columns().is_none() {
+                        break;
+                    }
+                    continue;
+                }
+                stream.next().await.map_err(mysql_error_to_db_error)?;
+                if stream.columns().is_none() {
+                    break;
+                }
             }
-
-            Ok(query_result.with_execution_time(execution_time))
+            stream
+                .drop_result()
+                .await
+                .map_err(mysql_error_to_db_error)?;
+            if result.columns.is_empty() {
+                result.rows_affected = Some(affected);
+            }
+            Ok::<_, DbError>(result)
+        };
+        let result = if let Some(duration) = timeout {
+            tokio::time::timeout(duration, execute)
+                .await
+                .map_err(|_| DbError::Timeout(format!("Query timed out after {:?}", duration)))??
         } else {
-            // For INSERT, UPDATE, DELETE, etc.
-            if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, conn.query_drop(query))
-                    .await
-                    .map_err(|_| {
-                        DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
-                    })?
-                    .map_err(mysql_error_to_db_error)?
-            } else {
-                conn.query_drop(query)
-                    .await
-                    .map_err(mysql_error_to_db_error)?
-            };
-
-            execution_time = start.elapsed().as_millis() as u64;
-
-            // Get affected rows
-            let affected = conn.affected_rows();
-
-            Ok(QueryResult::affected(affected).with_execution_time(execution_time))
-        }
+            execute.await?
+        };
+        Ok(result.with_execution_time(start.elapsed().as_millis() as u64))
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
@@ -1150,7 +1172,11 @@ impl DatabaseAdapter for MySQLAdapter {
 
         for row in rows {
             let key_name: String = row.get(2).unwrap_or_default();
-            let column_name: String = row.get(4).unwrap_or_default();
+            let column_name = row
+                .get::<Option<String>, _>(4)
+                .flatten()
+                .or_else(|| row.get::<Option<String>, _>("Expression").flatten())
+                .unwrap_or_default();
             let non_unique: i32 = row.get(1).unwrap_or(1);
             let index_type: String = row.get(10).unwrap_or_else(|| "BTREE".to_string());
             let is_unique = non_unique == 0;
@@ -1285,6 +1311,11 @@ impl DatabaseAdapter for MySQLAdapter {
             .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
 
         let sql = match object_type.to_uppercase().as_str() {
+            "TABLE" => format!(
+                "DROP TABLE IF EXISTS `{}`.`{}`",
+                db_name.replace('`', "``"),
+                object_name.replace('`', "``")
+            ),
             "VIEW" => format!("DROP VIEW IF EXISTS `{}`.`{}`", db_name, object_name),
             "PROCEDURE" => {
                 format!("DROP PROCEDURE IF EXISTS `{}`.`{}`", db_name, object_name)
