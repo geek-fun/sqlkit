@@ -85,6 +85,31 @@ watch(() => props.initialSubPage, (subPage) => {
     activeSubPage.value = subPage
 })
 
+// Counts reported by the metadata sub-pages, shown in their footer.
+const subPageCounts = ref<Partial<Record<SubPage, number>>>({})
+
+function setSubPageCount(subPage: SubPage, count: number | undefined) {
+  subPageCounts.value = { ...subPageCounts.value, [subPage]: count }
+}
+
+const activeSubPageCountLabel = computed(() => {
+  const count = subPageCounts.value[activeSubPage.value]
+  if (count === undefined)
+    return ''
+  switch (activeSubPage.value) {
+    case 'schema':
+      return t('components.dataTableView.columnsCount', { count })
+    case 'indexes':
+      return t('components.dataTableView.indexesCount', { count })
+    case 'foreign_keys':
+      return t('components.dataTableView.foreignKeysCount', { count })
+    case 'triggers':
+      return t('components.dataTableView.triggersCount', { count })
+    default:
+      return ''
+  }
+})
+
 const currentPage = ref(1)
 const rowsPerPage = ref<RowsPerPage>(100)
 const filterInput = ref('')
@@ -859,6 +884,7 @@ watch(
     hiddenColumns.value = new Set()
     sort.clearSort()
     connectionError.value = null
+    subPageCounts.value = {}
 
     if (newConnId !== oldConnId) {
       data.value = null
@@ -1318,6 +1344,7 @@ watch(
       :schema="props.schema ?? null"
       :table-name="props.tableName"
       class="flex-1"
+      @count-change="setSubPageCount('schema', $event)"
     />
 
     <!-- Indexes sub-page -->
@@ -1328,6 +1355,7 @@ watch(
       :schema="props.schema ?? null"
       :table-name="props.tableName"
       class="flex-1"
+      @count-change="setSubPageCount('indexes', $event)"
     />
 
     <!-- Foreign Keys sub-page -->
@@ -1338,6 +1366,7 @@ watch(
       :schema="props.schema ?? null"
       :table-name="props.tableName"
       class="flex-1"
+      @count-change="setSubPageCount('foreign_keys', $event)"
     />
 
     <!-- Triggers sub-page -->
@@ -1348,7 +1377,19 @@ watch(
       :schema="props.schema ?? null"
       :table-name="props.tableName"
       class="flex-1"
+      @count-change="setSubPageCount('triggers', $event)"
     />
+
+    <!-- Status footer for metadata sub-pages -->
+    <div
+      v-if="activeSubPage !== 'data'"
+      class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex shrink-0 gap-3 items-center overflow-hidden"
+    >
+      <span v-if="props.database" class="tabular-nums">
+        {{ t('pages.queries.status.database') }}: {{ props.database }}
+      </span>
+      <span v-if="activeSubPageCountLabel" class="tabular-nums">{{ activeSubPageCountLabel }}</span>
+    </div>
 
     <!-- ── Delete confirmation dialog ── -->
     <DestructiveConfirmDialog

@@ -24,6 +24,10 @@ const props = defineProps<{
   tableName: string
 }>()
 
+const emit = defineEmits<{
+  (e: 'countChange', count: number | undefined): void
+}>()
+
 const { t } = useI18n()
 
 const columns = ref<ColumnInfo[]>([])
@@ -33,6 +37,7 @@ const error = ref<string | null>(null)
 async function fetchColumns() {
   loading.value = true
   error.value = null
+  emit('countChange', undefined)
   try {
     const result = await invoke<ColumnInfo[]>('list_columns', {
       connectionId: props.connectionId,
@@ -41,9 +46,11 @@ async function fetchColumns() {
       tableName: props.tableName,
     })
     columns.value = result
+    emit('countChange', result.length)
   }
   catch (err) {
     error.value = String(err)
+    emit('countChange', undefined)
   }
   finally {
     loading.value = false
