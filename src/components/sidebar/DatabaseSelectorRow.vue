@@ -22,7 +22,8 @@ type Props = {
 }
 
 type ActionKind
-  = | 'newDatabase'
+  = | 'createScript'
+    | 'newDatabase'
     | 'newSchema'
     | 'newTable'
     | 'newView'
@@ -157,6 +158,7 @@ watch(() => props.connectionId, async (connId) => {
       class="shrink-0 h-7 w-7"
       :disabled="props.loading"
       :title="t('sidebar.database.refreshTooltip')"
+      :aria-label="t('sidebar.database.refreshTooltip')"
       @click="emit('refresh')"
     >
       <span class="i-carbon-renew h-3.5 w-3.5" :class="{ 'animate-spin': isSpinning }" />
@@ -164,7 +166,7 @@ watch(() => props.connectionId, async (connId) => {
 
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
-        <Button variant="ghost" size="icon" class="shrink-0 h-7 w-7" :title="t('sidebar.actionMenu.label')">
+        <Button variant="ghost" size="icon" class="shrink-0 h-7 w-7" :title="t('sidebar.actionMenu.label')" :aria-label="t('sidebar.actionMenu.label')">
           <span class="i-carbon-overflow-menu-horizontal h-3.5 w-3.5" />
         </Button>
       </DropdownMenuTrigger>
@@ -172,6 +174,10 @@ watch(() => props.connectionId, async (connId) => {
         <div class="text-xs font-semibold px-2 py-1.5">
           {{ t('sidebar.actionMenu.label') }}
         </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem :disabled="!props.modelValue" @click="handleAction('createScript')">
+          <span class="i-lucide-file-plus-2 mr-2 h-3.5 w-3.5" aria-hidden="true" /> {{ t('sidebar.actionMenu.createScript') }}
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem v-if="capabilities.newDatabase" @click="handleAction('newDatabase')">
           <span class="i-carbon-data-base mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.newDatabase') }}

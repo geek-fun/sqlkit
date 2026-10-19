@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ColumnFilter, DataGridEmits } from '@/types/grid'
 import { useVirtualizer } from '@tanstack/vue-virtual'
+import { useResizeObserver } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -119,6 +120,11 @@ function handleClearSort() {
 // ── Virtual Scroller ──
 const scrollContainer = ref<HTMLDivElement | null>(null)
 const headerViewport = ref<HTMLDivElement | null>(null)
+const viewportWidth = ref(0)
+
+useResizeObserver(scrollContainer, () => {
+  viewportWidth.value = scrollContainer.value?.clientWidth ?? 0
+})
 
 // The header lives outside the rows scroll container, so mirror the rows'
 // scrollLeft onto the header viewport. The overflow-hidden viewport is still a
@@ -147,6 +153,16 @@ const defaultColumnWidth = 150
 function getColumnWidth(col: string): number {
   return columnWidths.value.get(col) ?? defaultColumnWidth
 }
+
+// Absolute virtual rows must not size themselves from their cell contents.
+// Share one explicit width with the header, including scrollbar-free viewport space.
+const gridWidth = computed(() => Math.max(
+  viewportWidth.value,
+  40 + props.columns.reduce((width, col) => width + getColumnWidth(col), 0)
+  + (props.connectionId ? 80 : 0),
+))
+
+watch([gridWidth, viewportWidth], syncHeaderScroll, { flush: 'post' })
 
 let resizeStartX = 0
 let resizeStartWidth = 0
@@ -590,9 +606,11 @@ watch(sortableColumns, (columns) => {
       <div
         ref="headerViewport"
         class="border-b bg-muted flex flex-shrink-0 overflow-hidden"
+        :style="{ width: `${viewportWidth}px` }"
       >
         <div
-          class="flex flex-shrink-0 min-w-full"
+          class="flex flex-shrink-0"
+          :style="{ width: `${gridWidth}px` }"
         >
           <!-- Select-All Checkbox -->
           <div class="flex flex-shrink-0 h-8 w-10 items-center justify-center">
@@ -690,7 +708,7 @@ watch(sortableColumns, (columns) => {
         @scroll="syncHeaderScroll"
       >
         <div
-          :style="{ height: `${rowVirtualizer.getTotalSize()}px` }"
+          :style="{ width: `${gridWidth}px`, height: `${rowVirtualizer.getTotalSize()}px` }"
           class="relative"
         >
           <!-- Virtual Rows -->
@@ -698,12 +716,13 @@ watch(sortableColumns, (columns) => {
             v-for="virtualRow in rowVirtualizer.getVirtualItems()"
             :key="`r-${virtualRow.index}`"
             :data-index="virtualRow.index"
-            class="group border-b border-border/30 flex min-w-full transition-colors duration-75 left-0 top-0 absolute hover:bg-muted/[0.08]"
+            class="group border-b border-border/30 flex transition-colors duration-75 left-0 top-0 absolute hover:bg-muted/[0.08]"
             :class="[
               virtualRow.index % 2 === 0 ? 'bg-muted/[0.03]' : '',
               selection.isSelected(virtualRow.index) ? 'bg-primary/[0.08]' : '',
             ]"
             :style="{
+              width: `${gridWidth}px`,
               height: `${virtualRow.size}px`,
               transform: `translateY(${virtualRow.start}px)`,
             }"
@@ -787,7 +806,7 @@ watch(sortableColumns, (columns) => {
             <!-- Row Actions -->
             <div
               v-if="connectionId"
-              class="bg-background/80 flex flex-shrink-0 w-20 items-center right-0 justify-center sticky z-10"
+              class="bg-background flex flex-shrink-0 w-20 items-center right-0 justify-center sticky z-10"
               @click.stop
             >
               <DropdownMenu>

@@ -861,6 +861,10 @@ function handleDatabaseRefresh() {
 
 function handleDatabaseAction(kind: string) {
   switch (kind) {
+    case 'createScript':
+      if (selectedDatabase.value)
+        handleOpenQueryTab(selectedDatabase.value)
+      break
     case 'newDatabase':
       createDatabaseDialogOpen.value = true
       break
