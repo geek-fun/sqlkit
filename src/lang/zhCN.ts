@@ -1927,6 +1927,7 @@ export const zhCN = {
     },
     actionMenu: {
       label: '数据库操作',
+      createScript: '新建脚本',
       newDatabase: '新建数据库',
       newSchema: '新建模式',
       newTable: '新建表',

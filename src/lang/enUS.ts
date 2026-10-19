@@ -1927,6 +1927,7 @@ export const enUS = {
     },
     actionMenu: {
       label: 'Database actions',
+      createScript: 'Create Script',
       newDatabase: 'New Database',
       newSchema: 'New Schema',
       newTable: 'New Table',
