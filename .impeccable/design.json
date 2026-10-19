@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-18T17:31:31Z",
+  "title": "SQLKit 设计规范",
+  "extensions": {
+    "motion": [
+      {
+        "name": "dialog-transition",
+        "value": "200ms",
+        "purpose": "现有 DialogContent 过渡时长；新增动效须尊重 reduced-motion。"
+      },
+      {
+        "name": "toast-transition",
+        "value": "250ms ease",
+        "purpose": "现有 AppNotifications 通知过渡；不作为装饰动画依据。"
+      }
+    ]
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "安静的 SQL 工作台",
+    "rules": [
+      "DESIGN.md 是完整约束；此文件仅补充其 frontmatter 无法表达的信息。",
+      "保留现有蓝色主题和浅深模式，中性工作面优先。",
+      "主操作与真实状态具有固定色彩语义；次级工具操作保持中性。"
+    ],
+    "dos": [
+      "优先展示连接上下文、SQL 与数据。",
+      "复用语义 token 和共享组件，验证浅深主题及键盘可达性。"
+    ],
+    "donts": [
+      "不引入第二装饰色、彩虹工具栏或独立 AI 配色。",
+      "不把待迁移规则描述为已经实现的行为。"
+    ]
+  }
+}
