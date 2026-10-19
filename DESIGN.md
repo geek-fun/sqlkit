@@ -233,6 +233,7 @@ Interactive components must cover default, hover, focus-visible, active / select
 
 ### SQL editor and result grids
 
+- Keep the result-set selector inside the existing result toolbar. Collapse secondary export actions into a menu at narrow panel widths to preserve a single toolbar row.
 - Keep Monaco's theme integration (currently `vs / vs-dark`) and user font-size settings. Syntax highlighting is outside the application decoration color budget; reducing colors must not damage syntax recognition.
 - Keep data central: neutral headers, subtle hover, stable selection, and clear sorting / filtering indicators. Preserve virtual scrolling; do not rebuild the whole grid for animation.
 - Distinguish `NULL`, empty strings, and booleans. Show true / false or equivalent text / symbols; do not default to red / green boolean mapping.
@@ -306,7 +307,7 @@ Check each affected surface. Documentation-only changes need source, link, and i
 | --- | --- | --- |
 | P1 | Existing foreground pairs such as success / destructive need individual verification | Check contrast on actual backgrounds; adjust semantic pairs when needed while retaining the blue brand |
 | P1 | Success / warning in `ui/badge` and notifications still use fixed palettes; a global warning token is missing | Add light/dark semantic tokens and mappings first, then migrate shared components and check all consumers |
-| P2 | Some `QueriesPage.vue` toolbar buttons use purple / orange; `QueryResultPanel.vue` assigns sky / amber / green by format | Use neutral toolbars and primary for the main action |
+| P2 | Some `QueriesPage.vue` toolbar buttons use purple / orange | Use neutral toolbars and primary for the main action |
 | P2 | `grid/FilterBar.vue` assigns colors to operators; grid booleans and some attributes use red / green / amber | Use neutral text, symbols, and attribute icons; color only actual status |
 | P2 | `AppHeader.vue` uses red for ordinary task counts; some connection-page icon containers use multiple colors | Make counts neutral; distinguish connection cards by name / engine icon / actual status |
 | P2 | Shared Badge defaults to solid primary; some close buttons appear only on hover | Explicitly select neutral variants for non-interactive badges and make close buttons visible on keyboard focus |

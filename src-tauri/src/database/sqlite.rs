@@ -421,6 +421,7 @@ impl SQLiteAdapter {
                 rows_affected: None,
                 execution_time_ms: None,
                 truncated: false,
+                result_sets: Vec::new(),
             })
         } else {
             // For non-SELECT queries (INSERT, UPDATE, DELETE, etc.)
@@ -438,6 +439,7 @@ impl SQLiteAdapter {
                 rows_affected: Some(rows_affected as u64),
                 execution_time_ms: None,
                 truncated: false,
+                result_sets: Vec::new(),
             })
         }
     }

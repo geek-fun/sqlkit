@@ -27,6 +27,180 @@ use sqlkit_lib::database::{
 use std::env;
 use std::time::Duration;
 
+const SESSION_SCRIPT: &str = include_str!("fixtures/postgres_session_script.sql");
+
+fn script_test_config() -> ConnectionConfig {
+    let mut config = get_test_config();
+    config.pool_config.max_connections = 1;
+    config
+}
+
+async fn prepare_session_tables(adapter: &PostgresAdapter) {
+    adapter.execute_query(r#"
+        CREATE TEMP TABLE sample_customers (id bigint, email text);
+        CREATE TEMP TABLE sample_profiles (
+            customer_id bigint, label text, state text, score bigint,
+            region text, profile_type text, display_name text,
+            reference_code text, contact_email text
+        );
+        CREATE TEMP TABLE sample_events (
+            id bigint, customer_id bigint, type text, state text, unit text,
+            amount bigint, source text, external_ref text,
+            source_ref text, match_key text, created_at timestamptz DEFAULT now()
+        );
+        CREATE TEMP TABLE sample_requests (
+            id bigint, customer_id bigint, category text, state text, amount bigint,
+            unit text, payload jsonb, outcome text, owner_id bigint,
+            created_at timestamptz DEFAULT now(), completed_at timestamptz
+        );
+        INSERT INTO sample_customers VALUES (1, 'o''connor测试@example.com'), (2, 'other@example.com');
+        INSERT INTO sample_profiles (customer_id, label, state, score)
+            VALUES (1, 'standard', 'active', 0);
+        INSERT INTO sample_events (id, customer_id, type, state, unit, amount, external_ref, match_key)
+            VALUES (1, 1, 'credit', 'success', 'USD', 1000, 'ref-a', NULL),
+                   (2, 1, 'credit', 'success', 'USD', 2000, 'ref-b', NULL),
+                   (3, 1, 'adjustment', 'success', 'USD', -300, NULL, 'request:42'),
+                   (4, 1, 'excluded', 'success', 'USD', -5000, NULL, NULL),
+                   (5, 1, 'credit', 'failed', 'USD', 9000, NULL, NULL),
+                   (6, 1, 'adjustment', 'success', 'EUR', -100, NULL, 'request:42'),
+                   (7, 2, 'credit', 'success', 'USD', 9000, NULL, NULL);
+        INSERT INTO sample_requests (id, customer_id, category, state, amount, unit, payload)
+            VALUES (42, 1, 'adjustment', 'completed', 300, 'USD', '{"source":"test"}'),
+                   (43, 1, 'adjustment', 'pending', 100, 'USD', '{}'),
+                   (44, 2, 'adjustment', 'pending', 100, 'USD', '{}');
+    "#).await.expect("Failed to prepare synthetic session data");
+}
+
+#[tokio::test]
+#[ignore] // Requires PostgreSQL
+async fn test_session_script_preserves_all_results_and_transaction_parameters() {
+    let mut adapter = PostgresAdapter::new(script_test_config());
+    adapter.connect().await.unwrap();
+    prepare_session_tables(&adapter).await;
+
+    // Exercise both optional IDs, exact IDs, and Windows line endings.
+    for (request, reference, expected_events, expected_requests, expected_matches) in
+        [("", "", 3, 2, 0), ("42", "ref-a", 1, 1, 1)]
+    {
+        let script = SESSION_SCRIPT
+            .replace("request_id', ''", &format!("request_id', '{}'", request))
+            .replace(
+                "external_ref', ''",
+                &format!("external_ref', '{}'", reference),
+            )
+            .replace('\n', "\r\n");
+        let result = adapter.execute_query(&script).await.unwrap();
+        let sets = &result.result_sets;
+        assert_eq!(sets.len(), 8);
+        assert_eq!(
+            sets[0].rows[0]["email"],
+            QueryValue::String("o'connor测试@example.com".into())
+        );
+        assert_eq!(
+            sets[1].rows[0]["transaction_read_only"],
+            QueryValue::String("on".into())
+        );
+        assert!(matches!(
+            sets[1].rows[0]["checked_at"],
+            QueryValue::DateTime(_)
+        ));
+        assert_eq!(sets[2].rows.len(), 1);
+        assert_eq!(sets[2].rows[0]["reference_code"], QueryValue::Null);
+        assert_eq!(sets[3].rows.len(), expected_events);
+        assert_eq!(sets[4].rows.len(), expected_requests);
+        assert_eq!(
+            sets[5].rows[0]["total_amount"],
+            QueryValue::String("2700".into())
+        );
+        assert_eq!(sets[6].rows.len(), if request.is_empty() { 0 } else { 2 });
+        assert!(!sets[6].columns.is_empty());
+        assert_eq!(
+            sets[7].rows[0]["matched_rows"],
+            QueryValue::Int(expected_matches)
+        );
+        assert_eq!(
+            sets[7].rows[0]["matched_amount"],
+            QueryValue::String(if request.is_empty() { "0" } else { "-300" }.into())
+        );
+        assert_eq!(result.rows, sets[7].rows);
+        assert_eq!(result.columns, sets[7].columns);
+
+        let after = adapter.execute_query("SELECT current_setting('transaction_read_only') AS read_only, current_setting('script_test.email', true) AS email").await.unwrap();
+        assert_eq!(after.rows[0]["read_only"], QueryValue::String("off".into()));
+        assert_eq!(after.rows[0]["email"], QueryValue::String(String::new()));
+        assert!(after.result_sets.is_empty());
+    }
+    adapter.disconnect().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore] // Requires PostgreSQL
+async fn test_script_uses_one_session_and_repeatable_read_under_concurrent_queries() {
+    let mut adapter = PostgresAdapter::new(get_test_config());
+    adapter.connect().await.unwrap();
+    let (script, other) = tokio::join!(
+        adapter.execute_query(
+            "BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY;
+             SELECT pg_backend_pid() AS pid, set_config('sqlkit_test.marker', 'same-session', true);
+             SELECT pg_sleep(0.05);
+             SELECT pg_backend_pid() AS pid, current_setting('sqlkit_test.marker') AS marker,
+                    current_setting('transaction_isolation') AS isolation;
+             COMMIT;"
+        ),
+        adapter.execute_query("SELECT pg_sleep(0.05)")
+    );
+    other.unwrap();
+    let result = script.unwrap();
+    assert_eq!(result.result_sets.len(), 3);
+    assert_eq!(result.result_sets[0].rows[0]["pid"], result.rows[0]["pid"]);
+    assert_eq!(
+        result.rows[0]["marker"],
+        QueryValue::String("same-session".into())
+    );
+    assert_eq!(
+        result.rows[0]["isolation"],
+        QueryValue::String("repeatable read".into())
+    );
+    adapter.disconnect().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore] // Requires PostgreSQL
+async fn test_failed_script_discards_transaction_and_stops_before_commit() {
+    let mut adapter = PostgresAdapter::new(script_test_config());
+    adapter.connect().await.unwrap();
+    let result = adapter.execute_query("BEGIN; SELECT set_config('sqlkit_test.marker', 'pending', true); SELECT 1 / 0; COMMIT; SELECT 42").await;
+    assert!(result.unwrap_err().to_string().contains("22012"));
+    let after = adapter
+        .execute_query("SELECT current_setting('sqlkit_test.marker', true) AS marker, 42 AS value")
+        .await
+        .unwrap();
+    assert_eq!(after.rows[0]["marker"], QueryValue::Null);
+    assert_eq!(after.rows[0]["value"], QueryValue::Int(42));
+    adapter.disconnect().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore] // Requires PostgreSQL
+async fn test_script_timeout_discards_connection_even_when_future_is_dropped() {
+    let mut adapter = PostgresAdapter::new(script_test_config());
+    adapter.connect().await.unwrap();
+    let result = tokio::time::timeout(
+        Duration::from_millis(200),
+        adapter.execute_query("BEGIN; SELECT set_config('sqlkit_test.marker', 'pending', true); SELECT pg_sleep(10); COMMIT;"),
+    ).await;
+    assert!(result.is_err());
+    let after = tokio::time::timeout(
+        Duration::from_secs(2),
+        adapter.execute_query("SELECT current_setting('sqlkit_test.marker', true) AS marker"),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(after.rows[0]["marker"], QueryValue::Null);
+    adapter.disconnect().await.unwrap();
+}
+
 fn get_test_config() -> ConnectionConfig {
     let host = env::var("POSTGRES_HOST").unwrap_or_else(|_| "localhost".to_string());
     let port = env::var("POSTGRES_PORT")
@@ -291,18 +465,25 @@ async fn test_json_types() {
 #[ignore]
 async fn test_query_timeout() {
     // Test that queries timeout when they exceed the configured statement_timeout
-    let config = get_test_config().with_option("statement_timeout", "1000"); // 1000 milliseconds (1 second)
+    let config = script_test_config().with_option("statement_timeout", "1000");
 
     let mut adapter = PostgresAdapter::new(config);
     adapter.connect().await.expect("Failed to connect");
 
     // This query should timeout after 1 second (tries to sleep for 5 seconds)
-    let result = adapter.execute_query("SELECT pg_sleep(5)").await;
+    let result = adapter
+        .execute_query("BEGIN; SELECT set_config('sqlkit_test.marker', 'pending', true); SELECT pg_sleep(5); COMMIT;")
+        .await;
 
-    assert!(result.is_err());
-    if let Err(e) = result {
-        println!("Expected timeout error: {}", e);
-    }
+    assert!(matches!(
+        result,
+        Err(sqlkit_lib::database::DbError::Timeout(_))
+    ));
+    let after = adapter
+        .execute_query("SELECT current_setting('sqlkit_test.marker', true) AS marker")
+        .await
+        .unwrap();
+    assert_eq!(after.rows[0]["marker"], QueryValue::Null);
 
     adapter.disconnect().await.expect("Failed to disconnect");
 }

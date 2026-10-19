@@ -1479,6 +1479,10 @@ export const zhCN = {
     },
     queryResult: {
       title: '结果',
+      selectResult: '选择结果集',
+      resultSet: '结果 {index} / {count}',
+      exportActions: '复制和导出结果',
+      scriptReadOnly: '脚本结果为只读；排序仅针对已返回的行。',
       rows: '{count} 行',
       rowsAffected: '影响 {count} 行',
       time: '{time}',
