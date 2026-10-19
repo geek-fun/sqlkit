@@ -1,6 +1,6 @@
 ---
 name: SQLKit
-description: 以 SQL 和数据为中心的克制、高密度、跨平台数据库工作台
+description: A restrained, dense, cross-platform database workspace centered on SQL and data
 colors:
   primary-light: "hsl(221.2 83.2% 45%)"
   primary-dark: "hsl(217.2 91.2% 45%)"
@@ -16,300 +16,300 @@ rounded:
   sm: "4px"
 ---
 
-# SQLKit 设计规范
+# SQLKit Design Specification
 
 ## Overview
 
-**设计方向：安静的 SQL 工作台。** 用户应先看到连接上下文、SQL 和查询结果，再看到操作入口，最后才是品牌表达。设计服务于长时间编写、检查和比较数据：高信息密度、清晰层级、稳定布局、可预测交互。
+**Design direction: A quiet SQL workspace.** Users should notice connection context, SQL, and query results first, actions second, and brand expression last. Support long sessions of writing, inspecting, and comparing data through high information density, clear hierarchy, stable layouts, and predictable interactions.
 
-本文件是 SQLKit 客户端新增和修改 UI 的设计约束，与 [AGENTS.md](AGENTS.md) 配合使用。保留现有蓝色主题、浅色 / 深色 / 跟随系统模式、紧凑桌面布局和 shadcn-vue / Radix Vue 组件体系。本次只建立规约，不代表存量界面已完成整改。
+This file defines the design constraints for new and modified SQLKit client UI, alongside [AGENTS.md](AGENTS.md). Preserve the existing blue theme, light / dark / system modes, compact desktop layout, and shadcn-vue / Radix Vue component system. Establishing this specification does not mean existing screens have already been migrated.
 
-### 来源与取舍
+### Sources and adaptations
 
-参考项目为 `console-serverlessinsight`，核对日期为 2026-10-19。重点依据其 `AGENTS.md` 的「设计系统：色彩规则（V3 · Mono + Violet Accent）」、`apps/console/src/assets/css/themes/violet.css`、`apps/console/uno.config.ts`、`docs/console-ui-design.md` 和 `apps/console/PRODUCT.md`。这些路径仅记录来源，SQLKit 不依赖参考仓库运行。
+The reference project is `console-serverlessinsight`, reviewed on 2026-10-19. The main sources are its `AGENTS.md` section on color rules (V3 · Mono + Violet Accent), `apps/console/src/assets/css/themes/violet.css`, `apps/console/uno.config.ts`, `docs/console-ui-design.md`, and `apps/console/PRODUCT.md`. These paths record provenance only; SQLKit has no runtime dependency on the reference repository.
 
-| 参考经验 | SQLKit 的采用方式 |
+| Reference principle | SQLKit adaptation |
 | --- | --- |
-| 颜色具有固定语义，不为模块随意配色 | 蓝色表达主操作和交互，绿色表达成功，红色表达错误或危险；普通信息使用中性色 |
-| 中性面占主体，强调色保持稀缺 | 保留 SQLKit 略带冷色的中性 token，不照搬参考项目的零色度灰阶 |
-| 品牌色只在小面积使用 | 保留 SQLKit 蓝色主按钮，约束数量与面积；不照搬紫色或黑白主按钮 |
-| 状态色使用语义 token，兼容浅深主题 | 复用现有 success / destructive；warning 等缺口按下文流程补齐 |
-| 渐进披露、稳定应用框架、键盘可达 | 适配连接树、查询标签、编辑器、结果表格和桌面窗口行为 |
-| 非颜色信号与对比度要求 | 将其作为验收要求，不能因为已有 token 就假定已达标 |
+| Give colors fixed semantics rather than assigning them to modules | Blue for primary actions and interaction, green for success, red for errors or danger; neutrals for ordinary information |
+| Let neutral surfaces dominate and keep accents scarce | Preserve SQLKit's slightly cool neutral tokens rather than copying the reference project's zero-chroma grays |
+| Restrict brand color to small areas | Keep SQLKit's blue primary buttons, limiting their count and area; do not copy violet or monochrome primary buttons |
+| Use semantic status tokens across light and dark themes | Reuse success / destructive; fill gaps such as warning through the process below |
+| Use progressive disclosure, a stable app shell, and keyboard access | Apply these to the connection tree, query tabs, editor, result grids, and desktop window behavior |
+| Require non-color signals and readable contrast | Treat these as acceptance criteria; existing tokens do not prove compliance |
 
-参考项目早期文档中的彩色图示、登录页渐变，以及 CSS 中的玻璃和环境光效果，不作为 SQLKit 工作区的设计依据。
+The reference project's early colorful diagrams, login gradients, and CSS glass and ambient-light effects are not design references for SQLKit's workspace.
 
-### 规范与实现的关系
+### Specification and implementation
 
-- **现有基线**：下文明确引用代码的值是当前实现快照；颜色值的唯一运行时来源是 `src/assets/index.css`，工具类映射在 `uno.config.ts`。
-- **设计约束**：「必须 / 禁止 / 默认」适用于新增和修改的 UI；历史实现不构成继续扩散问题的理由。
-- **待迁移项**：尚未实现的 token、组件收敛和交互明确列在文末。不得把文档里的目标当作已经存在的 API。
-- 全局设计决策以本文件为准；专题文档描述功能行为。需要改变主题色、组件公共样式或密度基线时，在同一改动中更新本文件和对应实现。
+- **Current baseline:** Values explicitly tied to code below describe the current implementation. The sole runtime source of color values is `src/assets/index.css`; utility mappings live in `uno.config.ts`.
+- **Design constraints:** “Must,” “must not,” and “default” apply to new and modified UI. Historical implementations do not justify extending existing problems.
+- **Migration work:** Tokens, component cleanup, and interactions that remain unimplemented are listed at the end. Do not treat documented targets as existing APIs.
+- This file governs system-wide design decisions; feature documents describe behavior. When changing theme colors, shared component styles, or density baselines, update this file and the implementation together.
 
 ## Colors
 
-### 现有主题基线
+### Current theme baseline
 
-下表记录 CSS 中的 HSL 分量，使用方式是 `hsl(var(--token))`。顶部 frontmatter 仅收录部分已实现 token，供工具识别；完整主题以 CSS 为准，更新时同步维护，禁止在组件里复制数值。
+The table records CSS HSL components, used as `hsl(var(--token))`. The frontmatter contains a subset of implemented tokens for tooling. CSS defines the complete theme; keep the documentation synchronized and never copy these values into components.
 
-| Token | 浅色 | 深色 | 职责 |
+| Token | Light | Dark | Role |
 | --- | --- | --- | --- |
-| `--primary` | `221.2 83.2% 45%` | `217.2 91.2% 45%` | 主操作、链接、交互强调 |
-| `--primary-foreground` | `0 0% 100%` | `0 0% 100%` | 实心主色背景上的文字 |
-| `--background` | `0 0% 100%` | `222.2 84% 4.9%` | 主工作区 |
-| `--foreground` | `222.2 84% 4.9%` | `210 40% 98%` | 正文和重要数据 |
-| `--card` / `--popover` | `0 0% 100%` | `222.2 47% 8%` | 容器和浮层 |
-| `--secondary` / `--muted` | `210 40% 96.1%` | `217.2 32.6% 16%` | 次级表面和中性状态 |
-| `--muted-foreground` | `215.4 16.3% 46.9%` | `215 20.2% 65.1%` | 辅助文字，不承载唯一关键信息 |
-| `--accent` | `210 40% 96.1%` | `217.2 32.6% 17.5%` | 中性交互表面，**不是第二品牌色** |
-| `--border` | `214.3 31.8% 91.4%` | `217.2 32.6% 17.5%` | 结构分隔 |
-| `--input` | `214.3 31.8% 80%` | `217.2 32.6% 28%` | 输入边界 |
-| `--ring` | `220 13% 60%` | `212.7 26.8% 68%` | 键盘焦点；保留现有中性色 |
-| `--success` | `142.1 70.6% 35.5%` | `142.1 70% 45%` | 成功、连接已建立、任务已完成 |
-| `--success-muted` | `138 76% 95%` | `142 35% 16%` | 局部成功反馈底色 |
-| `--success-border` | `140 58% 85%` | `142 30% 25%` | 成功反馈边界 |
-| `--destructive` | `0 84.2% 60.2%` | `0 62.8% 30.6%` | 错误、失败、破坏性操作 |
+| `--primary` | `221.2 83.2% 45%` | `217.2 91.2% 45%` | Primary actions, links, interaction emphasis |
+| `--primary-foreground` | `0 0% 100%` | `0 0% 100%` | Text on solid primary backgrounds |
+| `--background` | `0 0% 100%` | `222.2 84% 4.9%` | Main workspace |
+| `--foreground` | `222.2 84% 4.9%` | `210 40% 98%` | Body text and important data |
+| `--card` / `--popover` | `0 0% 100%` | `222.2 47% 8%` | Containers and overlays |
+| `--secondary` / `--muted` | `210 40% 96.1%` | `217.2 32.6% 16%` | Secondary surfaces and neutral states |
+| `--muted-foreground` | `215.4 16.3% 46.9%` | `215 20.2% 65.1%` | Supporting text; never the sole carrier of critical information |
+| `--accent` | `210 40% 96.1%` | `217.2 32.6% 17.5%` | Neutral interaction surface, **not a second brand color** |
+| `--border` | `214.3 31.8% 91.4%` | `217.2 32.6% 17.5%` | Structural separation |
+| `--input` | `214.3 31.8% 80%` | `217.2 32.6% 28%` | Input boundaries |
+| `--ring` | `220 13% 60%` | `212.7 26.8% 68%` | Keyboard focus; retain the current neutral color |
+| `--success` | `142.1 70.6% 35.5%` | `142.1 70% 45%` | Success, connected, completed |
+| `--success-muted` | `138 76% 95%` | `142 35% 16%` | Local success feedback background |
+| `--success-border` | `140 58% 85%` | `142 30% 25%` | Success feedback boundary |
+| `--destructive` | `0 84.2% 60.2%` | `0 62.8% 30.6%` | Errors, failures, destructive actions |
 
-### 语义所有权
+### Semantic ownership
 
-| 视觉信号 | 可以表达 | 禁止借用 |
+| Visual signal | Allowed meaning | Must not represent |
 | --- | --- | --- |
-| 蓝色 `primary` | 主要操作、链接、选中控件、少量活动指示 | 成功、普通徽章、大面积面板底色 |
-| 中性色 `foreground / muted / secondary / accent` | 正文、辅助信息、工具栏、导航底色、计数、普通属性、未连接 | 用低对比度隐藏重要错误或风险 |
-| 绿色 `success` | 测试连接成功、已连接、执行成功、传输完成 | 执行按钮、布尔 true、自动递增、卖点装饰 |
-| 红色 `destructive` | 执行失败、连接失败、删除确认 | 普通任务数量、未连接、布尔 false、装饰 |
-| 琥珀色 `warning`（待实现） | 真实警告、风险提示、需要处理的异常状态 | JSON 格式、主键、普通未保存提示、任意工具按钮 |
+| Blue `primary` | Primary actions, links, selected controls, small active indicators | Success, ordinary badges, large panel backgrounds |
+| Neutrals `foreground / muted / secondary / accent` | Body text, supporting information, toolbars, navigation backgrounds, counts, ordinary attributes, disconnected states | Important errors or risks hidden through low contrast |
+| Green `success` | Successful connection tests, connected states, successful execution, completed transfers | Execute buttons, boolean true, auto-increment attributes, decorative selling points |
+| Red `destructive` | Execution failures, connection failures, deletion confirmations | Ordinary task counts, disconnected states, boolean false, decoration |
+| Amber `warning` (not yet implemented) | Actual warnings, risks, exceptional states requiring attention | JSON format, primary keys, ordinary unsaved indicators, arbitrary toolbar buttons |
 
-普通信息使用中性图标和文字，不引入独立天蓝色。SQLKit 的 `primary` 已承担蓝色交互职责；目前不存在 `--info` 或 `--warning` 映射。后续只有确需区分的语义才允许新增 token。
+Use neutral icons and text for ordinary information; do not introduce a separate sky-blue palette. SQLKit's `primary` already owns blue interaction emphasis. There are currently no `--info` or `--warning` mappings. Add tokens only for semantics that require a distinct role.
 
-### 色彩预算
+### Color budget
 
-1. **先中性，后强调。** 静止工作区的大多数背景、边框、正文、图标使用现有中性 token。层级先靠排版、间距和位置表达。
-2. **强调面积目标不超过约 10%。** 这是评审启发式，适用于应用外壳、工具栏、面板和表单，不要求逐像素计算。SQL 语法高亮、实际数据图表、局部错误提示单独按可读性评估；不能借这些例外扩大装饰色面积。
-3. **同一操作上下文最多一个实心主操作。** 查询工作区通常是执行；表单弹窗通常是保存；其他操作使用 outline / secondary / ghost。独立弹窗可以有自己的主操作。焦点环、状态点不计作第二个实心主操作。
-4. **成功、警告、失败可以同时存在，必须有真实状态依据。** 默认用图标 / 状态点加文字，必要时辅以局部低强调底色；禁止整行、整张卡、整个面板染色。
-5. **功能不等于颜色。** CSV / JSON / INSERT、复制 / 导出 / 格式化 / EXPLAIN、不同筛选操作符均不能各配一种颜色。
+1. **Start with neutrals, then add emphasis.** Most backgrounds, borders, body text, and icons in a resting workspace use existing neutral tokens. Establish hierarchy through typography, spacing, and position first.
+2. **Aim for accents to occupy no more than roughly 10% of the UI.** This is a review heuristic for the app shell, toolbars, panels, and forms, not a pixel-counting requirement. Evaluate SQL syntax highlighting, actual data charts, and local error feedback separately for readability; these exceptions must not expand decorative color use.
+3. **Use at most one solid primary action per operation context.** This is usually Execute in a query workspace or Save in a form dialog. Other actions use outline / secondary / ghost. An independent dialog may have its own primary action. Focus rings and status dots do not count as a second solid primary action.
+4. **Success, warning, and failure may coexist when backed by actual state.** Default to an icon / status dot with text, adding a local, subdued background when needed. Do not tint an entire row, card, or panel.
+5. **Features do not own colors.** Do not give each of CSV / JSON / INSERT, copy / export / format / EXPLAIN, or individual filter operators a separate color.
 
-### 允许与禁止
+### Allowed and avoided treatments
 
-| 场景 | 默认做法 | 避免 |
+| Context | Default treatment | Avoid |
 | --- | --- | --- |
-| 工具栏 | 中性图标与文字，hover 用 `accent` | 蓝 / 紫 / 橙 / 绿按钮并排 |
-| 导航 / 标签 | 中性底色与字重，必要时小面积蓝色指示 | 整块饱和蓝底、多色导航入口 |
-| 属性徽章 | `Badge` 显式选 `outline` 或 `secondary` | 仅因默认 variant 存在就使用实心蓝徽章 |
-| 连接卡片 | 名称、引擎图标、状态文字 / 状态点 | 每种数据库一个彩色背景 |
-| 提示 / 通知 | 中性表面，状态图标与可读文字 | 整块高饱和红绿背景 |
-| AI 助手 / Ultimate 标识 | 同一套中性容器和小面积主色 | 额外紫色主题、彩虹渐变、发光边框 |
+| Toolbars | Neutral icons and text; `accent` on hover | Blue / purple / orange / green buttons side by side |
+| Navigation / tabs | Neutral backgrounds and font weight; small blue indicators when needed | Solid saturated blue blocks or multicolor navigation entries |
+| Attribute badges | Explicitly select `outline` or `secondary` on `Badge` | Solid blue badges chosen merely because that variant is the default |
+| Connection cards | Name, engine icon, status text / dot | A different colored background for each database engine |
+| Alerts / notifications | Neutral surfaces, status icons, readable text | Large saturated red or green backgrounds |
+| AI assistant / Ultimate indicators | The same neutral containers and small primary accents | A separate purple theme, rainbow gradients, glowing borders |
 
-### 颜色例外
+### Color exceptions
 
-- Monaco SQL 语法高亮、代码差异、真实数据图表允许多色，但颜色必须帮助解释内容；不可把其中的色板扩散到应用操作控件。
-- 现有数据库厂商 logo 可保留识别色，限制在小图标内，不延伸到卡片、按钮和导航背景。
-- 图表优先以主色突出当前关注系列，其他系列使用中性色；多系列需要辨识时可使用专用图表色板，并提供标签、图例或线型辅助。`--chart-1` 至 `--chart-5` 已存在于 CSS，但尚未注册为 UnoCSS 色名，不可假设 `text-chart-1` 可用。
-- 数据差异可用 success / destructive 表达增加与删除，同时显示 `+ / −` 或文字；普通布尔值不是成功或失败。
+- Monaco SQL syntax highlighting, code diffs, and actual data charts may use multiple colors when those colors explain content. Do not extend their palettes into application controls.
+- Existing database vendor logos may retain identifying colors inside small icons. Do not extend those colors to cards, buttons, or navigation backgrounds.
+- Charts should emphasize the series of interest with primary and use neutrals for the others. When multiple series need distinction, a dedicated chart palette is allowed with labels, legends, or line styles. `--chart-1` through `--chart-5` exist in CSS but are not registered as UnoCSS color names; do not assume `text-chart-1` works.
+- Data diffs may use success / destructive for additions and deletions, accompanied by `+ / −` or text. Ordinary boolean values do not represent success or failure.
 
-### Token 落地流程
+### Token implementation process
 
-1. 先判断能否用现有角色表达，再考虑透明度变体。透明度不是免检通行证：文字与实际合成背景仍须通过对比度检查。
-2. 禁止在业务组件中新增替代现有语义的 hex / RGB / HSL 字面值或 `blue-500`、`green-600`、`violet-*` 等调色板工具类。图表、语法和厂商素材例外应隔离在对应模块。
-3. 需要新增语义 token 时，同一改动必须完成：`src/assets/index.css` 的 `:root` 与 `.dark` 定义、必要的前景 / 弱底色配对、`uno.config.ts` 映射、共享组件 variant（如需）、浅深主题验证及本文件更新。
-4. 在映射落地前，不得提交依赖 `text-warning`、`bg-info` 等未实现工具类的 UI。warning 是明确缺口，不用 `primary` 或 `success` 冒充警告。
-5. 修改公共 token 前核对所有使用方；修复语义色可读性不能顺带替换蓝色品牌或重设整套中性色。
+1. Check whether an existing role can express the meaning before considering opacity variants. Opacity does not waive contrast requirements: text must remain readable against the actual composited background.
+2. Do not add hex / RGB / HSL literals or palette utilities such as `blue-500`, `green-600`, and `violet-*` in business components to replace existing semantic roles. Isolate chart, syntax, and vendor-asset exceptions in their respective modules.
+3. When adding a semantic token, include all of the following in the same change: `:root` and `.dark` definitions in `src/assets/index.css`, necessary foreground / subdued-background pairs, `uno.config.ts` mappings, shared component variants where needed, light/dark verification, and this document's update.
+4. Do not submit UI that depends on unimplemented utilities such as `text-warning` or `bg-info` before their mappings exist. Warning is a known gap; do not substitute `primary` or `success` for it.
+5. Check all consumers before changing shared tokens. Fixing semantic color readability must not also replace the blue brand or reset the entire neutral palette.
 
 ## Typography
 
-### 字体与层级
+### Fonts and hierarchy
 
-现有全局正文为 14px，未在 `src/assets/index.css` 定义自有品牌字体。沿用系统无衬线字体及平台中文回退，不为客户端引入装饰字体或远程字体依赖。SQL 编辑器沿用 Monaco 等宽字体；SQL、类型、对象标识和代码片段可使用现有 `font-mono`。
+The global body size is currently 14px, and `src/assets/index.css` does not define a custom brand font. Keep system sans-serif fonts with platform Chinese fallbacks. Do not introduce decorative fonts or remote font dependencies for the client. Keep Monaco's monospace editor font; SQL, types, object identifiers, and code snippets may use the existing `font-mono` utility.
 
-以下是新增 UI 的层级约束；不要求批量改写现有页面标题。
+The following hierarchy constrains new UI; it does not require rewriting all existing page titles.
 
-| 角色 | 字号 / 字重 | 使用位置 |
+| Role | Size / weight | Usage |
 | --- | --- | --- |
-| 页面标题 | 20–24px / 600 | 连接、设置等独立页面；编辑工作区不额外堆大标题 |
-| 弹窗 / 区块标题 | 14–18px / 500–600 | 对话框标题、主要分组 |
-| 正文 / 表单 | 14px / 400 | 说明、输入、按钮；与当前 `text-sm` 对齐 |
-| 密集数据 / 辅助标签 | 12px / 400–500 | 结果表格、对象树、工具栏和状态栏 |
+| Page title | 20–24px / 600 | Standalone pages such as Connections and Settings; do not add large headings to editor workspaces |
+| Dialog / section title | 14–18px / 500–600 | Dialog titles and major groups |
+| Body / form | 14px / 400 | Descriptions, inputs, buttons; matches the current `text-sm` |
+| Dense data / supporting labels | 12px / 400–500 | Result grids, object trees, toolbars, status bars |
 
-- 普通文字行高使用约 1.4–1.6；代码遵循编辑器设置；固定行高的表格需保证文字不被裁切。
-- 禁止通过 9–10px 小字承载用户必须读取的状态、价格、字段含义或操作说明。紧凑空间优先调整布局。
-- 名称与数据优先使用 `foreground`；辅助说明用 `muted-foreground`。不要给多层透明度叠加后的浅灰小字承载重要信息。
-- 行数、耗时、金额、进度使用 `tabular-nums`；数值列右对齐，文本列左对齐，列头与内容对齐。
-- 长连接名、表名、SQL 和文件路径允许截断，但必须能通过展开、详情或复制获得完整内容；关键连接上下文不可仅靠悬浮提示。
+- Use roughly 1.4–1.6 line height for ordinary text. Code follows editor settings; fixed-height table rows must not clip text.
+- Do not use 9–10px text for states, prices, field meanings, or instructions users must read. Adjust the layout first when space is tight.
+- Prefer `foreground` for names and data, and `muted-foreground` for supporting descriptions. Do not place important information in tiny light-gray text with stacked opacity reductions.
+- Use `tabular-nums` for row counts, duration, amounts, and progress. Right-align numeric columns, left-align text columns, and align headers with their contents.
+- Long connection names, table names, SQL, and file paths may truncate, but users must be able to obtain the full content through expansion, details, or copying. Critical connection context must not depend solely on hover hints.
 
 ## Layout
 
-### 桌面工作台结构
+### Desktop workspace structure
 
-沿用现有应用外壳：顶部窗口栏 → 左侧功能导航 → 当前功能工作区。查询页内部为对象树 / 保存的查询、查询标签、编辑器、结果区；AI 与任务使用右侧辅助面板，保持与主任务的从属关系。
+Retain the existing app shell: top window bar → left feature navigation → current workspace. The query page contains the object tree / saved queries, query tabs, editor, and results. AI and tasks occupy supporting panels on the right and remain subordinate to the main task.
 
-| 现有实现 | 基线 | 来源 |
+| Current implementation | Baseline | Source |
 | --- | --- | --- |
-| 初始窗口 | 1600 × 1000 | `src-tauri/tauri.conf.json`，不是最小窗口限制 |
-| 窗口栏 | 40px | `AppHeader.vue` 的 `h-10` |
-| 功能导航 | 64px 宽，入口 40 × 40px | `AppSidebar.vue` |
-| 查询侧栏 | 初始 250px，拖动限制 200–400px | `QueriesPage.vue` |
-| 查询标签 | 35px 高，单标签最大 200px | `QueryTabs.vue` |
-| 结果工具栏 | 36px 高 | `QueryResultPanel.vue` |
-| 标准按钮 / 输入 | 32px 高 | `ui/button`、`ui/input` |
-| 结果虚拟行 | 32px 估算高度 | `grid/DataGrid.vue`；不代表所有表格共享同一高度 |
+| Initial window | 1600 × 1000 | `src-tauri/tauri.conf.json`; not a minimum window size |
+| Window bar | 40px | `h-10` in `AppHeader.vue` |
+| Feature navigation | 64px wide, 40 × 40px entries | `AppSidebar.vue` |
+| Query sidebar | Initially 250px, resize range 200–400px | `QueriesPage.vue` |
+| Query tabs | 35px high, maximum 200px per tab | `QueryTabs.vue` |
+| Result toolbar | 36px high | `QueryResultPanel.vue` |
+| Standard buttons / inputs | 32px high | `ui/button`, `ui/input` |
+| Virtual result rows | 32px estimated height | `grid/DataGrid.vue`; not a shared height for every table |
 
-### 间距与容器
+### Spacing and containers
 
-- 以 4px 为主要节奏：4 / 8 / 12 / 16 / 24 / 32px；现有紧凑控件的 6px 内边距可保留。
-- 图标与文字通常间隔 4–8px，同组操作 4–8px，区块内部 12–16px，主要分组 24px。
-- 优先使用分隔线、标题与留白组织内容。编辑器和结果区是连续工作面，不为每个工具栏或字段另套一张卡片。
-- 每个滚动区有明确职责；使用 `min-w-0` / `min-h-0` 避免 flex 子项挤爆布局。宽表格在结果区内横向滚动，不使整个外壳横向滚动。
-- 数据区域优先获得剩余空间。高级连接项、SSL/SSH、筛选详情按需展开，不默认占满首屏。
+- Use a primarily 4px rhythm: 4 / 8 / 12 / 16 / 24 / 32px. Existing compact controls may keep 6px internal padding.
+- Typical gaps are 4–8px between icons and text, 4–8px within action groups, 12–16px inside sections, and 24px between major groups.
+- Organize content with separators, headings, and whitespace first. Editors and results are continuous work surfaces; do not wrap every toolbar or field in another card.
+- Give each scroll region a clear responsibility. Use `min-w-0` / `min-h-0` to prevent flex children from overflowing the layout. Wide tables scroll horizontally within the result region, not across the entire app shell.
+- Give remaining space to data. Reveal advanced connection options, SSL/SSH, and filter details on demand rather than filling the initial viewport.
 
-### 窗口缩放与平台适配
+### Window resizing and platform adaptation
 
-客户端以桌面操作为主，不套用营销站的移动端卡片堆叠。以下是后续布局改动的验收场景，不表示已经配置 CSS 断点或最小窗口尺寸：
+The client primarily supports desktop operation; do not apply a marketing site's mobile card-stacking pattern. The following are acceptance scenarios for future layout changes, not claims that CSS breakpoints or minimum window sizes are already configured:
 
-- 在 1600 × 1000 和 1280 × 800 检查常规工作流；在约 1024 × 768 检查空间收缩，优先收起辅助面板、折叠次级文字、把低频操作放入更多菜单。
-- 无论窗口多窄，当前连接 / 数据库、主要操作、取消执行和关键错误都必须可达。禁止把必要信息通过 `overflow-hidden` 静默裁掉。
-- 弹窗不能超出可用窗口；长表单内部滚动，保存与取消仍可达。不能通过缩小字体解决溢出。
-- 复用 `usePlatform` 与 `useWindowControls`：保留 macOS 红绿灯安全区，兼容 Windows / Linux 窗口按钮和全屏。交互控件不能落入拖拽区域。
-- 快捷键显示与实际绑定一致：macOS 使用 `⌘ / ⌥`，Windows / Linux 使用 `Ctrl / Alt`。不得在标签、tooltip、帮助文案中硬编码单一平台修饰键。
+- Check ordinary workflows at 1600 × 1000 and 1280 × 800, and constrained space around 1024 × 768. Collapse supporting panels and secondary labels first; move infrequent actions into overflow menus.
+- Keep the current connection / database, primary action, execution cancellation, and critical errors reachable at any window width. Do not silently clip required information with `overflow-hidden`.
+- Dialogs must fit the available window. Long forms scroll internally while Save and Cancel remain reachable. Do not solve overflow by shrinking text.
+- Reuse `usePlatform` and `useWindowControls`: preserve the macOS traffic-light inset and support Windows / Linux window controls and fullscreen behavior. Interactive controls must stay outside drag regions.
+- Shortcut labels must match actual bindings: `⌘ / ⌥` on macOS, `Ctrl / Alt` on Windows / Linux. Do not hardcode one platform's modifiers in labels, tooltips, or help text.
 
 ## Elevation & Depth
 
-**默认平面，浮层抬升。** 工作区通过现有背景层级和边框分区；悬浮菜单、弹窗、通知才使用明显阴影。沿用现有 Card 的 `shadow-sm`，但新增嵌套容器不重复叠加卡片、阴影和描边。
+**Flat by default; elevate overlays.** Divide workspaces with existing surface levels and borders. Reserve pronounced shadows for floating menus, dialogs, and notifications. Retain the existing Card's `shadow-sm`, but do not repeatedly stack cards, shadows, and borders in new nested containers.
 
-- 主内容面使用 `background / card / muted`；浮层使用 `popover` 配对前景，不能引入新的彩色玻璃面。
-- 现有 `.border` 使用 0.5px 边框并有 1px 回退；不逐页自建另一套描边。分隔线不能成为识别控件或焦点的唯一信号。
-- 焦点环是交互反馈，不是装饰阴影；禁止全局发光描边、环境色团、彩色渐变背景、持续呼吸动画。
-- 浮层层级应覆盖所属面板并允许关闭；使用现有 Radix portal 和公共浮层组件，不靠随意增大 z-index 解决遮挡。
-- 动效只表达 hover、展开、切换、任务进度。新动效建议 120–200ms；现有通知过渡为 250ms，可保留。避免 `transition-all` 导致无关属性动画；尊重 `prefers-reduced-motion`，保留静态状态文字。
+- Use `background / card / muted` for content surfaces and `popover` with its paired foreground for overlays. Do not introduce colored glass surfaces.
+- The current `.border` uses a 0.5px border with a 1px fallback. Do not invent per-page border systems. Separators must not be the only signal identifying a control or keyboard focus.
+- Focus rings communicate interaction rather than decoration. Do not add global glowing outlines, ambient color blobs, colorful gradient backgrounds, or continuous pulsing animations.
+- Overlays must cover their owning panels and remain dismissible. Use existing Radix portals and shared overlay components rather than arbitrary z-index increases.
+- Motion should communicate hover, expansion, transitions, and task progress. Prefer 120–200ms for new motion; existing 250ms notification transitions may remain. Avoid `transition-all` animating unrelated properties. Respect `prefers-reduced-motion` and retain static status text.
 
 ## Shapes
 
-沿用 `--radius: 0.5rem`：`lg` 为 8px，`md` 为 6px，`sm` 为 4px。普通输入与按钮用 `rounded-md`，卡片与弹窗用 `rounded-lg`，紧凑内部元素按组件默认值。
+Keep `--radius: 0.5rem`: `lg` is 8px, `md` is 6px, and `sm` is 4px. Use `rounded-md` for ordinary inputs and buttons, `rounded-lg` for cards and dialogs, and component defaults for compact internal elements.
 
-- 圆角传递组件层级，不逐页发明数值；数据网格、分栏与编辑器保持连续直边。
-- `rounded-full` 仅用于头像、小型状态点、已有徽章等适合胶囊形态的元素，不把所有按钮做成胶囊。
-- 工具栏图标通常 14–16px，主导航 20px；可见图标小于点击区域。标准操作目标沿用 32px，紧凑网格操作原则上至少 24px，并保证间隔与键盘可达。
-- 图标优先复用所在组件的现有 Carbon / Lucide 风格，不为颜色或装饰新增图标库；不要在同组操作混入 emoji。
+- Use corner radius to convey component hierarchy rather than inventing per-page values. Keep continuous straight edges for data grids, split panes, and editors.
+- Limit `rounded-full` to suitable elements such as avatars, small status dots, and existing badges. Do not make every button pill-shaped.
+- Toolbar icons are usually 14–16px and main navigation icons 20px; the visible icon is smaller than its hit target. Keep standard action targets at 32px. Compact grid actions should generally be at least 24px with sufficient spacing and keyboard access.
+- Reuse the component's existing Carbon / Lucide style. Do not add icon libraries for color or decoration, or mix emoji into an action group.
 
 ## Components
 
-### 共享组件与状态
+### Shared components and states
 
-优先复用 `src/components/ui/*`，通过模块 `index.ts` 引入；共享 variants 由 CVA 管理，业务组件只选择角色和状态。相同操作在不同页面保持同一图标、文案和交互。
+Prefer `src/components/ui/*`, importing through each module's `index.ts`. Manage shared variants with CVA; business components select roles and states. Keep icons, labels, and interactions consistent for the same action across pages.
 
-交互组件须覆盖默认、hover、focus-visible、active / selected、disabled；异步操作另有 loading、success、error。hover 表示可操作，selected 表示已选择，focus-visible 表示键盘位置，三者不可混成唯一一种蓝色底块。
+Interactive components must cover default, hover, focus-visible, active / selected, and disabled states. Async actions also need loading, success, and error states. Hover signals interactivity, selected signals selection, and focus-visible signals keyboard position; do not collapse all three into the same blue background.
 
-### 按钮与工具栏
+### Buttons and toolbars
 
-- `default`：唯一主操作，保留 `bg-primary text-primary-foreground`；当前默认高 32px，大尺寸高 36px。
-- `outline / secondary`：次级操作；`ghost`：工具栏和低频操作；`link`：明确的文字链接。
-- `destructive`：删除等真实破坏性操作。普通断开连接、停止查询不因“停止”字样自动变成红色实心按钮。
-- loading 防止重复提交，保留可读标签。允许取消的长任务提供取消入口，不让整个面板失效。
-- 图标按钮必须有本地化的可访问名称；tooltip 补充动作和快捷键，不代替名称。图标、标签、tooltip 不得表达不同动作。
-- 禁用状态说明原因，例如未连接、无结果、任务执行中；不能只降低透明度而不解释。
+- `default`: the single primary action, retaining `bg-primary text-primary-foreground`. Current default height is 32px; large is 36px.
+- `outline / secondary`: secondary actions; `ghost`: toolbar and infrequent actions; `link`: explicit text links.
+- `destructive`: genuinely destructive actions such as deletion. Ordinary disconnect and stop-query actions do not automatically become solid red buttons because they stop something.
+- Loading states prevent duplicate submission and keep readable labels. Provide cancellation for cancellable long tasks rather than disabling the entire panel.
+- Icon buttons must have localized accessible names. Tooltips supplement actions and shortcuts; they do not replace accessible names. The icon, label, and tooltip must describe the same action.
+- Explain disabled states, such as no connection, no results, or a running task. Reduced opacity alone is insufficient.
 
-### 导航、查询标签与上下文
+### Navigation, query tabs, and context
 
-- 导航默认中性；活动入口可用中性底色加蓝色图标，避免额外实心蓝块。提供 `aria-current` 或等价语义。
-- 查询标签保持紧凑；活动项用背景 / 字重区分，未保存用小标记与可访问说明，不把整条标签染成警告色。
-- 关闭按钮应在 hover 或键盘 focus 时可见。未保存关闭流程说明影响；不能因视觉简化丢失保存入口。
-- 始终能确认当前连接、数据库 / schema 和执行目标；生产环境风险用文字 / 图标辅助，不依赖用户记住连接颜色。
+- Navigation is neutral by default. An active entry may use a neutral background and blue icon without an additional solid blue block. Provide `aria-current` or equivalent semantics.
+- Keep query tabs compact. Distinguish the active tab with background / weight, and unsaved changes with a small marker and accessible explanation. Do not tint the whole tab as a warning.
+- Close buttons must appear on hover or keyboard focus. Explain the consequences of closing unsaved work; visual simplification must not remove the save path.
+- Always make the current connection, database / schema, and execution target identifiable. Supplement production-environment risks with text / icons rather than relying on remembered connection colors.
 
-### 表单、连接配置与对话框
+### Forms, connection settings, and dialogs
 
-- 复用 32px Input / Select 与现有 label / helper / error 结构；placeholder 不能代替标签。
-- 主机、端口、认证、数据库等字段按任务分组。SSL / SSH 等高级配置渐进披露，沿用 [SSL_UI_DESIGN.md](docs/SSL_UI_DESIGN.md) 的条件字段行为。
-- 校验贴近字段，明确原因和修复方式；失败保留已填内容，敏感值按现有安全策略处理。
-- 对话框使用明确标题、与内容对应的描述、可达关闭 / 取消入口；正确管理焦点、Escape 与关闭后焦点恢复。
-- 删除数据、DROP / TRUNCATE 等破坏性确认展示目标和影响范围；执行按实际能力说明，不虚构可恢复或可回滚承诺。
+- Reuse 32px Input / Select controls and the existing label / helper / error structure. Placeholders do not replace labels.
+- Group host, port, authentication, database, and related fields by task. Progressively reveal advanced SSL / SSH settings, retaining the conditional-field behavior in [SSL_UI_DESIGN.md](docs/SSL_UI_DESIGN.md).
+- Place validation near the field and explain the cause and remedy. Preserve entered content after failure; handle sensitive values under existing security policies.
+- Give dialogs a clear title, a description matching the content, and reachable close / cancel controls. Manage focus, Escape, and focus restoration after closing.
+- Destructive confirmations for deleting data, DROP / TRUNCATE, and similar actions must show the target and impact scope. Describe actual capabilities; do not invent recovery or rollback guarantees.
 
-### 徽章、通知与任务状态
+### Badges, notifications, and task states
 
-- 非交互属性默认 `Badge variant="outline"` 或 `secondary`；状态使用状态点 / 图标加文字。公共 Badge 的当前默认仍为实心 primary，调用方必须显式选择合适 variant。
-- 已连接 / 完成用 success；未连接 / 未开始用中性色；失败用 destructive；警告待公共 token 补齐后统一表达。
-- 数量徽章默认中性。任务数不等于失败数，不能仅因 `taskCount > 0` 使用红色。
-- toast 使用中性背景与状态图标；需要处理的错误提供可读说明和重试 / 查看详情入口，不能只短暂闪过。执行结果反馈优先留在所属结果区。
-- 正常进展和成功无需重复 toast；区内状态、通知、任务面板避免同时重复播报同一事件。
+- Non-interactive attributes default to `Badge variant="outline"` or `secondary`. Status uses a dot / icon with text. The shared Badge still defaults to solid primary; callers must explicitly select an appropriate variant.
+- Use success for connected / completed, neutrals for disconnected / not started, and destructive for failed. Standardize warning treatment once shared tokens exist.
+- Count badges are neutral by default. Task count is not failure count; `taskCount > 0` alone does not justify red.
+- Toasts use neutral backgrounds and status icons. Errors requiring action need readable explanations and Retry / View details paths rather than a brief flash. Prefer keeping execution feedback in the relevant result region.
+- Do not duplicate toasts for normal progress and success. Avoid simultaneously repeating the same event in local status, notifications, and the task panel.
 
-### SQL 编辑器与结果表格
+### SQL editor and result grids
 
-- 保留 Monaco 的主题联动（当前 `vs / vs-dark`）和用户字号设置。语法高亮不受应用装饰色数量限制，不因“减少颜色”破坏语法辨识。
-- 结果表格以数据为主体：中性表头、轻量 hover、稳定选区、清楚的排序和筛选指示。保持虚拟滚动，不为动画重建整表。
-- `NULL`、空字符串、布尔值必须可辨；布尔值显示 true / false 或等价文字 / 符号，禁止默认红绿映射。
-- 主键、唯一约束、自动递增是属性，不是警告或成功；用 key 图标、PK / UNIQUE / identity 文本等中性标识。
-- 多列排序显示方向及优先级；保持 [GRID_SORT_DESIGN.md](docs/GRID_SORT_DESIGN.md) 的实际能力边界：当前返回结果 / 当前页排序，不暗示全库排序或再次执行 SQL。
-- 筛选使用操作符文字和可移除条目，不为 eq / like / gt 等操作符建立彩虹色板。
-- 格式化、执行计划、复制、导出按操作分组；CSV / JSON / INSERT 靠名称识别。导出范围和当前显示范围应清楚说明。
-- 长文本、JSON、BLOB 有详情 / 复制路径，不能仅留下不可恢复的省略号；表格编辑状态与只读状态明确区分。
+- Keep Monaco's theme integration (currently `vs / vs-dark`) and user font-size settings. Syntax highlighting is outside the application decoration color budget; reducing colors must not damage syntax recognition.
+- Keep data central: neutral headers, subtle hover, stable selection, and clear sorting / filtering indicators. Preserve virtual scrolling; do not rebuild the whole grid for animation.
+- Distinguish `NULL`, empty strings, and booleans. Show true / false or equivalent text / symbols; do not default to red / green boolean mapping.
+- Primary keys, unique constraints, and auto-increment are attributes, not warnings or success. Use neutral identifiers such as a key icon or PK / UNIQUE / identity text.
+- Show direction and priority for multi-column sorting. Preserve the capability limits in [GRID_SORT_DESIGN.md](docs/GRID_SORT_DESIGN.md): sorting applies to returned results / the current page, not the whole database or SQL re-execution.
+- Filters use operator text and removable entries, not a rainbow palette for eq / like / gt and other operators.
+- Group formatting, execution plans, copying, and exporting by action. Identify CSV / JSON / INSERT by name. Make export scope and the currently displayed scope explicit.
+- Provide details / copying for long text, JSON, and BLOBs rather than leaving an unrecoverable ellipsis. Clearly distinguish editable and read-only grid states.
 
-### AI、传输与辅助面板
+### AI, transfers, and supporting panels
 
-- AI 使用与查询页一致的中性表面和主色；用户消息、模型消息、代码块靠位置、标签和排版区分。
-- 生成 SQL 的待执行状态与已执行结果必须明确区分。执行目标、风险提示和确认流程沿用普通 SQL 工作流。
-- 导入 / 导出沿用 [TRANSFER_SCOPE_DESIGN.md](docs/TRANSFER_SCOPE_DESIGN.md) 的范围和步骤；步骤状态通过名称、序号、进度表示，不增加每步专属色。
-- 任务面板明确展示运行中、完成、失败、取消；列表行中性，仅局部状态信号着色。不会因全部任务正常运行就显示错误告警。
+- AI uses the same neutral surfaces and primary color as the query page. Distinguish user messages, model messages, and code blocks through position, labels, and typography.
+- Clearly separate generated SQL awaiting execution from executed results. Execution targets, risk messages, and confirmation follow the ordinary SQL workflow.
+- Imports / exports retain the scopes and steps in [TRANSFER_SCOPE_DESIGN.md](docs/TRANSFER_SCOPE_DESIGN.md). Express step state through names, numbers, and progress rather than a color per step.
+- Task panels clearly show running, completed, failed, and cancelled states. Keep rows neutral and color only local status signals. Normally running tasks must not appear as error alerts.
 
-### 空状态、加载与错误
+### Empty, loading, and error states
 
-| 状态 | 必须传达 | 视觉处理 |
+| State | Required information | Treatment |
 | --- | --- | --- |
-| 尚无连接 | 为什么为空、如何创建连接 | 中性图标、短说明、一个主操作 |
-| 尚未执行 | 选择目标 / 输入 SQL / 执行的下一步 | 简短操作提示，不展示虚构示例结果 |
-| 查询返回零行 | 查询成功但没有匹配记录 | 中性文字，保留耗时和可用操作 |
-| 加载 / 执行中 | 当前动作、必要的进度、可取消能力 | 局部 spinner / skeleton，避免整屏跳动 |
-| 失败 | 失败原因、目标上下文、可采取的动作 | 局部错误图标 / 文本，详情可复制 |
-| 无权限 / 功能受限 | 限制原因及已有可用路径 | 清楚的文案，避免伪装成系统错误 |
+| No connections yet | Why the view is empty and how to create a connection | Neutral icon, short explanation, one primary action |
+| Not executed yet | Next steps: select a target / enter SQL / execute | Brief guidance; no fabricated sample results |
+| Query returned zero rows | Execution succeeded with no matching records | Neutral text; retain duration and available actions |
+| Loading / executing | Current action, relevant progress, cancellation capability | Local spinner / skeleton; avoid whole-screen layout shifts |
+| Failure | Cause, target context, available actions | Local error icon / text with copyable details |
+| Permission / feature restriction | Reason for the restriction and available paths | Clear copy; do not disguise restrictions as system errors |
 
-### 可访问性与文案
+### Accessibility and copy
 
-- 普通正文、标签与按钮文字对比度至少 4.5:1；大字（至少 24px 常规或约 18.7px 加粗）至少 3:1。必需的控件边界、状态图形和焦点指示与相邻背景至少 3:1；装饰分隔线不按控件边界代替验收。
-- 状态不能只靠颜色；补充文字 / 图标，选中、排序、展开等状态提供合适的 ARIA 语义。
-- 检查实际合成颜色，尤其是透明背景、弱文字、success / destructive 的前景搭配；现有值是事实基线，不是对比度合格证明。
-- 保留 Radix 的键盘与焦点行为；Tab、Shift+Tab、Enter、Space、Escape、方向键按控件语义可用。对象树、网格和分栏提供相应键盘路径。
-- 文案使用具体动词与对象，区分“已提交”“执行中”“已完成”；不能把提交请求写成执行成功。
-- 新增文案进入现有 `src/lang` 体系，验证中英文长标签。错误包含上下文与下一步，不输出只有代码的泛化提示。
+- Body text, labels, and button text need at least 4.5:1 contrast. Large text (at least 24px regular or approximately 18.7px bold) needs at least 3:1. Required control boundaries, status graphics, and focus indicators need at least 3:1 against adjacent backgrounds. Decorative separators do not substitute for control-boundary checks.
+- Do not communicate state through color alone. Add text / icons and appropriate ARIA semantics for selection, sorting, expansion, and other states.
+- Check actual composited colors, especially translucent backgrounds, subdued text, and success / destructive foreground pairs. Existing values document the baseline, not proof of adequate contrast.
+- Preserve Radix keyboard and focus behavior. Support Tab, Shift+Tab, Enter, Space, Escape, and arrow keys according to control semantics. Provide suitable keyboard paths for trees, grids, and split panes.
+- Use specific verbs and objects. Distinguish “submitted,” “executing,” and “completed”; submitting a request is not successful execution.
+- Add copy through the existing `src/lang` system and check long English and Chinese labels. Errors need context and a next step, not generic messages containing only a code.
 
 ## Do's and Don'ts
 
 ### Do
 
-- 先判断信息层级与操作主次，再选择中性 / 主色 / 语义角色。
-- 复用 token、公共组件与当前平台适配，保持浅深主题语义一致。
-- 让 SQL、连接上下文与数据占主体，使用渐进披露降低首屏复杂度。
-- 在实际背景上验证对比度，以键盘完成主要工作流。
+- Establish information hierarchy and action priority before selecting neutral / primary / semantic roles.
+- Reuse tokens, shared components, and existing platform adaptation. Keep semantics consistent across light and dark themes.
+- Let SQL, connection context, and data dominate. Use progressive disclosure to reduce initial complexity.
+- Verify contrast against actual backgrounds and complete primary workflows with the keyboard.
 
 ### Don't
 
-- 不给每个功能、数据库类型、筛选操作符或文件格式发一种颜色。
-- 不把成功绿用于“执行”，不把错误红用于普通计数，不把警告色用于普通属性。
-- 不为了对齐参考项目替换 SQLKit 蓝色主题、强制纯灰中性面或改成黑白主按钮。
-- 不添加彩虹徽章、渐变 AI 面板、彩色大图标容器和无功能价值的光效。
-- 不把历史硬编码、默认 Badge、尚未落地的 token 当成新 UI 的设计依据。
+- Do not assign a color to every feature, database type, filter operator, or file format.
+- Do not use success green for Execute, error red for ordinary counts, or warning colors for ordinary attributes.
+- Do not replace SQLKit's blue theme, force pure-gray neutral surfaces, or switch to monochrome primary buttons to match the reference project.
+- Do not add rainbow badges, gradient AI panels, large colored icon containers, or light effects without functional value.
+- Do not use historical hardcoding, default Badge styling, or unimplemented tokens as the design basis for new UI.
 
-### 改动验收清单
+### Change acceptance checklist
 
-对涉及的界面逐项检查；纯文档改动只核对来源、链接与实现一致性，无需启动客户端。
+Check each affected surface. Documentation-only changes need source, link, and implementation-consistency checks; they do not require launching the client.
 
-- [ ] 用色均有明确职责，没有第二装饰色；每个操作上下文仅一个实心主操作。
-- [ ] 没有新增替代语义 token 的硬编码；新增 token 同步浅深定义与 UnoCSS 映射。
-- [ ] 浅 / 深 / 跟随系统均可用；编辑器主题、浮层、禁用、错误、选中和焦点状态一起检查。
-- [ ] 正文、按钮和必要交互信号通过对比度检查；状态附有文字或图标。
-- [ ] 键盘可达、焦点可见且恢复正确；图标按钮具有本地化可访问名称。
-- [ ] 空、加载、零行、错误、长内容、中英文和小窗口都有明确表现。
-- [ ] macOS / Windows / Linux 的修饰键、窗口按钮与拖动区域处理正确。
-- [ ] 数据范围、排序范围、执行状态与实际能力一致，视觉改动不改变功能语义。
-- [ ] UI 实现变更运行 `npm run lint:check`、`npm run build`；涉及行为再运行相关测试，布局改动附相关主题和窗口尺寸的实际截图。
+- [ ] Every color has a clear role, with no second decorative accent; each operation context has only one solid primary action.
+- [ ] No new hardcoded replacements for semantic tokens; new tokens include light/dark definitions and UnoCSS mappings.
+- [ ] Light / dark / system modes work; check editor themes, overlays, disabled, error, selected, and focus states together.
+- [ ] Text, buttons, and required interaction signals pass contrast checks; statuses include text or icons.
+- [ ] Keyboard access works, focus is visible and restored correctly, and icon buttons have localized accessible names.
+- [ ] Empty, loading, zero-row, error, long-content, English / Chinese, and small-window states are clear.
+- [ ] macOS / Windows / Linux modifiers, window controls, and drag regions behave correctly.
+- [ ] Data scope, sorting scope, and execution status match actual capabilities; visual changes preserve functional semantics.
+- [ ] UI implementation changes run `npm run lint:check` and `npm run build`; behavior changes also run relevant tests, and layout changes include actual screenshots at relevant themes and window sizes.
 
-### 存量迁移顺序（尚未在本次实现）
+### Existing UI migration priorities (not implemented in this change)
 
-| 优先级 | 当前事实 | 后续整改方向 |
+| Priority | Current state | Follow-up |
 | --- | --- | --- |
-| P1 | success / destructive 等现有前景配对尚需逐项核验 | 验证实际背景上的对比度；必要时调整语义配对，保留蓝色品牌 |
-| P1 | `ui/badge` 的 success / warning、通知组件仍使用固定调色板；全局缺少 warning token | 先补全浅深语义 token 与映射，再集中迁移共享组件，核对所有使用方 |
-| P2 | `QueriesPage.vue` 的部分工具按钮使用紫 / 橙，`QueryResultPanel.vue` 按格式使用天蓝 / 琥珀 / 绿 | 收敛为中性工具栏，主操作复用 primary |
-| P2 | `grid/FilterBar.vue` 为操作符分配多种颜色，网格布尔值和部分属性使用红绿 / 琥珀色 | 改为中性文字、符号和属性图标，仅真实状态着色 |
-| P2 | `AppHeader.vue` 的普通任务数量使用红色，连接页部分图标容器多色 | 计数改中性，连接卡以名称 / 引擎图标 / 真实状态区分 |
-| P2 | 公共 Badge 默认实心 primary；部分关闭按钮只在 hover 出现 | 非交互徽章显式选中性 variant，补充键盘 focus 的可见性 |
-| P2 | 窄窗口和 reduced-motion 尚未按本规范完整验收 | 按受影响工作流验证并修复，不宣称现有客户端已全部满足 |
+| P1 | Existing foreground pairs such as success / destructive need individual verification | Check contrast on actual backgrounds; adjust semantic pairs when needed while retaining the blue brand |
+| P1 | Success / warning in `ui/badge` and notifications still use fixed palettes; a global warning token is missing | Add light/dark semantic tokens and mappings first, then migrate shared components and check all consumers |
+| P2 | Some `QueriesPage.vue` toolbar buttons use purple / orange; `QueryResultPanel.vue` assigns sky / amber / green by format | Use neutral toolbars and primary for the main action |
+| P2 | `grid/FilterBar.vue` assigns colors to operators; grid booleans and some attributes use red / green / amber | Use neutral text, symbols, and attribute icons; color only actual status |
+| P2 | `AppHeader.vue` uses red for ordinary task counts; some connection-page icon containers use multiple colors | Make counts neutral; distinguish connection cards by name / engine icon / actual status |
+| P2 | Shared Badge defaults to solid primary; some close buttons appear only on hover | Explicitly select neutral variants for non-interactive badges and make close buttons visible on keyboard focus |
+| P2 | Narrow windows and reduced-motion behavior have not been fully checked against this specification | Verify and fix affected workflows; do not claim the current client already satisfies every requirement |
 
-迁移以被修改的公共组件或业务区域为单位逐步进行；每次对照此规范验收，不在建立规约时顺带批量替换业务 UI。
+Migrate incrementally by shared component or business area as it changes. Check each change against this specification; establishing the rules does not include a bulk rewrite of business UI.
