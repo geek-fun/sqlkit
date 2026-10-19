@@ -2,6 +2,14 @@
 
 This directory contains the shadcn-vue UI components used in SQLKit.
 
+## Design Specification
+
+Read [SQLKit Design Specification](../../DESIGN.md) before adding or changing components.
+It defines color ownership, compact desktop layouts, component states, accessibility,
+and the migration plan for existing styling inconsistencies. Preserve the current blue
+theme; keep secondary actions and ordinary badges neutral, and reserve status colors
+for actual state. CSS tokens remain the runtime source of truth.
+
 ## Components
 
 ### Base Components

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-19T00:23:35Z",
+  "title": "SQLKit Design Specification",
+  "extensions": {
+    "motion": [
+      {
+        "name": "dialog-transition",
+        "value": "200ms",
+        "purpose": "Existing DialogContent transition duration; new motion must respect reduced-motion preferences."
+      },
+      {
+        "name": "toast-transition",
+        "value": "250ms ease",
+        "purpose": "Existing AppNotifications transition; not a basis for decorative animation."
+      }
+    ]
+  },
+  "components": [],
+  "narrative": {
+    "northStar": "A quiet SQL workspace",
+    "rules": [
+      "DESIGN.md defines the complete constraints; this file only supplements information its frontmatter cannot express.",
+      "Preserve the existing blue theme and light/dark modes, prioritizing neutral work surfaces.",
+      "Primary actions and actual status have fixed color semantics; secondary toolbar actions remain neutral."
+    ],
+    "dos": [
+      "Prioritize connection context, SQL, and data.",
+      "Reuse semantic tokens and shared components; verify light/dark themes and keyboard access."
+    ],
+    "donts": [
+      "Do not introduce a second decorative accent, rainbow toolbars, or a separate AI palette.",
+      "Do not describe migration targets as implemented behavior."
+    ]
+  }
+}
