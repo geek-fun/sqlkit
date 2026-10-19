@@ -1540,6 +1540,10 @@ export const enUS = {
     },
     queryResult: {
       title: 'Results',
+      selectResult: 'Select result set',
+      resultSet: 'Result {index} of {count}',
+      exportActions: 'Copy and export result',
+      scriptReadOnly: 'Script results are read-only; sorting applies to returned rows.',
       rows: '{count} rows',
       rowsAffected: '{count} row(s) affected',
       time: '{time}',

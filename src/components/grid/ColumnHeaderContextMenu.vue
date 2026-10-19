@@ -20,6 +20,7 @@ const props = defineProps<{
   hasActiveFilter: boolean
   currentSortDirection: SortDirection | null
   sortable?: boolean
+  filterable?: boolean
 }>()
 
 const emit = defineEmits<ColumnHeaderContextMenuEmits>()
@@ -92,27 +93,27 @@ function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
           <DropdownMenuSeparator />
 
           <!-- Filter options -->
-          <DropdownMenuItem @click="handleFilterWithPrompt('eq')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('eq')">
             <span class="i-carbon-filter mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.byValue') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('like')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('like')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.byLike') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('gte')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('gte')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.greaterThan') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('lte')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('lte')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.lessThan') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('between')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('between')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.between') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('neq')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('neq')">
             <span class="i-carbon-filter-remove mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.excludeValue') }}
           </DropdownMenuItem>

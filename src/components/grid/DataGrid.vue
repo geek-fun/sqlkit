@@ -52,6 +52,7 @@ type Props = {
   connectionId?: string
   hideToolbar?: boolean
   hideBatchActions?: boolean
+  filterable?: boolean
   /** Why the result cannot be edited, when tableName is absent. */
   editabilityReason?: string
 }
@@ -68,6 +69,7 @@ const props = withDefaults(defineProps<Props>(), {
   connectionId: undefined,
   hideToolbar: false,
   hideBatchActions: false,
+  filterable: true,
   editabilityReason: undefined,
 })
 
@@ -863,6 +865,7 @@ watch(sortableColumns, (columns) => {
     <!-- Context Menus -->
     <CellContextMenu
       v-bind="cellMenu"
+      :filterable="filterable"
       :columns="columns"
       :table-name="tableName"
       @close="cellMenu.show = false"
@@ -870,6 +873,7 @@ watch(sortableColumns, (columns) => {
     />
     <ColumnHeaderContextMenu
       v-bind="headerMenu"
+      :filterable="filterable"
       :sortable="isSortable(headerMenu.column)"
       @close="headerMenu.show = false"
       @sort="handleSortFromHeader"

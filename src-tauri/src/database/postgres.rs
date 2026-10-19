@@ -177,6 +177,32 @@ pub struct PostgresPool {
     pool: Pool,
 }
 
+/// Only return a query connection to the pool after execution completes successfully.
+struct QueryClient(Option<deadpool_postgres::Object>);
+
+impl std::ops::Deref for QueryClient {
+    type Target = deadpool_postgres::Object;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().unwrap()
+    }
+}
+
+impl QueryClient {
+    fn release(mut self) {
+        drop(self.0.take());
+    }
+}
+
+impl Drop for QueryClient {
+    fn drop(&mut self) {
+        if let Some(client) = self.0.take() {
+            // Detach before closing, including when an outer timeout drops this future.
+            drop(deadpool_postgres::Object::take(client));
+        }
+    }
+}
+
 #[async_trait]
 impl ConnectionPool for PostgresPool {
     type Connection = Client;
@@ -365,6 +391,9 @@ impl PostgresAdapter {
 
         // Add additional options
         for (key, value) in &self.config.options {
+            if key == "statement_timeout" {
+                continue;
+            }
             // The keyword side cannot be quoted: reject keys with
             // syntax-meaningful characters instead of interpolating them.
             if !key
@@ -592,15 +621,21 @@ impl PostgresAdapter {
                 None
             };
 
+        let builder = ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::aws_lc_rs::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .map_err(|e| DbError::Configuration(format!("Failed to configure TLS: {}", e)))?;
+
         if skip_verification {
             let config = if let Some((certs, key)) = client_auth {
-                ClientConfig::builder()
+                builder
                     .dangerous()
                     .with_custom_certificate_verifier(Arc::new(NoVerification))
                     .with_client_auth_cert(certs, key)
                     .map_err(|e| DbError::Connection(format!("Failed to set client auth: {}", e)))?
             } else {
-                ClientConfig::builder()
+                builder
                     .dangerous()
                     .with_custom_certificate_verifier(Arc::new(NoVerification))
                     .with_no_client_auth()
@@ -640,7 +675,7 @@ impl PostgresAdapter {
 
         if !verify_hostname {
             let config = if let Some((certs, key)) = client_auth {
-                ClientConfig::builder()
+                builder
                     .dangerous()
                     .with_custom_certificate_verifier(Arc::new(ChainOnlyVerifier {
                         root_store: Arc::new(root_store),
@@ -648,7 +683,7 @@ impl PostgresAdapter {
                     .with_client_auth_cert(certs, key)
                     .map_err(|e| DbError::Connection(format!("Failed to set client auth: {}", e)))?
             } else {
-                ClientConfig::builder()
+                builder
                     .dangerous()
                     .with_custom_certificate_verifier(Arc::new(ChainOnlyVerifier {
                         root_store: Arc::new(root_store),
@@ -659,12 +694,12 @@ impl PostgresAdapter {
         }
 
         let config = if let Some((certs, key)) = client_auth {
-            ClientConfig::builder()
+            builder
                 .with_root_certificates(root_store)
                 .with_client_auth_cert(certs, key)
                 .map_err(|e| DbError::Connection(format!("Failed to set client auth: {}", e)))?
         } else {
-            ClientConfig::builder()
+            builder
                 .with_root_certificates(root_store)
                 .with_no_client_auth()
         };
@@ -1174,6 +1209,7 @@ impl DatabaseAdapter for PostgresAdapter {
             .get()
             .await
             .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+        let client = QueryClient(Some(client));
 
         let start = Instant::now();
 
@@ -1186,9 +1222,11 @@ impl DatabaseAdapter for PostgresAdapter {
             .map(Duration::from_millis);
 
         let execute = async {
-            let mut result = QueryResult::affected(0);
+            let statements = split_postgres_statements(query);
+            let is_script = statements.len() > 1;
+            let mut result_sets = Vec::new();
             let mut affected = 0;
-            for sql in split_postgres_statements(query) {
+            for sql in statements {
                 let statement = client
                     .prepare(sql)
                     .await
@@ -1239,10 +1277,14 @@ impl DatabaseAdapter for PostgresAdapter {
                         current.add_row(Self::row_to_query_row(&row)?);
                     }
                 }
-                result = current;
+                result_sets.push(current);
             }
-            if result.columns.is_empty() {
-                result.rows_affected = Some(affected);
+            let mut result = result_sets
+                .last()
+                .cloned()
+                .unwrap_or_else(|| QueryResult::affected(affected));
+            if is_script {
+                result.result_sets = result_sets;
             }
             Ok::<_, DbError>(result)
         };
@@ -1253,6 +1295,7 @@ impl DatabaseAdapter for PostgresAdapter {
         } else {
             execute.await?
         };
+        client.release();
         Ok(result.with_execution_time(start.elapsed().as_millis() as u64))
     }
 
@@ -2661,6 +2704,31 @@ impl DatabaseAdapter for PostgresAdapter {
 mod tests {
     use super::*;
     use crate::database::DatabaseType;
+
+    #[test]
+    fn tls_configuration_selects_an_explicit_crypto_provider() {
+        let adapter = PostgresAdapter::new(ConnectionConfig::new(
+            DatabaseType::PostgreSQL,
+            "localhost",
+            5432,
+            "postgres",
+        ));
+        assert!(adapter.build_rustls_config(true, true).is_ok());
+        assert!(adapter.build_rustls_config(false, false).is_ok());
+        assert!(adapter.build_rustls_config(false, true).is_ok());
+    }
+
+    #[test]
+    fn execution_timeout_is_not_forwarded_as_a_connection_keyword() {
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+            .with_option("statement_timeout", "1000")
+            .with_option("application_name", "sqlkit");
+        let connection_string = PostgresAdapter::new(config)
+            .build_connection_string()
+            .unwrap();
+        assert!(!connection_string.contains("statement_timeout"));
+        assert!(connection_string.contains("application_name='sqlkit'"));
+    }
 
     #[test]
     fn split_preserves_quoted_blocks_comments_and_unicode() {

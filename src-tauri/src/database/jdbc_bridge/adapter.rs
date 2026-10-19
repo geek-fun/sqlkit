@@ -141,6 +141,7 @@ impl JdbcBridgeAdapter {
             rows_affected: qr.rows_affected,
             execution_time_ms: None,
             truncated: false,
+            result_sets: Vec::new(),
         })
     }
 
@@ -236,6 +237,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                 rows_affected: Some(0),
                 execution_time_ms: None,
                 truncated: false,
+                result_sets: Vec::new(),
             });
         }
         // Execute each statement individually. Many JDBC drivers (notably
@@ -258,6 +260,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
             rows_affected: Some(0),
             execution_time_ms: None,
             truncated: false,
+            result_sets: Vec::new(),
         };
         for stmt in &statements {
             let data = Self::send_request(

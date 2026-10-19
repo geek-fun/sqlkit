@@ -15,6 +15,7 @@ export type QueryResult = {
   rowsAffected?: number
   executionTimeMs?: number
   truncated?: boolean
+  resultSets?: QueryResult[]
 }
 
 export type ErDiagramMeta = {
@@ -344,6 +345,7 @@ export const useTabStore = defineStore('tabs', {
 
       tab.isExecuting = true
       tab.error = undefined
+      tab.results = undefined
 
       const connectionStore = useConnectionStore()
       const connection = connectionStore.getConnectionById(activeConnectionId)
