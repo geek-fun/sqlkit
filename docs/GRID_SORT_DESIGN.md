@@ -79,8 +79,10 @@ menu disables its sort entries and explains why.
 
 ### `DataGrid` (query results)
 
-- `sortedRows` is the single source of truth for rendering, row actions,
-  copy/export and the status bar.
+- `sortedRows` contains the current result page and is the source of truth for
+  rendering, row actions, selected-row exports, and the status bar. Copy / export
+  all includes every returned row in execution order. See
+  [Result Panel Pagination](RESULT_PAGINATION_DESIGN.md).
 - Header clicks call `handleHeaderSort`; the context menu is told `sortable`.
 - Selection is cleared whenever rows, columns or the sort state change, because
   selection is positional.

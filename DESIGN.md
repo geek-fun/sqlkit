@@ -234,6 +234,7 @@ Interactive components must cover default, hover, focus-visible, active / select
 ### SQL editor and result grids
 
 - Keep the result-set selector inside the existing result toolbar. Collapse secondary export actions into a menu at narrow panel widths to preserve a single toolbar row.
+- Result grids page the returned rows locally, starting at 100 rows per page. Keep first / previous / next / last, direct page entry, page size, and the row range in the footer. Wrap footer groups at narrow widths; keep navigation reachable for empty results and disable it while loading or showing an error. Copy / export all retains its full returned-result scope. See [RESULT_PAGINATION_DESIGN.md](docs/RESULT_PAGINATION_DESIGN.md).
 - Keep Monaco's theme integration (currently `vs / vs-dark`) and user font-size settings. Syntax highlighting is outside the application decoration color budget; reducing colors must not damage syntax recognition.
 - Keep data central: neutral headers, subtle hover, stable selection, and clear sorting / filtering indicators. Preserve virtual scrolling; do not rebuild the whole grid for animation.
 - Distinguish `NULL`, empty strings, and booleans. Show true / false or equivalent text / symbols; do not default to red / green boolean mapping.

@@ -8,7 +8,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ExplainPlanPanel } from '@/components/explain-plan'
-import DataGrid from '@/components/grid/DataGrid.vue'
+import { DataGrid } from '@/components/grid'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -481,6 +481,7 @@ const handleExport = (action: typeof exportActions[number]) => {
           :column-types="displayColumnTypes"
           :rows="displayResults.rows"
           :row-count="displayResults.rows.length"
+          :truncated="displayResults.truncated"
           :execution-time-ms="displayExecutionTime"
           :connection-id="connectionId"
           :database="database"

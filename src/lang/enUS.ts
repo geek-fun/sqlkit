@@ -1657,6 +1657,22 @@ export const enUS = {
       },
     },
     dataGrid: {
+      pagination: {
+        label: 'Result pagination',
+        rowsPerPage: 'Rows per page',
+        pageSize: '{count} rows/page',
+        customSize: 'Custom rows/page',
+        apply: 'Apply',
+        showAll: 'Show all returned rows',
+        allRows: 'All returned rows',
+        firstPage: 'First page',
+        previousPage: 'Previous page',
+        nextPage: 'Next page',
+        lastPage: 'Last page',
+        goToPage: 'Go to page',
+        pageCount: 'of {count}',
+        sortScope: 'Sorting applies to the current page',
+      },
       sort: {
         asc: 'Sort Ascending',
         desc: 'Sort Descending',
