@@ -168,22 +168,7 @@ impl DatabaseAdapter for HttpSqlAdapter {
     }
 
     async fn test_connection(&self) -> DbResult<ConnectionStatus> {
-        let client = self
-            .client
-            .as_ref()
-            .ok_or_else(|| DbError::Connection("Not connected".into()))?;
-
-        let resp = client
-            .post(format!("{}/v1/statement", self.base_url()))
-            .header("X-Trino-User", &self.config.username)
-            .body("SELECT 1")
-            .send()
-            .await
-            .map_err(|e| DbError::Connection(e.to_string()))?;
-
-        if !resp.status().is_success() {
-            return Err(DbError::Connection("Connection test failed".into()));
-        }
+        self.execute_query("SELECT 1").await?;
 
         Ok(ConnectionStatus {
             is_connected: true,
@@ -207,28 +192,24 @@ impl DatabaseAdapter for HttpSqlAdapter {
             .body(query.to_owned())
             .send()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(DbError::from_http)?;
 
         let exec_ms = start.elapsed().as_millis();
         let status = resp.status();
 
         if !status.is_success() {
-            let body = resp.text().await.unwrap_or_default();
-            return Err(DbError::QueryExecution(format!(
-                "HTTP {}: {}",
-                status.as_u16(),
-                body
-            )));
+            let body = resp.text().await.map_err(DbError::from_http)?;
+            return Err(DbError::from_http_status(status, &body));
         }
 
-        let body = resp
-            .text()
-            .await
-            .map_err(|e| DbError::Serialization(e.to_string()))?;
+        let body = resp.text().await.map_err(DbError::from_http)?;
 
         let json: serde_json::Value =
             serde_json::from_str(&body).map_err(|e| DbError::Serialization(e.to_string()))?;
 
+        if let Some(error) = json.get("error") {
+            return Err(DbError::QueryExecution(error.to_string()));
+        }
         let columns: Vec<String> = json
             .get("columns")
             .and_then(|c| c.as_array())

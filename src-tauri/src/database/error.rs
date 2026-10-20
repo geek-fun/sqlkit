@@ -85,6 +85,43 @@ pub enum DbError {
 }
 
 impl DbError {
+    pub(crate) fn from_http(error: reqwest::Error) -> Self {
+        if error.is_timeout() {
+            Self::Timeout(error.to_string())
+        } else if error.is_builder() {
+            Self::Configuration(error.to_string())
+        } else if error.is_decode() {
+            Self::Serialization(error.to_string())
+        } else {
+            Self::Connection(error.to_string())
+        }
+    }
+
+    pub(crate) fn from_http_status(status: reqwest::StatusCode, body: &str) -> Self {
+        let message = format!("HTTP {}: {}", status.as_u16(), body.trim());
+        match status.as_u16() {
+            401 | 403 => Self::Authentication(message),
+            408 | 502 | 503 | 504 => Self::Connection(message),
+            _ => Self::QueryExecution(message),
+        }
+    }
+
+    pub(crate) fn is_connection_failure(&self) -> bool {
+        match self {
+            Self::Connection(_) | Self::PoolError(_) => true,
+            Self::Io(error) => matches!(
+                error.kind(),
+                std::io::ErrorKind::ConnectionAborted
+                    | std::io::ErrorKind::ConnectionRefused
+                    | std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::BrokenPipe
+                    | std::io::ErrorKind::NotConnected
+                    | std::io::ErrorKind::UnexpectedEof
+            ),
+            _ => false,
+        }
+    }
+
     /// Convenience constructor for `UnsupportedOperation`.
     pub fn unsupported(operation: impl Into<String>) -> Self {
         DbError::UnsupportedOperation(operation.into())

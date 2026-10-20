@@ -23,13 +23,11 @@ fn app_handle() -> AppHandle {
 pub(crate) async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnection, String> {
     let app = app_handle();
 
-    // Check if already connected
-    {
-        let state: tauri::State<'_, crate::state::AppState> = app.state();
-        let conns = state.connections.read().await;
-        if let Some(adapter) = conns.get(connection_id) {
-            return Ok(adapter.clone());
-        }
+    let state: tauri::State<'_, crate::state::AppState> = app.state();
+    let registered = state.connections.read().await.contains_key(connection_id)
+        || state.configs.read().await.contains_key(connection_id);
+    if registered {
+        return state.ensure_connection(connection_id).await;
     }
 
     // Auto-connect: look up credentials from the store
@@ -54,30 +52,16 @@ pub(crate) async fn resolve_adapter(connection_id: &str) -> Result<ActiveConnect
     let server_config: ServerConfig = serde_json::from_value(conn_value)
         .map_err(|e| format!("Failed to parse connection config: {}", e))?;
 
-    let adapter = crate::commands::helpers::create_and_connect_adapter(
-        &server_config.db_type,
-        server_config
-            .to_connection_config()
-            .map_err(|e| format!("Invalid connection config: {}", e))?,
-    )
-    .await?;
-
-    // Store the adapter for future use
-    {
-        let state: tauri::State<'_, crate::state::AppState> = app.state();
-        state
-            .connections
-            .write()
-            .await
-            .insert(connection_id.to_string(), adapter.clone());
-        state
-            .configs
-            .write()
-            .await
-            .insert(connection_id.to_string(), server_config);
-    }
-
-    Ok(adapter)
+    let gate = state.cache.reconnect_gate(connection_id).await;
+    let guard = gate.lock().await;
+    state
+        .configs
+        .write()
+        .await
+        .entry(connection_id.to_string())
+        .or_insert(server_config);
+    drop(guard);
+    state.ensure_connection(connection_id).await
 }
 
 pub(crate) async fn execute_on_adapter(

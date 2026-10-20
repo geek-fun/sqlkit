@@ -55,6 +55,20 @@ impl<'a> FromSql<'a> for RawString {
 
 /// Convert PostgreSQL error to DbError with detailed information
 fn postgres_error_to_db_error(error: tokio_postgres::Error) -> DbError {
+    use std::error::Error;
+
+    if error.is_closed()
+        || error
+            .source()
+            .and_then(|source| source.downcast_ref::<std::io::Error>())
+            .is_some()
+        || error.as_db_error().is_some_and(|error| {
+            error.code().code().starts_with("08")
+                || matches!(error.code().code(), "57P01" | "57P02" | "57P03")
+        })
+    {
+        return DbError::Connection(error.to_string());
+    }
     // For database errors, we want to preserve structured information
     // by creating a formatted string that our api_response parser can understand
     if let Some(db_error) = error.as_db_error() {
@@ -1117,6 +1131,9 @@ impl DatabaseAdapter for PostgresAdapter {
         // Create deadpool configuration
         let mut pg_config = DeadpoolConfig::new();
         pg_config.url = Some(connection_string);
+        pg_config.manager = Some(deadpool_postgres::ManagerConfig {
+            recycling_method: deadpool_postgres::RecyclingMethod::Verified,
+        });
         pg_config.pool = Some(DeadpoolPoolConfig::new(
             self.config.pool_config.max_connections as usize,
         ));

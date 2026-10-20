@@ -106,7 +106,7 @@ impl JdbcBridgeAdapter {
 
     fn parse_query_result(data: serde_json::Value) -> DbResult<QueryResult> {
         let qr: QueryResultData = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse query result: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse query result: {}", e)))?;
 
         let rows: Vec<QueryRow> = qr
             .rows
@@ -147,7 +147,7 @@ impl JdbcBridgeAdapter {
 
     fn parse_connection_status(data: serde_json::Value) -> DbResult<ConnectionStatus> {
         let cs: ConnectionStatusData = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse status: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse status: {}", e)))?;
         Ok(cs.into())
     }
 
@@ -175,7 +175,7 @@ impl JdbcBridgeAdapter {
         )
         .await?;
         serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse result: {}", e)))
+            .map_err(|e| DbError::Serialization(format!("Failed to parse result: {}", e)))
     }
 }
 
@@ -198,8 +198,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                 serde_json::json!({ "conn_id": conn_id }),
             );
             let _ = tokio::time::timeout(std::time::Duration::from_secs(10), async {
-                let mut guard = launcher.lock().await;
-                guard.send_request(&request)
+                Self::send_request(&launcher, request).await
             })
             .await;
         }
@@ -304,7 +303,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         )
         .await?;
         let names: Vec<String> = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse database list: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse database list: {}", e)))?;
         Ok(names
             .into_iter()
             .map(|name| DatabaseSchema {
@@ -330,7 +329,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         )
         .await?;
         serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse schema list: {}", e)))
+            .map_err(|e| DbError::Serialization(format!("Failed to parse schema list: {}", e)))
     }
 
     async fn list_tables(
@@ -352,7 +351,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         )
         .await?;
         let tables: Vec<serde_json::Value> = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse table list: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse table list: {}", e)))?;
         Ok(tables
             .into_iter()
             .filter_map(|t| {
@@ -394,7 +393,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         )
         .await?;
         let cols: Vec<serde_json::Value> = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse column list: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse column list: {}", e)))?;
         Ok(cols
             .into_iter()
             .filter_map(|c| {
@@ -536,7 +535,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
 
         let ddl: Option<String> =
             serde_json::from_value(data.get("ddl").cloned().unwrap_or(serde_json::Value::Null))
-                .map_err(|e| DbError::Connection(format!("Failed to parse DDL: {}", e)))?;
+                .map_err(|e| DbError::Serialization(format!("Failed to parse DDL: {}", e)))?;
         ddl.ok_or_else(|| {
             DbError::UnsupportedOperation(format!(
                 "DDL not available for {} '{}' on this engine",

@@ -3,7 +3,9 @@
 //! This module provides the application-wide state that is shared across all Tauri commands.
 //! The state includes connection managers for each database type and application configuration.
 
+use crate::connection::handle::ConnectionHandle;
 use crate::database::config::{ConnectionConfig, OracleConnectionOptions};
+use crate::database::DbError;
 use crate::ssh::config::TransportLayerConfig;
 use crate::ssh::TunnelManager;
 use serde::{Deserialize, Serialize};
@@ -295,6 +297,23 @@ pub enum ActiveConnection {
     Turso(Arc<Mutex<TursoAdapter>>),
 }
 
+impl ActiveConnection {
+    pub(crate) fn same_session(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Postgres(a), Self::Postgres(b)) => Arc::ptr_eq(a, b),
+            (Self::MySQL(a), Self::MySQL(b)) => Arc::ptr_eq(a, b),
+            (Self::SQLite(a), Self::SQLite(b)) => Arc::ptr_eq(a, b),
+            (Self::SQLServer(a), Self::SQLServer(b)) => Arc::ptr_eq(a, b),
+            (Self::ClickHouse(a), Self::ClickHouse(b)) => Arc::ptr_eq(a, b),
+            (Self::JdbcBridge(a), Self::JdbcBridge(b)) => Arc::ptr_eq(a, b),
+            (Self::HttpSql(a), Self::HttpSql(b)) => Arc::ptr_eq(a, b),
+            (Self::Rqlite(a), Self::Rqlite(b)) => Arc::ptr_eq(a, b),
+            (Self::Turso(a), Self::Turso(b)) => Arc::ptr_eq(a, b),
+            _ => false,
+        }
+    }
+}
+
 /// Application configuration.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct AppConfig {
@@ -326,17 +345,112 @@ impl AppState {
         }
     }
 
-    /// Return the active connection for `connection_id`.
-    ///
-    /// If the session was lost or idle-evicted, transparently reconnects using
-    /// the stored server config so user actions never fail with a
-    /// "No active connection found" error. Errors are returned only when the
-    /// server cannot be reached or no config was ever stored for this id.
+    /// Validate a session before user operations, coalescing checks within one second.
+    /// Failed probes are safe to retry because the user's operation has not started.
     pub async fn ensure_connection(&self, connection_id: &str) -> Result<ActiveConnection, String> {
+        let gate = self.cache.reconnect_gate(connection_id).await;
+        let _guard = gate.lock().await;
+        if let Some(guardian) = crate::GUARDIAN.get() {
+            guardian.touch(connection_id).await;
+        }
+        let connection = self.connect_missing(connection_id).await?;
+        let known_dead = if let Some(guardian) = crate::GUARDIAN.get() {
+            matches!(
+                guardian.get_state(connection_id).await,
+                crate::connection::guardian::HealthState::Dead
+                    | crate::connection::guardian::HealthState::Reconnecting
+            )
+        } else {
+            false
+        };
+        if !known_dead
+            && self
+                .cache
+                .recently_validated(connection_id, &connection)
+                .await
+        {
+            return Ok(connection);
+        }
+        match connection.check_connection().await {
+            Ok(status) if status.is_connected => {
+                self.cache.mark_validated(connection_id, &connection).await;
+                if let Some(guardian) = crate::GUARDIAN.get() {
+                    guardian.mark_healthy(connection_id, None).await;
+                }
+                Ok(connection)
+            }
+            Err(DbError::QueryExecution(_) | DbError::InvalidQuery(_)) => {
+                // A SQL error proves the server answered; permit ROLLBACK and other recovery SQL.
+                self.cache.mark_validated(connection_id, &connection).await;
+                if let Some(guardian) = crate::GUARDIAN.get() {
+                    guardian.mark_healthy(connection_id, None).await;
+                }
+                Ok(connection)
+            }
+            Err(error)
+                if !error.is_connection_failure() && !matches!(error, DbError::Timeout(_)) =>
+            {
+                Err(error.to_string())
+            }
+            _ => self.replace_connection(connection_id, &connection).await,
+        }
+    }
+
+    pub(crate) async fn reconnect_connection(
+        &self,
+        connection_id: &str,
+        failed: &ActiveConnection,
+    ) -> Result<ActiveConnection, String> {
+        let gate = self.cache.reconnect_gate(connection_id).await;
+        let _guard = gate.lock().await;
+        self.replace_connection(connection_id, failed).await
+    }
+
+    async fn replace_connection(
+        &self,
+        connection_id: &str,
+        failed: &ActiveConnection,
+    ) -> Result<ActiveConnection, String> {
+        let current = self.connections.read().await.get(connection_id).cloned();
+        if let Some(current) = current {
+            if !current.same_session(failed) {
+                return Ok(current);
+            }
+            self.connections.write().await.remove(connection_id);
+            self.cache.remove_all(connection_id).await;
+            let cleanup_timeout = self
+                .configs
+                .read()
+                .await
+                .get(connection_id)
+                .map(|config| config.connect_timeout_secs)
+                .unwrap_or(10);
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_secs(cleanup_timeout),
+                current.disconnect(),
+            )
+            .await;
+        }
+        if !self.configs.read().await.contains_key(connection_id) {
+            return Err(format!(
+                "No active connection found for server '{}'",
+                connection_id
+            ));
+        }
+        if let Some(guardian) = crate::GUARDIAN.get() {
+            guardian.mark_reconnecting(connection_id).await;
+        }
+        let result = self.connect_missing(connection_id).await;
+        if let (Err(error), Some(guardian)) = (&result, crate::GUARDIAN.get()) {
+            guardian.mark_dead(connection_id, error).await;
+        }
+        result
+    }
+
+    async fn connect_missing(&self, connection_id: &str) -> Result<ActiveConnection, String> {
         if let Some(conn) = self.connections.read().await.get(connection_id) {
             return Ok(conn.clone());
         }
-
         let config = self
             .configs
             .read()
@@ -363,6 +477,22 @@ impl AppState {
         .await
         .map_err(|_| format!("Reconnect timed out after {} seconds", timeout_secs))??;
 
+        match connection.check_connection().await {
+            Ok(status) if status.is_connected => {}
+            failed => {
+                let _ = tokio::time::timeout(
+                    std::time::Duration::from_secs(timeout_secs),
+                    connection.disconnect(),
+                )
+                .await;
+                return Err(match failed {
+                    Err(error) => error.to_string(),
+                    Ok(_) => "Connection check reported a disconnected session".to_string(),
+                });
+            }
+        }
+        self.cache.remove_all(connection_id).await;
+        self.cache.mark_validated(connection_id, &connection).await;
         self.connections
             .write()
             .await

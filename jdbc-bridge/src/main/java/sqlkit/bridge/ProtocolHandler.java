@@ -136,6 +136,7 @@ public class ProtocolHandler {
             ObjectNode errorResp = MAPPER.createObjectNode();
             errorResp.put("id", id);
             errorResp.put("error", buildErrorMessage(e));
+            errorResp.put("error_type", ErrorClassifier.classifyRuntime(e).name().toLowerCase());
             return errorResp;
         }
     }
