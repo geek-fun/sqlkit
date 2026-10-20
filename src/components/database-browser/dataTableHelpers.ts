@@ -22,11 +22,3 @@ export function rowsToCsv(rows: Record<string, unknown>[], columns: string[]): s
   )
   return [header, ...lines].join('\n')
 }
-
-export function computeTotalPages(totalCount: number, rowsPerPage: number): number {
-  return totalCount > 0 ? Math.ceil(totalCount / rowsPerPage) : 1
-}
-
-export function computeOffset(page: number, rowsPerPage: number): number {
-  return (page - 1) * rowsPerPage
-}

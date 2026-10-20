@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, Loader2, LogOut, RefreshCw, X } from 'lucide-vue-next'
+import { Check, Loader2, LogIn, LogOut, RefreshCw, UserPlus, X } from 'lucide-vue-next'
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SettingsFeedback } from '@/components/settings'
@@ -148,9 +148,11 @@ const handleLogout = () => runAccountAction(() => entitlementStore.clearSessionS
           </Button>
           <template v-if="!accountStore.isLoggedIn">
             <Button variant="outline" size="sm" :disabled="refreshing" @click="handleLogin">
+              <LogIn class="mr-2 h-4 w-4" aria-hidden="true" />
               Log in
             </Button>
             <Button size="sm" :disabled="refreshing" @click="handleStartFree">
+              <UserPlus class="mr-2 h-4 w-4" aria-hidden="true" />
               Register
             </Button>
           </template>

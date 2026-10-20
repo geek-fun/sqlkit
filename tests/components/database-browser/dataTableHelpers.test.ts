@@ -1,6 +1,4 @@
 import {
-  computeOffset,
-  computeTotalPages,
   formatTableValue,
   isTableNullValue,
   rowsToCsv,
@@ -98,46 +96,6 @@ describe('dataTableHelpers', () => {
       const csv = rowsToCsv(objRows, ['id', 'data'])
       const lines = csv.split('\n')
       expect(lines[1]).toBe('"1","{""key"":""val""}"')
-    })
-  })
-
-  describe('computeTotalPages', () => {
-    it('returns 1 when totalCount is 0', () => {
-      expect(computeTotalPages(0, 100)).toBe(1)
-    })
-
-    it('computes exact pages correctly', () => {
-      expect(computeTotalPages(100, 100)).toBe(1)
-      expect(computeTotalPages(200, 100)).toBe(2)
-    })
-
-    it('rounds up for partial pages', () => {
-      expect(computeTotalPages(101, 100)).toBe(2)
-      expect(computeTotalPages(1, 100)).toBe(1)
-      expect(computeTotalPages(1432, 100)).toBe(15)
-    })
-
-    it('works with different page sizes', () => {
-      expect(computeTotalPages(500, 500)).toBe(1)
-      expect(computeTotalPages(501, 500)).toBe(2)
-      expect(computeTotalPages(1000, 1000)).toBe(1)
-    })
-  })
-
-  describe('computeOffset', () => {
-    it('returns 0 for page 1', () => {
-      expect(computeOffset(1, 100)).toBe(0)
-    })
-
-    it('returns correct offset for subsequent pages', () => {
-      expect(computeOffset(2, 100)).toBe(100)
-      expect(computeOffset(3, 100)).toBe(200)
-      expect(computeOffset(15, 100)).toBe(1400)
-    })
-
-    it('works with different page sizes', () => {
-      expect(computeOffset(2, 500)).toBe(500)
-      expect(computeOffset(3, 1000)).toBe(2000)
     })
   })
 })

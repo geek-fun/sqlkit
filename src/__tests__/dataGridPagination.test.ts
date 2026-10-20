@@ -1,6 +1,6 @@
 /** @jest-environment jsdom */
 import { mount } from '@vue/test-utils'
-import DataGridPagination from '@/components/grid/DataGridPagination.vue'
+import { PaginationControls } from '@/components/pagination'
 
 jest.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 jest.mock('@/components/ui/button', () => ({
@@ -21,14 +21,14 @@ jest.mock('@/components/ui/dropdown-menu', () => ({
   DropdownMenuTrigger: { template: '<div><slot /></div>' },
 }))
 
-const mountPagination = () => mount(DataGridPagination, {
+const mountPagination = () => mount(PaginationControls, {
   props: { currentPage: 2, pageCount: 5, pageSize: 100, disabled: false },
 })
 
 describe('result pagination controls', () => {
   it('navigates in all four directions and disables boundary buttons', async () => {
     const wrapper = mountPagination()
-    const action = (name: string) => wrapper.get(`button[aria-label="components.dataGrid.pagination.${name}"]`)
+    const action = (name: string) => wrapper.get(`button[aria-label="components.pagination.${name}"]`)
     await action('firstPage').trigger('click')
     await action('previousPage').trigger('click')
     await action('nextPage').trigger('click')
@@ -44,7 +44,7 @@ describe('result pagination controls', () => {
 
   it('validates direct page entry, clamps to the last page, and restores invalid input', async () => {
     const wrapper = mountPagination()
-    const input = wrapper.get('input[aria-label="components.dataGrid.pagination.goToPage"]')
+    const input = wrapper.get('input[aria-label="components.pagination.goToPage"]')
     await input.setValue('4')
     await input.trigger('keydown', { key: 'Enter' })
     expect(wrapper.emitted('pageChange')).toEqual([[4]])
@@ -67,7 +67,7 @@ describe('result pagination controls', () => {
 
   it('applies valid custom sizes and prevents interaction while disabled', async () => {
     const wrapper = mountPagination()
-    const input = wrapper.get('input[aria-label="components.dataGrid.pagination.customSize"]')
+    const input = wrapper.get('input[aria-label="components.pagination.customSize"]')
     await input.setValue('37')
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('pageSizeChange')).toEqual([[37]])
@@ -79,5 +79,22 @@ describe('result pagination controls', () => {
     await wrapper.get('form').trigger('submit')
     expect(wrapper.emitted('pageSizeChange')).toHaveLength(1)
     expect(wrapper.findAll('nav > button').every(button => button.attributes('disabled') !== undefined)).toBe(true)
+  })
+
+  it('offers all returned rows only where supported and respects fetch size limits', async () => {
+    const wrapper = mountPagination()
+    expect(wrapper.text()).not.toContain('components.pagination.showAll')
+    await wrapper.setProps({ allowAll: true })
+    const all = wrapper.findAll('button').find(button => button.text().includes('components.pagination.showAll'))!
+    await all.trigger('click')
+    expect(wrapper.emitted('pageSizeChange')).toEqual([['all']])
+    await wrapper.setProps({ maxPageSize: 1000 })
+    const input = wrapper.get('input[aria-label="components.pagination.customSize"]')
+    await input.setValue('1001')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('pageSizeChange')).toHaveLength(1)
+    await input.setValue('100')
+    await wrapper.get('form').trigger('submit')
+    expect(wrapper.emitted('pageSizeChange')).toHaveLength(1)
   })
 })

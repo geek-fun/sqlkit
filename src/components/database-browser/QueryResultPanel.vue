@@ -85,6 +85,11 @@ watch(() => props.results, (res) => {
 
 const { t } = useI18n()
 const copyUtil = useDataGridCopy()
+const exportIconColors = {
+  csv: 'text-sky-600 dark:text-sky-400',
+  json: 'text-amber-600 dark:text-amber-400',
+  insert: 'text-emerald-600 dark:text-emerald-400',
+} as const
 const exportActions = [
   { label: 'copyAllCsv', icon: 'i-lucide-file-spreadsheet', format: 'csv', download: false },
   { label: 'copyAllJson', icon: 'i-lucide-file-json', format: 'json', download: false },
@@ -387,7 +392,7 @@ const handleExport = (action: typeof exportActions[number]) => {
                   :disabled="!displayResults?.rows.length"
                   @click="handleExport(action)"
                 >
-                  <span :class="action.icon" class="shrink-0 h-3.5 w-3.5" aria-hidden="true" />
+                  <span :class="[action.icon, exportIconColors[action.format]]" class="shrink-0 h-3.5 w-3.5" aria-hidden="true" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent>{{ t(`components.dataGrid.export.${action.label}`) }}</TooltipContent>
@@ -411,7 +416,7 @@ const handleExport = (action: typeof exportActions[number]) => {
             <template v-for="(action, index) in exportActions" :key="action.label">
               <DropdownMenuSeparator v-if="index === 3" />
               <DropdownMenuItem @select="handleExport(action)">
-                <span :class="action.icon" class="h-3.5 w-3.5" aria-hidden="true" />
+                <span :class="[action.icon, exportIconColors[action.format]]" class="h-3.5 w-3.5" aria-hidden="true" />
                 {{ t(`components.dataGrid.export.${action.label}`) }}
               </DropdownMenuItem>
             </template>

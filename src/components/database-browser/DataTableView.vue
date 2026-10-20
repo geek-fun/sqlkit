@@ -1,26 +1,18 @@
 <script setup lang="ts">
+import type { PageSize } from '@/composables/pagination'
 import type { TableViewSubPage } from '@/store'
 import { invoke } from '@tauri-apps/api/core'
 import { save as showSaveDialog } from '@tauri-apps/plugin-dialog'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { PaginationControls } from '@/components/pagination'
 import { Button } from '@/components/ui/button'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { isValidPageSize, MAX_FETCH_PAGE_SIZE, usePagination } from '@/composables/pagination'
 import { useDataGridSort } from '@/composables/useDataGridSort'
 import { useMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { toast } from '@/composables/useNotifications'
@@ -28,8 +20,6 @@ import { useTableSearch } from '@/composables/useTableSearch'
 import { ConnectionStatus, useConnectionStore } from '@/store'
 import { collectSortableColumns, sortRowsByState } from '@/utils/gridSort'
 import {
-  computeOffset,
-  computeTotalPages,
   formatTableValue,
   isTableNullValue,
   rowsToCsv,
@@ -65,9 +55,6 @@ const props = defineProps<{
 }>()
 
 const { t } = useI18n()
-
-const ROWS_PER_PAGE_OPTIONS = [100, 500, 1000] as const
-type RowsPerPage = (typeof ROWS_PER_PAGE_OPTIONS)[number]
 
 // Sub-page navigation
 type SubPage = TableViewSubPage
@@ -110,8 +97,6 @@ const activeSubPageCountLabel = computed(() => {
   }
 })
 
-const currentPage = ref(1)
-const rowsPerPage = ref<RowsPerPage>(100)
 const filterInput = ref('')
 const appliedFilter = ref('')
 const hiddenColumns = ref<Set<string>>(new Set())
@@ -135,7 +120,11 @@ watch(searchTerm, () => {
 
 const data = ref<TableDataResult | null>(null)
 const totalCount = ref(0)
+const { currentPage, pageSize: rowsPerPage, pageCount: totalPages, offset, setPage, setPageSize } = usePagination(totalCount, { maxPageSize: MAX_FETCH_PAGE_SIZE })
 const loading = ref(false)
+const countLoading = ref(false)
+const countAvailable = ref(false)
+const tableScrollRef = ref<HTMLElement | null>(null)
 const error = ref<string | null>(null)
 const executionTimeMs = ref<number | null>(null)
 const columnInfoList = ref<ColumnTypeInfo[]>([])
@@ -259,26 +248,15 @@ function formatPkSummary(row: Record<string, unknown>): string {
     : Object.entries(row).slice(0, 2).map(([k, v]) => `${k}: ${formatTableValue(v)}`).join(', ')
 }
 
-const totalPages = computed(() => computeTotalPages(totalCount.value, rowsPerPage.value))
-
-const offset = computed(() => computeOffset(currentPage.value, rowsPerPage.value))
-
-const pageNumbers = computed<(number | '...')[]>(() => {
-  const total = totalPages.value
-  const cur = currentPage.value
-  if (total <= 7)
-    return Array.from({ length: total }, (_, i) => i + 1)
-  const middlePages = Array.from(
-    { length: Math.min(total - 1, cur + 1) - Math.max(2, cur - 1) + 1 },
-    (_, i) => Math.max(2, cur - 1) + i,
-  )
-  return [
-    1,
-    ...(cur > 3 ? ['...' as const] : []),
-    ...middlePages,
-    ...(cur < total - 2 ? ['...' as const] : []),
-    total,
-  ]
+const pageStatus = computed(() => {
+  const count = data.value?.rows.length ?? 0
+  if (!countAvailable.value)
+    return t('components.pagination.showingWithoutTotal', { start: count > 0 ? offset.value + 1 : 0, end: offset.value + count })
+  return t('components.dataGrid.status.showing', {
+    start: count > 0 ? offset.value + 1 : 0,
+    end: count > 0 ? Math.min(totalCount.value, offset.value + count) : 0,
+    total: totalCount.value.toLocaleString(),
+  })
 })
 
 const formattedTime = computed(() => {
@@ -326,6 +304,7 @@ async function fetchCount() {
   if (invalidated.value) {
     return
   }
+  countLoading.value = true
   try {
     const count = await invoke<number>('get_table_count', {
       connectionId: props.connectionId,
@@ -335,9 +314,14 @@ async function fetchCount() {
       filter: appliedFilter.value.trim() || null,
     })
     totalCount.value = count
+    countAvailable.value = true
   }
   catch {
     totalCount.value = 0
+    countAvailable.value = false
+  }
+  finally {
+    countLoading.value = false
   }
 }
 
@@ -368,7 +352,8 @@ async function ensureConnection(): Promise<boolean> {
 }
 
 async function refresh() {
-  await Promise.all([fetchData(), fetchCount()])
+  await fetchCount()
+  await fetchData()
 }
 
 async function handleRetry() {
@@ -514,16 +499,17 @@ function onGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
-function goToPage(page: number) {
-  if (page < 1 || page > totalPages.value)
+const goToPage = (page: number) => {
+  if (loading.value || countLoading.value || !Number.isSafeInteger(page) || page === currentPage.value)
     return
-  currentPage.value = page
+  setPage(page)
   fetchData()
 }
 
-function changeRowsPerPage(val: string) {
-  rowsPerPage.value = Number(val) as RowsPerPage
-  currentPage.value = 1
+const changeRowsPerPage = (size: PageSize) => {
+  if (loading.value || countLoading.value || size === rowsPerPage.value || !isValidPageSize(size, false, MAX_FETCH_PAGE_SIZE))
+    return
+  setPageSize(size)
   fetchData()
 }
 
@@ -845,6 +831,15 @@ async function confirmEdit() {
 // Clear selection when data changes
 watch(data, () => {
   selectedRows.value = new Set()
+  if (tableScrollRef.value)
+    tableScrollRef.value.scrollTop = 0
+})
+
+watch([currentPage, rowsPerPage], () => {
+  selectedRows.value = new Set()
+  editDialogOpen.value = false
+  deleteDialogOpen.value = false
+  batchDeleteDialogOpen.value = false
 })
 
 // Sorting reorders positional indices, so the current selection no longer maps
@@ -1056,7 +1051,7 @@ watch(
       </div>
 
       <!-- Table area -->
-      <div class="flex-1 min-h-0 relative overflow-auto">
+      <div ref="tableScrollRef" class="flex-1 min-h-0 relative overflow-auto">
         <!-- Connection error state -->
         <div v-if="connectionError" class="p-4 flex h-full items-center justify-center">
           <div class="text-center max-w-md">
@@ -1252,88 +1247,19 @@ watch(
         </div>
       </div>
 
-      <!-- Status bar + pagination -->
-      <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex shrink-0 gap-3 items-center overflow-hidden">
-        <!-- Left: stats -->
-        <div class="flex flex-shrink-0 gap-3 items-center">
-          <span v-if="props.database" class="tabular-nums">
-            {{ t('pages.queries.status.database') }}: {{ props.database }}
-          </span>
-          <span v-if="totalCount > 0" class="tabular-nums">
-            {{ totalCount.toLocaleString() }} rows
-          </span>
-          <span v-if="formattedTime" class="text-muted-foreground/70">{{ formattedTime }}</span>
-        </div>
-
-        <div class="flex-1 min-w-0" />
-
-        <!-- Right: pagination + rows per page grouped -->
-        <div class="flex flex-shrink-0 gap-2 max-w-[70%] items-center overflow-x-auto">
-          <!-- Page navigation -->
-          <div v-if="data" class="flex flex-nowrap gap-0.5 items-center">
-            <!-- Prev -->
-            <button
-              class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="currentPage === 1 || loading"
-              @click="goToPage(currentPage - 1)"
-            >
-              <span class="i-carbon-chevron-left h-3 w-3" />
-            </button>
-
-            <template v-for="(p, idx) in pageNumbers" :key="idx">
-              <span
-                v-if="p === '...'"
-                class="text-xs text-muted-foreground inline-flex h-6 w-6 items-center justify-center"
-              >…</span>
-              <button
-                v-else
-                class="text-xs font-medium px-1.5 rounded inline-flex h-6 min-w-6 transition-colors items-center justify-center"
-                :class="p === currentPage
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-accent'"
-                :disabled="loading"
-                @click="goToPage(p as number)"
-              >
-                {{ p }}
-              </button>
-            </template>
-
-            <!-- Next -->
-            <button
-              class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="currentPage >= totalPages || loading"
-              @click="goToPage(currentPage + 1)"
-            >
-              <span class="i-carbon-chevron-right h-3 w-3" />
-            </button>
-          </div>
-
-          <!-- Divider -->
-          <div v-if="data" class="bg-border h-3.5 w-px" />
-
-          <!-- Rows per page -->
-          <div class="flex gap-1.5 items-center">
-            <span class="text-muted-foreground/70">Rows</span>
-            <Select
-              :model-value="String(rowsPerPage)"
-              @update:model-value="changeRowsPerPage"
-            >
-              <SelectTrigger class="text-xs h-6 w-16">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="n in ROWS_PER_PAGE_OPTIONS"
-                  :key="n"
-                  :value="String(n)"
-                >
-                  {{ n }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+      <PaginationControls
+        :current-page="currentPage"
+        :page-count="totalPages"
+        :page-size="rowsPerPage"
+        :max-page-size="MAX_FETCH_PAGE_SIZE"
+        :database="props.database"
+        :disabled="loading || countLoading || isReconnecting || !!connectionError || !!error"
+        @page-change="goToPage"
+        @page-size-change="changeRowsPerPage"
+      >
+        <span class="tabular-nums" role="status">{{ pageStatus }}</span>
+        <span v-if="formattedTime">{{ t('components.dataGrid.status.time', { time: formattedTime }) }}</span>
+      </PaginationControls>
     </template>
 
     <!-- Schema sub-page -->

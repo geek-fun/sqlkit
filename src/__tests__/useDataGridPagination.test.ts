@@ -1,5 +1,5 @@
 import { effectScope, nextTick, ref } from 'vue'
-import { useDataGridPagination } from '@/composables/useDataGridPagination'
+import { useDataGridPagination } from '@/composables/pagination'
 
 const makeRows = (count: number) => Array.from({ length: count }, (_, id) => ({ id }))
 

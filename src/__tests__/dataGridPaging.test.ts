@@ -18,9 +18,8 @@ jest.mock('@tanstack/vue-virtual', () => ({
     getVirtualItems: () => Array.from({ length: options.value.count }, (_, index) => ({ index, size: 32, start: index * 32 })),
   }),
 }))
-jest.mock('@/components/grid/DataGridPagination.vue', () => ({
-  __esModule: true,
-  default: { name: 'DataGridPagination', props: ['currentPage', 'pageCount', 'pageSize', 'disabled'], template: '<nav />' },
+jest.mock('@/components/pagination', () => ({
+  PaginationControls: { name: 'PaginationControls', props: ['currentPage', 'pageCount', 'pageSize', 'disabled'], template: '<footer><slot /></footer>' },
 }))
 jest.mock('@/components/grid/EditRowDialog.vue', () => ({ __esModule: true, default: { template: '<div />' } }))
 jest.mock('@/components/grid/RowDetailsDialog.vue', () => ({
@@ -47,9 +46,30 @@ const mountGrid = () => shallowMount(DataGrid, {
 })
 
 describe('paged result grid', () => {
+  it('shows database type metadata for sortable and structured columns and updates it with new results', async () => {
+    const wrapper = mountGrid()
+    await wrapper.setProps({
+      columns: ['id', 'payload', 'unknown'],
+      columnTypes: { id: 'numeric(18,4)', payload: 'jsonb' },
+      rows: [{ id: 1, payload: { enabled: true }, unknown: 'value' }],
+      rowCount: 1,
+    })
+    const typeLabels = wrapper.findAll('.column-type')
+    expect(typeLabels.map(label => label.text())).toEqual(['numeric(18,4)', 'jsonb'])
+    expect(typeLabels[0].attributes('title')).toBe('numeric(18,4)')
+    expect(typeLabels[0].element.previousElementSibling?.textContent).toBe('id')
+    expect(typeLabels[0].element.closest('button')?.classList.contains('justify-end')).toBe(true)
+    expect(typeLabels[1].element.closest('button')).toBeNull()
+    await wrapper.setProps({ columnTypes: { id: 'bigint' } })
+    expect(wrapper.find('.column-type').text()).toBe('bigint')
+    await wrapper.setProps({ columnTypes: {} })
+    expect(wrapper.findAll('.column-type')).toHaveLength(0)
+  })
+
   it('renders the requested page and sorts only its rows without mutating the result', async () => {
     const wrapper = mountGrid()
-    const pagination = wrapper.findComponent({ name: 'DataGridPagination' })
+    expect(wrapper.get('.i-carbon-chevron-sort').classes()).not.toContain('opacity-0')
+    const pagination = wrapper.findComponent({ name: 'PaginationControls' })
     expect(wrapper.findAll('[data-index]')).toHaveLength(100)
     expect(pagination.props('pageCount')).toBe(3)
     pagination.vm.$emit('pageChange', 3)
@@ -59,6 +79,7 @@ describe('paged result grid', () => {
     expect(wrapper.find('[role="status"]').text()).toContain('"start":201,"end":235,"total":"235"')
     const sortHeader = wrapper.findAll('button').find(button => button.text().includes('id'))!
     await sortHeader.trigger('click')
+    expect(wrapper.find('.i-carbon-arrow-up').exists()).toBe(true)
     expect(wrapper.find('[data-index="0"]').text()).toContain('1')
     expect(rows[0].id).toBe(235)
     expect(rows[200].id).toBe(35)
@@ -74,7 +95,7 @@ describe('paged result grid', () => {
     expect(wrapper.get('[data-index="0"]').classes()).toContain('bg-primary/[0.08]')
     const scroller = wrapper.find('.overflow-auto').element as HTMLDivElement
     scroller.scrollTop = 320
-    wrapper.findComponent({ name: 'DataGridPagination' }).vm.$emit('pageChange', 2)
+    wrapper.findComponent({ name: 'PaginationControls' }).vm.$emit('pageChange', 2)
     await wrapper.vm.$nextTick()
     expect(scroller.scrollTop).toBe(0)
     expect(wrapper.get('[data-index="0"]').classes()).not.toContain('bg-primary/[0.08]')
@@ -83,7 +104,7 @@ describe('paged result grid', () => {
 
   it('copies and exports every returned row while viewing a later page', async () => {
     const wrapper = mountGrid()
-    wrapper.findComponent({ name: 'DataGridPagination' }).vm.$emit('pageChange', 3)
+    wrapper.findComponent({ name: 'PaginationControls' }).vm.$emit('pageChange', 3)
     await wrapper.vm.$nextTick()
     const buttons = wrapper.findAllComponents({ name: 'Button' })
     buttons[0].vm.$emit('click')
@@ -98,7 +119,7 @@ describe('paged result grid', () => {
 
   it('shows all rows and resets to the first page when results are replaced', async () => {
     const wrapper = mountGrid()
-    const pagination = wrapper.findComponent({ name: 'DataGridPagination' })
+    const pagination = wrapper.findComponent({ name: 'PaginationControls' })
     pagination.vm.$emit('pageSizeChange', 'all')
     await wrapper.vm.$nextTick()
     expect(wrapper.findAll('[data-index]')).toHaveLength(235)
