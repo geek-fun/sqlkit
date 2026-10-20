@@ -1596,6 +1596,22 @@ export const zhCN = {
       },
     },
     dataGrid: {
+      pagination: {
+        label: '查询结果分页',
+        rowsPerPage: '每页行数',
+        pageSize: '{count} 行/页',
+        customSize: '自定义每页行数',
+        apply: '应用',
+        showAll: '显示全部已返回行',
+        allRows: '全部已返回行',
+        firstPage: '首页',
+        previousPage: '上一页',
+        nextPage: '下一页',
+        lastPage: '末页',
+        goToPage: '跳转到页',
+        pageCount: '/ {count} 页',
+        sortScope: '排序仅应用于当前页',
+      },
       sort: {
         asc: '升序排列',
         desc: '降序排列',

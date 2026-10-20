@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { ColumnFilter, DataGridEmits } from '@/types/grid'
+import type { ColumnFilter } from '@/types/grid'
 import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useResizeObserver } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
@@ -25,6 +25,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useDataGridCopy } from '@/composables/useDataGridCopy'
 import { useDataGridFilter } from '@/composables/useDataGridFilter'
+import { useDataGridPagination } from '@/composables/useDataGridPagination'
 import { useDataGridSelection } from '@/composables/useDataGridSelection'
 import { useDataGridSort } from '@/composables/useDataGridSort'
 import { toast } from '@/composables/useNotifications'
@@ -33,6 +34,7 @@ import { collectSortableColumns, formatSortState, sortRowsByState } from '@/util
 import BatchActionBar from './BatchActionBar.vue'
 import CellContextMenu from './CellContextMenu.vue'
 import ColumnHeaderContextMenu from './ColumnHeaderContextMenu.vue'
+import DataGridPagination from './DataGridPagination.vue'
 import EditRowDialog from './EditRowDialog.vue'
 import FilterBar from './FilterBar.vue'
 import JsonViewDialog from './JsonViewDialog.vue'
@@ -42,6 +44,7 @@ type Props = {
   columns: string[]
   rows: Record<string, unknown>[]
   rowCount: number
+  truncated?: boolean
   executionTimeMs?: number
   columnTypes?: Record<string, string>
   primaryKeys?: string[]
@@ -59,6 +62,7 @@ type Props = {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  truncated: false,
   executionTimeMs: undefined,
   columnTypes: () => ({}),
   primaryKeys: () => [],
@@ -74,7 +78,10 @@ const props = withDefaults(defineProps<Props>(), {
   editabilityReason: undefined,
 })
 
-const emit = defineEmits<DataGridEmits>()
+const emit = defineEmits<{
+  (e: 'filterChange', state: ColumnFilter[]): void
+  (e: 'refresh'): void
+}>()
 
 const { t } = useI18n({ useScope: 'global' })
 const sort = useDataGridSort()
@@ -84,6 +91,7 @@ const isMultiSort = computed(() => sort.sortState.value.length > 1)
 const filter = useDataGridFilter()
 const selection = useDataGridSelection()
 const copyUtil = useDataGridCopy()
+const pagination = useDataGridPagination(computed(() => props.rows))
 
 // ── Client-side sorting ──
 // Sorting happens on the returned rows, in the frontend. Only primitive
@@ -96,7 +104,7 @@ const sortableColumns = computed(() =>
 const isSortable = (column: string): boolean => sortableColumns.value.has(column)
 
 const sortedRows = computed(() =>
-  sortRowsByState(props.rows, sort.sortState.value, props.columnTypes ?? {}),
+  sortRowsByState(pagination.pageRows.value, sort.sortState.value, props.columnTypes ?? {}),
 )
 
 const sortSummary = computed(() => formatSortState(sort.sortState.value))
@@ -138,11 +146,11 @@ function syncHeaderScroll() {
 
 const rowVirtualizer = useVirtualizer(
   computed(() => ({
-    count: props.rows.length,
+    count: sortedRows.value.length,
     getScrollElement: () => scrollContainer.value,
     estimateSize: () => 32,
     overscan: 10,
-    enabled: props.rows.length > 0,
+    enabled: sortedRows.value.length > 0,
   })),
 )
 
@@ -480,19 +488,19 @@ function formatCellText(v: unknown): string {
 
 // ── Copy/Export ──
 function copyAllAs(format: import('@/types/grid').CopyFormat) {
-  copyUtil.copyRowsAs(sortedRows.value, props.columns, format, props.tableName)
+  copyUtil.copyRowsAs(props.rows, props.columns, format, props.tableName)
 }
 
 function exportAllAs(format: import('@/types/grid').CopyFormat) {
-  copyUtil.exportToFile(sortedRows.value, props.columns, format, props.tableName)
+  copyUtil.exportToFile(props.rows, props.columns, format, props.tableName)
 }
 
 // ── Status Bar ──
 const statusText = computed(() => {
-  if (sortedRows.value.length === 0)
-    return ''
-  const start = 1
-  const end = sortedRows.value.length
+  const start = sortedRows.value.length === 0 ? 0 : pagination.offset.value + 1
+  const end = pagination.offset.value + sortedRows.value.length
+  if (props.truncated)
+    return t('components.dataGrid.status.showingLimited', { start, end, loaded: props.rows.length.toLocaleString() })
   return t('components.dataGrid.status.showing', { start, end, total: props.rowCount.toLocaleString() })
 })
 
@@ -505,13 +513,17 @@ const formattedTime = computed(() => {
   return `${t('components.dataGrid.status.time', { time: t2 })}`
 })
 
-// ── Load more handling for virtual scroll ──
-const allRowsLoaded = computed(() => props.rows.length >= props.rowCount)
-
 // ── Clear selection on data or sort change (indices are positional) ──
-watch(() => [props.rows, props.columns, sort.sortState.value], () => {
+watch(() => [pagination.pageRows.value, props.columns, sort.sortState.value], () => {
   selection.clearSelection()
-})
+  cellMenu.value.show = false
+  headerMenu.value.show = false
+  deleteDialogOpen.value = false
+  detailsDialogOpen.value = false
+  editDialogOpen.value = false
+  if (scrollContainer.value)
+    scrollContainer.value.scrollTop = 0
+}, { flush: 'post' })
 
 // ── Drop sort rules for columns that disappeared from the result set ──
 watch(sortableColumns, (columns) => {
@@ -845,14 +857,6 @@ watch(sortableColumns, (columns) => {
               </DropdownMenu>
             </div>
           </div>
-
-          <!-- "Load more..." indicator if not all rows loaded -->
-          <div
-            v-if="!allRowsLoaded && sortedRows.length > 0"
-            class="text-xs text-muted-foreground py-2 flex items-center justify-center"
-          >
-            {{ $t('components.dataGrid.status.showingLimited', { start: 1, end: sortedRows.length, loaded: sortedRows.length }) }}
-          </div>
         </div>
       </div>
 
@@ -865,20 +869,28 @@ watch(sortableColumns, (columns) => {
         :table-name="tableName"
         @export-selected="(fmt) => copyUtil.copyRowsAs(selection.getSelectedRows(sortedRows), columns, fmt, tableName)"
       />
+    </div>
 
-      <!-- Status Bar -->
-      <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex flex-shrink-0 gap-3 items-center overflow-hidden">
-        <span v-if="database" class="flex-shrink-0 tabular-nums">{{ $t('pages.queries.status.database') }}: {{ database }}</span>
-        <span class="flex-shrink-0 tabular-nums">{{ statusText }}</span>
-        <span v-if="formattedTime" class="text-muted-foreground/70 flex-shrink-0">{{ formattedTime }}</span>
-        <div class="flex-1" />
-        <span v-if="sortSummary" class="text-primary flex-shrink-0 tabular-nums">
+    <div class="result-grid-footer text-xs text-muted-foreground px-3 py-1 border-t bg-muted/20 flex shrink-0 flex-wrap gap-x-3 gap-y-1 items-center justify-between">
+      <div class="flex flex-wrap gap-x-3 gap-y-1 min-w-0 items-center">
+        <span v-if="database" class="max-w-40 truncate" :title="database">{{ $t('pages.queries.status.database') }}: {{ database }}</span>
+        <span class="tabular-nums" role="status">{{ statusText }}</span>
+        <span v-if="formattedTime">{{ formattedTime }}</span>
+        <span v-if="sortSummary" class="tabular-nums" :title="t('components.dataGrid.pagination.sortScope')">
           {{ sortSummary }}
         </span>
-        <span v-if="filter.hasActiveFilters.value" class="text-blue-500 flex-shrink-0 tabular-nums">
+        <span v-if="filter.hasActiveFilters.value" class="tabular-nums">
           {{ filter.filters.value.length }} {{ $t('components.dataGrid.filter.activeFilters') }}
         </span>
       </div>
+      <DataGridPagination
+        :current-page="pagination.currentPage.value"
+        :page-count="pagination.pageCount.value"
+        :page-size="pagination.pageSize.value"
+        :disabled="loading || !!error"
+        @page-change="pagination.setPage"
+        @page-size-change="pagination.setPageSize"
+      />
     </div>
 
     <!-- Context Menus -->
