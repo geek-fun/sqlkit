@@ -888,6 +888,9 @@ export const useConnectionStore = defineStore('connectionStore', {
         error: string | null
       }>('connection-state-changed', (event) => {
         const { connection_id, state, error } = event.payload
+        const conn = this.getConnectionById(connection_id)
+        if (conn)
+          conn.isConnected = state === 'healthy' || state === 'degraded'
         if (state === 'dead') {
           this.connectionStatus[connection_id] = ConnectionStatus.ERROR
         }
@@ -895,10 +898,6 @@ export const useConnectionStore = defineStore('connectionStore', {
           this.connectionStatus[connection_id] = ConnectionStatus.CONNECTING
         }
         else if (state === 'healthy' || state === 'degraded') {
-          const conn = this.getConnectionById(connection_id)
-          if (conn) {
-            conn.isConnected = true
-          }
           this.connectionStatus[connection_id] = ConnectionStatus.CONNECTED
         }
         if (error) {

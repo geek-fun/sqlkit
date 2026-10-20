@@ -25,7 +25,16 @@ use std::time::{Duration, Instant};
 
 /// Convert MySQL error to DbError with detailed information for query errors.
 fn mysql_error_to_db_error(error: mysql_async::Error) -> DbError {
+    if matches!(error, mysql_async::Error::Url(_)) {
+        return DbError::Configuration(error.to_string());
+    }
+    if error.is_fatal() {
+        return DbError::Connection(error.to_string());
+    }
     if let mysql_async::Error::Server(server_error) = &error {
+        if server_error.state.starts_with("28") {
+            return DbError::Authentication(server_error.message.clone());
+        }
         let mut details = vec![server_error.message.clone()];
         details.push(format!("[Error Code: {}]", server_error.code));
         details.push(format!("[SQL State: {}]", server_error.state));
@@ -385,9 +394,23 @@ impl MySQLAdapter {
             .as_ref()
             .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
 
-        pool.get_conn()
+        let mut connection = pool
+            .get_conn()
             .await
-            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))
+            .map_err(mysql_connection_error_to_db_error)?;
+        if connection.ping().await.is_err_and(|error| error.is_fatal()) {
+            drop(connection);
+            connection = pool
+                .get_conn()
+                .await
+                .map_err(mysql_connection_error_to_db_error)?;
+            if let Err(error) = connection.ping().await {
+                if error.is_fatal() {
+                    return Err(mysql_connection_error_to_db_error(error));
+                }
+            }
+        }
+        Ok(connection)
     }
 
     fn quote_object(object: &str) -> DbResult<String> {
@@ -589,27 +612,33 @@ impl DatabaseAdapter for MySQLAdapter {
     }
 
     async fn disconnect(&mut self) -> DbResult<()> {
-        if let Some(conn) = self.session.get_mut().take() {
-            conn.disconnect()
+        let session_result = match self.session.get_mut().take() {
+            Some(connection) => connection
+                .disconnect()
                 .await
-                .map_err(mysql_connection_error_to_db_error)?;
-        }
-        if let Some(pool) = self.pool.take() {
-            pool.close().await?;
-        }
+                .map_err(mysql_connection_error_to_db_error),
+            None => Ok(()),
+        };
+        let pool_result = match self.pool.take() {
+            Some(pool) => pool.close().await,
+            None => Ok(()),
+        };
         self.raw_pool = None;
-        Ok(())
+        session_result.and(pool_result)
     }
 
     async fn test_connection(&self) -> DbResult<ConnectionStatus> {
-        let mut conn = self.get_conn().await?;
+        let mut session = self.session.lock().await;
+        let conn = session
+            .as_mut()
+            .ok_or_else(|| DbError::Connection("Not connected".into()))?;
 
         // Get server version — VERSION() is never NULL on standard MySQL
         // but may be NULL on MySQL-compatible databases like OceanBase
         let version_row: Option<Row> = conn
             .query_first("SELECT VERSION() as version")
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
         let server_version = match version_row {
             Some(ref row) => match row.get_opt::<String, _>("version") {
                 Some(Ok(val)) => Some(val),
@@ -624,7 +653,7 @@ impl DatabaseAdapter for MySQLAdapter {
         let db_row: Option<Row> = conn
             .query_first("SELECT DATABASE() as db, USER() as user")
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
         let (current_database, current_user) = match db_row {
             Some(ref row) => {
                 let db = match row.get_opt::<String, _>("db") {
@@ -770,10 +799,7 @@ impl DatabaseAdapter for MySQLAdapter {
             "SHOW FULL TABLES".to_string()
         };
 
-        let rows: Vec<Row> = conn
-            .query(&query)
-            .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+        let rows: Vec<Row> = conn.query(&query).await.map_err(mysql_error_to_db_error)?;
 
         let tables = rows
             .into_iter()
@@ -832,7 +858,7 @@ impl DatabaseAdapter for MySQLAdapter {
         let rows: Vec<Row> = conn
             .exec(query, (db_name, table))
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         let columns = rows
             .into_iter()
@@ -896,7 +922,7 @@ impl DatabaseAdapter for MySQLAdapter {
         let row: Option<Row> = conn
             .exec_first(query, (db_name, table))
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         let row = row.ok_or_else(|| {
             DbError::TableNotFound(format!("Table {}.{} not found", db_name, table))
@@ -958,10 +984,7 @@ impl DatabaseAdapter for MySQLAdapter {
         "#,
         );
 
-        let rows: Vec<Row> = conn
-            .query(sql)
-            .await
-            .map_err(|e| DbError::QueryExecution(format!("Failed to query foreign keys: {}", e)))?;
+        let rows: Vec<Row> = conn.query(sql).await.map_err(mysql_error_to_db_error)?;
 
         let mut fk_map: std::collections::HashMap<String, ForeignKeyInfo> =
             std::collections::HashMap::new();
@@ -1021,7 +1044,7 @@ impl DatabaseAdapter for MySQLAdapter {
                 (db_name,),
             )
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         let views = rows
             .into_iter()
@@ -1056,7 +1079,7 @@ impl DatabaseAdapter for MySQLAdapter {
                 (db_name,),
             )
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         let procedures = rows
             .into_iter()
@@ -1091,7 +1114,7 @@ impl DatabaseAdapter for MySQLAdapter {
                 (db_name,),
             )
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         let functions = rows
             .into_iter()
@@ -1127,7 +1150,7 @@ impl DatabaseAdapter for MySQLAdapter {
                 (db_name, table),
             )
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         let triggers = rows
             .into_iter()
@@ -1161,10 +1184,7 @@ impl DatabaseAdapter for MySQLAdapter {
             .ok_or_else(|| DbError::Configuration("No database specified".to_string()))?;
 
         let query = format!("SHOW INDEX FROM `{}`.`{}`", db_name, table);
-        let rows: Vec<Row> = conn
-            .query(&query)
-            .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+        let rows: Vec<Row> = conn.query(&query).await.map_err(mysql_error_to_db_error)?;
 
         // SHOW INDEX returns: Table, Non_unique, Key_name, Seq_in_index, Column_name, Collation, ...
         let mut index_map: std::collections::HashMap<String, IndexInfo> =
@@ -1216,7 +1236,7 @@ impl DatabaseAdapter for MySQLAdapter {
                 (db_name, table),
             )
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         let mut fk_map: std::collections::HashMap<String, ForeignKeyInfo> =
             std::collections::HashMap::new();
@@ -1281,7 +1301,7 @@ impl DatabaseAdapter for MySQLAdapter {
         let row: Row = conn
             .query_first(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .map_err(mysql_error_to_db_error)?
             .ok_or_else(|| DbError::DatabaseNotFound(object_name.to_string()))?;
 
         // SHOW CREATE VIEW puts DDL in column 1 (Create View), others use column 2
@@ -1336,7 +1356,7 @@ impl DatabaseAdapter for MySQLAdapter {
 
         conn.query_drop(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         Ok(())
     }
@@ -1372,7 +1392,7 @@ impl DatabaseAdapter for MySQLAdapter {
 
         conn.query_drop(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         Ok(())
     }
@@ -1383,10 +1403,7 @@ impl DatabaseAdapter for MySQLAdapter {
         let query = "SELECT id, user, host, db, command, time, state, info \
                      FROM information_schema.processlist";
 
-        let rows: Vec<Row> = conn
-            .query(query)
-            .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+        let rows: Vec<Row> = conn.query(query).await.map_err(mysql_error_to_db_error)?;
 
         let sessions = rows
             .into_iter()
@@ -1427,7 +1444,7 @@ impl DatabaseAdapter for MySQLAdapter {
 
         conn.query_drop(format!("KILL {}", id))
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         Ok(())
     }
@@ -1448,10 +1465,7 @@ impl DatabaseAdapter for MySQLAdapter {
             limit
         );
 
-        let rows: Vec<Row> = conn
-            .query(&query)
-            .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+        let rows: Vec<Row> = conn.query(&query).await.map_err(mysql_error_to_db_error)?;
 
         let slow = rows
             .into_iter()
@@ -1488,7 +1502,7 @@ impl DatabaseAdapter for MySQLAdapter {
 
         conn.query_drop(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         Ok(())
     }
@@ -1503,7 +1517,7 @@ impl DatabaseAdapter for MySQLAdapter {
 
         conn.query_drop(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(mysql_error_to_db_error)?;
 
         Ok(())
     }
@@ -1521,6 +1535,24 @@ impl DatabaseAdapter for MySQLAdapter {
 mod tests {
     use super::*;
     use crate::database::DatabaseType;
+
+    #[test]
+    fn lost_connections_are_not_reported_as_sql_errors() {
+        let error = mysql_async::Error::Driver(mysql_async::DriverError::ConnectionClosed);
+        assert!(matches!(
+            mysql_error_to_db_error(error),
+            DbError::Connection(_)
+        ));
+        let error = mysql_async::Error::Server(mysql_async::ServerError {
+            code: 1064,
+            message: "invalid SQL".into(),
+            state: "42000".into(),
+        });
+        assert!(matches!(
+            mysql_error_to_db_error(error),
+            DbError::QueryExecution(_)
+        ));
+    }
 
     #[test]
     fn test_mysql_adapter_creation() {

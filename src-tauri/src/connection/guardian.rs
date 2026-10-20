@@ -10,8 +10,9 @@
 //!   - Idle eviction after configurable TTL (default 30 min)
 //!   - Emits `connection-state-changed` event for reactive frontend updates
 
-use crate::database::adapter::DatabaseAdapter;
-use crate::state::{ActiveConnection, AppState};
+use crate::connection::handle::ConnectionHandle;
+use crate::database::DbError;
+use crate::state::AppState;
 use crate::APP_HANDLE;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -108,7 +109,7 @@ impl ConnectionGuardian {
         self.run_loop().await;
     }
 
-    /// Mark a connection as accessed (called by query execution).
+    /// Mark a connection as accessed by a user operation.
     pub async fn touch(&self, connection_id: &str) {
         let mut health_map = self.health.write().await;
         if let Some(h) = health_map.get_mut(connection_id) {
@@ -121,8 +122,11 @@ impl ConnectionGuardian {
     /// for the quality scoring system.
     pub async fn mark_healthy(&self, connection_id: &str, latency_ms: Option<f64>) {
         let mut health_map = self.health.write().await;
+        let changed = health_map
+            .get(connection_id)
+            .map(|h| h.state != HealthState::Healthy)
+            .unwrap_or(true);
         let h = health_map.entry(connection_id.to_string()).or_default();
-        let was_dead = h.state == HealthState::Dead;
         h.state = HealthState::Healthy;
         h.error_count = 0;
         h.last_healthy = Instant::now();
@@ -132,9 +136,33 @@ impl ConnectionGuardian {
             h.total_queries = h.total_queries.saturating_add(1);
             h.total_latency_ms += lat;
         }
-        if was_dead {
+        if changed {
             self.emit_state_change(connection_id, HealthState::Healthy, None);
         }
+    }
+
+    pub(crate) async fn mark_reconnecting(&self, connection_id: &str) {
+        let mut health = self.health.write().await;
+        let entry = health.entry(connection_id.to_string()).or_default();
+        let changed = entry.state != HealthState::Reconnecting;
+        entry.state = HealthState::Reconnecting;
+        entry.last_access = Instant::now();
+        if changed {
+            self.emit_state_change(connection_id, HealthState::Reconnecting, None);
+        }
+    }
+
+    pub(crate) async fn mark_dead(&self, connection_id: &str, error: &str) {
+        let mut health = self.health.write().await;
+        let entry = health.entry(connection_id.to_string()).or_default();
+        entry.state = HealthState::Dead;
+        entry.error_count = entry.error_count.max(DEAD_THRESHOLD);
+        entry.last_access = Instant::now();
+        self.emit_state_change(connection_id, HealthState::Dead, Some(error));
+    }
+
+    pub(crate) async fn forget(&self, connection_id: &str) {
+        self.health.write().await.remove(connection_id);
     }
 
     /// Mark a connection as errored after a failed operation.
@@ -304,41 +332,51 @@ impl ConnectionGuardian {
                 .get()
                 .expect("APP_HANDLE not initialized")
                 .state::<AppState>();
-            let connection_exists = {
-                let conns = state.connections.read().await;
-                conns.contains_key(&conn_id)
-            };
-            if !connection_exists {
-                drop(state);
-                self.health.write().await.remove(&conn_id);
+            let gate = state.cache.reconnect_gate(&conn_id).await;
+            let _guard = gate.lock().await;
+            let still_idle = self
+                .health
+                .read()
+                .await
+                .get(&conn_id)
+                .is_some_and(|health| health.last_access.elapsed() > idle_threshold);
+            if !still_idle {
                 continue;
             }
-            // Gracefully disconnect idle connection
-            log::info!(
-                "Connection '{conn_id}' idle for {}s, evicting",
-                self.idle_eviction_secs
-            );
-            let conns = state.connections.write().await;
-            if let Some(connection) = conns.get(&conn_id) {
-                self.disconnect_connection(connection).await;
+            let connection = state.connections.write().await.remove(&conn_id);
+            state.cache.remove_all(&conn_id).await;
+            if let Some(connection) = connection {
+                let timeout = state
+                    .configs
+                    .read()
+                    .await
+                    .get(&conn_id)
+                    .map(|config| config.connect_timeout_secs)
+                    .unwrap_or(10);
+                let _ = tokio::time::timeout(Duration::from_secs(timeout), connection.disconnect())
+                    .await;
             }
-            drop(conns);
-            let mut conns = state.connections.write().await;
-            conns.remove(&conn_id);
-            drop(conns);
-            drop(state);
             self.health.write().await.remove(&conn_id);
-            self.emit_state_change(&conn_id, HealthState::Dead, Some("Idle eviction".into()));
+            self.emit_state_change(&conn_id, HealthState::Dead, Some("Idle eviction"));
         }
     }
 
     async fn try_reconnect(&self, connection_id: &str, now: Instant) {
+        let state = APP_HANDLE
+            .get()
+            .expect("APP_HANDLE not initialized")
+            .state::<AppState>();
+        let gate = state.cache.reconnect_gate(connection_id).await;
+        let guard = gate.lock().await;
         let (should_attempt, attempt_num) = {
             let health_map = self.health.read().await;
             let h = match health_map.get(connection_id) {
                 Some(h) => h,
                 None => return,
             };
+            if h.state != HealthState::Dead {
+                return;
+            }
             let should = match h.next_reconnect_at {
                 Some(t) => now >= t,
                 None => true,
@@ -349,47 +387,56 @@ impl ConnectionGuardian {
         if !should_attempt {
             return;
         }
+        let failed = state.connections.read().await.get(connection_id).cloned();
 
         {
             let mut health_map = self.health.write().await;
-            if let Some(h) = health_map.get_mut(connection_id) {
-                h.state = HealthState::Reconnecting;
-                h.reconnect_attempt += 1;
+            let Some(h) = health_map.get_mut(connection_id) else {
+                return;
+            };
+            if h.state != HealthState::Dead {
+                return;
             }
+            h.state = HealthState::Reconnecting;
+            h.reconnect_attempt = h.reconnect_attempt.saturating_add(1);
+            self.emit_state_change(connection_id, HealthState::Reconnecting, None);
         }
-        self.emit_state_change(connection_id, HealthState::Reconnecting, None);
+        drop(guard);
 
         // Try to reconnect by recreating the adapter from the stored config.
         // Pinging the stale adapter is not enough — the underlying session may
         // be irrecoverable (server restart, dropped connection).
-        let success = {
-            let state = APP_HANDLE
-                .get()
-                .expect("APP_HANDLE not initialized")
-                .state::<AppState>();
-            state.ensure_connection(connection_id).await.is_ok()
+        let success = match failed {
+            Some(connection) => state
+                .reconnect_connection(connection_id, &connection)
+                .await
+                .is_ok(),
+            None => state.ensure_connection(connection_id).await.is_ok(),
         };
 
-        if success {
-            self.mark_healthy(connection_id, None).await;
-        } else {
+        if !success {
+            let _guard = gate.lock().await;
             // Exponential backoff
-            let delay =
-                (RECONNECT_BASE_DELAY_SECS * 2u64.pow(attempt_num)).min(RECONNECT_MAX_DELAY_SECS);
+            let delay = (RECONNECT_BASE_DELAY_SECS
+                .saturating_mul(2u64.saturating_pow(attempt_num)))
+            .min(RECONNECT_MAX_DELAY_SECS);
             let next = Instant::now() + Duration::from_secs(delay);
             let mut health_map = self.health.write().await;
-            if let Some(h) = health_map.get_mut(connection_id) {
+            if let Some(h) = health_map
+                .get_mut(connection_id)
+                .filter(|h| matches!(h.state, HealthState::Dead | HealthState::Reconnecting))
+            {
                 h.next_reconnect_at = Some(next);
                 h.state = HealthState::Dead;
+                self.emit_state_change(
+                    connection_id,
+                    HealthState::Dead,
+                    Some(&format!(
+                        "Reconnect attempt {} failed, retrying in {}s",
+                        attempt_num, delay
+                    )),
+                );
             }
-            self.emit_state_change(
-                connection_id,
-                HealthState::Dead,
-                Some(&format!(
-                    "Reconnect attempt {} failed, retrying in {}s",
-                    attempt_num, delay
-                )),
-            );
         }
     }
 
@@ -398,14 +445,26 @@ impl ConnectionGuardian {
             .get()
             .expect("APP_HANDLE not initialized")
             .state::<AppState>();
-        let conns = state.connections.read().await;
-        let conn = match conns.get(connection_id) {
-            Some(c) => c,
-            None => return,
+        let connection = state.connections.read().await.get(connection_id).cloned();
+        let Some(connection) = connection else {
+            return;
         };
-        let success = self.ping_connection(conn).await;
-        drop(conns);
-
+        let success = match connection.check_connection().await {
+            Ok(status) => status.is_connected,
+            Err(DbError::QueryExecution(_) | DbError::InvalidQuery(_)) => true,
+            Err(_) => false,
+        };
+        let gate = state.cache.reconnect_gate(connection_id).await;
+        let _guard = gate.lock().await;
+        if !state
+            .connections
+            .read()
+            .await
+            .get(connection_id)
+            .is_some_and(|current| current.same_session(&connection))
+        {
+            return;
+        }
         if success {
             self.mark_healthy(connection_id, None).await;
         } else {
@@ -413,33 +472,43 @@ impl ConnectionGuardian {
                 .await;
         }
     }
+}
 
-    async fn ping_connection(&self, connection: &ActiveConnection) -> bool {
-        let result = match connection {
-            ActiveConnection::Postgres(adapter) => adapter.lock().await.test_connection().await,
-            ActiveConnection::MySQL(adapter) => adapter.lock().await.test_connection().await,
-            ActiveConnection::SQLServer(adapter) => adapter.lock().await.test_connection().await,
-            ActiveConnection::SQLite(adapter) => adapter.lock().await.test_connection().await,
-            ActiveConnection::ClickHouse(adapter) => adapter.lock().await.test_connection().await,
-            ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.test_connection().await,
-            ActiveConnection::HttpSql(adapter) => adapter.lock().await.test_connection().await,
-            ActiveConnection::Rqlite(adapter) => adapter.lock().await.test_connection().await,
-            ActiveConnection::Turso(adapter) => adapter.lock().await.test_connection().await,
-        };
-        result.is_ok()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn successful_reconnect_restores_health_and_clears_failures() {
+        let guardian = ConnectionGuardian::new();
+        guardian.mark_healthy("test", None).await;
+        guardian.mark_dead("test", "connection closed").await;
+        assert_eq!(guardian.get_state("test").await, HealthState::Dead);
+        guardian.mark_reconnecting("test").await;
+        assert_eq!(guardian.get_state("test").await, HealthState::Reconnecting);
+        guardian.mark_healthy("test", Some(12.0)).await;
+        let quality = guardian.quality_score("test").await.unwrap();
+        assert_eq!(quality.state, HealthState::Healthy);
+        assert_eq!(quality.error_count, 0);
+        assert_eq!(quality.total_queries, 1);
     }
 
-    async fn disconnect_connection(&self, connection: &ActiveConnection) {
-        let _ = match connection {
-            ActiveConnection::Postgres(adapter) => adapter.lock().await.disconnect().await,
-            ActiveConnection::MySQL(adapter) => adapter.lock().await.disconnect().await,
-            ActiveConnection::SQLServer(adapter) => adapter.lock().await.disconnect().await,
-            ActiveConnection::SQLite(adapter) => adapter.lock().await.disconnect().await,
-            ActiveConnection::ClickHouse(adapter) => adapter.lock().await.disconnect().await,
-            ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.disconnect().await,
-            ActiveConnection::HttpSql(adapter) => adapter.lock().await.disconnect().await,
-            ActiveConnection::Rqlite(adapter) => adapter.lock().await.disconnect().await,
-            ActiveConnection::Turso(adapter) => adapter.lock().await.disconnect().await,
-        };
+    #[tokio::test]
+    async fn browse_access_updates_idle_activity_and_disconnect_forgets_health() {
+        let guardian = ConnectionGuardian::new();
+        guardian.mark_healthy("test", None).await;
+        guardian
+            .health
+            .write()
+            .await
+            .get_mut("test")
+            .unwrap()
+            .last_access = Instant::now() - Duration::from_secs(3600);
+        guardian.touch("test").await;
+        assert!(
+            guardian.health.read().await["test"].last_access.elapsed() < Duration::from_secs(1)
+        );
+        guardian.forget("test").await;
+        assert!(guardian.quality_score("test").await.is_none());
     }
 }

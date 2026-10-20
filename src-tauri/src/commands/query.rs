@@ -4,7 +4,6 @@
 //! and getting query execution plans.
 
 use crate::api_response::{db_error_to_api_error, ApiResponse};
-use crate::connection::guardian::HealthState;
 use crate::connection::handle::ConnectionHandle;
 use crate::database::sql_service::{self, WrapQueryOptions};
 use crate::database::{
@@ -248,29 +247,13 @@ pub async fn execute_query(
     }
 
     // Common path: use the already-connected adapter (reconnecting if needed)
-    let connection = state.ensure_connection(&connection_id).await?;
-
-    // Cache this handle for future cross-database lookups
-    state
+    let connection = state
         .cache
         .get_or_create(
             &crate::connection::cache::PoolKey::new(&connection_id, database.as_deref()),
             state.inner(),
         )
-        .await
-        .ok();
-
-    // Guardian health check
-    if let Some(guardian) = crate::GUARDIAN.get() {
-        guardian.touch(&connection_id).await;
-        let health_state = guardian.get_state(&connection_id).await;
-        if health_state == HealthState::Dead || health_state == HealthState::Reconnecting {
-            return Err(format!(
-                "Connection is in state '{:?}'. Please wait for it to reconnect or reconnect manually.",
-                health_state
-            ));
-        }
-    }
+        .await?;
 
     let query_start = std::time::Instant::now();
     let timeout_secs = connection.query_timeout_secs().await;
@@ -288,23 +271,36 @@ pub async fn execute_query(
     };
 
     let elapsed_ms = query_start.elapsed().as_secs_f64() * 1000.0;
-
-    match result {
-        Ok(data) => {
-            if let Some(guardian) = crate::GUARDIAN.get() {
+    let gate = state.cache.reconnect_gate(&connection_id).await;
+    let _guard = gate.lock().await;
+    let is_current = state
+        .connections
+        .read()
+        .await
+        .get(&connection_id)
+        .is_some_and(|current| current.same_session(&connection));
+    if let Some(guardian) = crate::GUARDIAN.get().filter(|_| is_current) {
+        match &result {
+            Ok(_) => {
                 guardian
                     .mark_healthy(&connection_id, Some(elapsed_ms))
                     .await;
             }
-            Ok(ApiResponse::success(data))
-        }
-        Err(e) => {
-            if let Some(guardian) = crate::GUARDIAN.get() {
+            Err(error) if error.is_connection_failure() => {
+                guardian.mark_dead(&connection_id, &error.to_string()).await;
+            }
+            Err(DbError::QueryExecution(_) | DbError::InvalidQuery(_)) => {
                 guardian
-                    .mark_error(&connection_id, &format!("{}", e), Some(elapsed_ms))
+                    .mark_healthy(&connection_id, Some(elapsed_ms))
                     .await;
             }
-            let api_error = db_error_to_api_error(&e);
+            _ => {}
+        }
+    }
+    match result {
+        Ok(data) => Ok(ApiResponse::success(data)),
+        Err(error) => {
+            let api_error = db_error_to_api_error(&error);
             Ok(ApiResponse::error(api_error))
         }
     }
@@ -716,18 +712,6 @@ pub async fn explain_query(
         ActiveConnection::Rqlite(_) => "rqlite",
         ActiveConnection::Turso(_) => "turso",
     };
-
-    // Guardian health check before EXPLAIN
-    if let Some(guardian) = crate::GUARDIAN.get() {
-        guardian.touch(&connection_id).await;
-        let health_state = guardian.get_state(&connection_id).await;
-        if health_state == HealthState::Dead || health_state == HealthState::Reconnecting {
-            return Err(format!(
-                "Connection is in state '{:?}'. Please wait for it to reconnect or reconnect manually.",
-                health_state
-            ));
-        }
-    }
 
     let (explain_sql, plan_format) = match database_type {
         "postgresql" => {

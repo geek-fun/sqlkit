@@ -26,6 +26,20 @@ use tokio::net::TcpStream;
 use tokio_util::compat::{Compat, TokioAsyncWriteCompatExt};
 use uuid;
 
+fn sqlserver_error_to_db_error(error: tiberius::error::Error) -> DbError {
+    match &error {
+        tiberius::error::Error::Io { .. }
+        | tiberius::error::Error::Tls(_)
+        | tiberius::error::Error::Protocol(_)
+        | tiberius::error::Error::Routing { .. } => DbError::Connection(error.to_string()),
+        _ if error.code() == Some(18456) => DbError::Authentication(error.to_string()),
+        tiberius::error::Error::Server(server) if server.class() >= 20 => {
+            DbError::Connection(error.to_string())
+        }
+        _ => DbError::QueryExecution(error.to_string()),
+    }
+}
+
 /// SQL Server connection wrapper.
 pub struct SqlServerConnection {
     client: Client<Compat<TcpStream>>,
@@ -435,12 +449,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let version_stream = client
             .simple_query("SELECT @@VERSION as version")
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let version_result = version_stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let server_version = if let Some(row) = version_result.first() {
             match Self::convert_value(row, 0)? {
@@ -455,12 +469,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let db_stream = client
             .simple_query("SELECT DB_NAME() as db, SUSER_SNAME() as username")
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let db_result = db_stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let (current_database, current_user) = if let Some(row) = db_result.first() {
             let db = match Self::convert_value(row, 0)? {
@@ -514,19 +528,19 @@ impl DatabaseAdapter for SqlServerAdapter {
                 let count = client
                     .execute(query, &[])
                     .await
-                    .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                    .map_err(sqlserver_error_to_db_error)?
                     .total();
                 return Ok(QueryResult::affected(count));
             }
             let mut stream = client
                 .simple_query(query)
                 .await
-                .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+                .map_err(sqlserver_error_to_db_error)?;
             let mut result = QueryResult::affected(0);
             while let Some(item) = stream
                 .try_next()
                 .await
-                .map_err(|e| DbError::QueryExecution(e.to_string()))?
+                .map_err(sqlserver_error_to_db_error)?
             {
                 match item {
                     QueryItem::Metadata(metadata) => {
@@ -574,12 +588,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let databases = rows
             .iter()
@@ -635,12 +649,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let schemas = rows
             .iter()
@@ -700,12 +714,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let tables = rows
             .iter()
@@ -794,12 +808,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let columns = rows
             .iter()
@@ -916,12 +930,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         if rows.is_empty() {
             return Err(DbError::TableNotFound(format!(
@@ -1016,12 +1030,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(format!("Failed to query foreign keys: {}", e)))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(format!("Failed to get FK results: {}", e)))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         // Group rows by constraint_name to collect columns and referenced_columns
         let mut fk_map: HashMap<String, ForeignKeyInfo> = HashMap::new();
@@ -1112,12 +1126,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let views = rows
             .iter()
@@ -1201,12 +1215,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let procedures = rows
             .iter()
@@ -1283,12 +1297,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let functions = rows
             .iter()
@@ -1369,12 +1383,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let triggers = rows
             .iter()
@@ -1457,12 +1471,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let indexes = rows
             .iter()
@@ -1564,12 +1578,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let foreign_keys = rows
             .iter()
@@ -1661,12 +1675,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         if let Some(row) = rows.first() {
             match Self::convert_value(row, 0) {
@@ -1724,10 +1738,10 @@ impl DatabaseAdapter for SqlServerAdapter {
         client
             .simple_query(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .map_err(sqlserver_error_to_db_error)?
             .into_results()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         Ok(())
     }
@@ -1766,10 +1780,10 @@ impl DatabaseAdapter for SqlServerAdapter {
         client
             .simple_query(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .map_err(sqlserver_error_to_db_error)?
             .into_results()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         Ok(())
     }
@@ -1784,12 +1798,12 @@ impl DatabaseAdapter for SqlServerAdapter {
                  FROM sys.dm_exec_sessions ORDER BY session_id",
             )
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let sessions = rows
             .iter()
@@ -1838,10 +1852,10 @@ impl DatabaseAdapter for SqlServerAdapter {
         client
             .simple_query(&format!("KILL {}", id))
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .map_err(sqlserver_error_to_db_error)?
             .into_results()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         Ok(())
     }
@@ -1874,12 +1888,12 @@ impl DatabaseAdapter for SqlServerAdapter {
         let stream = client
             .simple_query(&query)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let rows = stream
             .into_first_result()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         let slow = rows
             .iter()
@@ -1920,10 +1934,10 @@ impl DatabaseAdapter for SqlServerAdapter {
         client
             .simple_query(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .map_err(sqlserver_error_to_db_error)?
             .into_results()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         Ok(())
     }
@@ -1940,10 +1954,10 @@ impl DatabaseAdapter for SqlServerAdapter {
         client
             .simple_query(&sql)
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?
+            .map_err(sqlserver_error_to_db_error)?
             .into_results()
             .await
-            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+            .map_err(sqlserver_error_to_db_error)?;
 
         Ok(())
     }
@@ -1961,6 +1975,23 @@ impl DatabaseAdapter for SqlServerAdapter {
 mod tests {
     use super::*;
     use crate::database::DatabaseType;
+
+    #[test]
+    fn io_failures_are_connection_errors_and_conversion_errors_are_not() {
+        let error = tiberius::error::Error::Io {
+            kind: std::io::ErrorKind::BrokenPipe,
+            message: "closed socket".into(),
+        };
+        assert!(matches!(
+            sqlserver_error_to_db_error(error),
+            DbError::Connection(_)
+        ));
+        let error = tiberius::error::Error::Conversion("invalid value".into());
+        assert!(matches!(
+            sqlserver_error_to_db_error(error),
+            DbError::QueryExecution(_)
+        ));
+    }
 
     #[test]
     fn test_sqlserver_adapter_creation() {

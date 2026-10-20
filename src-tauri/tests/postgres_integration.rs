@@ -21,8 +21,8 @@
 #![cfg(test)]
 
 use sqlkit_lib::database::{
-    ConnectionConfig, DatabaseAdapter, DatabaseType, PoolConfig, PostgresAdapter, QueryValue,
-    SslMode,
+    ConnectionConfig, DatabaseAdapter, DatabaseType, DbError, PoolConfig, PostgresAdapter,
+    QueryValue, SslMode,
 };
 use std::env;
 use std::time::Duration;
@@ -33,6 +33,52 @@ fn script_test_config() -> ConnectionConfig {
     let mut config = get_test_config();
     config.pool_config.max_connections = 1;
     config
+}
+
+#[tokio::test]
+#[ignore] // Requires PostgreSQL
+async fn test_idle_pool_recovers_after_server_terminates_session() {
+    let mut adapter = PostgresAdapter::new(script_test_config());
+    adapter.connect().await.unwrap();
+    let first = adapter
+        .execute_query("SELECT pg_backend_pid() AS pid")
+        .await
+        .unwrap();
+    let QueryValue::Int(pid) = first.rows[0]["pid"] else {
+        panic!("Expected a backend process ID");
+    };
+    let mut admin = PostgresAdapter::new(get_test_config());
+    admin.connect().await.unwrap();
+    admin
+        .execute_query(&format!("SELECT pg_terminate_backend({})", pid))
+        .await
+        .unwrap();
+
+    let refreshed = adapter
+        .execute_query("SELECT pg_backend_pid() AS pid, 42 AS value")
+        .await
+        .unwrap();
+    assert_ne!(refreshed.rows[0]["pid"], QueryValue::Int(pid));
+    assert_eq!(refreshed.rows[0]["value"], QueryValue::Int(42));
+    adapter.disconnect().await.unwrap();
+    admin.disconnect().await.unwrap();
+}
+
+#[tokio::test]
+#[ignore] // Requires PostgreSQL
+async fn test_server_terminated_session_is_a_connection_error() {
+    let mut adapter = PostgresAdapter::new(script_test_config());
+    adapter.connect().await.unwrap();
+    let result = adapter
+        .execute_query("SELECT pg_terminate_backend(pg_backend_pid())")
+        .await;
+    assert!(matches!(result, Err(DbError::Connection(_))), "{result:?}");
+    let invalid = adapter.execute_query("SELECT nonexistent_column").await;
+    assert!(
+        matches!(invalid, Err(DbError::QueryExecution(_))),
+        "{invalid:?}"
+    );
+    adapter.disconnect().await.unwrap();
 }
 
 async fn prepare_session_tables(adapter: &PostgresAdapter) {

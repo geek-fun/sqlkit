@@ -233,32 +233,13 @@ impl ClickHouseAdapter {
             .body(query.to_owned())
             .send()
             .await
-            .map_err(|e| {
-                if e.is_timeout() {
-                    DbError::Timeout(format!("ClickHouse query timed out: {}", e))
-                } else if e.is_connect() {
-                    DbError::Connection(format!(
-                        "Cannot connect to ClickHouse at {}: {}",
-                        self.build_base_url(),
-                        e
-                    ))
-                } else {
-                    DbError::QueryExecution(format!("HTTP request failed: {}", e))
-                }
-            })?;
+            .map_err(DbError::from_http)?;
 
         let status = response.status();
-        let body = response
-            .text()
-            .await
-            .map_err(|e| DbError::QueryExecution(format!("Failed to read response body: {}", e)))?;
+        let body = response.text().await.map_err(DbError::from_http)?;
 
         if !status.is_success() {
-            return Err(DbError::QueryExecution(format!(
-                "ClickHouse error (HTTP {}): {}",
-                status.as_u16(),
-                body.trim()
-            )));
+            return Err(DbError::from_http_status(status, &body));
         }
 
         serde_json::from_str::<ClickHouseResponse>(&body).map_err(|e| {

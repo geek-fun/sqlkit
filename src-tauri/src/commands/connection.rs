@@ -9,6 +9,8 @@ pub async fn connect_server(
     state: State<'_, AppState>,
 ) -> Result<ConnectionStatus, String> {
     let id = config.id.clone();
+    let gate = state.cache.reconnect_gate(&id).await;
+    let _guard = gate.lock().await;
     let mut conn_config = config.to_connection_config()?;
 
     let (host, port) =
@@ -25,41 +27,73 @@ pub async fn connect_server(
     .await
     .map_err(|_| format!("Connection timed out after {} seconds", timeout_secs))??;
 
-    let mut connections = state.connections.write().await;
-    connections.insert(id.clone(), connection.clone());
-    drop(connections);
-    // Keep the config so a lost session can be transparently recreated later.
-    state.configs.write().await.insert(id.clone(), config);
-    let status = connection
-        .test_connection()
+    let status = match connection.check_connection().await {
+        Ok(status) if status.is_connected => status,
+        failed => {
+            let _ = tokio::time::timeout(
+                std::time::Duration::from_secs(timeout_secs),
+                connection.disconnect(),
+            )
+            .await;
+            return Err(match failed {
+                Err(error) => error.to_string(),
+                Ok(_) => "Connection check reported a disconnected session".into(),
+            });
+        }
+    };
+    state.cache.remove_all(&id).await;
+    let previous = state
+        .connections
+        .write()
         .await
-        .map_err(|e| format!("Failed to get connection status: {}", e))?;
-
+        .insert(id.clone(), connection.clone());
+    state.configs.write().await.insert(id.clone(), config);
+    if let Some(previous) = previous {
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_secs),
+            previous.disconnect(),
+        )
+        .await;
+    }
+    state.cache.mark_validated(&id, &connection).await;
+    if let Some(guardian) = crate::GUARDIAN.get() {
+        guardian.mark_healthy(&id, None).await;
+        guardian.touch(&id).await;
+    }
     Ok(status)
 }
 
 #[tauri::command]
 pub async fn disconnect_server(id: String, state: State<'_, AppState>) -> Result<(), String> {
+    let gate = state.cache.reconnect_gate(&id).await;
+    let _guard = gate.lock().await;
     state.tunnels.stop_tunnel(&id).await;
-
-    let mut connections = state.connections.write().await;
-
-    let connection = connections
-        .remove(&id)
-        .ok_or_else(|| format!("No active connection found for server '{}'", id))?;
-
-    state.configs.write().await.remove(&id);
-
-    let disconnect_result = connection.disconnect().await;
-
-    if let Err(e) = disconnect_result {
-        eprintln!(
-            "Warning: Error during disconnect cleanup for '{}': {}",
-            id, e
-        );
+    if let Some(guardian) = crate::GUARDIAN.get() {
+        guardian.forget(&id).await;
     }
 
+    let connection = state.connections.write().await.remove(&id);
+    let timeout = state
+        .configs
+        .write()
+        .await
+        .remove(&id)
+        .map(|config| config.connect_timeout_secs)
+        .unwrap_or(10);
     state.cache.remove_all(&id).await;
+
+    if let Some(connection) = connection {
+        match tokio::time::timeout(
+            std::time::Duration::from_secs(timeout),
+            connection.disconnect(),
+        )
+        .await
+        {
+            Ok(Ok(())) => {}
+            Ok(Err(error)) => log::warn!("Error during disconnect cleanup for '{}': {}", id, error),
+            Err(_) => log::warn!("Disconnect cleanup timed out for '{}'", id),
+        }
+    }
 
     Ok(())
 }
@@ -69,11 +103,17 @@ pub async fn get_connection_status(
     id: String,
     state: State<'_, AppState>,
 ) -> Result<ConnectionStatus, String> {
-    let connections = state.connections.read().await;
-    let is_connected = connections.contains_key(&id);
-
+    if state.configs.read().await.contains_key(&id)
+        || state.connections.read().await.contains_key(&id)
+    {
+        let connection = state.ensure_connection(&id).await?;
+        return connection
+            .check_connection()
+            .await
+            .map_err(|error| error.to_string());
+    }
     Ok(ConnectionStatus {
-        is_connected,
+        is_connected: false,
         server_version: None,
         current_database: None,
         current_user: None,

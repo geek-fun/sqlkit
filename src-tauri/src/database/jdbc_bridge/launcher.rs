@@ -333,13 +333,7 @@ impl JdbcBridgeLauncher {
             .map_err(|e| DbError::Connection(format!("Failed to parse bridge response: {}", e)))?;
 
         if let Some(ref err) = resp.error {
-            let error_type = resp.error_type.as_deref().unwrap_or("unknown");
-            return Err(match error_type {
-                "version_incompatible" => DbError::DriverVersionIncompatible(err.clone()),
-                "authentication_failed" => DbError::Authentication(err.clone()),
-                "network_error" | "timeout" => DbError::Connection(err.clone()),
-                _ => DbError::Connection(format!("JDBC bridge error: {}", err)),
-            });
+            return Err(Self::response_error(err, resp.error_type.as_deref()));
         }
 
         Ok(resp)
@@ -487,16 +481,45 @@ impl JdbcBridgeLauncher {
             .map_err(|e| DbError::Connection(format!("Failed to parse bridge response: {}", e)))?;
 
         if let Some(ref err) = resp.error {
-            let error_type = resp.error_type.as_deref().unwrap_or("unknown");
-            return Err(match error_type {
-                "version_incompatible" => DbError::DriverVersionIncompatible(err.clone()),
-                "authentication_failed" => DbError::Authentication(err.clone()),
-                "network_error" | "timeout" => DbError::Connection(err.clone()),
-                _ => DbError::Connection(format!("JDBC bridge error: {}", err)),
-            });
+            return Err(Self::response_error(err, resp.error_type.as_deref()));
         }
 
         Ok(resp)
+    }
+
+    fn response_error(message: &str, error_type: Option<&str>) -> DbError {
+        match error_type {
+            Some("version_incompatible") => DbError::DriverVersionIncompatible(message.into()),
+            Some("authentication_failed") => DbError::Authentication(message.into()),
+            Some("network_error") => DbError::Connection(message.into()),
+            Some("timeout") => DbError::Timeout(message.into()),
+            Some("query_error") => DbError::QueryExecution(message.into()),
+            _ => {
+                let closed = message.lines().any(|line| {
+                    let text = line.trim().to_lowercase();
+                    let text = text.strip_prefix("caused by: ").unwrap_or(&text);
+                    [
+                        "connection closed",
+                        "connection is closed",
+                        "this connection has been closed",
+                        "closed connection",
+                        "connection not found:",
+                        "connection reset",
+                        "communications link failure",
+                        "ora-03113",
+                        "ora-03114",
+                        "ora-17008",
+                    ]
+                    .iter()
+                    .any(|prefix| text.starts_with(prefix))
+                });
+                if closed {
+                    DbError::Connection(message.into())
+                } else {
+                    DbError::QueryExecution(message.into())
+                }
+            }
+        }
     }
 
     /// Check if the bridge process is still alive.
@@ -578,6 +601,34 @@ pub fn shared_launcher(
 #[cfg(test)]
 mod launcher_registry_tests {
     use super::*;
+
+    #[test]
+    fn runtime_errors_preserve_query_failures_and_recognize_old_closed_sessions() {
+        assert!(matches!(
+            JdbcBridgeLauncher::response_error("closed", Some("network_error")),
+            DbError::Connection(_)
+        ));
+        assert!(matches!(
+            JdbcBridgeLauncher::response_error("slow query", Some("timeout")),
+            DbError::Timeout(_)
+        ));
+        assert!(matches!(
+            JdbcBridgeLauncher::response_error("column connection closed", Some("query_error")),
+            DbError::QueryExecution(_)
+        ));
+        assert!(matches!(
+            JdbcBridgeLauncher::response_error("Connection is closed", None),
+            DbError::Connection(_)
+        ));
+        assert!(matches!(
+            JdbcBridgeLauncher::response_error("Connection not found: old-session", None),
+            DbError::Connection(_)
+        ));
+        assert!(matches!(
+            JdbcBridgeLauncher::response_error("column 'connection closed' does not exist", None),
+            DbError::QueryExecution(_)
+        ));
+    }
 
     #[test]
     fn launcher_key_separates_jars_and_jvm_options() {

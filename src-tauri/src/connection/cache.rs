@@ -10,7 +10,7 @@ use crate::state::{ActiveConnection, AppState};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::{Notify, RwLock};
+use tokio::sync::{Mutex, RwLock};
 
 const DEFAULT_MAX_ENTRIES: usize = 20;
 
@@ -41,12 +41,18 @@ struct CacheEntry {
     last_access: Instant,
 }
 
+struct ValidatedSession {
+    connection: ActiveConnection,
+    checked_at: Instant,
+}
+
 /// Bounded LRU cache for database connections.
 pub struct ConnectionCache {
     entries: RwLock<HashMap<String, CacheEntry>>,
     max_entries: usize,
     /// Reconnect gate — ensures only one reconnect per connection_id at a time.
-    reconnect_gates: RwLock<HashMap<String, Arc<Notify>>>,
+    reconnect_gates: RwLock<HashMap<String, Arc<Mutex<()>>>>,
+    validated_sessions: RwLock<HashMap<String, ValidatedSession>>,
 }
 
 impl ConnectionCache {
@@ -55,6 +61,7 @@ impl ConnectionCache {
             entries: RwLock::new(HashMap::new()),
             max_entries,
             reconnect_gates: RwLock::new(HashMap::new()),
+            validated_sessions: RwLock::new(HashMap::new()),
         }
     }
 
@@ -70,12 +77,16 @@ impl ConnectionCache {
         app_state: &AppState,
     ) -> Result<ActiveConnection, String> {
         let string_key = key.to_string_key();
+        let connection = app_state.ensure_connection(&key.connection_id).await?;
 
         // Fast path: cache hit
         {
             let entries = self.entries.read().await;
-            if let Some(entry) = entries.get(&string_key) {
-                let conn = entry.connection.clone();
+            if entries
+                .get(&string_key)
+                .is_some_and(|entry| entry.connection.same_session(&connection))
+            {
+                let conn = connection.clone();
                 drop(entries);
                 let mut entries = self.entries.write().await;
                 if let Some(entry) = entries.get_mut(&string_key) {
@@ -87,7 +98,6 @@ impl ConnectionCache {
 
         // Slow path: need to create connection — transparently reconnect when
         // the session was lost or idle-evicted instead of erroring out.
-        let connection = app_state.ensure_connection(&key.connection_id).await?;
 
         // Evict if at capacity
         {
@@ -118,14 +128,43 @@ impl ConnectionCache {
 
     /// Remove all cached entries for a given connection_id.
     pub async fn remove_all(&self, connection_id: &str) {
+        self.validated_sessions.write().await.remove(connection_id);
         let prefix = format!("{}:", connection_id);
         let mut entries = self.entries.write().await;
         entries.retain(|k, _| k != connection_id && !k.starts_with(&prefix));
     }
 
+    pub(crate) async fn recently_validated(&self, id: &str, connection: &ActiveConnection) -> bool {
+        self.validated_sessions
+            .read()
+            .await
+            .get(id)
+            .is_some_and(|session| {
+                session.connection.same_session(connection)
+                    && session.checked_at.elapsed() < std::time::Duration::from_secs(1)
+            })
+    }
+
+    pub(crate) async fn mark_validated(&self, id: &str, connection: &ActiveConnection) {
+        self.validated_sessions.write().await.insert(
+            id.to_string(),
+            ValidatedSession {
+                connection: connection.clone(),
+                checked_at: Instant::now(),
+            },
+        );
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn expire_validation(&self, id: &str) {
+        if let Some(session) = self.validated_sessions.write().await.get_mut(id) {
+            session.checked_at = Instant::now() - std::time::Duration::from_secs(2);
+        }
+    }
+
     /// Get the reconnect gate for a connection_id. Creates one if not exists.
     /// The gate prevents multiple simultaneous reconnects for the same connection.
-    pub async fn reconnect_gate(&self, connection_id: &str) -> Arc<Notify> {
+    pub async fn reconnect_gate(&self, connection_id: &str) -> Arc<Mutex<()>> {
         let gates = self.reconnect_gates.read().await;
         if let Some(gate) = gates.get(connection_id) {
             return gate.clone();
@@ -135,16 +174,8 @@ impl ConnectionCache {
         let mut gates = self.reconnect_gates.write().await;
         gates
             .entry(connection_id.to_string())
-            .or_insert_with(|| Arc::new(Notify::new()))
+            .or_insert_with(|| Arc::new(Mutex::new(())))
             .clone()
-    }
-
-    /// Signal that a reconnect has completed, waking any waiters.
-    pub async fn signal_reconnect(&self, connection_id: &str) {
-        let gates = self.reconnect_gates.read().await;
-        if let Some(gate) = gates.get(connection_id) {
-            gate.notify_waiters();
-        }
     }
 
     /// Number of cached entries.
