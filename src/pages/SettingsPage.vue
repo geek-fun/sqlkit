@@ -43,9 +43,9 @@ watch(() => [appStore.themeType, appStore.editorConfig, appStore.queryConfig], (
 const currentTheme = computed(() => appStore.themeType)
 
 const themeOptions = [
-  { value: ThemeType.AUTO, label: () => t('pages.settings.appearance.themes.system') },
-  { value: ThemeType.DARK, label: () => t('pages.settings.appearance.themes.dark') },
-  { value: ThemeType.LIGHT, label: () => t('pages.settings.appearance.themes.light') },
+  { value: ThemeType.AUTO, label: () => t('pages.settings.general.themes.system') },
+  { value: ThemeType.DARK, label: () => t('pages.settings.general.themes.dark') },
+  { value: ThemeType.LIGHT, label: () => t('pages.settings.general.themes.light') },
 ]
 
 const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)
@@ -184,13 +184,13 @@ async function handleCheckUpdates() {
 
       <!-- Tabbed settings content -->
       <Tabs
-        default-value="appearance"
+        default-value="general"
         class="px-6 py-4 flex-1 overflow-y-auto"
       >
         <div class="mx-auto max-w-4xl">
           <TabsList class="mb-6 flex-wrap h-auto max-w-full justify-start">
-            <TabsTrigger value="appearance">
-              {{ t('pages.settings.appearance.title') }}
+            <TabsTrigger value="general">
+              {{ t('pages.settings.general.title') }}
             </TabsTrigger>
             <TabsTrigger value="editor">
               {{ t('pages.settings.editor.title') }}
@@ -209,25 +209,22 @@ async function handleCheckUpdates() {
             <TabsTrigger value="jre">
               {{ t('pages.settings.jre.title') }}
             </TabsTrigger>
-            <TabsTrigger value="account">
-              {{ t('plan.tab') }}
-            </TabsTrigger>
             <TabsTrigger value="about">
               {{ t('pages.settings.about.title') }}
             </TabsTrigger>
           </TabsList>
 
-          <!-- Appearance Tab -->
-          <TabsContent value="appearance" class="mt-0">
+          <!-- General Tab -->
+          <TabsContent value="general" class="mt-0 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>{{ t('pages.settings.appearance.title') }}</CardTitle>
-                <CardDescription>{{ t('pages.settings.appearance.description') }}</CardDescription>
+                <CardTitle>{{ t('pages.settings.general.title') }}</CardTitle>
+                <CardDescription>{{ t('pages.settings.general.description') }}</CardDescription>
               </CardHeader>
               <CardContent class="space-y-6">
                 <!-- Theme selector -->
                 <div class="space-y-3">
-                  <Label>{{ t('pages.settings.appearance.theme') }}</Label>
+                  <Label>{{ t('pages.settings.general.theme') }}</Label>
                   <div class="gap-4 grid grid-cols-3">
                     <button
                       v-for="opt in themeOptions"
@@ -342,6 +339,17 @@ async function handleCheckUpdates() {
                 />
               </CardContent>
             </Card>
+            <section aria-labelledby="settings-account-plan-title" class="space-y-3">
+              <div class="space-y-1">
+                <h2 id="settings-account-plan-title" class="text-base font-semibold">
+                  {{ t('plan.section.title') }}
+                </h2>
+                <p class="text-sm text-muted-foreground">
+                  {{ t('plan.section.desc') }}
+                </p>
+              </div>
+              <PlanSection />
+            </section>
           </TabsContent>
 
           <!-- Editor Tab -->
@@ -612,19 +620,6 @@ async function handleCheckUpdates() {
           </TabsContent>
 
           <!-- About Tab -->
-          <!-- Account Tab -->
-          <TabsContent value="account" class="mt-0">
-            <Card>
-              <CardHeader>
-                <CardTitle>{{ t('plan.section.title') }}</CardTitle>
-                <CardDescription>{{ t('plan.section.desc') }}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PlanSection />
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           <TabsContent value="about" class="mt-0">
             <Card>
               <CardHeader>

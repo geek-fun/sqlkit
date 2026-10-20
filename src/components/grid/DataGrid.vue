@@ -4,6 +4,7 @@ import { useVirtualizer } from '@tanstack/vue-virtual'
 import { useResizeObserver } from '@vueuse/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { PaginationControls } from '@/components/pagination'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,9 +24,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useDataGridPagination } from '@/composables/pagination'
 import { useDataGridCopy } from '@/composables/useDataGridCopy'
 import { useDataGridFilter } from '@/composables/useDataGridFilter'
-import { useDataGridPagination } from '@/composables/useDataGridPagination'
 import { useDataGridSelection } from '@/composables/useDataGridSelection'
 import { useDataGridSort } from '@/composables/useDataGridSort'
 import { toast } from '@/composables/useNotifications'
@@ -34,7 +35,6 @@ import { collectSortableColumns, formatSortState, sortRowsByState } from '@/util
 import BatchActionBar from './BatchActionBar.vue'
 import CellContextMenu from './CellContextMenu.vue'
 import ColumnHeaderContextMenu from './ColumnHeaderContextMenu.vue'
-import DataGridPagination from './DataGridPagination.vue'
 import EditRowDialog from './EditRowDialog.vue'
 import FilterBar from './FilterBar.vue'
 import JsonViewDialog from './JsonViewDialog.vue'
@@ -621,11 +621,11 @@ watch(sortableColumns, (columns) => {
         :style="{ width: `${viewportWidth}px` }"
       >
         <div
-          class="flex flex-shrink-0"
+          class="flex flex-shrink-0 h-8"
           :style="{ width: `${gridWidth}px` }"
         >
           <!-- Select-All Checkbox -->
-          <div class="flex flex-shrink-0 h-8 w-10 items-center justify-center">
+          <div class="flex flex-shrink-0 w-10 items-center justify-center">
             <Checkbox
               :checked="selection.isAllSelected(sortedRows.length)"
               @update:checked="selection.toggleAll(sortedRows.length)"
@@ -649,11 +649,15 @@ watch(sortableColumns, (columns) => {
               ]"
               @click="handleHeaderSort(col, ($event as MouseEvent).shiftKey)"
             >
-              <span class="text-xs font-medium truncate">{{ col }}</span>
-              <!-- Sort/filter indicators always follow the column name. For
-                   right-aligned columns the group is pulled into the cell's right
-                   padding so the label — not the icon — ends on the same edge as
-                   the values. -->
+              <span
+                class="flex gap-1.5 min-w-0 items-baseline"
+              >
+                <span class="text-xs font-medium shrink-0 truncate" :class="columnTypes?.[col] ? 'max-w-[70%]' : 'max-w-full'" :title="col">{{ col }}</span>
+                <span v-if="columnTypes?.[col]" class="column-type text-[10px] text-foreground/60 font-mono font-normal max-w-24 min-w-0 truncate" :title="columnTypes[col]">
+                  {{ columnTypes?.[col] }}
+                </span>
+              </span>
+              <!-- Indicators sit in the trailing padding for right-aligned headers. -->
               <span
                 class="flex flex-shrink-0 gap-1 items-center"
                 :class="getColumnAlignment(columnTypes?.[col]) === 'end' ? '-mr-3' : ''"
@@ -668,7 +672,7 @@ watch(sortableColumns, (columns) => {
                 />
                 <span
                   v-else
-                  class="i-carbon-chevron-sort opacity-0 flex-shrink-0 h-3 w-3 transition-opacity group-hover:opacity-40"
+                  class="i-carbon-chevron-sort text-foreground/60 flex-shrink-0 h-3 w-3"
                 />
                 <!-- Multi-sort priority -->
                 <span
@@ -689,7 +693,12 @@ watch(sortableColumns, (columns) => {
               :class="getAlignmentClass(columnTypes?.[col])"
               :title="$t('components.dataGrid.sort.unsortable')"
             >
-              <span class="text-xs font-medium truncate">{{ col }}</span>
+              <span class="flex gap-1.5 min-w-0 items-baseline">
+                <span class="text-xs font-medium shrink-0 truncate" :class="columnTypes?.[col] ? 'max-w-[70%]' : 'max-w-full'" :title="col">{{ col }}</span>
+                <span v-if="columnTypes?.[col]" class="column-type text-[10px] text-foreground/60 font-mono font-normal max-w-24 min-w-0 truncate" :title="columnTypes[col]">
+                  {{ columnTypes?.[col] }}
+                </span>
+              </span>
               <span
                 v-if="filter.hasFilter(col)"
                 class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
@@ -706,7 +715,7 @@ watch(sortableColumns, (columns) => {
             v-if="connectionId"
             class="bg-muted flex-shrink-0 w-20 right-0 sticky z-10"
           >
-            <div class="px-2 flex h-8 items-center justify-center">
+            <div class="px-2 flex h-full items-center justify-center">
               <span class="text-xs text-muted-foreground font-medium truncate">{{ $t('components.dataGrid.row.actions') }}</span>
             </div>
           </div>
@@ -871,27 +880,25 @@ watch(sortableColumns, (columns) => {
       />
     </div>
 
-    <div class="result-grid-footer text-xs text-muted-foreground px-3 py-1 border-t bg-muted/20 flex shrink-0 flex-wrap gap-x-3 gap-y-1 items-center justify-between">
-      <div class="flex flex-wrap gap-x-3 gap-y-1 min-w-0 items-center">
-        <span v-if="database" class="max-w-40 truncate" :title="database">{{ $t('pages.queries.status.database') }}: {{ database }}</span>
-        <span class="tabular-nums" role="status">{{ statusText }}</span>
-        <span v-if="formattedTime">{{ formattedTime }}</span>
-        <span v-if="sortSummary" class="tabular-nums" :title="t('components.dataGrid.pagination.sortScope')">
-          {{ sortSummary }}
-        </span>
-        <span v-if="filter.hasActiveFilters.value" class="tabular-nums">
-          {{ filter.filters.value.length }} {{ $t('components.dataGrid.filter.activeFilters') }}
-        </span>
-      </div>
-      <DataGridPagination
-        :current-page="pagination.currentPage.value"
-        :page-count="pagination.pageCount.value"
-        :page-size="pagination.pageSize.value"
-        :disabled="loading || !!error"
-        @page-change="pagination.setPage"
-        @page-size-change="pagination.setPageSize"
-      />
-    </div>
+    <PaginationControls
+      :current-page="pagination.currentPage.value"
+      :page-count="pagination.pageCount.value"
+      :page-size="pagination.pageSize.value"
+      :disabled="loading || !!error"
+      :database="database"
+      allow-all
+      @page-change="pagination.setPage"
+      @page-size-change="pagination.setPageSize"
+    >
+      <span class="tabular-nums" role="status">{{ statusText }}</span>
+      <span v-if="formattedTime">{{ formattedTime }}</span>
+      <span v-if="sortSummary" class="tabular-nums" :title="t('components.pagination.sortScope')">
+        {{ sortSummary }}
+      </span>
+      <span v-if="filter.hasActiveFilters.value" class="tabular-nums">
+        {{ filter.filters.value.length }} {{ $t('components.dataGrid.filter.activeFilters') }}
+      </span>
+    </PaginationControls>
 
     <!-- Context Menus -->
     <CellContextMenu

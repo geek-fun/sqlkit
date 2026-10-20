@@ -1,4 +1,23 @@
-# Result Panel Pagination
+# Application Pagination
+
+Table browsing and query results share `PaginationControls` and `usePagination`.
+The footer, localized labels, first/previous/next/last controls, direct page entry,
+page-size presets and custom-size validation use the same implementation.
+Every view starts at 100 rows and returns to page 1 when its size changes.
+Choosing the current size is a no-op. The footer wraps without clipping its
+controls in constrained panels, and remains visible for empty/loading/error states.
+The full database name remains visible, wrapping even without spaces, with a
+divider before row counts and timing. Context, metrics and navigation wrap as
+separate groups when space is constrained; long names never paint over the
+result statistics.
+
+Table browsing fetches one page from the database using a numeric limit and
+offset. It offers the same numeric sizes and custom entry, capped at the backend's
+unsigned 32-bit limit, without a show-all action. Refresh obtains the count first,
+clamps the page if rows were removed, and fetches the corrected offset. Filters
+and table changes reset to page 1. Navigation clears positional selection and row
+dialogs; completed fetches reset vertical scrolling while retaining horizontal
+scrolling. Loading and error states disable pagination consistently.
 
 Query results are paged locally over the rows returned by the execution command.
 Page navigation never executes SQL, so it also works for script results and

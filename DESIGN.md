@@ -88,7 +88,7 @@ Use neutral icons and text for ordinary information; do not introduce a separate
 2. **Aim for accents to occupy no more than roughly 10% of the UI.** This is a review heuristic for the app shell, toolbars, panels, and forms, not a pixel-counting requirement. Evaluate SQL syntax highlighting, actual data charts, and local error feedback separately for readability; these exceptions must not expand decorative color use.
 3. **Use at most one solid primary action per operation context.** This is usually Execute in a query workspace or Save in a form dialog. Other actions use outline / secondary / ghost. An independent dialog may have its own primary action. Focus rings and status dots do not count as a second solid primary action.
 4. **Success, warning, and failure may coexist when backed by actual state.** Default to an icon / status dot with text, adding a local, subdued background when needed. Do not tint an entire row, card, or panel.
-5. **Features do not own colors.** Do not give each of CSV / JSON / INSERT, copy / export / format / EXPLAIN, or individual filter operators a separate color.
+5. **Features do not own colors.** Do not give copy / export / format / EXPLAIN or individual filter operators a separate color. The result copy/export icons have the bounded exception below.
 
 ### Allowed and avoided treatments
 
@@ -103,6 +103,7 @@ Use neutral icons and text for ordinary information; do not introduce a separate
 
 ### Color exceptions
 
+- Result copy/export icons retain their established format colors: sky blue for CSV, amber for JSON, and emerald for INSERT, including the overflow menu and light/dark variants. This is an icon-only recognition cue; buttons and menu surfaces remain neutral, and labels still identify each action. These colors do not indicate status or extend to other format controls.
 - Monaco SQL syntax highlighting, code diffs, and actual data charts may use multiple colors when those colors explain content. Do not extend their palettes into application controls.
 - Existing database vendor logos may retain identifying colors inside small icons. Do not extend those colors to cards, buttons, or navigation backgrounds.
 - Charts should emphasize the series of interest with primary and use neutrals for the others. When multiple series need distinction, a dedicated chart palette is allowed with labels, legends, or line styles. `--chart-1` through `--chart-5` exist in CSS but are not registered as UnoCSS color names; do not assume `text-chart-1` works.
@@ -217,6 +218,7 @@ Interactive components must cover default, hover, focus-visible, active / select
 
 ### Forms, connection settings, and dialogs
 
+- Settings opens on General, grouping theme, application updates, and Account & Plan. Keep account controls in this first category rather than a separate settings tab.
 - Reuse 32px Input / Select controls and the existing label / helper / error structure. Placeholders do not replace labels.
 - Group host, port, authentication, database, and related fields by task. Progressively reveal advanced SSL / SSH settings, retaining the conditional-field behavior in [SSL_UI_DESIGN.md](docs/SSL_UI_DESIGN.md).
 - Place validation near the field and explain the cause and remedy. Preserve entered content after failure; handle sensitive values under existing security policies.
@@ -233,8 +235,10 @@ Interactive components must cover default, hover, focus-visible, active / select
 
 ### SQL editor and result grids
 
+- Keep the full database name visible in result and table-data footers. Use a divider and wrap context, row statistics, and pagination controls independently; do not truncate the name or let it overlap statistics.
+- Result column headers show the database-provided type on the same line as the name when metadata is available, using small neutral text. Keep numeric headers right-aligned, truncate long types with the full value available on hover, and omit type labels when metadata is absent. Sortable columns always show a neutral sort indicator, with directional arrows for active sorting; do not hide it until hover.
 - Keep the result-set selector inside the existing result toolbar. Collapse secondary export actions into a menu at narrow panel widths to preserve a single toolbar row.
-- Result grids page the returned rows locally, starting at 100 rows per page. Keep first / previous / next / last, direct page entry, page size, and the row range in the footer. Wrap footer groups at narrow widths; keep navigation reachable for empty results and disable it while loading or showing an error. Copy / export all retains its full returned-result scope. See [RESULT_PAGINATION_DESIGN.md](docs/RESULT_PAGINATION_DESIGN.md).
+- Use the shared pagination footer and state model in table browsing and query result grids, starting at 100 rows per page. Keep first / previous / next / last, direct page entry, common page-size presets, custom sizes, and the row range consistent. Wrap footer groups at narrow widths; keep navigation reachable for empty results and disable it while loading or showing an error. Table browsing fetches one page at a time; query grids page returned rows locally and additionally offer all returned rows. Copy / export retains its stated data scope. See [RESULT_PAGINATION_DESIGN.md](docs/RESULT_PAGINATION_DESIGN.md).
 - Keep Monaco's theme integration (currently `vs / vs-dark`) and user font-size settings. Syntax highlighting is outside the application decoration color budget; reducing colors must not damage syntax recognition.
 - Keep data central: neutral headers, subtle hover, stable selection, and clear sorting / filtering indicators. Preserve virtual scrolling; do not rebuild the whole grid for animation.
 - Distinguish `NULL`, empty strings, and booleans. Show true / false or equivalent text / symbols; do not default to red / green boolean mapping.
