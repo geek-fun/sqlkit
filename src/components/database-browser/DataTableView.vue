@@ -1007,7 +1007,7 @@ watch(
                 class="text-sm px-2 py-1 text-left rounded flex gap-2 w-full cursor-pointer items-center hover:bg-accent"
                 @click="toggleColumn(col)"
               >
-                <span v-if="!hiddenColumns.has(col)" class="i-carbon-checkmark text-primary flex-shrink-0 h-3 w-3" />
+                <span v-if="!hiddenColumns.has(col)" class="i-carbon-checkmark text-primary-text flex-shrink-0 h-3 w-3" />
                 <span v-else class="flex-shrink-0 w-3 inline-block" />
                 <span class="truncate">{{ col }}</span>
               </button>
@@ -1059,7 +1059,7 @@ watch(
             <p class="text-sm text-muted-foreground mb-2">
               {{ t('components.dataTableView.connectionLost') }}
             </p>
-            <p class="text-xs text-muted-foreground/70 mb-4">
+            <p class="text-xs text-muted-foreground mb-4">
               {{ connectionError }}
             </p>
             <Button size="sm" @click="handleRetry">
@@ -1072,7 +1072,7 @@ watch(
         <!-- Reconnecting state -->
         <div v-else-if="isReconnecting" class="p-4 flex h-full items-center justify-center">
           <div class="text-center">
-            <span class="i-carbon-loading text-primary mx-auto mb-2 h-8 w-8 block animate-spin" />
+            <span class="i-carbon-loading text-primary-text mx-auto mb-2 h-8 w-8 block animate-spin" />
             <p class="text-sm text-muted-foreground">
               {{ t('components.dataTableView.reconnecting') }}
             </p>
@@ -1085,7 +1085,7 @@ watch(
           class="bg-background/60 flex items-center inset-0 justify-center absolute z-10"
         >
           <div class="text-center">
-            <span class="i-carbon-loading text-primary mx-auto mb-2 h-8 w-8 block animate-spin" />
+            <span class="i-carbon-loading text-primary-text mx-auto mb-2 h-8 w-8 block animate-spin" />
             <p class="text-sm text-muted-foreground">
               {{ t('components.dataTableView.loading') }}
             </p>
@@ -1094,14 +1094,14 @@ watch(
 
         <!-- Error state -->
         <div v-else-if="error" class="p-4">
-          <div class="p-4 border border-red-200 rounded-md bg-red-50 dark:border-red-800 dark:bg-red-900/20">
+          <div class="p-4 border border-destructive-border rounded-md bg-destructive-muted">
             <div class="flex gap-3 items-start">
-              <span class="i-carbon-error text-red-600 mt-0.5 flex-shrink-0 h-5 w-5 dark:text-red-400" />
+              <span class="i-carbon-error text-destructive-text mt-0.5 flex-shrink-0 h-5 w-5" />
               <div>
-                <p class="text-sm text-red-800 font-medium dark:text-red-200">
+                <p class="text-sm text-destructive-text font-medium">
                   {{ t('components.dataTableView.error') }}
                 </p>
-                <p class="text-sm text-red-700 mt-1 dark:text-red-300">
+                <p class="text-sm text-destructive-text mt-1">
                   {{ error }}
                 </p>
               </div>
@@ -1138,7 +1138,7 @@ watch(
                   :title="columnTypeMap[col] ? `${col} · ${columnTypeMap[col]}` : col"
                   @click="handleHeaderSort(col)"
                 >
-                  <span v-if="columnIsPK[col]" class="i-carbon-key text-amber-500 flex-shrink-0 h-3 w-3" />
+                  <span v-if="columnIsPK[col]" class="i-carbon-key text-muted-foreground flex-shrink-0 h-3 w-3" />
                   <span class="col-name truncate">{{ col }}</span>
                   <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
                   <span
@@ -1159,7 +1159,7 @@ watch(
                   class="col-header-cell cursor-default"
                   :title="$t('components.dataGrid.sort.unsortable')"
                 >
-                  <span v-if="columnIsPK[col]" class="i-carbon-key text-amber-500 flex-shrink-0 h-3 w-3" />
+                  <span v-if="columnIsPK[col]" class="i-carbon-key text-muted-foreground flex-shrink-0 h-3 w-3" />
                   <span class="col-name truncate">{{ col }}</span>
                   <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
                 </div>
@@ -1204,7 +1204,7 @@ watch(
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="text-blue-600 h-6 w-6 dark:text-blue-400"
+                    class="text-primary-text h-6 w-6"
                     :title="t('components.dataTableView.editRow')"
                     @click.stop="openEditDialog(row)"
                   >
@@ -1214,7 +1214,7 @@ watch(
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="text-rose-500 h-6 w-6 dark:text-rose-400 hover:text-red-600 dark:hover:text-red-400"
+                    class="text-destructive-text h-6 w-6 hover:text-destructive-text"
                     :title="t('components.dataTableView.deleteRow')"
                     @click.stop="openDeleteDialog(row)"
                   >
@@ -1242,7 +1242,7 @@ watch(
         <!-- No data yet -->
         <div v-else class="flex h-full items-center justify-center">
           <div class="text-muted-foreground text-center">
-            <span class="i-carbon-loading text-primary mx-auto mb-2 h-8 w-8 block animate-spin" />
+            <span class="i-carbon-loading text-primary-text mx-auto mb-2 h-8 w-8 block animate-spin" />
           </div>
         </div>
       </div>
@@ -1365,7 +1365,7 @@ watch(
               <Label :for="`edit-field-${col}`" class="text-xs font-medium whitespace-nowrap">
                 {{ col }}<span v-if="columnTypeMap[col]" class="text-[10px] text-muted-foreground font-mono font-normal ml-1">{{ columnTypeMap[col] }}</span><span
                   v-if="columnIsPK[col]"
-                  class="i-carbon-key text-amber-500 ml-1.5 h-3 w-3 inline-block"
+                  class="i-carbon-key text-muted-foreground ml-1.5 h-3 w-3 inline-block"
                 />
               </Label>
               <div class="flex-1" />
@@ -1395,7 +1395,7 @@ watch(
               :class="{ 'border-destructive': editErrors[col], 'opacity-60': columnIsAutoIncrement[col] }"
               @update:model-value="(v) => editForm[col] = { ...editForm[col], value: String(v), setNull: editForm[col]?.setNull ?? false }"
             />
-            <p v-if="editErrors[col]" class="text-xs text-destructive">
+            <p v-if="editErrors[col]" class="text-xs text-destructive-text">
               {{ editErrors[col] }}
             </p>
           </div>

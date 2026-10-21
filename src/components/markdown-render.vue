@@ -172,7 +172,7 @@ pre code[class*='language-'] {
   font-size: 11px;
   font-weight: 500;
   font-family: ui-monospace, 'Cascadia Code', 'Source Code Pro', Menlo, Monaco, monospace;
-  color: hsl(var(--muted-foreground) / 0.65);
+  color: hsl(var(--muted-foreground));
   text-transform: lowercase;
 }
 

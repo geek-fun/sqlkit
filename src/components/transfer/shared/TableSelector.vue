@@ -119,7 +119,7 @@ const selectedTableInfo = computed(() =>
       <span v-if="selectedTableInfo.rowCount" class="font-mono tabular-nums">
         {{ selectedTableInfo.rowCount.toLocaleString() }} rows
       </span>
-      <span v-if="selectedTableInfo.table_type" class="text-muted-foreground/60 uppercase">
+      <span v-if="selectedTableInfo.table_type" class="text-muted-foreground uppercase">
         {{ selectedTableInfo.table_type }}
       </span>
     </div>

@@ -105,7 +105,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
 </script>
 
 <template>
-  <div class="query-tabs border-b border-border flex items-stretch overflow-x-auto">
+  <div class="query-tabs border-b border-border bg-chrome flex items-stretch overflow-x-auto">
     <!-- Tabs -->
     <div class="flex flex-1 min-w-0 items-stretch">
       <div
@@ -131,7 +131,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          class="text-orange-500 flex-shrink-0"
+          class="text-warning flex-shrink-0"
           :title="t('components.queryTabs.orphan')"
         >
           <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 3 21h18a2 2 0 0 0 1.73-3Z" />
@@ -211,14 +211,14 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
         <!-- Unsaved indicator -->
         <span
           v-if="tab.hasUnsavedChanges"
-          class="rounded-full bg-orange-500 flex-shrink-0 h-2 w-2"
+          class="rounded-full bg-muted-foreground flex-shrink-0 h-2 w-2"
           :title="t('components.queryTabs.unsaved')"
         />
 
         <!-- Executing indicator -->
         <svg
           v-if="tab.isExecuting"
-          class="text-primary flex-shrink-0 h-3 w-3 animate-spin"
+          class="text-primary-text flex-shrink-0 h-3 w-3 animate-spin"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
@@ -229,8 +229,9 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
 
         <!-- Close button -->
         <button
-          class="rounded opacity-0 flex flex-shrink-0 h-4 w-4 transition-colors items-center justify-center hover:bg-muted-foreground/20 group-hover:opacity-100"
+          class="rounded opacity-0 flex flex-shrink-0 h-4 w-4 transition-colors items-center justify-center hover:bg-muted-foreground/20 focus-visible:opacity-100 group-hover:opacity-100"
           :class="{ 'opacity-100': isActiveTab(tab.id) }"
+          :aria-label="t('common.buttons.close')"
           @click="handleCloseClick($event, tab)"
         >
           <span class="i-lucide-x shrink-0 h-3 w-3" />

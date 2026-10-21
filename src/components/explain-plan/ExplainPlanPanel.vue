@@ -112,7 +112,7 @@ const formattedTotalCost = computed(() => {
       v-else-if="error"
       class="p-4 flex flex-1 items-start justify-center"
     >
-      <div class="text-sm text-destructive px-3 py-2 border border-destructive/30 rounded bg-destructive/5 max-w-xl">
+      <div class="text-sm text-destructive-text px-3 py-2 border border-destructive/30 rounded bg-destructive/5 max-w-xl">
         <p>{{ error }}</p>
       </div>
     </div>

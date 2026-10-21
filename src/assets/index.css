@@ -1,4 +1,6 @@
-:root {
+:root,
+.theme-preview.light {
+  color-scheme: light;
   --background: 0 0% 100%;
   --foreground: 222.2 84% 4.9%;
   --card: 0 0% 100%;
@@ -10,55 +12,84 @@
   --secondary: 210 40% 96.1%;
   --secondary-foreground: 222.2 47.4% 11.2%;
   --muted: 210 40% 96.1%;
-  --muted-foreground: 215.4 16.3% 46.9%;
+  --muted-foreground: 213.33 16.82% 41.96%;
   --accent: 210 40% 96.1%;
   --accent-foreground: 222.2 47.4% 11.2%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --success: 142.1 70.6% 35.5%;
-  --success-foreground: 0 0% 100%;
-  --success-muted: 138 76% 95%;
-  --success-border: 140 58% 85%;
+  --destructive: 0.00 73.71% 41.76%;
+  --destructive-foreground: 0.00 0.00% 100.00%;
+  --success: 142.43 71.81% 29.22%;
+  --success-foreground: 0.00 0.00% 100.00%;
+  --success-muted: 138.46 76.47% 96.67%;
+  --success-border: 141.00 78.95% 85.10%;
   --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 80%;
-  --ring: 220 13% 60%;
+  --input: 213.75 13.91% 54.90%;
+  --ring: 215.38 16.32% 46.86%;
   --radius: 0.5rem;
   --chart-1: 12 76% 61%;
   --chart-2: 173 58% 39%;
   --chart-3: 197 37% 24%;
   --chart-4: 43 74% 66%;
   --chart-5: 27 87% 67%;
+  --chrome: 210.00 40.00% 98.04%;
+  --primary-text: 224.28 76.33% 48.04%;
+  --selection: 220.00 100.00% 95.29%;
+  --destructive-text: 0.00 73.71% 41.76%;
+  --destructive-muted: 0.00 85.71% 97.25%;
+  --destructive-border: 0.00 96.30% 89.41%;
+  --warning: 35.65 100.00% 27.06%;
+  --warning-foreground: 0.00 0.00% 100.00%;
+  --warning-muted: 39.00 100.00% 96.08%;
+  --warning-border: 39.10 67.94% 74.31%;
+  --syntax-keyword: 224.28 76.33% 48.04%;
+  --syntax-string: 23.16 60.64% 36.86%;
+  --syntax-number: 270.65 39.66% 45.49%;
+  --syntax-comment: 98.18 12.09% 35.69%;
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 47% 8%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 47% 8%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 217.2 91.2% 45%;
-  --primary-foreground: 0 0% 100%;
-  --secondary: 217.2 32.6% 16%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 16%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --success: 142.1 70% 45%;
-  --success-foreground: 0 0% 100%;
-  --success-muted: 142 35% 16%;
-  --success-border: 142 30% 25%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 28%;
-  --ring: 212.7 26.8% 68%;
+  color-scheme: dark;
+  --background: 220.00 12.00% 9.80%;
+  --foreground: 217.50 17.39% 90.98%;
+  --card: 220.00 11.39% 15.49%;
+  --card-foreground: 217.50 17.39% 90.98%;
+  --popover: 220.00 11.39% 15.49%;
+  --popover-foreground: 217.50 17.39% 90.98%;
+  --primary: 221.21 83.19% 53.33%;
+  --primary-foreground: 0.00 0.00% 100.00%;
+  --secondary: 220.00 11.39% 15.49%;
+  --secondary-foreground: 217.50 17.39% 90.98%;
+  --muted: 220.00 11.39% 15.49%;
+  --muted-foreground: 217.89 11.80% 68.43%;
+  --accent: 216.92 13.13% 19.41%;
+  --accent-foreground: 217.50 17.39% 90.98%;
+  --destructive: 0.00 53.53% 47.25%;
+  --destructive-foreground: 0.00 0.00% 100.00%;
+  --success: 143.02 47.25% 64.31%;
+  --success-foreground: 220.00 12.00% 9.80%;
+  --success-muted: 148.42 22.89% 16.27%;
+  --success-border: 141.67 23.08% 30.59%;
+  --border: 217.50 13.33% 23.53%;
+  --input: 215.56 11.79% 44.90%;
+  --ring: 217.89 11.80% 68.43%;
   --chart-1: 220 70% 50%;
   --chart-2: 160 60% 45%;
   --chart-3: 30 80% 55%;
   --chart-4: 280 65% 60%;
   --chart-5: 340 75% 55%;
+  --chrome: 217.50 12.50% 12.55%;
+  --primary-text: 218.46 100.00% 77.06%;
+  --selection: 215.71 35.59% 23.14%;
+  --destructive-text: 4.82 81.16% 72.94%;
+  --destructive-muted: 352.94 19.10% 17.45%;
+  --destructive-border: 3.40 29.61% 35.10%;
+  --warning: 36.61 79.73% 70.98%;
+  --warning-foreground: 220.00 12.00% 9.80%;
+  --warning-muted: 36.67 20.45% 17.25%;
+  --warning-border: 37.36 32.12% 32.35%;
+  --syntax-keyword: 218.46 100.00% 77.06%;
+  --syntax-string: 26.40 47.77% 69.22%;
+  --syntax-number: 264.49 51.58% 81.37%;
+  --syntax-comment: 112.50 7.55% 58.43%;
 }
 
 * {
@@ -99,7 +130,6 @@ button:not(:disabled),
 @supports not (border-width: 0.5px) {
   .border {
     border-width: 1px !important;
-    opacity: 0.6;
   }
 }
 
@@ -126,4 +156,9 @@ button:not(:disabled),
 * {
   scrollbar-width: thin;
   scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+}
+
+::selection {
+  background-color: hsl(var(--selection));
+  color: hsl(var(--foreground));
 }

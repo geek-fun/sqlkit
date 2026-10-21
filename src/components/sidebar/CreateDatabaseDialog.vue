@@ -137,7 +137,7 @@ function handleConfirm() {
 
       <div class="space-y-3">
         <div class="space-y-1.5">
-          <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.name') }} <span class="text-destructive">*</span></Label>
+          <Label class="text-xs">{{ t('sidebar.databases.actions.createDatabase.name') }} <span class="text-destructive-text">*</span></Label>
           <Input
             v-model="objectName"
             :placeholder="t('sidebar.databases.actions.createDatabase.namePlaceholder')"

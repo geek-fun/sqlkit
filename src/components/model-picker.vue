@@ -56,7 +56,7 @@ const triggerClasses = computed(() =>
 const panelClasses = computed(() =>
   props.compact
     ? 'w-[280px] p-0 bg-popover text-foreground border-border'
-    : 'w-[360px] p-0 bg-[#151515] text-white border-[#2b2b2b]',
+    : 'w-[360px] p-0 bg-popover text-popover-foreground border-border',
 )
 
 const flattenedModels = computed(() => props.groups.flatMap(group => group.models))
@@ -189,7 +189,7 @@ function selectModel(value: string) {
   margin-top: 2px;
   font-size: 10px;
   text-transform: uppercase;
-  color: hsl(var(--muted-foreground) / 0.6);
+  color: hsl(var(--muted-foreground));
 }
 
 .model-picker-list {
@@ -205,7 +205,7 @@ function selectModel(value: string) {
   padding: 0 6px 6px;
   font-size: 11px;
   font-weight: 700;
-  color: hsl(var(--primary) / 0.8);
+  color: hsl(var(--primary-text));
 }
 
 .model-picker-row {
@@ -225,11 +225,11 @@ function selectModel(value: string) {
 }
 
 .model-picker-row.selected .model-picker-name {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .model-picker-row.selected .model-picker-checkmark {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .model-picker-main {

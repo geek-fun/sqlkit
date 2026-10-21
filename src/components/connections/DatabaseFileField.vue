@@ -252,8 +252,8 @@ const fileDetails = computed(() => {
 const toneClass: Record<StatusDescriptor['tone'], string> = {
   info: 'text-muted-foreground',
   success: 'text-muted-foreground',
-  warning: 'text-amber-600 dark:text-amber-500',
-  error: 'text-destructive',
+  warning: 'text-warning',
+  error: 'text-destructive-text',
 }
 
 const toneIcon: Record<StatusDescriptor['tone'], string> = {
@@ -267,7 +267,7 @@ const toneIcon: Record<StatusDescriptor['tone'], string> = {
 <template>
   <div class="space-y-2">
     <Label :for="`db-file-${engine}`">
-      {{ label }}<span v-if="required" class="text-destructive ml-0.5">*</span>
+      {{ label }}<span v-if="required" class="text-destructive-text ml-0.5">*</span>
     </Label>
     <div class="flex gap-2 items-center">
       <Input
@@ -285,7 +285,7 @@ const toneIcon: Record<StatusDescriptor['tone'], string> = {
       </Button>
     </div>
 
-    <p v-if="errorMessage" class="text-sm text-destructive">
+    <p v-if="errorMessage" class="text-sm text-destructive-text">
       {{ errorMessage }}
     </p>
 
@@ -329,7 +329,7 @@ const toneIcon: Record<StatusDescriptor['tone'], string> = {
           </button>
           <button
             type="button"
-            class="text-muted-foreground opacity-0 shrink-0 hover:text-destructive group-hover:opacity-100"
+            class="text-muted-foreground opacity-0 shrink-0 hover:text-destructive-text group-hover:opacity-100"
             :title="t('components.serverForm.fileStatus.removeRecent')"
             @click.stop="removeRecentDatabase(entry.path)"
           >

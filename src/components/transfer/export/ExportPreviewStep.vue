@@ -107,7 +107,7 @@ onMounted(() => {
       <div class="space-y-1">
         <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.selectFormat') }}</Label>
         <div>
-          <Badge class="text-[10px] text-primary font-mono px-1.5 py-0.5 border border-primary/60 bg-primary/[0.04] uppercase hover:bg-primary/[0.08]" variant="outline">
+          <Badge class="text-[10px] text-primary-text font-mono px-1.5 py-0.5 border border-primary/60 bg-primary/[0.04] uppercase hover:bg-primary/[0.08]" variant="outline">
             {{ sourceInfo.format }}
           </Badge>
         </div>

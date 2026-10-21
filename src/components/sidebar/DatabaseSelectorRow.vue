@@ -142,11 +142,11 @@ watch(() => props.connectionId, async (connId) => {
       @update:model-value="handleSelect"
     >
       <template #selected-prepend>
-        <span class="i-lucide-database text-yellow-500 mr-1.5 shrink-0 h-3.5 w-3.5" />
+        <span class="i-lucide-database text-muted-foreground mr-1.5 shrink-0 h-3.5 w-3.5" />
       </template>
       <template #option="{ option }">
         <div class="flex gap-1.5 w-full items-center">
-          <span class="i-lucide-database text-yellow-500 shrink-0 h-3.5 w-3.5" />
+          <span class="i-lucide-database text-muted-foreground shrink-0 h-3.5 w-3.5" />
           <span class="text-left flex-1 truncate">{{ option.label }}</span>
         </div>
       </template>
@@ -211,7 +211,7 @@ watch(() => props.connectionId, async (connId) => {
         <DropdownMenuSeparator v-if="capabilities.dropDatabase" />
         <DropdownMenuItem
           v-if="capabilities.dropDatabase"
-          class="text-destructive focus:text-destructive"
+          class="text-destructive-text focus:text-destructive-text"
           @click="handleAction('dropDatabase')"
         >
           <span class="i-carbon-trash-can mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.dropDatabase') }}

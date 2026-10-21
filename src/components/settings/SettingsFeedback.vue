@@ -52,9 +52,9 @@ const percent = computed(() => props.progress == null || !Number.isFinite(props.
 .settings-feedback { color: hsl(var(--foreground)); padding: 10px 12px; border-radius: 6px; background: hsl(var(--primary) / 0.06); }
 .settings-feedback.is-success { background: hsl(var(--success-muted)); }
 .settings-feedback.is-error { color: hsl(var(--foreground)); background: hsl(var(--destructive) / 0.08); }
-.settings-spinner { color: hsl(var(--primary)); }
+.settings-spinner { color: hsl(var(--primary-text)); }
 .is-success [aria-hidden] { color: hsl(var(--success)); }
-.is-error [aria-hidden] { color: hsl(var(--destructive)); }
+.is-error [aria-hidden] { color: hsl(var(--destructive-text)); }
 .settings-detail { color: hsl(var(--foreground)); opacity: 0.8; overflow-wrap: anywhere; }
 .settings-track { margin-top: 8px; height: 3px; border-radius: 2px; overflow: hidden; background: hsl(var(--primary) / 0.15); }
 .settings-meter { height: 100%; background: hsl(var(--primary)); transform-origin: left; transition: transform 180ms ease-out; }

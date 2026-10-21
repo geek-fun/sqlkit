@@ -48,17 +48,17 @@ const activeInheritedPerms = computed<(keyof DataSourcePermissions)[]>(() => {
 })
 
 const permColors: Record<string, string> = {
-  read: 'text-primary',
-  create: 'text-primary',
-  update: 'text-amber-600 dark:text-amber-500',
-  delete: 'text-red-600 dark:text-red-500',
+  read: 'text-muted-foreground',
+  create: 'text-muted-foreground',
+  update: 'text-muted-foreground',
+  delete: 'text-muted-foreground',
 }
 
 const permTagColors: Record<string, string> = {
-  read: 'bg-primary/10 text-primary',
-  create: 'bg-primary/10 text-primary',
-  update: 'bg-amber-500/10 text-amber-600 dark:text-amber-500',
-  delete: 'bg-red-500/10 text-red-600 dark:text-red-500',
+  read: 'bg-secondary text-secondary-foreground',
+  create: 'bg-secondary text-secondary-foreground',
+  update: 'bg-secondary text-secondary-foreground',
+  delete: 'bg-secondary text-secondary-foreground',
 }
 
 watch(() => props.open, (open) => {
@@ -162,8 +162,8 @@ function handleDetach() {
                     class="h-3 w-3"
                     :class="
                       sessionPermissionsMode === 'Auto'
-                        ? 'i-carbon-flash text-amber-500'
-                        : 'i-carbon-user-activity text-blue-500'
+                        ? 'i-carbon-flash text-muted-foreground'
+                        : 'i-carbon-user-activity text-muted-foreground'
                     "
                   />
                   {{ sessionPermissionsMode }}
@@ -258,7 +258,7 @@ function handleDetach() {
               </Button>
             </div>
           </div>
-          <Button v-else variant="ghost" class="text-destructive" @click="detachConfirming = true">
+          <Button v-else variant="ghost" class="text-destructive-text" @click="detachConfirming = true">
             <span class="i-carbon-unlink mr-1.5 h-3.5 w-3.5" />
             {{ t('dataStudio.detachSource.title') }}
           </Button>

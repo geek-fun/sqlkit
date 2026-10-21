@@ -92,13 +92,13 @@ describe('paged result grid', () => {
     const firstRow = wrapper.get('[data-index="0"]')
     firstRow.findComponent({ name: 'Checkbox' }).vm.$emit('update:checked', true)
     await wrapper.vm.$nextTick()
-    expect(wrapper.get('[data-index="0"]').classes()).toContain('bg-primary/[0.08]')
+    expect(wrapper.get('[data-index="0"]').classes()).toContain('bg-selection')
     const scroller = wrapper.find('.overflow-auto').element as HTMLDivElement
     scroller.scrollTop = 320
     wrapper.findComponent({ name: 'PaginationControls' }).vm.$emit('pageChange', 2)
     await wrapper.vm.$nextTick()
     expect(scroller.scrollTop).toBe(0)
-    expect(wrapper.get('[data-index="0"]').classes()).not.toContain('bg-primary/[0.08]')
+    expect(wrapper.get('[data-index="0"]').classes()).not.toContain('bg-selection')
     expect(wrapper.get('[data-index="0"]').text()).toContain('135')
   })
 

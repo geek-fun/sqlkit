@@ -340,7 +340,7 @@ const tools = [
   backdrop-filter: blur(8px);
   font-size: 11.5px;
   font-weight: 600;
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .poster__lock-icon {

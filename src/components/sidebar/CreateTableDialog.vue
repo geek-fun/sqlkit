@@ -306,7 +306,7 @@ function handleCreate() {
             <!-- Remove -->
             <div class="flex col-span-1 justify-center">
               <button
-                class="text-muted-foreground flex h-5 w-5 cursor-pointer items-center justify-center hover:text-destructive disabled:opacity-20 disabled:cursor-not-allowed"
+                class="text-muted-foreground flex h-5 w-5 cursor-pointer items-center justify-center hover:text-destructive-text disabled:opacity-20 disabled:cursor-not-allowed"
                 :disabled="columns.length <= 1"
                 @click="removeColumn(col.id)"
               >

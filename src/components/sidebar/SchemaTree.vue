@@ -410,7 +410,7 @@ defineExpose({ refresh })
             <span
               class="shrink-0 h-3.5 w-3.5"
               :class="expandedSchemas.has(schema)
-                ? 'i-lucide-folder-open text-sky-500'
+                ? 'i-lucide-folder-open text-primary-text'
                 : 'i-lucide-folder text-muted-foreground'"
             />
             <span class="text-left flex-1 truncate">{{ schema }}</span>
@@ -422,7 +422,7 @@ defineExpose({ refresh })
             <TreeGroup
               :label="t('sidebar.groups.tables')"
               icon="i-lucide-table"
-              icon-color="text-green-600"
+              icon-color="text-muted-foreground"
               :count="getTablesForSchema(schema).length"
               :default-open="true"
             >
@@ -430,12 +430,12 @@ defineExpose({ refresh })
                 v-for="table in getTablesForSchema(schema)"
                 :key="table.name"
                 class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                 @click="handleTableClick(table, schema)"
                 @dblclick="handleDoubleClick(table, schema)"
                 @contextmenu="handleContextMenu($event, table, schema)"
               >
-                <span class="i-lucide-table text-green-500 shrink-0 h-3.5 w-3.5" />
+                <span class="i-lucide-table text-muted-foreground shrink-0 h-3.5 w-3.5" />
                 <span class="text-left truncate">{{ table.name }}</span>
               </div>
               <div v-if="getTablesForSchema(schema).length === 0" class="text-xs text-muted-foreground ml-2 px-2 py-1">
@@ -447,7 +447,7 @@ defineExpose({ refresh })
             <TreeGroup
               :label="t('sidebar.groups.views')"
               icon="i-lucide-eye"
-              icon-color="text-purple-600"
+              icon-color="text-muted-foreground"
               :count="getObjectsForSchema(schema)?.views.length ?? 0"
               :default-open="false"
               @toggle="(open: boolean) => handleGroupToggle(open, schema)"
@@ -456,15 +456,15 @@ defineExpose({ refresh })
                 v-for="view in getObjectsForSchema(schema)?.views ?? []"
                 :key="view.name"
                 class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                 @click="selectedTreeItem = { type: 'view', name: view.name, schema }"
                 @dblclick="handleViewClick(view, schema)"
               >
                 <span
                   class="shrink-0 h-3.5 w-3.5"
                   :class="view.object_type?.toUpperCase().includes('MATERIALIZED')
-                    ? 'i-lucide-eye text-indigo-500'
-                    : 'i-lucide-eye text-purple-500'"
+                    ? 'i-lucide-layers text-muted-foreground'
+                    : 'i-lucide-eye text-muted-foreground'"
                 />
                 <span class="text-left truncate">{{ view.name }}</span>
               </div>
@@ -477,7 +477,7 @@ defineExpose({ refresh })
             <TreeGroup
               :label="t('sidebar.groups.procedures')"
               icon="i-lucide-terminal"
-              icon-color="text-blue-600"
+              icon-color="text-muted-foreground"
               :count="getObjectsForSchema(schema)?.procedures.length ?? 0"
               :default-open="false"
               @toggle="(open: boolean) => handleGroupToggle(open, schema)"
@@ -486,11 +486,11 @@ defineExpose({ refresh })
                 v-for="proc in getObjectsForSchema(schema)?.procedures ?? []"
                 :key="proc.name"
                 class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                 @click="selectedTreeItem = { type: 'procedure', name: proc.name, schema }"
                 @dblclick="handleProcedureClick(proc, schema)"
               >
-                <span class="i-lucide-terminal text-blue-500 shrink-0 h-3.5 w-3.5" />
+                <span class="i-lucide-terminal text-muted-foreground shrink-0 h-3.5 w-3.5" />
                 <span class="text-left truncate">{{ proc.name }}</span>
               </div>
               <div v-if="!getObjectsForSchema(schema)?.procedures || getObjectsForSchema(schema)!.procedures.length === 0" class="text-xs text-muted-foreground ml-2 px-2 py-1">
@@ -502,7 +502,7 @@ defineExpose({ refresh })
             <TreeGroup
               :label="t('sidebar.groups.functions')"
               icon="i-lucide-function-square"
-              icon-color="text-amber-600"
+              icon-color="text-muted-foreground"
               :count="getObjectsForSchema(schema)?.functions.length ?? 0"
               :default-open="false"
               @toggle="(open: boolean) => handleGroupToggle(open, schema)"
@@ -511,11 +511,11 @@ defineExpose({ refresh })
                 v-for="fn in getObjectsForSchema(schema)?.functions ?? []"
                 :key="fn.name"
                 class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                 @click="selectedTreeItem = { type: 'function', name: fn.name, schema }"
                 @dblclick="handleFunctionClick(fn, schema)"
               >
-                <span class="i-lucide-function-square text-amber-500 shrink-0 h-3.5 w-3.5" />
+                <span class="i-lucide-function-square text-muted-foreground shrink-0 h-3.5 w-3.5" />
                 <span class="text-left truncate">{{ fn.name }}</span>
               </div>
               <div v-if="!getObjectsForSchema(schema)?.functions || getObjectsForSchema(schema)!.functions.length === 0" class="text-xs text-muted-foreground ml-2 px-2 py-1">
@@ -531,7 +531,7 @@ defineExpose({ refresh })
         <TreeGroup
           :label="t('sidebar.groups.tables')"
           icon="i-lucide-table"
-          icon-color="text-green-600"
+          icon-color="text-muted-foreground"
           :count="flatTables.length"
           :default-open="true"
         >
@@ -539,12 +539,12 @@ defineExpose({ refresh })
             v-for="table in flatTables"
             :key="table.name"
             class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-            :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === undefined ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+            :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === undefined ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
             @click="handleTableClick(table, undefined)"
             @dblclick="handleDoubleClick(table, undefined)"
             @contextmenu="handleContextMenu($event, table, undefined)"
           >
-            <span class="i-lucide-table text-green-500 shrink-0 h-3.5 w-3.5" />
+            <span class="i-lucide-table text-muted-foreground shrink-0 h-3.5 w-3.5" />
             <span class="text-left truncate">{{ table.name }}</span>
           </div>
           <div v-if="flatTables.length === 0" class="text-xs text-muted-foreground px-2 py-1">
@@ -563,7 +563,7 @@ defineExpose({ refresh })
           @contextmenu="handleDatabaseContextMenu($event, db.name)"
         >
           <span class="i-lucide-chevron-right shrink-0 h-3 w-3 transition-transform" :class="{ 'rotate-90': expandedDatabases.has(db.name) }" />
-          <span class="i-lucide-database text-yellow-500 shrink-0 h-3.5 w-3.5" />
+          <span class="i-lucide-database text-muted-foreground shrink-0 h-3.5 w-3.5" />
           <span class="text-left flex-1 truncate">{{ db.name }}</span>
           <span class="inline-flex h-3 w-3 items-center justify-center"><span v-if="loadingDatabases.has(db.name)" class="i-carbon-loading h-3 w-3 animate-spin" /></span>
         </button>
@@ -572,59 +572,59 @@ defineExpose({ refresh })
           <template v-if="hasRealSchemas(db.name)">
             <div v-for="schema in getDbSchemas(db.name)" :key="schema" class="ml-4">
               <div class="text-xs text-muted-foreground font-medium px-2 py-1 flex gap-1.5 items-center">
-                <span class="i-lucide-folder-open text-sky-400 shrink-0 h-3.5 w-3.5" />
+                <span class="i-lucide-folder-open text-primary-text shrink-0 h-3.5 w-3.5" />
                 <span class="text-left">{{ schema }}</span>
               </div>
-              <TreeGroup :label="t('sidebar.groups.tables')" icon="i-lucide-table" icon-color="text-green-600" :count="getTablesForDbSchema(db.name, schema).length" :default-open="true">
+              <TreeGroup :label="t('sidebar.groups.tables')" icon="i-lucide-table" icon-color="text-muted-foreground" :count="getTablesForDbSchema(db.name, schema).length" :default-open="true">
                 <div
                   v-for="table in getTablesForDbSchema(db.name, schema)"
                   :key="table.name"
                   class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'table', name: table.name, schema }"
                   @dblclick="selectedTreeItem = { type: 'table', name: table.name, schema }; emit('selectTable', table, db.name, schema)"
                   @contextmenu="(e) => { e.preventDefault(); contextMenuTable = { table, database: db.name, schema, x: e.clientX, y: e.clientY } }"
                 >
-                  <span class="i-lucide-table text-green-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="i-lucide-table text-muted-foreground shrink-0 h-3.5 w-3.5" />
                   <span class="text-left truncate">{{ table.name }}</span>
                 </div>
               </TreeGroup>
-              <TreeGroup :label="t('sidebar.groups.views')" icon="i-lucide-eye" icon-color="text-purple-600" :count="getObjectsForDbSchema(db.name, schema)?.views.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, schema)">
+              <TreeGroup :label="t('sidebar.groups.views')" icon="i-lucide-eye" icon-color="text-muted-foreground" :count="getObjectsForDbSchema(db.name, schema)?.views.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, schema)">
                 <div
                   v-for="view in getObjectsForDbSchema(db.name, schema)?.views ?? []"
                   :key="view.name"
                   class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'view', name: view.name, schema }"
                   @dblclick="emit('openDdlTab', view.name, 'VIEW', db.name, schema)"
                 >
-                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-lucide-eye text-indigo-500' : 'i-lucide-eye text-purple-500'" />
+                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-lucide-layers text-muted-foreground' : 'i-lucide-eye text-muted-foreground'" />
                   <span class="text-left truncate">{{ view.name }}</span>
                 </div>
               </TreeGroup>
-              <TreeGroup :label="t('sidebar.groups.procedures')" icon="i-lucide-terminal" icon-color="text-blue-600" :count="getObjectsForDbSchema(db.name, schema)?.procedures.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, schema)">
+              <TreeGroup :label="t('sidebar.groups.procedures')" icon="i-lucide-terminal" icon-color="text-muted-foreground" :count="getObjectsForDbSchema(db.name, schema)?.procedures.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, schema)">
                 <div
                   v-for="proc in getObjectsForDbSchema(db.name, schema)?.procedures ?? []"
                   :key="proc.name"
                   class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'procedure', name: proc.name, schema }"
                   @dblclick="emit('openDdlTab', proc.name, 'PROCEDURE', db.name, schema)"
                 >
-                  <span class="i-lucide-terminal text-blue-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="i-lucide-terminal text-muted-foreground shrink-0 h-3.5 w-3.5" />
                   <span class="text-left truncate">{{ proc.name }}</span>
                 </div>
               </TreeGroup>
-              <TreeGroup :label="t('sidebar.groups.functions')" icon="i-lucide-function-square" icon-color="text-amber-600" :count="getObjectsForDbSchema(db.name, schema)?.functions.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, schema)">
+              <TreeGroup :label="t('sidebar.groups.functions')" icon="i-lucide-function-square" icon-color="text-muted-foreground" :count="getObjectsForDbSchema(db.name, schema)?.functions.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, schema)">
                 <div
                   v-for="fn in getObjectsForDbSchema(db.name, schema)?.functions ?? []"
                   :key="fn.name"
                   class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'function', name: fn.name, schema }"
                   @dblclick="emit('openDdlTab', fn.name, 'FUNCTION', db.name, schema)"
                 >
-                  <span class="i-lucide-function-square text-amber-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="i-lucide-function-square text-muted-foreground shrink-0 h-3.5 w-3.5" />
                   <span class="text-left truncate">{{ fn.name }}</span>
                 </div>
               </TreeGroup>
@@ -633,56 +633,56 @@ defineExpose({ refresh })
           <!-- Non-schema-aware: flat groups directly under database -->
           <template v-else>
             <div class="ml-4">
-              <TreeGroup :label="t('sidebar.groups.tables')" icon="i-lucide-table" icon-color="text-green-600" :count="getTablesForDbSchema(db.name).length" :default-open="true">
+              <TreeGroup :label="t('sidebar.groups.tables')" icon="i-lucide-table" icon-color="text-muted-foreground" :count="getTablesForDbSchema(db.name).length" :default-open="true">
                 <div
                   v-for="table in getTablesForDbSchema(db.name)"
                   :key="table.name"
                   class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === undefined ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === undefined ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'table', name: table.name, schema: undefined }"
                   @dblclick="selectedTreeItem = { type: 'table', name: table.name, schema: undefined }; emit('selectTable', table, db.name)"
                   @contextmenu="(e) => { e.preventDefault(); contextMenuTable = { table, database: db.name, x: e.clientX, y: e.clientY } }"
                 >
-                  <span class="i-lucide-table text-green-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="i-lucide-table text-muted-foreground shrink-0 h-3.5 w-3.5" />
                   <span class="text-left truncate">{{ table.name }}</span>
                 </div>
               </TreeGroup>
-              <TreeGroup :label="t('sidebar.groups.views')" icon="i-lucide-eye" icon-color="text-purple-600" :count="getObjectsForDbSchema(db.name, db.name)?.views.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
+              <TreeGroup :label="t('sidebar.groups.views')" icon="i-lucide-eye" icon-color="text-muted-foreground" :count="getObjectsForDbSchema(db.name, db.name)?.views.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
                 <div
                   v-for="view in getObjectsForDbSchema(db.name, db.name)?.views ?? []"
                   :key="view.name"
                   class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'view', name: view.name }"
                   @dblclick="emit('openDdlTab', view.name, 'VIEW', db.name)"
                 >
-                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-lucide-eye text-indigo-500' : 'i-lucide-eye text-purple-500'" />
+                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-lucide-layers text-muted-foreground' : 'i-lucide-eye text-muted-foreground'" />
                   <span class="text-left truncate">{{ view.name }}</span>
                 </div>
               </TreeGroup>
-              <TreeGroup :label="t('sidebar.groups.procedures')" icon="i-lucide-terminal" icon-color="text-blue-600" :count="getObjectsForDbSchema(db.name, db.name)?.procedures.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
+              <TreeGroup :label="t('sidebar.groups.procedures')" icon="i-lucide-terminal" icon-color="text-muted-foreground" :count="getObjectsForDbSchema(db.name, db.name)?.procedures.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
                 <div
                   v-for="proc in getObjectsForDbSchema(db.name, db.name)?.procedures ?? []"
                   :key="proc.name"
                   class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'procedure', name: proc.name }"
                   @dblclick="emit('openDdlTab', proc.name, 'PROCEDURE', db.name)"
                 >
-                  <span class="i-lucide-terminal text-blue-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="i-lucide-terminal text-muted-foreground shrink-0 h-3.5 w-3.5" />
                   <span class="text-left truncate">{{ proc.name }}</span>
                 </div>
               </TreeGroup>
-              <TreeGroup :label="t('sidebar.groups.functions')" icon="i-lucide-function-square" icon-color="text-amber-600" :count="getObjectsForDbSchema(db.name, db.name)?.functions.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
+              <TreeGroup :label="t('sidebar.groups.functions')" icon="i-lucide-function-square" icon-color="text-muted-foreground" :count="getObjectsForDbSchema(db.name, db.name)?.functions.length ?? 0" :default-open="false" @toggle="(open: boolean) => handleGroupToggleForDb(open, db.name, db.name)">
                 <div
                   v-for="fn in getObjectsForDbSchema(db.name, db.name)?.functions ?? []"
                   :key="fn.name"
                   class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'function', name: fn.name }"
                   @dblclick="emit('openDdlTab', fn.name, 'FUNCTION', db.name)"
                 >
-                  <span class="i-lucide-function-square text-amber-500 shrink-0 h-3.5 w-3.5" />
+                  <span class="i-lucide-function-square text-muted-foreground shrink-0 h-3.5 w-3.5" />
                   <span class="text-left truncate">{{ fn.name }}</span>
                 </div>
               </TreeGroup>
@@ -796,14 +796,14 @@ defineExpose({ refresh })
         </div>
         <div class="my-1 bg-border h-px" />
         <div
-          class="text-sm text-destructive px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-foreground hover:bg-destructive/10"
+          class="text-sm text-destructive-text px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-text hover:bg-destructive/10"
           @click="handleContextAction('dropTable')"
         >
           <span class="i-carbon-trash-can mr-2 shrink-0 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.contextMenu.dropTable') }}
         </div>
         <div
-          class="text-sm text-destructive px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-foreground hover:bg-destructive/10"
+          class="text-sm text-destructive-text px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-text hover:bg-destructive/10"
           @click="handleContextAction('truncateTable')"
         >
           <span class="i-carbon-clean mr-2 shrink-0 h-3.5 w-3.5" />

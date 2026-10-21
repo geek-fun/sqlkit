@@ -97,27 +97,27 @@ const handleLogout = () => runAccountAction(() => entitlementStore.clearSessionS
         <span v-if="expiryText" class="text-xs text-muted-foreground">
           {{ expiryText }}
         </span>
-        <span v-if="entitlementStore.cancelScheduled" class="text-xs text-amber-600">
+        <span v-if="entitlementStore.cancelScheduled" class="text-xs text-warning">
           {{ t('plan.section.cancelScheduled') }}
         </span>
-        <span v-if="entitlementStore.sessionExpired" class="text-xs text-amber-600">
+        <span v-if="entitlementStore.sessionExpired" class="text-xs text-warning">
           {{ t('plan.section.sessionExpired') }}
         </span>
         <span
           v-else-if="accountStore.isLoggedIn && !accountStore.refreshToken && deviceStore.activationError"
-          class="text-xs text-amber-600"
+          class="text-xs text-warning"
         >
           {{ t('plan.section.deviceActivationFailed') }}
         </span>
         <span
           v-else-if="entitlementStore.hasEntitlementError && accountStore.isLoggedIn"
-          class="text-xs text-destructive"
+          class="text-xs text-destructive-text"
         >
           {{ t('plan.section.checkFailed') }}
         </span>
         <span v-if="!accountStore.isLoggedIn" class="text-xs text-muted-foreground">
           {{ t('plan.section.notLoggedIn') }}
-          <button class="text-primary underline cursor-pointer hover:opacity-80" :disabled="refreshing" @click="handleLogin">
+          <button class="text-primary-text underline cursor-pointer hover:opacity-80" :disabled="refreshing" @click="handleLogin">
             {{ t('plan.section.loginLink') }}
           </button>
         </span>
@@ -248,17 +248,17 @@ const handleLogout = () => runAccountAction(() => entitlementStore.clearSessionS
   padding: 1px 8px;
   border-radius: 999px;
   background-color: hsl(var(--primary) / 0.12);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   font-size: 9px;
   font-weight: 700;
   white-space: nowrap;
 }
 
 .compare-yes {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .compare-no {
-  color: hsl(var(--muted-foreground) / 0.55);
+  color: hsl(var(--muted-foreground));
 }
 </style>

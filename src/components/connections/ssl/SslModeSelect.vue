@@ -44,7 +44,7 @@ function selectMode(mode: SslMode) {
           :title="getDescription(mode)"
           class="text-xs leading-none px-2.5 py-1.5 rounded-sm cursor-pointer transition-colors" :class="[
             modelValue === mode
-              ? 'bg-background text-primary shadow-sm font-medium'
+              ? 'bg-background text-primary-text shadow-sm font-medium'
               : 'text-muted-foreground hover:text-foreground',
           ]"
           @click="selectMode(mode)"
@@ -53,7 +53,7 @@ function selectMode(mode: SslMode) {
         </button>
       </div>
     </div>
-    <p v-if="error" class="text-sm text-destructive">
+    <p v-if="error" class="text-sm text-destructive-text">
       {{ t(error) }}
     </p>
   </div>

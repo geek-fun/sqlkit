@@ -116,14 +116,14 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
   <div class="flex flex-col h-full">
     <!-- Table Content -->
     <div class="flex flex-1 flex-col min-h-0 overflow-hidden">
-      <div v-if="error" class="p-4 border border-red-200 rounded-md bg-red-50 flex-1 dark:border-red-800 dark:bg-red-900/20">
+      <div v-if="error" class="p-4 border border-destructive-border rounded-md bg-destructive-muted flex-1">
         <div class="flex gap-3 items-start">
-          <span class="i-carbon-warning-alt text-lg text-red-600 shrink-0 dark:text-red-400" />
+          <span class="i-carbon-warning-alt text-lg text-destructive-text shrink-0" />
           <div>
-            <p class="text-sm text-red-800 font-medium dark:text-red-200">
+            <p class="text-sm text-destructive-text font-medium">
               {{ t('transfer.export.tables.loadFailed', 'Failed to load tables') }}
             </p>
-            <p class="text-xs text-red-700 mt-1 dark:text-red-300">
+            <p class="text-xs text-destructive-text mt-1">
               {{ error }}
             </p>
           </div>
@@ -185,7 +185,7 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
               </th>
               <th scope="col" class="font-medium px-2 py-1.5 text-right w-20">
                 <span class="flex gap-1 items-center justify-end">
-                  <span v-if="selectionCount > 0" class="text-primary font-semibold">{{ selectionCount }}</span>
+                  <span v-if="selectionCount > 0" class="text-primary-text font-semibold">{{ selectionCount }}</span>
                   <span v-else>{{ t('transfer.common.type') }}</span>
                 </span>
               </th>
@@ -225,7 +225,7 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
     </div>
 
     <!-- Selection Count Footer -->
-    <div v-if="selectionCount > 0" class="text-[10px] text-primary font-mono font-semibold mt-2 flex shrink-0 gap-1 items-center">
+    <div v-if="selectionCount > 0" class="text-[10px] text-primary-text font-mono font-semibold mt-2 flex shrink-0 gap-1 items-center">
       <span class="i-carbon-checkmark-filled h-3 w-3" />
       {{ selectionCount }} tables selected
     </div>

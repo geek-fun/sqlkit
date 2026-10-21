@@ -6,6 +6,7 @@ import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
 import { onBeforeUnmount } from 'vue'
 import { ThemeType, useAppStore } from '@/store/appStore'
+import { applyEditorTheme } from './editorTheme'
 import { hasGrammar } from './sqlCompletion/dialects'
 import { getCompletionProvider } from './sqlCompletion/provider'
 import {
@@ -101,7 +102,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     editor = monaco.editor.create(containerRef.value, {
       value: initialValue.value,
       language: resolveEditorLanguage(options.language || 'sql'),
-      theme: appStore.uiThemeType === ThemeType.DARK ? 'vs-dark' : 'vs',
+      theme: applyEditorTheme(monaco, appStore.uiThemeType === ThemeType.DARK),
       automaticLayout: true,
       readOnly: options.readOnly || false,
       minimap: { enabled: options.minimap !== false },
@@ -215,7 +216,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
   }
 
   const updateTheme = (dark: boolean) => {
-    monaco.editor.setTheme(dark ? 'vs-dark' : 'vs')
+    applyEditorTheme(monaco, dark)
   }
 
   const updateLanguage = (id: SQLDialect) => {

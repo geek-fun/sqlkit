@@ -129,7 +129,7 @@ ORDER BY revenue DESC;</pre>
   padding: 2px 8px;
   border-radius: 6px;
   border: 1px solid hsl(var(--primary) / 0.35);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   font-size: 10px;
   font-weight: 600;
 }
@@ -214,7 +214,7 @@ ORDER BY revenue DESC;</pre>
 }
 
 .p-ic--pulse {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   animation: p-pulse 1.6s ease-in-out infinite;
 }
 
@@ -263,7 +263,7 @@ ORDER BY revenue DESC;</pre>
 .p-spin {
   width: 12px;
   height: 12px;
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   animation:
     p-visible-1 12s linear both,
     p-rotate 1.1s linear infinite;
@@ -376,7 +376,7 @@ ORDER BY revenue DESC;</pre>
   backdrop-filter: blur(8px);
   font-size: 11.5px;
   font-weight: 600;
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .poster__lock-icon {

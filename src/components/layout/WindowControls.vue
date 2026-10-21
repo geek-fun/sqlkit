@@ -29,7 +29,7 @@ const { isMac, platformReady } = usePlatform()
       </svg>
     </button>
     <button
-      class="inline-flex h-10 w-11 transition-colors items-center justify-center hover:text-white hover:bg-red-500"
+      class="inline-flex h-10 w-11 transition-colors items-center justify-center hover:text-destructive-foreground hover:bg-destructive"
       @click="close"
     >
       <svg width="12" height="12" viewBox="0 0 12 12">

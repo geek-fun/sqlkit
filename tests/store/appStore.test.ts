@@ -205,18 +205,18 @@ describe('appStore', () => {
   })
 
   describe('getEditorTheme', () => {
-    it('should return vs for light theme', () => {
+    it('should return SQLKit theme for light appearance', () => {
       const store = useAppStore()
       store.uiThemeType = ThemeType.LIGHT
 
-      expect(store.getEditorTheme()).toBe('vs')
+      expect(store.getEditorTheme()).toBe('sqlkit-light')
     })
 
-    it('should return vs-dark for dark theme', () => {
+    it('should return SQLKit theme for dark appearance', () => {
       const store = useAppStore()
       store.uiThemeType = ThemeType.DARK
 
-      expect(store.getEditorTheme()).toBe('vs-dark')
+      expect(store.getEditorTheme()).toBe('sqlkit-dark')
     })
   })
 

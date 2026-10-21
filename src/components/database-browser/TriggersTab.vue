@@ -84,7 +84,7 @@ onMounted(fetchTriggers)
       <Spinner size="sm" />
       {{ t('common.loading') }}
     </div>
-    <div v-else-if="error" class="text-sm text-destructive py-8 text-center">
+    <div v-else-if="error" class="text-sm text-destructive-text py-8 text-center">
       {{ error }}
     </div>
     <div v-else-if="triggers.length === 0" class="text-sm text-muted-foreground py-8 text-center">

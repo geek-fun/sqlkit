@@ -1130,7 +1130,7 @@ function closeResultPanel() {
       <div class="flex flex-1 overflow-hidden">
         <!-- Sidebar -->
         <div
-          class="border-r bg-background flex flex-col"
+          class="border-r bg-chrome flex flex-col"
           :style="{ width: `${sidebarWidth}px` }"
         >
           <!-- Connection selector with status indicator -->
@@ -1256,16 +1256,17 @@ function closeResultPanel() {
 
           <!-- Query editor area (shown for normal query tabs) -->
           <template v-else>
-            <!-- Toolbar (DBX-style: compact h-9, colored icons, no constant bg) -->
-            <div class="text-xs text-muted-foreground px-2 border-b border-border bg-background/80 flex shrink-0 gap-0.5 h-9 items-center">
+            <!-- Query actions -->
+            <div class="text-xs text-muted-foreground px-2 border-b border-border bg-chrome flex shrink-0 gap-0.5 h-9 items-center">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button
-                      variant="ghost"
+                      variant="default"
                       size="icon"
-                      class="text-emerald-600 h-7 w-7 dark:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 dark:hover:bg-emerald-500/20"
+                      class="h-7 w-7 disabled:opacity-40"
                       :disabled="!activeTab"
+                      :aria-label="t('pages.queries.editor.execute')"
                       @click="executeQuery"
                     >
                       <span class="i-lucide-play shrink-0 h-3.5 w-3.5" />
@@ -1283,9 +1284,9 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-violet-600 h-7 w-7 dark:text-violet-400 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:bg-violet-500/20"
-                      :class="{ '!text-emerald-600 !bg-emerald-500/10 !dark:bg-emerald-500/20': explainAnalyzeMode }"
+                      class="text-muted-foreground h-7 w-7 hover:text-foreground disabled:opacity-40"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
+                      :aria-label="t('pages.queries.editor.explain')"
                       @click="handleExplainQuery(explainAnalyzeMode)"
                     >
                       <span class="i-lucide-line-chart shrink-0 h-3.5 w-3.5" />
@@ -1302,9 +1303,11 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-muted-foreground h-7 w-7 hover:text-violet-600 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:text-violet-400 dark:hover:bg-violet-500/20"
-                      :class="explainAnalyzeMode ? '!text-violet-600 !bg-violet-100 dark:!text-violet-300 dark:!bg-violet-900/30' : ''"
+                      class="text-muted-foreground h-7 w-7 hover:text-foreground disabled:opacity-40"
+                      :class="explainAnalyzeMode ? 'bg-accent text-accent-foreground' : ''"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
+                      :aria-pressed="explainAnalyzeMode"
+                      :aria-label="t('pages.queries.explain.analyzeToggle', { mode: explainAnalyzeMode ? 'ON' : 'OFF' })"
                       @click="toggleExplainMode"
                     >
                       <span class="i-lucide-activity shrink-0 h-3.5 w-3.5" />
@@ -1324,8 +1327,9 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40 dark:hover:bg-amber-500/20"
+                      class="text-muted-foreground h-7 w-7 hover:text-foreground disabled:opacity-40"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
+                      :aria-label="t('pages.queries.editor.format')"
                       @click="handleToolbarFormat"
                     >
                       <span class="i-lucide-align-left shrink-0 h-3.5 w-3.5" />
@@ -1346,8 +1350,9 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 disabled:opacity-40 dark:hover:bg-sky-500/20"
+                      class="text-muted-foreground h-7 w-7 hover:text-foreground disabled:opacity-40"
                       :disabled="!activeTab || !activeTab.content.trim()"
+                      :aria-label="t('pages.queries.shortcuts.saveAs')"
                       @click="handleDownloadQuery"
                     >
                       <span class="i-lucide-download shrink-0 h-3.5 w-3.5" />
@@ -1409,7 +1414,7 @@ function closeResultPanel() {
                   </div>
 
                   <!-- Welcome message -->
-                  <span class="i-carbon-document text-muted-foreground/50 mx-auto mb-4 h-12 w-12 block" />
+                  <span class="i-carbon-document text-muted-foreground mx-auto mb-4 h-12 w-12 block" />
                   <p class="text-muted-foreground mb-4">
                     {{ getConnectionId() ? t('pages.queries.landing.ready') : t('pages.queries.noTab') }}
                   </p>

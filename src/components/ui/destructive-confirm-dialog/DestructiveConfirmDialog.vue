@@ -60,8 +60,8 @@ const confirmButtonClass = props.confirmVariant === 'warning'
           <div
             class="rounded-full flex shrink-0 h-10 w-10 items-center justify-center"
             :class="props.confirmVariant === 'warning'
-              ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
-              : 'bg-destructive/10 text-destructive'"
+              ? 'bg-warning-muted text-warning'
+              : 'bg-destructive/10 text-destructive-text'"
           >
             <span class="i-carbon-warning h-5 w-5" />
           </div>
@@ -72,7 +72,7 @@ const confirmButtonClass = props.confirmVariant === 'warning'
             </AlertDialogDescription>
             <p
               v-if="props.detail"
-              class="text-xs text-muted-foreground/80 pt-1"
+              class="text-xs text-muted-foreground pt-1"
             >
               {{ props.detail }}
             </p>

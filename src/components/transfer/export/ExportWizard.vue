@@ -220,7 +220,7 @@ async function startExport() {
       :title="t('transfer.export.step.source')"
       :step-number="1"
       icon="i-carbon-data-base"
-      icon-class="text-emerald-600 dark:text-emerald-500"
+      icon-class="text-muted-foreground"
       :summary="sourceSummary"
       min-height="340px"
     >
@@ -293,7 +293,7 @@ async function startExport() {
       :title="t('transfer.export.step.formatOutput')"
       :step-number="2"
       icon="i-carbon-document"
-      icon-class="text-blue-600 dark:text-blue-500"
+      icon-class="text-muted-foreground"
       min-height="180px"
     >
       <div class="flex flex-col gap-3">
@@ -316,8 +316,8 @@ async function startExport() {
                   : 'border-border/40 bg-card hover:bg-muted/40'"
                 @click="selectedFormat = opt.value"
               >
-                <span :class="[opt.icon, selectedFormat === opt.value ? 'h-4 w-4 text-primary' : 'h-4 w-4 text-muted-foreground']" />
-                <span class="text-xs font-semibold" :class="selectedFormat === opt.value ? 'text-primary' : ''">
+                <span :class="[opt.icon, selectedFormat === opt.value ? 'h-4 w-4 text-primary-text' : 'h-4 w-4 text-muted-foreground']" />
+                <span class="text-xs font-semibold" :class="selectedFormat === opt.value ? 'text-primary-text' : ''">
                   {{ opt.label }}
                 </span>
               </button>

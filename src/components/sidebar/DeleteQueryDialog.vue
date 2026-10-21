@@ -33,7 +33,7 @@ const { t } = useI18n()
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle class="flex gap-2 items-center">
-          <span class="i-carbon-trash-can text-destructive h-4 w-4" />
+          <span class="i-carbon-trash-can text-destructive-text h-4 w-4" />
           {{ t('sidebar.savedQueries.delete.title') }}
         </AlertDialogTitle>
         <AlertDialogDescription>

@@ -103,7 +103,7 @@ onUnmounted(() => {
           </div>
           <div class="flex flex-col gap-1 items-center">
             <span class="text-xs text-foreground/60 font-medium">{{ t('transfer.tasks.noTasks') }}</span>
-            <span class="text-[11px] text-muted-foreground/60">{{ t('transfer.tasks.emptyDescription') }}</span>
+            <span class="text-[11px] text-muted-foreground">{{ t('transfer.tasks.emptyDescription') }}</span>
           </div>
         </div>
 

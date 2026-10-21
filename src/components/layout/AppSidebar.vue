@@ -26,7 +26,7 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <aside class="border-r bg-background flex flex-shrink-0 flex-col h-full w-16 z-50">
+  <aside class="border-r bg-chrome flex flex-shrink-0 flex-col h-full w-16 z-50">
     <!-- User identity (was the logo; the app mark moved to the title bar) -->
     <div class="border-b flex h-14 items-center justify-center">
       <UserMenu />
@@ -49,9 +49,10 @@ const { t } = useI18n()
                   item.id === 'github'
                     ? 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                     : isActive(item.path)
-                      ? 'bg-secondary text-primary border border-border shadow-sm'
+                      ? 'bg-secondary text-primary-text border border-border shadow-sm'
                       : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                 ]"
+                :aria-label="item.label"
                 @click="item.id === 'github' ? openUrl('https://github.com/geek-fun/sqlkit') : navigate()"
               >
                 <ProBadge
@@ -155,7 +156,7 @@ const { t } = useI18n()
                 <!-- AI Badge -->
                 <span
                   v-if="false"
-                  class="text-[8px] text-white font-bold px-1 rounded-full bg-primary right-1 top-1 absolute"
+                  class="text-[8px] text-primary-foreground font-bold px-1 rounded-full bg-primary right-1 top-1 absolute"
                 >
                   AI
                 </span>
@@ -178,9 +179,10 @@ const { t } = useI18n()
               <button
                 class="mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center" :class="[
                   isActive('/settings')
-                    ? 'bg-secondary text-primary border border-border shadow-sm'
+                    ? 'bg-secondary text-primary-text border border-border shadow-sm'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                 ]"
+                :aria-label="t('common.settings')"
                 @click="navigate"
               >
                 <svg

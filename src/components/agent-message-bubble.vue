@@ -482,7 +482,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
 .message-error .assistant-content {
   background: hsl(var(--destructive) / 0.08);
   border: 1px solid hsl(var(--destructive) / 0.3);
-  color: hsl(var(--destructive));
+  color: hsl(var(--destructive-text));
 }
 
 .activity-list {
@@ -515,7 +515,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
 .iteration-icon {
   width: 10px;
   height: 10px;
-  color: hsl(var(--muted-foreground) / 0.5);
+  color: hsl(var(--muted-foreground));
   flex-shrink: 0;
   margin-left: 2px;
   position: relative;
@@ -527,7 +527,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: hsl(var(--muted-foreground) / 0.45);
+  color: hsl(var(--muted-foreground));
   user-select: none;
 }
 
@@ -586,7 +586,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
 .duration-badge {
   font-size: 10.5px;
   font-weight: 500;
-  color: hsl(var(--muted-foreground) / 0.55);
+  color: hsl(var(--muted-foreground));
   background: hsl(var(--muted));
   padding: 1px 6px;
   border-radius: 9px;
@@ -617,7 +617,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
 
 .tool-verb-label {
   font-size: 12px;
-  color: hsl(var(--muted-foreground) / 0.7);
+  color: hsl(var(--muted-foreground));
 }
 
 .activity-status-icon {
@@ -627,7 +627,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
 }
 
 .activity-status-icon.executing {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .activity-status-icon.done {
@@ -635,20 +635,20 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
 }
 
 .activity-status-icon.pending {
-  color: hsl(var(--muted-foreground) / 0.6);
+  color: hsl(var(--muted-foreground));
 }
 
 .activity-status-icon.error {
-  color: hsl(var(--destructive));
+  color: hsl(var(--destructive-text));
 }
 
 .activity-status-icon.denied {
-  color: hsl(var(--muted-foreground) / 0.5);
+  color: hsl(var(--muted-foreground));
 }
 
 .result-preview {
   font-size: 11.5px;
-  color: hsl(var(--muted-foreground) / 0.55);
+  color: hsl(var(--muted-foreground));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -658,11 +658,11 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
 }
 
 .result-preview-error {
-  color: hsl(var(--destructive) / 0.7);
+  color: hsl(var(--destructive-text));
 }
 
 .result-preview-executing {
-  color: hsl(var(--primary) / 0.7);
+  color: hsl(var(--primary-text));
 }
 
 .tool-body-wrapper {
@@ -690,13 +690,13 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
 }
 
 .result-body-error {
-  color: hsl(var(--destructive) / 0.8);
+  color: hsl(var(--destructive-text));
 }
 
 .activity-chevron {
   width: 11px;
   height: 11px;
-  color: hsl(var(--muted-foreground) / 0.4);
+  color: hsl(var(--muted-foreground));
   flex-shrink: 0;
   transition: transform 0.18s ease;
 }
@@ -878,7 +878,7 @@ details[open] .activity-chevron {
 }
 
 .markdown-body :deep(a) {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -887,7 +887,7 @@ details[open] .activity-chevron {
   margin: 8px 0;
   padding: 4px 14px;
   border-left: 3px solid hsl(var(--border));
-  color: hsl(var(--muted-foreground) / 0.85);
+  color: hsl(var(--muted-foreground));
 }
 
 .markdown-body :deep(blockquote p) {
@@ -967,7 +967,7 @@ details[open] .activity-chevron {
 .compaction-icon {
   width: 12px;
   height: 12px;
-  color: hsl(var(--muted-foreground) / 0.7);
+  color: hsl(var(--muted-foreground));
   flex-shrink: 0;
 }
 
@@ -992,7 +992,7 @@ details[open] .activity-chevron {
 .delta-arrow {
   width: 10px;
   height: 10px;
-  color: hsl(var(--muted-foreground) / 0.6);
+  color: hsl(var(--muted-foreground));
 }
 
 .delta-saved {
@@ -1011,7 +1011,7 @@ details[open] .activity-chevron {
   border: none;
   cursor: pointer;
   font-size: 11px;
-  color: hsl(var(--muted-foreground) / 0.8);
+  color: hsl(var(--muted-foreground));
   padding: 0;
   margin-left: 4px;
 }

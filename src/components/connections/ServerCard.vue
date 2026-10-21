@@ -38,11 +38,11 @@ const { getDatabaseIcon, getDatabaseColor } = useDatabaseIcon()
 const statusColor = computed(() => {
   switch (props.connectionStatus) {
     case ConnectionStatus.CONNECTED:
-      return 'bg-green-600 dark:bg-green-500'
+      return 'bg-success'
     case ConnectionStatus.CONNECTING:
-      return 'bg-yellow-600 dark:bg-yellow-500 animate-pulse'
+      return 'bg-warning animate-pulse'
     case ConnectionStatus.ERROR:
-      return 'bg-red-600 dark:bg-red-500'
+      return 'bg-destructive-text'
     default:
       return 'bg-muted-foreground/50'
   }
@@ -372,7 +372,7 @@ const connectTooltip = computed(() =>
               {{ t('components.serverCard.actions.duplicate') }}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem class="text-destructive focus:text-destructive" @click="handleDelete">
+            <DropdownMenuItem class="text-destructive-text focus:text-destructive-text" @click="handleDelete">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
