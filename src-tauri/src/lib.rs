@@ -389,7 +389,6 @@ pub fn run() {
             commands::auto_map_migration_columns,
             commands::generate_ddl_for_objects,
             commands::execute_sql_content,
-            commands::get_app_version,
             crate::consume_pending_auth,
             crate::entitlement::refresh_entitlement,
             crate::entitlement::get_entitlement,

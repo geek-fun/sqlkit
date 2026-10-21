@@ -233,7 +233,7 @@ Interactive components must cover default, hover, focus-visible, active / select
 
 ### Forms, connection settings, and dialogs
 
-- Settings opens on General, grouping theme, application updates, and Account & Plan. Keep account controls in this first category rather than a separate settings tab.
+- Settings opens on General, grouping theme, application updates, and Account & Plan. Keep account controls in this first category, with About at the bottom after Account & Plan. About reads the running Tauri app version, with the package version as a browser fallback. Opening General checks for updates without starting installation; show checking, available, current, and failure states beside the version. Keep repository and website links; omit unmaintained community links.
 - Reuse 32px Input / Select controls and the existing label / helper / error structure. Placeholders do not replace labels.
 - Group host, port, authentication, database, and related fields by task. Progressively reveal advanced SSL / SSH settings, retaining the conditional-field behavior in [SSL_UI_DESIGN.md](docs/SSL_UI_DESIGN.md).
 - Place validation near the field and explain the cause and remedy. Preserve entered content after failure; handle sensitive values under existing security policies.

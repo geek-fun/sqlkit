@@ -18,9 +18,3 @@ pub use query::*;
 pub use server::*;
 pub use store::*;
 pub use transfer::*;
-
-/// Returns the current app version from Cargo.toml.
-#[tauri::command]
-pub fn get_app_version() -> String {
-    env!("CARGO_PKG_VERSION").to_string()
-}
