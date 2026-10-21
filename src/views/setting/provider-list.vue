@@ -124,7 +124,7 @@ const handleSync = async (id: string) => {
         >
           <div class="flex gap-2 items-center">
             <div
-              :class="provider.enabled ? 'bg-primary' : 'bg-muted-foreground'"
+              :class="provider.enabled ? 'bg-green-500' : 'bg-gray-400'"
               class="rounded-full flex-shrink-0 h-2 w-2"
             />
             <span class="font-medium">{{ provider.name }}</span>
@@ -218,7 +218,7 @@ const handleSync = async (id: string) => {
               />
               <template v-else-if="testResult?.id === provider.id && testResult.success">
                 <svg
-                  class="text-primary-text mr-1 h-3 w-3"
+                  class="text-green-500 mr-1 h-3 w-3"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"

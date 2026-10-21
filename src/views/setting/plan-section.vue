@@ -97,15 +97,15 @@ const handleLogout = () => runAccountAction(() => entitlementStore.clearSessionS
         <span v-if="expiryText" class="text-xs text-muted-foreground">
           {{ expiryText }}
         </span>
-        <span v-if="entitlementStore.cancelScheduled" class="text-xs text-warning">
+        <span v-if="entitlementStore.cancelScheduled" class="text-xs text-amber-600">
           {{ t('plan.section.cancelScheduled') }}
         </span>
-        <span v-if="entitlementStore.sessionExpired" class="text-xs text-warning">
+        <span v-if="entitlementStore.sessionExpired" class="text-xs text-amber-600">
           {{ t('plan.section.sessionExpired') }}
         </span>
         <span
           v-else-if="accountStore.isLoggedIn && !accountStore.refreshToken && deviceStore.activationError"
-          class="text-xs text-warning"
+          class="text-xs text-amber-600"
         >
           {{ t('plan.section.deviceActivationFailed') }}
         </span>

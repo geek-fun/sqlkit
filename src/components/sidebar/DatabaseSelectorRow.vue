@@ -142,11 +142,11 @@ watch(() => props.connectionId, async (connId) => {
       @update:model-value="handleSelect"
     >
       <template #selected-prepend>
-        <span class="i-lucide-database text-icon-database mr-1.5 shrink-0 h-3.5 w-3.5" />
+        <span class="i-lucide-database text-yellow-500 mr-1.5 shrink-0 h-3.5 w-3.5" />
       </template>
       <template #option="{ option }">
         <div class="flex gap-1.5 w-full items-center">
-          <span class="i-lucide-database text-icon-database shrink-0 h-3.5 w-3.5" />
+          <span class="i-lucide-database text-yellow-500 shrink-0 h-3.5 w-3.5" />
           <span class="text-left flex-1 truncate">{{ option.label }}</span>
         </div>
       </template>

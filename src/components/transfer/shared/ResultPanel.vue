@@ -54,7 +54,7 @@ function formatDuration(seconds: number) {
     <div class="px-3 py-2 border border-border/40 rounded-md bg-card flex gap-3 shadow-none items-center">
       <div
         class="rounded-full flex h-6 w-6 items-center justify-center"
-        :class="isSuccess ? 'bg-success-muted text-success' : 'bg-destructive/10 text-destructive-text'"
+        :class="isSuccess ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'"
       >
         <span v-if="isSuccess" class="i-carbon-checkmark-filled h-3.5 w-3.5" />
         <span v-else class="i-carbon-warning-filled h-3.5 w-3.5" />

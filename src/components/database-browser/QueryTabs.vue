@@ -131,7 +131,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          class="text-warning flex-shrink-0"
+          class="text-orange-500 flex-shrink-0"
           :title="t('components.queryTabs.orphan')"
         >
           <path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 3 21h18a2 2 0 0 0 1.73-3Z" />
@@ -211,7 +211,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
         <!-- Unsaved indicator -->
         <span
           v-if="tab.hasUnsavedChanges"
-          class="rounded-full bg-muted-foreground flex-shrink-0 h-2 w-2"
+          class="rounded-full bg-orange-500 flex-shrink-0 h-2 w-2"
           :title="t('components.queryTabs.unsaved')"
         />
 

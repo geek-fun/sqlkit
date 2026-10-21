@@ -370,8 +370,8 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                   {{ stats.total }}
                 </p>
               </div>
-              <div class="rounded-lg bg-muted flex h-10 w-10 items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground h-5 w-5">
+              <div class="rounded-lg bg-primary/10 flex h-10 w-10 items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary-text h-5 w-5">
                   <ellipse cx="12" cy="5" rx="9" ry="3" />
                   <path d="M3 5v14a9 3 0 0 0 18 0V5" />
                 </svg>
@@ -388,8 +388,8 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                   {{ stats.sshProfiles }}
                 </p>
               </div>
-              <div class="rounded-lg bg-muted flex h-10 w-10 items-center justify-center">
-                <span class="i-carbon-key text-muted-foreground h-5 w-5" />
+              <div class="rounded-lg bg-violet-100 flex h-10 w-10 items-center justify-center dark:bg-violet-900/30">
+                <span class="i-carbon-key text-violet-600 h-5 w-5 dark:text-violet-400" />
               </div>
             </div>
           </Card>
@@ -403,8 +403,8 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
                   {{ stats.active }}
                 </p>
               </div>
-              <div class="rounded-lg bg-muted flex h-10 w-10 items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground h-5 w-5">
+              <div class="rounded-lg bg-green-100 flex h-10 w-10 items-center justify-center dark:bg-green-900/30">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-green-600 h-5 w-5 dark:text-green-400">
                   <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
                 </svg>
               </div>
@@ -412,22 +412,22 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
           </Card>
         </div>
 
-        <div v-if="connectError" class="p-4 rounded-md bg-destructive-muted">
+        <div v-if="connectError" class="p-4 rounded-md bg-red-50 dark:bg-red-900/20">
           <div class="flex gap-3 items-start">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-destructive-text h-5 w-5">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-500 h-5 w-5">
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
             </svg>
             <div class="flex-1">
-              <h3 class="text-sm text-destructive-text font-medium">
+              <h3 class="text-sm text-red-800 font-medium dark:text-red-200">
                 {{ t('pages.connections.error.title') }}
               </h3>
-              <p class="text-sm text-destructive-text mt-1">
+              <p class="text-sm text-red-700 mt-1 dark:text-red-300">
                 {{ connectError }}
               </p>
             </div>
-            <button type="button" class="text-destructive-text hover:text-destructive-text" @click="connectError = null">
+            <button type="button" class="text-red-500 hover:text-red-700" @click="connectError = null">
               <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4">
                 <path d="M18 6 6 18" />
                 <path d="m6 6 12 12" />
@@ -457,8 +457,8 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             @keydown.space.self.prevent="openProfileEdit(profile)"
           >
             <div class="flex gap-3 items-start">
-              <div class="p-1.5 rounded-lg bg-muted flex shrink-0 h-10 w-10 items-center justify-center">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground h-5 w-5">
+              <div class="p-1.5 rounded-lg bg-violet-100 flex shrink-0 h-10 w-10 items-center justify-center dark:bg-violet-900/30">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-violet-600 h-5 w-5 dark:text-violet-400">
                   <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
                 </svg>
               </div>
@@ -626,7 +626,7 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
       <!-- Floating Add Connection — INSIDE the relative page container so the
            absolute anchor tracks the content edge even with a side panel open -->
       <button
-        class="text-primary-foreground rounded-full bg-primary flex h-14 w-14 cursor-pointer shadow-lg transition-colors items-center bottom-6 right-6 justify-center absolute hover:bg-primary/90"
+        class="text-white rounded-full bg-blue-600 flex h-14 w-14 cursor-pointer shadow-lg transition-colors items-center bottom-6 right-6 justify-center absolute dark:bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-700"
         @click="handleAddConnection"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-6 w-6">

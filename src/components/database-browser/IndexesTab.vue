@@ -54,7 +54,7 @@ onMounted(fetchIndexes)
       <Spinner size="sm" />
       {{ t('common.loading') }}
     </div>
-    <div v-else-if="error" class="text-sm text-muted-foreground py-8 text-center">
+    <div v-else-if="error" class="text-sm text-destructive-text py-8 text-center">
       {{ error }}
     </div>
     <div v-else-if="indexes.length === 0" class="text-sm text-muted-foreground py-8 text-center">
@@ -97,11 +97,11 @@ onMounted(fetchIndexes)
               {{ idx.index_type }}
             </td>
             <td class="px-3 py-1.5">
-              <span v-if="idx.is_unique" class="text-muted-foreground font-medium">{{ t('components.indexesTab.yes') }}</span>
+              <span v-if="idx.is_unique" class="text-green-500 font-medium">{{ t('components.indexesTab.yes') }}</span>
               <span v-else class="text-muted-foreground">{{ t('components.indexesTab.no') }}</span>
             </td>
             <td class="px-3 py-1.5">
-              <span v-if="idx.is_primary" class="text-muted-foreground font-medium">{{ t('components.indexesTab.yes') }}</span>
+              <span v-if="idx.is_primary" class="text-amber-500 font-medium">{{ t('components.indexesTab.yes') }}</span>
               <span v-else class="text-muted-foreground">{{ t('components.indexesTab.no') }}</span>
             </td>
           </tr>

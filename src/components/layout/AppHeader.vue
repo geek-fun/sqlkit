@@ -59,7 +59,7 @@ const trafficLightInset = computed(() => {
               <span class="i-carbon-list-boxes h-4 w-4" />
               <span
                 v-if="taskCount > 0"
-                class="text-[9px] text-secondary-foreground font-bold px-1 rounded-full bg-secondary flex h-4 min-w-4 items-center justify-center absolute -right-0.5 -top-0.5"
+                class="text-[9px] text-white font-bold px-1 rounded-full bg-red-500 flex h-4 min-w-4 items-center justify-center absolute -right-0.5 -top-0.5"
               >
                 {{ taskCount > 9 ? '9+' : taskCount }}
               </span>

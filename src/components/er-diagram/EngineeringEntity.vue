@@ -107,7 +107,7 @@ defineExpose({})
 
 <style scoped>
 .er-entity {
-  @apply bg-card border border-border rounded-xl;
+  @apply bg-card border-2 border-blue-500/50 rounded-xl shadow-sm;
   width: 260px;
   font-size: 12px;
   user-select: none;
@@ -117,7 +117,7 @@ defineExpose({})
   @apply border-primary ring-2 ring-primary/30;
 }
 .er-entity-header {
-  @apply bg-chrome px-3 py-2 font-semibold text-sm border-b border-border flex items-center gap-2;
+  @apply bg-blue-50 dark:bg-blue-950/30 px-3 py-2 font-semibold text-sm border-b border-blue-500/20 flex items-center gap-2;
   cursor: grab;
   white-space: nowrap;
   overflow: hidden;
@@ -127,7 +127,7 @@ defineExpose({})
   cursor: grabbing;
 }
 .er-entity-icon {
-  @apply text-muted-foreground shrink-0;
+  @apply text-blue-500 shrink-0;
 }
 .er-entity-pills {
   @apply p-2 flex flex-wrap gap-1.5;
@@ -138,10 +138,10 @@ defineExpose({})
   @apply bg-muted/50 border-border/60 text-muted-foreground;
 }
 .er-entity-pill--pk {
-  @apply bg-secondary border-border text-foreground;
+  @apply bg-amber-50 dark:bg-amber-950/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300;
 }
 .er-entity-pill--fk {
-  @apply bg-secondary border-border text-foreground;
+  @apply bg-blue-50 dark:bg-blue-950/30 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300;
 }
 .er-entity-pill-name {
   @apply truncate;

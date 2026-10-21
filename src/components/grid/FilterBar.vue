@@ -23,6 +23,20 @@ function operatorLabel(op: FilterOperator): string {
   }
   return labels[op]
 }
+
+function chipColor(op: FilterOperator): string {
+  const colors: Record<FilterOperator, string> = {
+    eq: 'bg-blue-500/15 text-blue-700 dark:text-blue-300',
+    neq: 'bg-orange-500/15 text-orange-700 dark:text-orange-300',
+    like: 'bg-purple-500/15 text-purple-700 dark:text-purple-300',
+    gt: 'bg-green-500/15 text-green-700 dark:text-green-300',
+    gte: 'bg-green-500/15 text-green-700 dark:text-green-300',
+    lt: 'bg-yellow-600/15 text-yellow-700 dark:text-yellow-300',
+    lte: 'bg-yellow-600/15 text-yellow-700 dark:text-yellow-300',
+    between: 'bg-teal-500/15 text-teal-700 dark:text-teal-300',
+  }
+  return colors[op]
+}
 </script>
 
 <template>
@@ -34,7 +48,8 @@ function operatorLabel(op: FilterOperator): string {
     <span
       v-for="f in filters"
       :key="f.column"
-      class="text-xs text-secondary-foreground font-medium px-2 py-0.5 border border-border rounded bg-secondary inline-flex gap-1 items-center"
+      class="text-xs font-medium px-2 py-0.5 rounded inline-flex gap-1 items-center"
+      :class="chipColor(f.operator)"
     >
       <span class="font-semibold">{{ f.column }}</span>
       <span>{{ operatorLabel(f.operator) }}</span>

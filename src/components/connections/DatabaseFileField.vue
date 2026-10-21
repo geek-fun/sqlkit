@@ -252,8 +252,8 @@ const fileDetails = computed(() => {
 const toneClass: Record<StatusDescriptor['tone'], string> = {
   info: 'text-muted-foreground',
   success: 'text-muted-foreground',
-  warning: 'text-warning',
-  error: 'text-destructive-text',
+  warning: 'text-amber-600 dark:text-amber-500',
+  error: 'text-destructive',
 }
 
 const toneIcon: Record<StatusDescriptor['tone'], string> = {

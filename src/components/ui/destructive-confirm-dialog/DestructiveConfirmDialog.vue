@@ -60,8 +60,8 @@ const confirmButtonClass = props.confirmVariant === 'warning'
           <div
             class="rounded-full flex shrink-0 h-10 w-10 items-center justify-center"
             :class="props.confirmVariant === 'warning'
-              ? 'bg-warning-muted text-warning'
-              : 'bg-destructive/10 text-destructive-text'"
+              ? 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'
+              : 'bg-destructive/10 text-destructive'"
           >
             <span class="i-carbon-warning h-5 w-5" />
           </div>

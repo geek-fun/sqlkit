@@ -39,18 +39,6 @@ export default defineConfig({
         text: 'hsl(var(--primary-text))',
         foreground: 'hsl(var(--primary-foreground))',
       },
-      icon: {
-        table: 'hsl(var(--icon-table))',
-        group: 'hsl(var(--icon-procedure))',
-        view: 'hsl(var(--icon-view))',
-        procedure: 'hsl(var(--icon-procedure))',
-        function: 'hsl(var(--icon-function))',
-        database: 'hsl(var(--icon-database))',
-        execute: 'hsl(var(--icon-table))',
-        explain: 'hsl(var(--icon-view))',
-        format: 'hsl(var(--icon-function))',
-        save: 'hsl(var(--icon-procedure))',
-      },
       secondary: {
         DEFAULT: 'hsl(var(--secondary))',
         foreground: 'hsl(var(--secondary-foreground))',
