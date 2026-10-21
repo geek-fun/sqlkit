@@ -153,7 +153,7 @@ defineExpose({
 
         <div
           v-if="errorMessage && errorHint"
-          class="text-sm text-warning p-4 border border-warning-border rounded-md bg-warning-muted w-full"
+          class="text-sm text-amber-700 p-4 border border-amber-500/40 rounded-md bg-amber-500/10 w-full dark:text-amber-400"
         >
           <div class="flex gap-3 items-start">
             <span class="i-carbon-warning mt-0.5 flex-shrink-0 h-5 w-5" />
@@ -184,7 +184,7 @@ defineExpose({
              no longer detected — the tunnel falls back to a direct connection -->
         <p
           v-if="!errorMessage && warningMessage"
-          class="text-xs text-warning text-center max-w-[400px]"
+          class="text-xs text-amber-600 text-center max-w-[400px] dark:text-amber-400"
         >
           {{ warningMessage }}
         </p>

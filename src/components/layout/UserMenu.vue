@@ -135,7 +135,7 @@ async function handleLogout() {
           </span>
           <!-- The re-login instruction outranks any cached benefit copy: the
                session verdict is the only verified fact while degraded. -->
-          <p v-if="entitlementStore.sessionExpired" class="text-[11px] text-warning mt-1">
+          <p v-if="entitlementStore.sessionExpired" class="text-[11px] text-amber-500 mt-1">
             {{ t('plan.section.sessionExpired') }}
           </p>
           <p v-else-if="expiryText" class="text-[11px] text-muted-foreground mt-1">

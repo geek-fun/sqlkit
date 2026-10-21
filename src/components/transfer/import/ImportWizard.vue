@@ -379,7 +379,7 @@ onUnmounted(() => {
       :title="t('transfer.import.step.file', 'Source File')"
       :step-number="1"
       icon="i-carbon-document-import"
-      icon-class="text-muted-foreground"
+      icon-class="text-emerald-600 dark:text-emerald-500"
       :summary="fileSummary"
     >
       <div class="space-y-4">
@@ -445,7 +445,7 @@ onUnmounted(() => {
       :title="t('transfer.import.step.mapping', 'Target & Mapping')"
       :step-number="2"
       icon="i-carbon-data-base"
-      icon-class="text-muted-foreground"
+      icon-class="text-blue-600 dark:text-blue-500"
       :summary="targetSummary"
       :scope="scope"
       @update:scope="scope = $event"
@@ -580,7 +580,7 @@ onUnmounted(() => {
                     {{ mapping.targetType || '-' }}
                   </td>
                   <td class="px-2 py-1 align-middle">
-                    <span v-if="mapping.targetColumn" class="text-[10px] text-muted-foreground tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-secondary flex w-fit uppercase items-center">
+                    <span v-if="mapping.targetColumn" class="text-[10px] text-green-600 tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-green-500/10 flex w-fit uppercase items-center">
                       <span class="sr-only">Status: </span>
                       <div class="i-carbon-checkmark mr-1" aria-hidden="true" /> Mapped
                     </span>
@@ -607,7 +607,7 @@ onUnmounted(() => {
       :title="t('transfer.import.step.options', 'Options & Import')"
       :step-number="3"
       icon="i-carbon-settings"
-      icon-class="text-muted-foreground"
+      icon-class="text-amber-600 dark:text-amber-500"
       variant="highlight"
     >
       <div class="space-y-4">

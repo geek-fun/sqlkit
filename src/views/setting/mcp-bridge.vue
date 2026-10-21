@@ -76,8 +76,8 @@ const permissionModeDesc = computed(() => {
 
 const statusDotClass = computed(() => {
   if (restartPhase.value === 'shutting-down' || restartPhase.value === 'starting')
-    return 'bg-warning animate-pulse'
-  return restartPhase.value === 'failed' ? 'bg-destructive-text' : status.value.running ? 'bg-success' : 'bg-muted-foreground'
+    return 'bg-yellow-500 animate-pulse'
+  return status.value.running ? 'bg-green-500' : 'bg-red-500'
 })
 
 const statusText = computed(() => {

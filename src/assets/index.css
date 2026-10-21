@@ -44,11 +44,6 @@
   --syntax-string: 23.16 60.64% 36.86%;
   --syntax-number: 270.65 39.66% 45.49%;
   --syntax-comment: 98.18 12.09% 35.69%;
-  --icon-table: 142.43 71.81% 29.22%;
-  --icon-view: 262.12 83.26% 57.84%;
-  --icon-procedure: 224.28 76.33% 48.04%;
-  --icon-function: 35.65 100.00% 27.06%;
-  --icon-database: 43.91 100.00% 27.06%;
 }
 
 .dark {
@@ -95,11 +90,6 @@
   --syntax-string: 26.40 47.77% 69.22%;
   --syntax-number: 264.49 51.58% 81.37%;
   --syntax-comment: 112.50 7.55% 58.43%;
-  --icon-table: 143.02 47.25% 64.31%;
-  --icon-view: 265.41 80.95% 79.41%;
-  --icon-procedure: 218.46 100.00% 77.06%;
-  --icon-function: 36.61 79.73% 70.98%;
-  --icon-database: 45.00 55.17% 65.88%;
 }
 
 * {

@@ -38,11 +38,11 @@ const { getDatabaseIcon, getDatabaseColor } = useDatabaseIcon()
 const statusColor = computed(() => {
   switch (props.connectionStatus) {
     case ConnectionStatus.CONNECTED:
-      return 'bg-success'
+      return 'bg-green-600 dark:bg-green-500'
     case ConnectionStatus.CONNECTING:
-      return 'bg-warning animate-pulse'
+      return 'bg-yellow-600 dark:bg-yellow-500 animate-pulse'
     case ConnectionStatus.ERROR:
-      return 'bg-destructive-text'
+      return 'bg-red-600 dark:bg-red-500'
     default:
       return 'bg-muted-foreground/50'
   }

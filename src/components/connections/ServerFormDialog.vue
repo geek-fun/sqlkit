@@ -1390,7 +1390,7 @@ function handleSave() {
 
                     <div
                       v-if="conflictingDuckDbConnection"
-                      class="text-xs text-warning p-2 border border-warning-border rounded-md flex gap-2 items-start"
+                      class="text-xs text-amber-600 p-2 border border-amber-500/50 rounded-md flex gap-2 items-start dark:text-amber-500"
                     >
                       <span class="i-carbon-warning mt-0.5 shrink-0 h-4 w-4" />
                       <div class="flex-1 space-y-1">
@@ -1529,9 +1529,9 @@ function handleSave() {
         <!-- Test Connection Status -->
         <div
           v-if="testStatus !== 'idle' || (isJdbcDb && setupSteps.some(s => s.status !== 'pending'))" class="p-3 rounded-md" :class="{
-            'bg-primary/5': testStatus === 'testing',
-            'bg-success-muted': testStatus === 'success',
-            'bg-destructive-muted': testStatus === 'error',
+            'bg-blue-50 dark:bg-blue-900/10': testStatus === 'testing',
+            'bg-green-50 dark:bg-green-900/10': testStatus === 'success',
+            'bg-red-50 dark:bg-red-900/10': testStatus === 'error',
           }"
         >
           <!-- Per-step status list (shown during and after setup for JDBC databases) -->
@@ -1540,11 +1540,11 @@ function handleSave() {
               v-for="step in setupSteps"
               :key="step.id"
               class="text-xs flex gap-2 min-w-0 items-center"
-              :class="step.status === 'done' ? 'text-success' : step.status === 'running' ? 'text-foreground' : step.status === 'error' ? 'text-destructive-text' : 'text-muted-foreground'"
+              :class="step.status === 'done' ? 'text-green-600 dark:text-green-400' : step.status === 'running' ? 'text-foreground' : step.status === 'error' ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'"
             >
               <span v-if="step.status === 'done'" class="i-carbon-checkmark shrink-0 h-3.5 w-3.5" />
               <span v-else-if="step.status === 'running' && !step.progress" class="i-carbon-circle-dash shrink-0 h-3.5 w-3.5 animate-spin" />
-              <span v-else-if="step.status === 'running'" class="i-carbon-circle-dash text-primary-text shrink-0 h-3.5 w-3.5 animate-spin" />
+              <span v-else-if="step.status === 'running'" class="i-carbon-circle-dash text-blue-500 shrink-0 h-3.5 w-3.5 animate-spin" />
               <span v-else-if="step.status === 'error'" class="i-carbon-close shrink-0 h-3.5 w-3.5" />
               <span v-else class="i-carbon-circle-dash shrink-0 h-3.5 w-3.5" />
               <span class="font-medium whitespace-nowrap">{{ t(step.label) }}</span>
@@ -1560,7 +1560,7 @@ function handleSave() {
               </span>
               <!-- Error + retry button (pushed right) -->
               <span v-if="step.status === 'error'" class="flex flex-1 gap-1.5 min-w-0 items-center justify-end">
-                <span class="text-destructive-text text-right max-w-[200px] truncate">{{ step.error || t('components.serverForm.ssh.stepFailed') }}</span>
+                <span class="text-red-500 text-right max-w-[200px] truncate">{{ step.error || t('components.serverForm.ssh.stepFailed') }}</span>
                 <button
                   type="button"
                   class="text-muted-foreground inline-flex shrink-0 gap-0.5 cursor-pointer transition-colors items-center hover:text-foreground"
@@ -1574,16 +1574,16 @@ function handleSave() {
           </div>
           <div class="space-y-1.5">
             <!-- Loading state during connection test (always visible when testing after steps) -->
-            <div v-if="testStatus === 'testing'" class="text-xs text-primary-text text-primary-text mt-1.5 pt-1 flex gap-1.5 items-center" :class="{ 'border-t border-border/50': isJdbcDb }">
+            <div v-if="testStatus === 'testing'" class="text-xs text-blue-600 mt-1.5 pt-1 flex gap-1.5 items-center dark:text-blue-400" :class="{ 'border-t border-border/50': isJdbcDb }">
               <span class="i-carbon-circle-dash shrink-0 h-3.5 w-3.5 animate-spin" />
               <span class="font-medium">{{ t('common.status.testing') }}</span>
             </div>
             <!-- Summary result -->
-            <div v-if="testStatus === 'success'" class="text-xs text-success text-success mt-1.5 pt-1 flex gap-1.5 items-center" :class="{ 'border-t border-border/50': isJdbcDb }">
+            <div v-if="testStatus === 'success'" class="text-xs text-green-600 mt-1.5 pt-1 flex gap-1.5 items-center dark:text-green-400" :class="{ 'border-t border-border/50': isJdbcDb }">
               <span class="i-carbon-checkmark shrink-0 h-3.5 w-3.5" />
               <span class="font-medium">{{ t('common.status.success') }}</span>
             </div>
-            <div v-else-if="testStatus === 'error'" class="text-xs text-destructive-text text-destructive-text mt-1.5 pt-1 space-y-0.5" :class="{ 'border-t border-border/50': isJdbcDb }">
+            <div v-else-if="testStatus === 'error'" class="text-xs text-red-600 mt-1.5 pt-1 space-y-0.5 dark:text-red-400" :class="{ 'border-t border-border/50': isJdbcDb }">
               <div class="flex gap-1.5 items-center">
                 <span class="i-carbon-close shrink-0 h-3.5 w-3.5" />
                 <span class="font-medium">{{ t('common.status.failed') }}</span>
@@ -1596,12 +1596,12 @@ function handleSave() {
                   <span class="text-xs">{{ t('common.buttons.retry') }}</span>
                 </button>
               </div>
-              <p v-if="testError" class="text-destructive-text pl-5">
+              <p v-if="testError" class="text-red-500 pl-5">
                 {{ testError }}
               </p>
               <div
                 v-if="testFailureHint"
-                class="text-xs text-warning pl-5 flex gap-2 items-start"
+                class="text-xs text-amber-600 pl-5 flex gap-2 items-start dark:text-amber-500"
               >
                 <span class="i-carbon-warning mt-0.5 shrink-0 h-4 w-4" />
                 <div class="flex-1 space-y-1">
@@ -1634,7 +1634,7 @@ function handleSave() {
 
         <div
           v-if="testSshTunnelStripped"
-          class="text-sm text-warning mt-2 p-4 border border-warning-border rounded-md bg-warning-muted"
+          class="text-sm text-amber-700 mt-2 p-4 border border-amber-500/40 rounded-md bg-amber-500/10 dark:text-amber-400"
         >
           <div class="flex gap-3 items-start">
             <span class="i-carbon-warning mt-0.5 flex-shrink-0 h-5 w-5" />

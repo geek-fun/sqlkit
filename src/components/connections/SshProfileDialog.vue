@@ -214,7 +214,7 @@ async function save() {
         <p
           v-if="testResult"
           class="text-xs leading-relaxed flex gap-1.5 break-words items-start"
-          :class="testResult.success ? 'text-success' : 'text-destructive-text'"
+          :class="testResult.success ? 'text-green-600 dark:text-green-400' : 'text-destructive'"
         >
           <span v-if="testing" class="i-carbon-circle-dash mt-0.5 shrink-0 h-3.5 w-3.5 animate-spin" />
           <span v-else class="i-carbon-network-3 mt-0.5 shrink-0 h-3.5 w-3.5" />
@@ -239,7 +239,7 @@ async function save() {
           :disabled="testing || !valid"
           @click="testProfile"
         >
-          <span v-if="testing" class="i-carbon-circle-dash text-primary-text h-3.5 w-3.5 animate-spin" />
+          <span v-if="testing" class="i-carbon-circle-dash text-blue-500 h-3.5 w-3.5 animate-spin" />
           <span v-else class="i-carbon-network-3 h-3.5 w-3.5" />
           {{ t('common.buttons.testConnection') }}
         </Button>

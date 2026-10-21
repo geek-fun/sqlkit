@@ -50,11 +50,11 @@ type StatusInfo = { dotClass: string, tooltipKey: string }
 const statusInfo = computed<StatusInfo>(() => {
   switch (status.value) {
     case ConnectionStatus.CONNECTED:
-      return { dotClass: 'i-carbon-circle-filled text-success', tooltipKey: 'sidebar.connection.connected' }
+      return { dotClass: 'i-carbon-circle-filled text-green-500', tooltipKey: 'sidebar.connection.connected' }
     case ConnectionStatus.ERROR:
-      return { dotClass: 'i-carbon-circle-filled text-warning', tooltipKey: 'sidebar.connection.lost' }
+      return { dotClass: 'i-carbon-circle-filled text-amber-500', tooltipKey: 'sidebar.connection.lost' }
     case ConnectionStatus.CONNECTING:
-      return { dotClass: 'i-carbon-circle-filled text-warning animate-pulse', tooltipKey: 'sidebar.connection.connecting' }
+      return { dotClass: 'i-carbon-circle-filled text-amber-500 animate-pulse', tooltipKey: 'sidebar.connection.connecting' }
     default:
       return { dotClass: 'i-carbon-circle-filled text-muted-foreground', tooltipKey: 'sidebar.connection.disconnected' }
   }
@@ -85,7 +85,7 @@ function handleSelect(value: string) {
           <span class="text-left flex-1 truncate">{{ option.label }}</span>
           <span
             v-if="connectionStore.getConnectionStatus(option.value) === ConnectionStatus.CONNECTED"
-            class="rounded-full bg-success shrink-0 h-2 w-2"
+            class="rounded-full bg-green-500 shrink-0 h-2 w-2"
           />
         </div>
       </template>

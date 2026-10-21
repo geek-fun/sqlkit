@@ -220,7 +220,7 @@ async function startExport() {
       :title="t('transfer.export.step.source')"
       :step-number="1"
       icon="i-carbon-data-base"
-      icon-class="text-muted-foreground"
+      icon-class="text-emerald-600 dark:text-emerald-500"
       :summary="sourceSummary"
       min-height="340px"
     >
@@ -293,7 +293,7 @@ async function startExport() {
       :title="t('transfer.export.step.formatOutput')"
       :step-number="2"
       icon="i-carbon-document"
-      icon-class="text-muted-foreground"
+      icon-class="text-blue-600 dark:text-blue-500"
       min-height="180px"
     >
       <div class="flex flex-col gap-3">

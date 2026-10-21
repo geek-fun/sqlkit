@@ -15,21 +15,21 @@ const { toasts, dismiss } = useNotifications()
         class="text-sm px-4 py-3 border rounded-lg flex gap-3 pointer-events-auto shadow-lg items-start"
         :class="{
           'bg-background border-border text-foreground': item.type === 'info',
-          'bg-background border-success-border text-foreground': item.type === 'success',
-          'bg-background border-destructive-border text-foreground': item.type === 'error',
-          'bg-background border-warning-border text-foreground': item.type === 'warning',
+          'bg-background border-green-500/40 text-foreground': item.type === 'success',
+          'bg-background border-destructive/40 text-foreground': item.type === 'error',
+          'bg-background border-yellow-500/40 text-foreground': item.type === 'warning',
         }"
       >
         <!-- Icon -->
         <div class="mt-0.5 flex-shrink-0">
           <!-- Success -->
-          <span v-if="item.type === 'success'" class="i-carbon-checkmark text-success h-4 w-4" />
+          <span v-if="item.type === 'success'" class="i-carbon-checkmark text-green-500 h-4 w-4" />
           <!-- Error -->
           <span v-else-if="item.type === 'error'" class="i-carbon-error text-destructive-text h-4 w-4" />
           <!-- Warning -->
-          <span v-else-if="item.type === 'warning'" class="i-carbon-warning text-warning h-4 w-4" />
+          <span v-else-if="item.type === 'warning'" class="i-carbon-warning text-yellow-500 h-4 w-4" />
           <!-- Info -->
-          <span v-else class="i-carbon-information text-muted-foreground h-4 w-4" />
+          <span v-else class="i-carbon-information text-primary-text h-4 w-4" />
         </div>
 
         <!-- Content -->

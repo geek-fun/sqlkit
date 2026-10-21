@@ -213,7 +213,7 @@ const shouldShowSchema = computed(() => {
                 <span class="font-mono">{{ selectedConnection.name }}</span>
                 <span
                   v-if="isConnected"
-                  class="text-[9px] text-muted-foreground font-medium ml-1.5"
+                  class="text-[9px] text-green-600 font-medium ml-1.5"
                 >●</span>
                 <span
                   v-else-if="isConnecting"
@@ -233,7 +233,7 @@ const shouldShowSchema = computed(() => {
                 <span>{{ conn.name }}</span>
                 <span
                   v-if="connectionStore.getConnectionStatus(conn.id!) === ConnectionStatus.CONNECTED"
-                  class="text-[10px] text-muted-foreground tracking-wide font-mono px-1 rounded-sm bg-secondary uppercase"
+                  class="text-[10px] text-green-600 tracking-wide font-mono px-1 rounded-sm bg-green-500/10 uppercase"
                 >
                   {{ t('transfer.connection.connected') }}
                 </span>

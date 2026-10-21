@@ -116,14 +116,14 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
   <div class="flex flex-col h-full">
     <!-- Table Content -->
     <div class="flex flex-1 flex-col min-h-0 overflow-hidden">
-      <div v-if="error" class="p-4 border border-destructive-border rounded-md bg-destructive-muted flex-1">
+      <div v-if="error" class="p-4 border border-red-200 rounded-md bg-red-50 flex-1 dark:border-red-800 dark:bg-red-900/20">
         <div class="flex gap-3 items-start">
-          <span class="i-carbon-warning-alt text-lg text-destructive-text shrink-0" />
+          <span class="i-carbon-warning-alt text-lg text-red-600 shrink-0 dark:text-red-400" />
           <div>
-            <p class="text-sm text-destructive-text font-medium">
+            <p class="text-sm text-red-800 font-medium dark:text-red-200">
               {{ t('transfer.export.tables.loadFailed', 'Failed to load tables') }}
             </p>
-            <p class="text-xs text-destructive-text mt-1">
+            <p class="text-xs text-red-700 mt-1 dark:text-red-300">
               {{ error }}
             </p>
           </div>

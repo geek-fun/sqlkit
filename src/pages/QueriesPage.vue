@@ -1264,7 +1264,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-icon-execute h-7 w-7 hover:text-icon-execute disabled:opacity-40"
+                      class="text-emerald-600 h-7 w-7 dark:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 dark:hover:bg-emerald-500/20"
                       :disabled="!activeTab"
                       :aria-label="t('pages.queries.editor.execute')"
                       @click="executeQuery"
@@ -1284,7 +1284,8 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-icon-explain h-7 w-7 hover:text-icon-explain disabled:opacity-40"
+                      class="text-violet-600 h-7 w-7 dark:text-violet-400 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:bg-violet-500/20"
+                      :class="{ '!text-emerald-600 !bg-emerald-500/10 !dark:bg-emerald-500/20': explainAnalyzeMode }"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       :aria-label="t('pages.queries.editor.explain')"
                       @click="handleExplainQuery(explainAnalyzeMode)"
@@ -1303,8 +1304,8 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-icon-explain h-7 w-7 hover:text-icon-explain disabled:opacity-40"
-                      :class="explainAnalyzeMode ? 'bg-accent ring-1 ring-input' : ''"
+                      class="text-muted-foreground h-7 w-7 hover:text-violet-600 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:text-violet-400 dark:hover:bg-violet-500/20"
+                      :class="explainAnalyzeMode ? '!text-violet-600 !bg-violet-100 dark:!text-violet-300 dark:!bg-violet-900/30' : ''"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       :aria-pressed="explainAnalyzeMode"
                       :aria-label="t('pages.queries.explain.analyzeToggle', { mode: explainAnalyzeMode ? 'ON' : 'OFF' })"
@@ -1327,7 +1328,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-icon-format h-7 w-7 hover:text-icon-format disabled:opacity-40"
+                      class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40 dark:hover:bg-amber-500/20"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       :aria-label="t('pages.queries.editor.format')"
                       @click="handleToolbarFormat"
@@ -1350,7 +1351,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-icon-save h-7 w-7 hover:text-icon-save disabled:opacity-40"
+                      class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 disabled:opacity-40 dark:hover:bg-sky-500/20"
                       :disabled="!activeTab || !activeTab.content.trim()"
                       :aria-label="t('pages.queries.shortcuts.saveAs')"
                       @click="handleDownloadQuery"

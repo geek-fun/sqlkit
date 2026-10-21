@@ -1094,14 +1094,14 @@ watch(
 
         <!-- Error state -->
         <div v-else-if="error" class="p-4">
-          <div class="p-4 border border-destructive-border rounded-md bg-destructive-muted">
+          <div class="p-4 border border-red-200 rounded-md bg-red-50 dark:border-red-800 dark:bg-red-900/20">
             <div class="flex gap-3 items-start">
-              <span class="i-carbon-error text-destructive-text mt-0.5 flex-shrink-0 h-5 w-5" />
+              <span class="i-carbon-error text-red-600 mt-0.5 flex-shrink-0 h-5 w-5 dark:text-red-400" />
               <div>
-                <p class="text-sm text-destructive-text font-medium">
+                <p class="text-sm text-red-800 font-medium dark:text-red-200">
                   {{ t('components.dataTableView.error') }}
                 </p>
-                <p class="text-sm text-destructive-text mt-1">
+                <p class="text-sm text-red-700 mt-1 dark:text-red-300">
                   {{ error }}
                 </p>
               </div>
@@ -1138,7 +1138,7 @@ watch(
                   :title="columnTypeMap[col] ? `${col} · ${columnTypeMap[col]}` : col"
                   @click="handleHeaderSort(col)"
                 >
-                  <span v-if="columnIsPK[col]" class="i-carbon-key text-muted-foreground flex-shrink-0 h-3 w-3" />
+                  <span v-if="columnIsPK[col]" class="i-carbon-key text-amber-500 flex-shrink-0 h-3 w-3" />
                   <span class="col-name truncate">{{ col }}</span>
                   <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
                   <span
@@ -1159,7 +1159,7 @@ watch(
                   class="col-header-cell cursor-default"
                   :title="$t('components.dataGrid.sort.unsortable')"
                 >
-                  <span v-if="columnIsPK[col]" class="i-carbon-key text-muted-foreground flex-shrink-0 h-3 w-3" />
+                  <span v-if="columnIsPK[col]" class="i-carbon-key text-amber-500 flex-shrink-0 h-3 w-3" />
                   <span class="col-name truncate">{{ col }}</span>
                   <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
                 </div>
@@ -1204,7 +1204,7 @@ watch(
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="text-primary-text h-6 w-6"
+                    class="text-blue-600 h-6 w-6 dark:text-blue-400"
                     :title="t('components.dataTableView.editRow')"
                     @click.stop="openEditDialog(row)"
                   >
@@ -1214,7 +1214,7 @@ watch(
                   <Button
                     variant="ghost"
                     size="icon"
-                    class="text-destructive-text h-6 w-6 hover:text-destructive-text"
+                    class="text-rose-500 h-6 w-6 dark:text-rose-400 hover:text-red-600 dark:hover:text-red-400"
                     :title="t('components.dataTableView.deleteRow')"
                     @click.stop="openDeleteDialog(row)"
                   >
@@ -1365,7 +1365,7 @@ watch(
               <Label :for="`edit-field-${col}`" class="text-xs font-medium whitespace-nowrap">
                 {{ col }}<span v-if="columnTypeMap[col]" class="text-[10px] text-muted-foreground font-mono font-normal ml-1">{{ columnTypeMap[col] }}</span><span
                   v-if="columnIsPK[col]"
-                  class="i-carbon-key text-muted-foreground ml-1.5 h-3 w-3 inline-block"
+                  class="i-carbon-key text-amber-500 ml-1.5 h-3 w-3 inline-block"
                 />
               </Label>
               <div class="flex-1" />

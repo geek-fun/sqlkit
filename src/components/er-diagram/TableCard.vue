@@ -111,10 +111,10 @@ function isFKColumn(colName: string): boolean {
   @apply flex gap-0.5 flex-shrink-0 w-4 items-center justify-center;
 }
 .er-pk {
-  @apply text-muted-foreground flex-shrink-0;
+  @apply text-amber-500 flex-shrink-0;
 }
 .er-fk {
-  @apply text-muted-foreground flex-shrink-0;
+  @apply text-blue-500 flex-shrink-0;
 }
 .er-col-spacer {
   @apply block w-3;

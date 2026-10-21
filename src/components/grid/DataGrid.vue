@@ -682,7 +682,7 @@ watch(sortableColumns, (columns) => {
                 <!-- Filter indicator -->
                 <span
                   v-if="filter.hasFilter(col)"
-                  class="i-carbon-filter text-primary-text flex-shrink-0 h-3 w-3"
+                  class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
                 />
               </span>
             </button>
@@ -701,7 +701,7 @@ watch(sortableColumns, (columns) => {
               </span>
               <span
                 v-if="filter.hasFilter(col)"
-                class="i-carbon-filter text-primary-text flex-shrink-0 h-3 w-3"
+                class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
               />
             </div>
             <!-- Resize Handle -->
@@ -778,7 +778,8 @@ watch(sortableColumns, (columns) => {
               <!-- Boolean -->
               <span
                 v-else-if="isBooleanType(columnTypes?.[col])"
-                class="text-foreground inline-flex"
+                :class="sortedRows[virtualRow.index][col] ? 'text-green-600' : 'text-red-400'"
+                class="inline-flex"
               >
                 <span
                   v-if="sortedRows[virtualRow.index][col]"
