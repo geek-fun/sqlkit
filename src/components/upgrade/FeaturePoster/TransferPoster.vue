@@ -164,7 +164,7 @@ import { ProgressiveBlur } from '../effects'
   padding: 2px 8px;
   border-radius: 6px;
   border: 1px solid hsl(var(--primary) / 0.35);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   font-size: 10px;
   font-weight: 600;
 }
@@ -221,7 +221,7 @@ import { ProgressiveBlur } from '../effects'
   background-color: hsl(var(--background));
   border: 1px solid hsl(var(--border) / 0.4);
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   font-weight: 600;
 }
 
@@ -353,7 +353,7 @@ import { ProgressiveBlur } from '../effects'
   border-color: hsl(var(--primary) / 0.6);
   box-shadow: 0 0 0 1px hsl(var(--primary) / 0.2);
   background-color: hsl(var(--primary) / 0.04);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 /* ── task panel — mirrors the real TaskManagerPanel / TaskCard ── */
@@ -395,7 +395,7 @@ import { ProgressiveBlur } from '../effects'
   padding: 1px 8px;
   border-radius: 999px;
   background-color: hsl(var(--primary) / 0.12);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   font-size: 9.5px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -499,7 +499,7 @@ import { ProgressiveBlur } from '../effects'
   backdrop-filter: blur(8px);
   font-size: 11.5px;
   font-weight: 600;
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .poster__lock-icon {

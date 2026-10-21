@@ -76,8 +76,8 @@ const permissionModeDesc = computed(() => {
 
 const statusDotClass = computed(() => {
   if (restartPhase.value === 'shutting-down' || restartPhase.value === 'starting')
-    return 'bg-yellow-500 animate-pulse'
-  return status.value.running ? 'bg-green-500' : 'bg-red-500'
+    return 'bg-warning animate-pulse'
+  return restartPhase.value === 'failed' ? 'bg-destructive-text' : status.value.running ? 'bg-success' : 'bg-muted-foreground'
 })
 
 const statusText = computed(() => {
@@ -495,7 +495,7 @@ async function onActionToggle(id: string, action: McpAction) {
                           type="button"
                           class="text-xs px-2 py-1 border rounded-md cursor-pointer transition-all"
                           :class="connectionActions(String(conn.id)).includes(action.value)
-                            ? 'border-primary bg-primary/10 text-primary font-medium'
+                            ? 'border-primary bg-primary/10 text-primary-text font-medium'
                             : 'border-input text-muted-foreground hover:border-primary/50'"
                           @click="onActionToggle(String(conn.id), action.value)"
                         >

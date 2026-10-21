@@ -240,6 +240,6 @@ function formatTime(session: AgentSession): string {
 
 .delete-btn:hover {
   background: hsl(var(--destructive) / 0.1);
-  color: hsl(var(--destructive));
+  color: hsl(var(--destructive-text));
 }
 </style>

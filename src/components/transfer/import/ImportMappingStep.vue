@@ -210,7 +210,7 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
                 {{ mapping.targetType || '-' }}
               </td>
               <td class="px-2 py-1 align-middle">
-                <span v-if="mapping.targetColumn" class="text-[10px] text-green-600 tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-green-500/10 flex w-fit uppercase items-center">
+                <span v-if="mapping.targetColumn" class="text-[10px] text-muted-foreground tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-secondary flex w-fit uppercase items-center">
                   <span class="sr-only">Status: </span>
                   <div class="i-carbon-checkmark mr-1" aria-hidden="true" /> Mapped
                 </span>

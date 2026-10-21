@@ -235,63 +235,24 @@ async function handleCheckUpdates() {
                         : 'border-border hover:border-muted-foreground'"
                       @click="handleThemeChange(opt.value)"
                     >
-                      <!-- Theme preview -->
-                      <div class="mb-2 rounded flex h-24 overflow-hidden" :class="opt.value === ThemeType.LIGHT ? 'bg-white' : 'bg-zinc-900'">
-                        <!-- Auto: split preview -->
-                        <template v-if="opt.value === ThemeType.AUTO">
-                          <div class="flex h-full w-1/2">
-                            <div class="p-1 bg-zinc-800 flex flex-col gap-1 h-full w-6">
-                              <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                              <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                              <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                            </div>
-                            <div class="p-1 bg-zinc-900 flex-1 space-y-1">
-                              <div class="rounded bg-zinc-700 h-1.5" />
-                              <div class="rounded bg-zinc-700 h-1.5 w-3/4" />
-                              <div class="rounded bg-zinc-700 h-1.5 w-1/2" />
-                            </div>
+                      <div class="mb-2 rounded flex h-24 overflow-hidden">
+                        <div
+                          v-for="mode in opt.value === ThemeType.AUTO ? [ThemeType.DARK, ThemeType.LIGHT] : [opt.value]"
+                          :key="mode"
+                          class="theme-preview bg-background flex flex-1 h-full overflow-hidden"
+                          :class="mode === ThemeType.LIGHT ? 'light' : 'dark'"
+                          aria-hidden="true"
+                        >
+                          <div class="p-1 bg-chrome flex flex-col gap-1 w-6">
+                            <div v-for="item in 3" :key="item" class="rounded-sm bg-muted-foreground/40 h-3 w-3" />
                           </div>
-                          <div class="flex h-full w-1/2">
-                            <div class="p-1 bg-gray-200 flex flex-col gap-1 h-full w-6">
-                              <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                              <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                              <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                            </div>
-                            <div class="p-1 bg-white flex-1 space-y-1">
-                              <div class="rounded bg-gray-200 h-1.5" />
-                              <div class="rounded bg-gray-200 h-1.5 w-3/4" />
-                              <div class="rounded bg-gray-200 h-1.5 w-1/2" />
-                            </div>
+                          <div class="p-2 flex-1 space-y-1.5">
+                            <div class="rounded bg-muted-foreground/30 h-2" />
+                            <div class="rounded bg-muted-foreground/30 h-2 w-3/4" />
+                            <div class="rounded bg-muted-foreground/30 h-2 w-1/2" />
+                            <div class="rounded bg-muted h-2 w-5/6" />
                           </div>
-                        </template>
-                        <!-- Dark preview -->
-                        <template v-else-if="opt.value === ThemeType.DARK">
-                          <div class="p-1 bg-zinc-800 flex flex-col gap-1 h-full w-6">
-                            <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                            <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                            <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                          </div>
-                          <div class="p-2 bg-zinc-900 flex-1 space-y-1.5">
-                            <div class="rounded bg-zinc-700 h-2" />
-                            <div class="rounded bg-zinc-700 h-2 w-3/4" />
-                            <div class="rounded bg-zinc-700 h-2 w-1/2" />
-                            <div class="rounded bg-zinc-800 h-2 w-5/6" />
-                          </div>
-                        </template>
-                        <!-- Light preview -->
-                        <template v-else>
-                          <div class="p-1 bg-gray-200 flex flex-col gap-1 h-full w-6">
-                            <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                            <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                            <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                          </div>
-                          <div class="p-2 bg-white flex-1 space-y-1.5">
-                            <div class="rounded bg-gray-200 h-2" />
-                            <div class="rounded bg-gray-200 h-2 w-3/4" />
-                            <div class="rounded bg-gray-200 h-2 w-1/2" />
-                            <div class="rounded bg-gray-100 h-2 w-5/6" />
-                          </div>
-                        </template>
+                        </div>
                       </div>
                       <!-- Selected checkmark -->
                       <div
@@ -377,7 +338,7 @@ async function handleCheckUpdates() {
                       class="w-28"
                       @update:model-value="handleFontSizeChange($event)"
                     />
-                    <p v-if="fontSizeError" class="text-xs text-destructive">
+                    <p v-if="fontSizeError" class="text-xs text-destructive-text">
                       {{ fontSizeError }}
                     </p>
                   </div>
@@ -400,7 +361,7 @@ async function handleCheckUpdates() {
                       class="w-28"
                       @update:model-value="handleTabSizeChange($event)"
                     />
-                    <p v-if="tabSizeError" class="text-xs text-destructive">
+                    <p v-if="tabSizeError" class="text-xs text-destructive-text">
                       {{ tabSizeError }}
                     </p>
                   </div>
@@ -423,7 +384,7 @@ async function handleCheckUpdates() {
                       class="w-28"
                       @update:model-value="handleIndentWidthChange($event)"
                     />
-                    <p v-if="indentWidthError" class="text-xs text-destructive">
+                    <p v-if="indentWidthError" class="text-xs text-destructive-text">
                       {{ indentWidthError }}
                     </p>
                   </div>
@@ -446,7 +407,7 @@ async function handleCheckUpdates() {
                       class="w-28"
                       @update:model-value="handleLineWidthChange($event)"
                     />
-                    <p v-if="lineWidthError" class="text-xs text-destructive">
+                    <p v-if="lineWidthError" class="text-xs text-destructive-text">
                       {{ lineWidthError }}
                     </p>
                   </div>
@@ -546,7 +507,7 @@ async function handleCheckUpdates() {
                       class="w-32"
                       @update:model-value="handleDefaultLimitChange($event)"
                     />
-                    <p v-if="defaultLimitError" class="text-xs text-destructive">
+                    <p v-if="defaultLimitError" class="text-xs text-destructive-text">
                       {{ defaultLimitError }}
                     </p>
                   </div>
@@ -569,7 +530,7 @@ async function handleCheckUpdates() {
                       class="w-32"
                       @update:model-value="handleQueryTimeoutChange($event)"
                     />
-                    <p v-if="queryTimeoutError" class="text-xs text-destructive">
+                    <p v-if="queryTimeoutError" class="text-xs text-destructive-text">
                       {{ queryTimeoutError }}
                     </p>
                   </div>

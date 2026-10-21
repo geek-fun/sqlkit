@@ -40,7 +40,7 @@ function toggle() {
       <span class="text-left flex-1 truncate">{{ label }}</span>
       <span
         v-if="count !== undefined"
-        class="text-xs text-muted-foreground/70 shrink-0"
+        class="text-xs text-muted-foreground shrink-0"
       >
         {{ count }}
       </span>

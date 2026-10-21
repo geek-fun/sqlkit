@@ -77,7 +77,7 @@ function handleFileInput(e: Event) {
   >
     <CardContent class="p-4 text-center flex flex-col min-h-[120px] items-center justify-center">
       <div
-        class="text-primary mb-2.5 rounded-full bg-primary/5 flex h-9 w-9 items-center justify-center"
+        class="text-primary-text mb-2.5 rounded-full bg-primary/5 flex h-9 w-9 items-center justify-center"
         aria-hidden="true"
       >
         <span class="i-carbon-document-upload h-4.5 w-4.5" />

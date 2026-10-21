@@ -149,7 +149,7 @@ function handleCloseDialog() {
         >
           <ProBadge size="xs" />
           <span class="text-sm text-muted-foreground">{{ t('pages.settings.ai.chat.systemPromptUltimateOnly') }}</span>
-          <span class="text-xs text-primary font-medium ml-auto px-2 py-1 rounded-md bg-primary/10 shrink-0">{{ t('plan.upgrade.cta') }}</span>
+          <span class="text-xs text-primary-text font-medium ml-auto px-2 py-1 rounded-md bg-primary/10 shrink-0">{{ t('plan.upgrade.cta') }}</span>
         </button>
         <div v-else class="p-4 border border-border/70 rounded-xl bg-card/70 space-y-3">
           <div class="flex gap-4 items-start justify-between">
@@ -169,7 +169,7 @@ function handleCloseDialog() {
                 <Button variant="ghost" size="sm" @click="startEditPrompt">
                   {{ t('pages.settings.ai.chat.systemPromptEdit') }}
                 </Button>
-                <Button variant="ghost" size="sm" class="text-destructive" @click="deletePrompt">
+                <Button variant="ghost" size="sm" class="text-destructive-text" @click="deletePrompt">
                   {{ t('pages.settings.ai.chat.systemPromptDelete') }}
                 </Button>
               </template>
@@ -193,7 +193,7 @@ function handleCloseDialog() {
               {{ t('pages.settings.ai.chat.systemPromptSave') }}
             </Button>
           </div>
-          <p v-if="promptSaveError" class="text-sm text-destructive" role="alert">
+          <p v-if="promptSaveError" class="text-sm text-destructive-text" role="alert">
             {{ promptSaveError }}
           </p>
         </div>

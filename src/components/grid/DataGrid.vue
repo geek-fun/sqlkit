@@ -587,8 +587,8 @@ watch(sortableColumns, (columns) => {
       class="p-6 flex flex-1 items-center justify-center"
     >
       <div class="text-center space-y-3">
-        <span class="i-carbon-warning-alt text-destructive mx-auto h-8 w-8 block" />
-        <p class="text-sm text-destructive">
+        <span class="i-carbon-warning-alt text-destructive-text mx-auto h-8 w-8 block" />
+        <p class="text-sm text-destructive-text">
           {{ error }}
         </p>
         <Button variant="outline" size="sm" @click="emit('refresh')">
@@ -677,12 +677,12 @@ watch(sortableColumns, (columns) => {
                 <!-- Multi-sort priority -->
                 <span
                   v-if="isMultiSort && sort.getSortPriority(col)"
-                  class="text-[10px] text-primary leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
+                  class="text-[10px] text-primary-text leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
                 >{{ sort.getSortPriority(col) }}</span>
                 <!-- Filter indicator -->
                 <span
                   v-if="filter.hasFilter(col)"
-                  class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
+                  class="i-carbon-filter text-primary-text flex-shrink-0 h-3 w-3"
                 />
               </span>
             </button>
@@ -701,7 +701,7 @@ watch(sortableColumns, (columns) => {
               </span>
               <span
                 v-if="filter.hasFilter(col)"
-                class="i-carbon-filter text-blue-500 flex-shrink-0 h-3 w-3"
+                class="i-carbon-filter text-primary-text flex-shrink-0 h-3 w-3"
               />
             </div>
             <!-- Resize Handle -->
@@ -740,7 +740,7 @@ watch(sortableColumns, (columns) => {
             class="group border-b border-border/30 flex transition-colors duration-75 left-0 top-0 absolute hover:bg-muted/[0.08]"
             :class="[
               virtualRow.index % 2 === 0 ? 'bg-muted/[0.03]' : '',
-              selection.isSelected(virtualRow.index) ? 'bg-primary/[0.08]' : '',
+              selection.isSelected(virtualRow.index) ? 'bg-selection' : '',
             ]"
             :style="{
               width: `${gridWidth}px`,
@@ -778,8 +778,7 @@ watch(sortableColumns, (columns) => {
               <!-- Boolean -->
               <span
                 v-else-if="isBooleanType(columnTypes?.[col])"
-                :class="sortedRows[virtualRow.index][col] ? 'text-green-600' : 'text-red-400'"
-                class="inline-flex"
+                class="text-foreground inline-flex"
               >
                 <span
                   v-if="sortedRows[virtualRow.index][col]"
@@ -809,7 +808,7 @@ watch(sortableColumns, (columns) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  class="text-[10px] text-primary px-1 flex-shrink-0 h-5"
+                  class="text-[10px] text-primary-text px-1 flex-shrink-0 h-5"
                   @click.stop="openJsonDialog(sortedRows[virtualRow.index][col], col)"
                 >{{ $t('components.dataGrid.json.expand') }}</Button>
               </span>
@@ -857,7 +856,7 @@ watch(sortableColumns, (columns) => {
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
-                    class="text-destructive focus:text-destructive"
+                    class="text-destructive-text focus:text-destructive-text"
                     @click="openDeleteDialog(virtualRow.index)"
                   >
                     <span class="i-carbon-trash-can mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.delete') }}

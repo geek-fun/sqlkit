@@ -241,7 +241,7 @@ onBeforeUnmount(() => {
       <ScrollArea ref="scrollAreaRef" class="h-full">
         <!-- Empty state -->
         <div v-if="messages.length === 0 && !isLoading" class="px-4 text-center flex flex-col h-full items-center justify-center">
-          <div class="i-carbon-ibm-watsonx-assistant text-muted-foreground/20 mb-4 h-16 w-16" />
+          <div class="i-carbon-ibm-watsonx-assistant text-muted-foreground mb-4 h-16 w-16" />
           <p class="text-sm text-muted-foreground max-w-xs">
             <slot name="empty">
               {{ emptyHint || t('dataStudio.agent.emptyState') }}
@@ -268,11 +268,11 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Error banner -->
-        <div v-if="error" class="text-sm text-destructive mx-4 mb-2 p-3 border border-destructive/20 rounded-lg bg-destructive/10 flex gap-2 items-start">
+        <div v-if="error" class="text-sm text-destructive-text mx-4 mb-2 p-3 border border-destructive/20 rounded-lg bg-destructive/10 flex gap-2 items-start">
           <span class="i-carbon-warning mt-0.5 shrink-0 h-4 w-4" />
           <span class="flex-1 min-w-0">{{ error }}</span>
           <button
-            class="text-destructive/60 p-0.5 rounded shrink-0 transition-colors hover:text-destructive"
+            class="text-destructive-text p-0.5 rounded shrink-0 transition-colors hover:text-destructive-text"
             @click="emit('dismissError')"
           >
             <span class="i-carbon-close h-3.5 w-3.5" />

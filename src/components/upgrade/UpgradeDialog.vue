@@ -271,7 +271,7 @@ onUnmounted(() => {
   background-color: hsl(var(--background) / 0.7);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .upgrade-panel {
@@ -327,7 +327,7 @@ onUnmounted(() => {
   width: 13px;
   height: 13px;
   flex-shrink: 0;
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .upgrade-stack__item--current {
@@ -339,7 +339,7 @@ onUnmounted(() => {
   padding: 0 7px;
   border-radius: 999px;
   background-color: hsl(var(--primary) / 0.14);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   font-size: 10px;
   font-weight: 700;
 }
@@ -382,7 +382,7 @@ onUnmounted(() => {
   padding: 1px 7px;
   border-radius: 999px;
   background-color: hsl(var(--primary) / 0.12);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   font-size: 10.5px;
   font-weight: 700;
 }
@@ -420,7 +420,7 @@ onUnmounted(() => {
   width: 11px;
   height: 11px;
   flex-shrink: 0;
-  color: hsl(var(--primary) / 0.8);
+  color: hsl(var(--primary-text));
 }
 </style>
 

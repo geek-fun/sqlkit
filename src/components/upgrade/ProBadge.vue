@@ -20,7 +20,7 @@ withDefaults(defineProps<{ size?: 'dot' | 'xs' | 'sm' }>(), { size: 'sm' })
   border-radius: 999px;
   border: 1px solid hsl(var(--primary) / 0.45);
   background-color: hsl(var(--primary) / 0.08);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   font-weight: 600;
   letter-spacing: 0.04em;
   white-space: nowrap;

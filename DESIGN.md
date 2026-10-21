@@ -3,13 +3,13 @@ name: SQLKit
 description: A restrained, dense, cross-platform database workspace centered on SQL and data
 colors:
   primary-light: "hsl(221.2 83.2% 45%)"
-  primary-dark: "hsl(217.2 91.2% 45%)"
+  primary-dark: "hsl(221.21 83.19% 53.33%)"
   background-light: "hsl(0 0% 100%)"
-  background-dark: "hsl(222.2 84% 4.9%)"
+  background-dark: "hsl(220.00 12.00% 9.80%)"
   foreground-light: "hsl(222.2 84% 4.9%)"
-  foreground-dark: "hsl(210 40% 98%)"
+  foreground-dark: "hsl(217.50 17.39% 90.98%)"
   card-light: "hsl(0 0% 100%)"
-  card-dark: "hsl(222.2 47% 8%)"
+  card-dark: "hsl(220.00 11.39% 15.49%)"
 rounded:
   lg: "8px"
   md: "6px"
@@ -22,22 +22,17 @@ rounded:
 
 **Design direction: A quiet SQL workspace.** Users should notice connection context, SQL, and query results first, actions second, and brand expression last. Support long sessions of writing, inspecting, and comparing data through high information density, clear hierarchy, stable layouts, and predictable interactions.
 
-This file defines the design constraints for new and modified SQLKit client UI, alongside [AGENTS.md](AGENTS.md). Preserve the existing blue theme, light / dark / system modes, compact desktop layout, and shadcn-vue / Radix Vue component system. Establishing this specification does not mean existing screens have already been migrated.
+This file defines the design constraints for new and modified SQLKit client UI, alongside [AGENTS.md](AGENTS.md). Preserve the existing blue theme, light / dark / system modes, compact desktop layout, and shadcn-vue / Radix Vue component system. The graphite theme and semantic color migration apply to the client shell, shared controls, SQL editor, connections, grids, transfers, settings, and AI surfaces.
 
-### Sources and adaptations
+### Design principles
 
-The reference project is `console-serverlessinsight`, reviewed on 2026-10-19. The main sources are its `AGENTS.md` section on color rules (V3 · Mono + Violet Accent), `apps/console/src/assets/css/themes/violet.css`, `apps/console/uno.config.ts`, `docs/console-ui-design.md`, and `apps/console/PRODUCT.md`. These paths record provenance only; SQLKit has no runtime dependency on the reference repository.
+The client uses a restrained desktop workspace with softly cool graphite surfaces in dark mode and blue primary actions in both themes.
 
-| Reference principle | SQLKit adaptation |
-| --- | --- |
-| Give colors fixed semantics rather than assigning them to modules | Blue for primary actions and interaction, green for success, red for errors or danger; neutrals for ordinary information |
-| Let neutral surfaces dominate and keep accents scarce | Preserve SQLKit's slightly cool neutral tokens rather than copying the reference project's zero-chroma grays |
-| Restrict brand color to small areas | Keep SQLKit's blue primary buttons, limiting their count and area; do not copy violet or monochrome primary buttons |
-| Use semantic status tokens across light and dark themes | Reuse success / destructive; fill gaps such as warning through the process below |
-| Use progressive disclosure, a stable app shell, and keyboard access | Apply these to the connection tree, query tabs, editor, result grids, and desktop window behavior |
-| Require non-color signals and readable contrast | Treat these as acceptance criteria; existing tokens do not prove compliance |
-
-The reference project's early colorful diagrams, login gradients, and CSS glass and ambient-light effects are not design references for SQLKit's workspace.
+- Give colors fixed semantics: blue for interaction, green for actual success, red for errors and danger, amber for actual warnings, and neutrals for ordinary information.
+- Keep accents scarce and let typography, spacing, and surface hierarchy organize the workspace.
+- Use shared semantic tokens for light, dark, and system appearance, including the SQL editor and overlays.
+- Preserve compact layouts, progressive disclosure, predictable keyboard access, and readable contrast.
+- Keep decorative gradients, ambient effects, and glass treatments out of the database workspace.
 
 ### Specification and implementation
 
@@ -54,33 +49,49 @@ The table records CSS HSL components, used as `hsl(var(--token))`. The frontmatt
 
 | Token | Light | Dark | Role |
 | --- | --- | --- | --- |
-| `--primary` | `221.2 83.2% 45%` | `217.2 91.2% 45%` | Primary actions, links, interaction emphasis |
-| `--primary-foreground` | `0 0% 100%` | `0 0% 100%` | Text on solid primary backgrounds |
-| `--background` | `0 0% 100%` | `222.2 84% 4.9%` | Main workspace |
-| `--foreground` | `222.2 84% 4.9%` | `210 40% 98%` | Body text and important data |
-| `--card` / `--popover` | `0 0% 100%` | `222.2 47% 8%` | Containers and overlays |
-| `--secondary` / `--muted` | `210 40% 96.1%` | `217.2 32.6% 16%` | Secondary surfaces and neutral states |
-| `--muted-foreground` | `215.4 16.3% 46.9%` | `215 20.2% 65.1%` | Supporting text; never the sole carrier of critical information |
-| `--accent` | `210 40% 96.1%` | `217.2 32.6% 17.5%` | Neutral interaction surface, **not a second brand color** |
-| `--border` | `214.3 31.8% 91.4%` | `217.2 32.6% 17.5%` | Structural separation |
-| `--input` | `214.3 31.8% 80%` | `217.2 32.6% 28%` | Input boundaries |
-| `--ring` | `220 13% 60%` | `212.7 26.8% 68%` | Keyboard focus; retain the current neutral color |
-| `--success` | `142.1 70.6% 35.5%` | `142.1 70% 45%` | Success, connected, completed |
-| `--success-muted` | `138 76% 95%` | `142 35% 16%` | Local success feedback background |
-| `--success-border` | `140 58% 85%` | `142 30% 25%` | Success feedback boundary |
-| `--destructive` | `0 84.2% 60.2%` | `0 62.8% 30.6%` | Errors, failures, destructive actions |
+| `--background` | `0 0% 100%` | `220.00 12.00% 9.80%` | Workspace and editor |
+| `--chrome` | `210.00 40.00% 98.04%` | `217.50 12.50% 12.55%` | Title bar, navigation, sidebar, toolbars |
+| `--foreground` | `222.2 84% 4.9%` | `217.50 17.39% 90.98%` | Body text and data |
+| `--card` | `0 0% 100%` | `220.00 11.39% 15.49%` | Containers |
+| `--popover` | `0 0% 100%` | `220.00 11.39% 15.49%` | Menus, dialogs and editor widgets |
+| `--primary` | `221.2 83.2% 45%` | `221.21 83.19% 53.33%` | Solid primary actions |
+| `--primary-foreground` | `0 0% 100%` | `0.00 0.00% 100.00%` | Text on primary fills |
+| `--primary-text` | `224.28 76.33% 48.04%` | `218.46 100.00% 77.06%` | Links and small active indicators |
+| `--selection` | `220.00 100.00% 95.29%` | `215.71 35.59% 23.14%` | Text and grid selection |
+| `--secondary` | `210 40% 96.1%` | `220.00 11.39% 15.49%` | Secondary surfaces |
+| `--muted` | `210 40% 96.1%` | `220.00 11.39% 15.49%` | Subdued surfaces |
+| `--muted-foreground` | `213.33 16.82% 41.96%` | `217.89 11.80% 68.43%` | Supporting text |
+| `--accent` | `210 40% 96.1%` | `216.92 13.13% 19.41%` | Neutral hover and selected controls |
+| `--border` | `214.3 31.8% 91.4%` | `217.50 13.33% 23.53%` | Structural separation |
+| `--input` | `213.75 13.91% 54.90%` | `215.56 11.79% 44.90%` | Control boundaries |
+| `--ring` | `215.38 16.32% 46.86%` | `217.89 11.80% 68.43%` | Keyboard focus |
+| `--destructive` | `0.00 73.71% 41.76%` | `0.00 53.53% 47.25%` | Solid destructive actions |
+| `--destructive-foreground` | `0.00 0.00% 100.00%` | `0.00 0.00% 100.00%` | Text on destructive fills |
+| `--destructive-text` | `0.00 73.71% 41.76%` | `4.82 81.16% 72.94%` | Readable error text and icons |
+| `--destructive-muted` | `0.00 85.71% 97.25%` | `352.94 19.10% 17.45%` | Subdued error feedback |
+| `--destructive-border` | `0.00 96.30% 89.41%` | `3.40 29.61% 35.10%` | Error feedback boundary |
+| `--success` | `142.43 71.81% 29.22%` | `143.02 47.25% 64.31%` | Success text and connected/completed signals |
+| `--success-foreground` | `0.00 0.00% 100.00%` | `220.00 12.00% 9.80%` | Text on success fills |
+| `--success-muted` | `138.46 76.47% 96.67%` | `148.42 22.89% 16.27%` | Success feedback surface |
+| `--success-border` | `141.00 78.95% 85.10%` | `141.67 23.08% 30.59%` | Success feedback boundary |
+| `--warning` | `35.65 100.00% 27.06%` | `36.61 79.73% 70.98%` | Actual warnings and risk signals |
+| `--warning-foreground` | `0.00 0.00% 100.00%` | `220.00 12.00% 9.80%` | Text on warning fills |
+| `--warning-muted` | `39.00 100.00% 96.08%` | `36.67 20.45% 17.25%` | Warning feedback surface |
+| `--warning-border` | `39.10 67.94% 74.31%` | `37.36 32.12% 32.35%` | Warning feedback boundary |
+
+Dark mode uses the approved softly cool graphite palette. Preserve blue primary actions. Use `primary-text` for blue text and icons, and `destructive-text` for error text and icons; solid fill tokens are not readable-text tokens. `success` and `warning` are paired with dark foregrounds in dark mode and white foregrounds in light mode.
 
 ### Semantic ownership
 
 | Visual signal | Allowed meaning | Must not represent |
 | --- | --- | --- |
-| Blue `primary` | Primary actions, links, selected controls, small active indicators | Success, ordinary badges, large panel backgrounds |
+| Blue `primary / primary-text` | Primary actions, links, selected controls, small active indicators | Success, ordinary badges, large panel backgrounds |
 | Neutrals `foreground / muted / secondary / accent` | Body text, supporting information, toolbars, navigation backgrounds, counts, ordinary attributes, disconnected states | Important errors or risks hidden through low contrast |
 | Green `success` | Successful connection tests, connected states, successful execution, completed transfers | Execute buttons, boolean true, auto-increment attributes, decorative selling points |
-| Red `destructive` | Execution failures, connection failures, deletion confirmations | Ordinary task counts, disconnected states, boolean false, decoration |
-| Amber `warning` (not yet implemented) | Actual warnings, risks, exceptional states requiring attention | JSON format, primary keys, ordinary unsaved indicators, arbitrary toolbar buttons |
+| Red `destructive / destructive-text` | Execution failures, connection failures, deletion confirmations | Ordinary task counts, disconnected states, boolean false, decoration |
+| Amber `warning` | Actual warnings, risks, exceptional states requiring attention | JSON format, primary keys, ordinary unsaved indicators, arbitrary toolbar buttons |
 
-Use neutral icons and text for ordinary information; do not introduce a separate sky-blue palette. SQLKit's `primary` already owns blue interaction emphasis. There are currently no `--info` or `--warning` mappings. Add tokens only for semantics that require a distinct role.
+Use neutral icons and text for ordinary information; do not introduce a separate sky-blue palette. SQLKit's `primary` already owns blue interaction emphasis. Warning includes foreground, muted-background, and border pairs in both themes. There is no `--info` mapping; ordinary information remains neutral. Add tokens only for semantics that require a distinct role.
 
 ### Color budget
 
@@ -114,8 +125,8 @@ Use neutral icons and text for ordinary information; do not introduce a separate
 1. Check whether an existing role can express the meaning before considering opacity variants. Opacity does not waive contrast requirements: text must remain readable against the actual composited background.
 2. Do not add hex / RGB / HSL literals or palette utilities such as `blue-500`, `green-600`, and `violet-*` in business components to replace existing semantic roles. Isolate chart, syntax, and vendor-asset exceptions in their respective modules.
 3. When adding a semantic token, include all of the following in the same change: `:root` and `.dark` definitions in `src/assets/index.css`, necessary foreground / subdued-background pairs, `uno.config.ts` mappings, shared component variants where needed, light/dark verification, and this document's update.
-4. Do not submit UI that depends on unimplemented utilities such as `text-warning` or `bg-info` before their mappings exist. Warning is a known gap; do not substitute `primary` or `success` for it.
-5. Check all consumers before changing shared tokens. Fixing semantic color readability must not also replace the blue brand or reset the entire neutral palette.
+4. Do not submit UI that depends on unimplemented utilities such as `text-warning` or `bg-info` before their mappings exist. Use `warning` for actual risk; ordinary attributes remain neutral.
+5. Check all consumers before changing shared tokens. Preserve the approved graphite surface hierarchy and blue brand when adjusting individual semantic colors.
 
 ## Typography
 
@@ -227,8 +238,8 @@ Interactive components must cover default, hover, focus-visible, active / select
 
 ### Badges, notifications, and task states
 
-- Non-interactive attributes default to `Badge variant="outline"` or `secondary`. Status uses a dot / icon with text. The shared Badge still defaults to solid primary; callers must explicitly select an appropriate variant.
-- Use success for connected / completed, neutrals for disconnected / not started, and destructive for failed. Standardize warning treatment once shared tokens exist.
+- Non-interactive attributes default to `Badge variant="outline"` or `secondary`. Status uses a dot / icon with text. The shared Badge defaults to neutral secondary. Explicitly use success / warning / destructive variants only for real states; those variants use subdued semantic pairs.
+- Use success for connected / completed, neutrals for disconnected / not started, and destructive for failed. Use the shared warning tokens for actual risks.
 - Count badges are neutral by default. Task count is not failure count; `taskCount > 0` alone does not justify red.
 - Toasts use neutral backgrounds and status icons. Errors requiring action need readable explanations and Retry / View details paths rather than a brief flash. Prefer keeping execution feedback in the relevant result region.
 - Do not duplicate toasts for normal progress and success. Avoid simultaneously repeating the same event in local status, notifications, and the task panel.
@@ -239,7 +250,7 @@ Interactive components must cover default, hover, focus-visible, active / select
 - Result column headers show the database-provided type on the same line as the name when metadata is available, using small neutral text. Keep numeric headers right-aligned, truncate long types with the full value available on hover, and omit type labels when metadata is absent. Sortable columns always show a neutral sort indicator, with directional arrows for active sorting; do not hide it until hover.
 - Keep the result-set selector inside the existing result toolbar. Collapse secondary export actions into a menu at narrow panel widths to preserve a single toolbar row.
 - Use the shared pagination footer and state model in table browsing and query result grids, starting at 100 rows per page. Keep first / previous / next / last, direct page entry, common page-size presets, custom sizes, and the row range consistent. Wrap footer groups at narrow widths; keep navigation reachable for empty results and disable it while loading or showing an error. Table browsing fetches one page at a time; query grids page returned rows locally and additionally offer all returned rows. Copy / export retains its stated data scope. See [RESULT_PAGINATION_DESIGN.md](docs/RESULT_PAGINATION_DESIGN.md).
-- Keep Monaco's theme integration (currently `vs / vs-dark`) and user font-size settings. Syntax highlighting is outside the application decoration color budget; reducing colors must not damage syntax recognition.
+- Use the token-driven `sqlkit-light / sqlkit-dark` Monaco themes and preserve user font-size settings. Both inherit Monaco's built-in grammar support; editor, gutter, active-line, selection, completion and hover surfaces read the active CSS theme. Syntax hues live in `--syntax-keyword / string / number / comment` in the same CSS token source. Syntax highlighting is outside the application decoration color budget; reducing colors must not damage syntax recognition.
 - Keep data central: neutral headers, subtle hover, stable selection, and clear sorting / filtering indicators. Preserve virtual scrolling; do not rebuild the whole grid for animation.
 - Distinguish `NULL`, empty strings, and booleans. Show true / false or equivalent text / symbols; do not default to red / green boolean mapping.
 - Primary keys, unique constraints, and auto-increment are attributes, not warnings or success. Use neutral identifiers such as a key icon or PK / UNIQUE / identity text.
@@ -306,16 +317,10 @@ Check each affected surface. Documentation-only changes need source, link, and i
 - [ ] Data scope, sorting scope, and execution status match actual capabilities; visual changes preserve functional semantics.
 - [ ] UI implementation changes run `npm run lint:check` and `npm run build`; behavior changes also run relevant tests, and layout changes include actual screenshots at relevant themes and window sizes.
 
-### Existing UI migration priorities (not implemented in this change)
+### Theme maintenance
 
-| Priority | Current state | Follow-up |
-| --- | --- | --- |
-| P1 | Existing foreground pairs such as success / destructive need individual verification | Check contrast on actual backgrounds; adjust semantic pairs when needed while retaining the blue brand |
-| P1 | Success / warning in `ui/badge` and notifications still use fixed palettes; a global warning token is missing | Add light/dark semantic tokens and mappings first, then migrate shared components and check all consumers |
-| P2 | Some `QueriesPage.vue` toolbar buttons use purple / orange | Use neutral toolbars and primary for the main action |
-| P2 | `grid/FilterBar.vue` assigns colors to operators; grid booleans and some attributes use red / green / amber | Use neutral text, symbols, and attribute icons; color only actual status |
-| P2 | `AppHeader.vue` uses red for ordinary task counts; some connection-page icon containers use multiple colors | Make counts neutral; distinguish connection cards by name / engine icon / actual status |
-| P2 | Shared Badge defaults to solid primary; some close buttons appear only on hover | Explicitly select neutral variants for non-interactive badges and make close buttons visible on keyboard focus |
-| P2 | Narrow windows and reduced-motion behavior have not been fully checked against this specification | Verify and fix affected workflows; do not claim the current client already satisfies every requirement |
-
-Migrate incrementally by shared component or business area as it changes. Check each change against this specification; establishing the rules does not include a bulk rewrite of business UI.
+- Keep the CSS token source, UnoCSS mappings, Monaco adapter, and this specification synchronized.
+- Shared badges default to neutral secondary. Connection and transfer status signals use semantic tokens; database attributes, booleans, filter operators, task counts, feature icons, and vendor icon containers remain neutral.
+- Theme preview tiles scope the same light/dark tokens instead of maintaining a second miniature palette.
+- Automated contrast checks cover text on workspace, chrome, raised, selection, and semantic feedback surfaces, plus foregrounds on solid actions. Editor theme tests cover light/dark switching and token inheritance.
+- Continue to verify real content, narrow windows, keyboard focus, system appearance changes, and native window controls on the target operating systems. Theme tests do not replace native-platform interaction checks.

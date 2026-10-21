@@ -318,7 +318,7 @@ function syncAllProviderModels() {
             <div class="flex gap-2 items-center">
               <button
                 v-if="isLoading"
-                class="text-destructive rounded inline-flex h-8 w-8 cursor-pointer transition-colors items-center justify-center hover:bg-destructive/10"
+                class="text-destructive-text rounded inline-flex h-8 w-8 cursor-pointer transition-colors items-center justify-center hover:bg-destructive/10"
                 :title="t('dataStudio.agent.stop')"
                 @click="cancelSession"
               >
@@ -531,7 +531,7 @@ function syncAllProviderModels() {
                 </div>
               </template>
               <template #empty>
-                <div class="i-carbon-ibm-watsonx-assistant text-muted-foreground/20 h-12 w-12" />
+                <div class="i-carbon-ibm-watsonx-assistant text-muted-foreground h-12 w-12" />
               </template>
             </ChatPanel>
           </div>
@@ -701,7 +701,7 @@ function syncAllProviderModels() {
   left: 8px;
   top: 50%;
   transform: translateY(-50%);
-  color: hsl(var(--muted-foreground) / 0.6);
+  color: hsl(var(--muted-foreground));
   pointer-events: none;
 }
 
@@ -721,7 +721,7 @@ function syncAllProviderModels() {
 }
 
 .add-source-search::placeholder {
-  color: hsl(var(--muted-foreground) / 0.5);
+  color: hsl(var(--muted-foreground));
 }
 
 .add-source-list {
@@ -953,7 +953,7 @@ function syncAllProviderModels() {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: hsl(var(--muted-foreground) / 0.6);
+  color: hsl(var(--muted-foreground));
 }
 
 .permission-menu-item {
@@ -982,7 +982,7 @@ function syncAllProviderModels() {
 }
 
 .permission-menu-item--active .permission-menu-icon {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .permission-menu-label {
@@ -990,7 +990,7 @@ function syncAllProviderModels() {
 }
 
 .permission-check {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
   flex-shrink: 0;
 }
 

@@ -54,7 +54,7 @@ function formatDuration(seconds: number) {
     <div class="px-3 py-2 border border-border/40 rounded-md bg-card flex gap-3 shadow-none items-center">
       <div
         class="rounded-full flex h-6 w-6 items-center justify-center"
-        :class="isSuccess ? 'bg-green-500/10 text-green-600' : 'bg-destructive/10 text-destructive'"
+        :class="isSuccess ? 'bg-success-muted text-success' : 'bg-destructive/10 text-destructive-text'"
       >
         <span v-if="isSuccess" class="i-carbon-checkmark-filled h-3.5 w-3.5" />
         <span v-else class="i-carbon-warning-filled h-3.5 w-3.5" />
@@ -94,8 +94,8 @@ function formatDuration(seconds: number) {
 
       <Card v-if="props.result.errorCount > 0" class="border-destructive/20 rounded-md bg-destructive/5 shadow-none">
         <CardContent class="p-3 flex flex-col justify-center">
-          <span class="text-[10px] text-destructive/80 tracking-widest font-medium uppercase">{{ t('transfer.result.errorCount') }}</span>
-          <span class="text-lg text-destructive font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.errorCount.toLocaleString() }}</span>
+          <span class="text-[10px] text-destructive-text tracking-widest font-medium uppercase">{{ t('transfer.result.errorCount') }}</span>
+          <span class="text-lg text-destructive-text font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.errorCount.toLocaleString() }}</span>
         </CardContent>
       </Card>
     </div>
@@ -115,12 +115,12 @@ function formatDuration(seconds: number) {
             :key="index"
             class="mb-1.5 flex items-start last:mb-0"
           >
-            <span v-if="error.rowNumber" class="text-destructive/80 mr-2 whitespace-nowrap">
+            <span v-if="error.rowNumber" class="text-destructive-text mr-2 whitespace-nowrap">
               [Row {{ String(error.rowNumber).padStart(3, '0') }}]
             </span>
             <span class="text-muted-foreground">{{ error.message }}</span>
           </div>
-          <div v-if="props.result.errors.length > 10" class="text-muted-foreground/60 mt-2 italic">
+          <div v-if="props.result.errors.length > 10" class="text-muted-foreground mt-2 italic">
             ...and {{ props.result.errors.length - 10 }} more errors
           </div>
         </div>

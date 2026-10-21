@@ -221,7 +221,7 @@ function handleToggleFavorite(id: string) {
                   <TableRow
                     v-for="entry in displayedEntries"
                     :key="entry.id"
-                    :class="entry.isFavorite ? 'bg-yellow-50 dark:bg-yellow-900/10' : ''"
+                    :class="entry.isFavorite ? 'bg-accent/50' : ''"
                   >
                     <!-- Favorite toggle -->
                     <TableCell class="px-2">
@@ -229,8 +229,8 @@ function handleToggleFavorite(id: string) {
                         <Tooltip>
                           <TooltipTrigger as-child>
                             <button
-                              class="rounded flex h-6 w-6 cursor-pointer transition-colors items-center justify-center hover:text-yellow-500"
-                              :class="entry.isFavorite ? 'text-yellow-500' : 'text-muted-foreground'"
+                              class="rounded flex h-6 w-6 cursor-pointer transition-colors items-center justify-center hover:text-foreground"
+                              :class="entry.isFavorite ? 'text-foreground' : 'text-muted-foreground'"
                               @click="handleToggleFavorite(entry.id)"
                             >
                               <svg
@@ -333,7 +333,7 @@ function handleToggleFavorite(id: string) {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                class="text-destructive h-7 w-7 hover:text-destructive"
+                                class="text-destructive-text h-7 w-7 hover:text-destructive-text"
                                 @click="handleDelete(entry.id)"
                               >
                                 <svg

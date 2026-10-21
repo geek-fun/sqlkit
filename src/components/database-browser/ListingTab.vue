@@ -246,7 +246,7 @@ async function copyDdlContext() {
       </div>
 
       <!-- Error -->
-      <div v-else-if="error" class="text-sm text-destructive py-8 text-center">
+      <div v-else-if="error" class="text-sm text-destructive-text py-8 text-center">
         {{ error }}
       </div>
 
@@ -294,7 +294,7 @@ async function copyDdlContext() {
             </td>
             <td class="px-3 py-2">
               <div class="flex gap-1">
-                <Button variant="ghost" size="sm" class="text-xs text-destructive h-6" @click.stop="confirmDrop(obj)">
+                <Button variant="ghost" size="sm" class="text-xs text-destructive-text h-6" @click.stop="confirmDrop(obj)">
                   {{ t('components.listingTab.drop') }}
                 </Button>
                 <Button variant="ghost" size="sm" class="text-xs h-6" @click.stop="confirmRename(obj)">

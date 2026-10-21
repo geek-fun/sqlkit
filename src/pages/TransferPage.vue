@@ -56,7 +56,7 @@ const tabConfig = computed(() => [
                     v-for="tab in tabConfig"
                     :key="tab.value"
                     :value="tab.value"
-                    class="text-xs font-medium px-4 rounded-md flex gap-2 h-full transition-colors items-center justify-center data-[state=active]:text-primary data-[state=active]:bg-background data-[state=active]:shadow-sm"
+                    class="text-xs font-medium px-4 rounded-md flex gap-2 h-full transition-colors items-center justify-center data-[state=active]:text-primary-text data-[state=active]:bg-background data-[state=active]:shadow-sm"
                   >
                     <span :class="tab.icon" class="h-3.5 w-3.5" />
                     <span class="truncate">{{ tab.label }}</span>

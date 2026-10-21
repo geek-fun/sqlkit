@@ -22,8 +22,8 @@ const { t } = useI18n()
 
 const statusColor = computed(() => {
   switch (props.task.status) {
-    case 'running': return 'default'
-    case 'completed': return 'outline'
+    case 'running': return 'secondary'
+    case 'completed': return 'success'
     case 'failed': return 'destructive'
     default: return 'outline'
   }
@@ -39,9 +39,9 @@ const progressPercent = computed(() =>
 
 const icon = computed(() => {
   switch (props.task.kind) {
-    case 'export': return 'i-carbon-document-export text-blue-500/80'
-    case 'import': return 'i-carbon-document-import text-purple-500/80'
-    default: return 'i-carbon-data-refinery text-orange-500/80'
+    case 'export': return 'i-carbon-document-export text-muted-foreground'
+    case 'import': return 'i-carbon-document-import text-muted-foreground'
+    default: return 'i-carbon-data-refinery text-muted-foreground'
   }
 })
 
@@ -70,9 +70,7 @@ const timeAgo = computed(() => {
         </div>
         <Badge
           :variant="statusColor"
-          class="text-[10px] tracking-wide font-mono px-1.5 py-0.5 rounded-sm uppercase" :class="[
-            props.task.status === 'completed' ? 'bg-green-500/10 text-green-600 border-transparent' : '',
-          ]"
+          class="text-[10px] tracking-wide font-mono px-1.5 py-0.5 rounded-sm uppercase"
         >
           {{ statusLabel }}
         </Badge>
@@ -94,7 +92,7 @@ const timeAgo = computed(() => {
         <span>{{ timeAgo }}</span>
       </div>
 
-      <div v-if="props.task.error" class="text-[11px] text-destructive">
+      <div v-if="props.task.error" class="text-[11px] text-destructive-text">
         {{ props.task.error }}
       </div>
 

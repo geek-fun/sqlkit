@@ -23,7 +23,7 @@ const planBadge = computed(() => {
   if (entitlementStore.sessionExpired)
     return { label: t(`plan.state.${s}`), cls: 'bg-muted text-muted-foreground border-transparent' }
   if (s === 'ultimate')
-    return { label: t('plan.state.ultimate'), cls: 'bg-primary/15 text-primary border-primary/30' }
+    return { label: t('plan.state.ultimate'), cls: 'bg-primary/15 text-primary-text border-primary/30' }
   if (s === 'community')
     return { label: t('plan.state.community'), cls: 'bg-muted text-muted-foreground border-transparent' }
   if (s === 'checking')
@@ -135,7 +135,7 @@ async function handleLogout() {
           </span>
           <!-- The re-login instruction outranks any cached benefit copy: the
                session verdict is the only verified fact while degraded. -->
-          <p v-if="entitlementStore.sessionExpired" class="text-[11px] text-amber-500 mt-1">
+          <p v-if="entitlementStore.sessionExpired" class="text-[11px] text-warning mt-1">
             {{ t('plan.section.sessionExpired') }}
           </p>
           <p v-else-if="expiryText" class="text-[11px] text-muted-foreground mt-1">
@@ -174,7 +174,7 @@ async function handleLogout() {
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
-          class="text-destructive focus:text-destructive"
+          class="text-destructive-text focus:text-destructive-text"
           :disabled="recovering"
           @click="handleLogout"
         >

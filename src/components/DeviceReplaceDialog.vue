@@ -224,7 +224,7 @@ function handleOpenChange(open: boolean) {
 
 .replace-error {
   font-size: 13px;
-  color: hsl(var(--destructive));
+  color: hsl(var(--destructive-text));
   margin-top: 8px;
 }
 

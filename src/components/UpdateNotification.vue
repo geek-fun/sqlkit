@@ -123,24 +123,24 @@ const buttonsDisabled = computed(() =>
       <div v-if="hasError" class="px-5 pb-3">
         <div class="px-3 py-2.5 border border-destructive/30 rounded-lg bg-destructive/10 space-y-1.5">
           <div class="flex gap-2 items-start">
-            <span class="i-carbon-warning text-destructive mt-0.5 shrink-0 h-4 w-4" />
+            <span class="i-carbon-warning text-destructive-text mt-0.5 shrink-0 h-4 w-4" />
             <div class="flex-1 min-w-0">
-              <p class="text-xs text-destructive font-semibold">
+              <p class="text-xs text-destructive-text font-semibold">
                 {{ t('updater.installFailed') }}
               </p>
-              <p class="text-xs text-destructive/80 leading-relaxed mt-0.5 break-all">
+              <p class="text-xs text-destructive-text leading-relaxed mt-0.5 break-all">
                 {{ updateError }}
               </p>
             </div>
             <button
-              class="text-destructive/60 shrink-0 transition-colors hover:text-destructive"
+              class="text-destructive-text shrink-0 transition-colors hover:text-destructive-text"
               :aria-label="t('common.buttons.dismiss')"
               @click="clearError"
             >
               <span class="i-carbon-close h-3.5 w-3.5" />
             </button>
           </div>
-          <p class="text-xs text-destructive/70 pl-6">
+          <p class="text-xs text-destructive-text pl-6">
             {{ t('updater.installFailedHelp') }}
           </p>
         </div>
@@ -169,7 +169,7 @@ const buttonsDisabled = computed(() =>
           <Button
             variant="default"
             size="sm"
-            class="text-white font-semibold min-w-[96px]"
+            class="text-primary-foreground font-semibold min-w-[96px]"
             :class="{
               'opacity-50 cursor-not-allowed': buttonsDisabled,
             }"

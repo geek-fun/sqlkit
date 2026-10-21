@@ -23,9 +23,9 @@ function riskLabel(risk: string): string {
 
 function riskColor(risk: string): string {
   switch (risk) {
-    case 'destructive': return 'text-red-600 bg-red-50 border-red-200'
-    case 'elevated': return 'text-amber-600 bg-amber-50 border-amber-200'
-    default: return 'text-green-600 bg-green-50 border-green-200'
+    case 'destructive': return 'text-destructive-text bg-destructive-muted border-destructive-border'
+    case 'elevated': return 'text-warning bg-warning-muted border-warning-border'
+    default: return 'text-foreground bg-card border-border'
   }
 }
 </script>
@@ -71,7 +71,7 @@ function riskColor(risk: string): string {
       <Button
         size="sm"
         variant="ghost"
-        class="text-muted-foreground hover:text-destructive"
+        class="text-muted-foreground hover:text-destructive-text"
         @click="emit('confirm', { toolCallId: props.toolCall.id, action: 'deny_always' })"
       >
         {{ t('dataStudio.agent.denyAlways') }}

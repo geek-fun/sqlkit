@@ -4,25 +4,25 @@ import { cva } from 'class-variance-authority'
 export { default as Badge } from './Badge.vue'
 
 export const badgeVariants = cva(
-  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-1 focus:ring-ring focus:ring-offset-1',
+  'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold',
   {
     variants: {
       variant: {
         default:
-          'border-transparent bg-primary text-primary-foreground hover:bg-primary/80',
+          'border-transparent bg-primary text-primary-foreground',
         secondary:
-          'border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80',
+          'border-transparent bg-secondary text-secondary-foreground',
         destructive:
-          'border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80',
+          'border-destructive-border bg-destructive-muted text-destructive-text',
         outline: 'text-foreground',
         success:
-          'border-transparent bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300',
+          'border-success-border bg-success-muted text-success',
         warning:
-          'border-transparent bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300',
+          'border-warning-border bg-warning-muted text-warning',
       },
     },
     defaultVariants: {
-      variant: 'default',
+      variant: 'secondary',
     },
   },
 )

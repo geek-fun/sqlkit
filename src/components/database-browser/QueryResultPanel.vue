@@ -464,12 +464,12 @@ const handleExport = (action: typeof exportActions[number]) => {
         <div v-else-if="displayError && !displayResults" class="p-4">
           <div class="p-4 border border-destructive/30 rounded-md bg-destructive/5">
             <div class="flex gap-3 items-start">
-              <span class="i-carbon-warning-alt text-destructive mt-0.5 flex-shrink-0 h-5 w-5" />
+              <span class="i-carbon-warning-alt text-destructive-text mt-0.5 flex-shrink-0 h-5 w-5" />
               <div>
                 <p
                   v-for="(line, index) in (typeof displayError === 'string' ? displayError : formatApiError(displayError, t)).split('\n\n')"
                   :key="index"
-                  class="text-sm text-destructive"
+                  class="text-sm text-destructive-text"
                 >
                   {{ line }}
                 </p>
@@ -543,7 +543,7 @@ const handleExport = (action: typeof exportActions[number]) => {
         {{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}
       </span>
       <span v-else class="tabular-nums">{{ t('components.queryResult.commandCompleted') }}</span>
-      <span v-if="formattedTime" class="text-muted-foreground/70 tabular-nums">
+      <span v-if="formattedTime" class="text-muted-foreground tabular-nums">
         {{ t('components.queryResult.time', { time: formattedTime }) }}
       </span>
     </div>

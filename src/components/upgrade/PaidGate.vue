@@ -496,7 +496,7 @@ async function handleLogin() {
   width: 14px;
   height: 14px;
   flex-shrink: 0;
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .gate-card__tiles {
@@ -524,7 +524,7 @@ async function handleLogin() {
   flex-shrink: 0;
   border-radius: 8px;
   background-color: hsl(var(--primary) / 0.12);
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .gate-tile__text {
@@ -573,7 +573,7 @@ async function handleLogin() {
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: hsl(var(--muted-foreground) / 0.8);
+  color: hsl(var(--muted-foreground));
 }
 
 .prov-group__chips {

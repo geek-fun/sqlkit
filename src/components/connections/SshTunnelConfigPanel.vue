@@ -319,14 +319,14 @@ onMounted(detectProxy)
       <span class="text-sm text-muted-foreground truncate transition-colors group-hover:text-foreground/80">
         {{ t('components.serverForm.ssh.ultimateOnly') }}
       </span>
-      <span class="text-xs text-primary font-medium ml-auto px-2 py-1 rounded-md bg-primary/10 shrink-0 transition-colors group-hover:bg-primary/15">
+      <span class="text-xs text-primary-text font-medium ml-auto px-2 py-1 rounded-md bg-primary/10 shrink-0 transition-colors group-hover:bg-primary/15">
         {{ t('plan.upgrade.cta') }}
       </span>
     </button>
 
     <template v-else>
       <div class="flex gap-2 items-center">
-        <span class="i-carbon-locked text-green-500 shrink-0 h-4 w-4" />
+        <span class="i-carbon-locked text-muted-foreground shrink-0 h-4 w-4" />
         <span class="text-sm font-medium whitespace-nowrap">{{ t('components.serverForm.ssh.useSshTunnel') }}</span>
         <span v-if="hopProfiles.length > 0" class="text-xs text-muted-foreground whitespace-nowrap">
           {{ hopProfiles.length }} {{ t('components.serverForm.ssh.hops', hopProfiles.length) }}
@@ -344,7 +344,7 @@ onMounted(detectProxy)
             : t('components.serverForm.ssh.testChain')"
           @click="testFirstHop"
         >
-          <span v-if="testing" class="i-carbon-circle-dash text-blue-500 h-3.5 w-3.5 animate-spin" />
+          <span v-if="testing" class="i-carbon-circle-dash text-primary-text h-3.5 w-3.5 animate-spin" />
           <span v-else class="i-carbon-network-3 h-3.5 w-3.5" />
         </Button>
 
@@ -375,7 +375,7 @@ onMounted(detectProxy)
       <p
         v-if="testResult"
         class="text-xs leading-relaxed break-words"
-        :class="testResult.success ? 'text-green-600 dark:text-green-400' : 'text-destructive'"
+        :class="testResult.success ? 'text-success' : 'text-destructive-text'"
       >
         {{ testResult.success && testResult.user && testResult.host && testResult.port
           ? t('components.serverForm.ssh.testSuccess', {
@@ -416,7 +416,7 @@ onMounted(detectProxy)
           variant="ghost"
           size="icon"
           type="button"
-          class="text-muted-foreground shrink-0 h-6 w-6 hover:text-destructive"
+          class="text-muted-foreground shrink-0 h-6 w-6 hover:text-destructive-text"
           :title="t('components.serverForm.ssh.systemProxyDetach')"
           @click="patch({ useSystemProxy: false })"
         >
@@ -428,14 +428,14 @@ onMounted(detectProxy)
            connect time). -->
       <div
         v-else-if="!detectedProxy && useSystemProxy"
-        class="px-2.5 py-1.5 border border-amber-500/50 rounded-md bg-amber-50 flex gap-2 items-center dark:bg-amber-900/20"
+        class="px-2.5 py-1.5 border border-warning-border rounded-md bg-warning-muted flex gap-2 items-center"
       >
         <span class="text-[10px] text-muted-foreground font-bold shrink-0 w-4">0</span>
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium">
             {{ t('components.serverForm.ssh.systemProxy') }}
           </div>
-          <div class="text-[11px] text-amber-600 truncate dark:text-amber-400">
+          <div class="text-[11px] text-warning truncate">
             {{ t('components.serverForm.ssh.systemProxyNotDetected') }}
           </div>
         </div>
@@ -443,7 +443,7 @@ onMounted(detectProxy)
           variant="ghost"
           size="icon"
           type="button"
-          class="text-muted-foreground shrink-0 h-6 w-6 hover:text-destructive"
+          class="text-muted-foreground shrink-0 h-6 w-6 hover:text-destructive-text"
           :title="t('components.serverForm.ssh.systemProxyDetach')"
           @click="patch({ useSystemProxy: false })"
         >
@@ -494,7 +494,7 @@ onMounted(detectProxy)
               variant="ghost"
               size="icon"
               type="button"
-              class="text-muted-foreground h-6 w-6 hover:text-destructive"
+              class="text-muted-foreground h-6 w-6 hover:text-destructive-text"
               :title="t('components.serverForm.ssh.detachAction')"
               @click="detachHop(index)"
             >
@@ -515,7 +515,7 @@ onMounted(detectProxy)
       <!-- Legacy manual (inline) config — pre-profiles connections keep editing
          their inline fields; new configurations always go through profiles -->
       <template v-if="legacyInline">
-        <p class="text-[11px] text-amber-600 dark:text-amber-400">
+        <p class="text-[11px] text-warning">
           {{ t('components.serverForm.ssh.legacyManual') }}
         </p>
         <div class="space-y-2">

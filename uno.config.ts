@@ -31,9 +31,12 @@ export default defineConfig({
       input: 'hsl(var(--input))',
       ring: 'hsl(var(--ring))',
       background: 'hsl(var(--background))',
+      chrome: 'hsl(var(--chrome))',
+      selection: 'hsl(var(--selection))',
       foreground: 'hsl(var(--foreground))',
       primary: {
         DEFAULT: 'hsl(var(--primary))',
+        text: 'hsl(var(--primary-text))',
         foreground: 'hsl(var(--primary-foreground))',
       },
       secondary: {
@@ -42,6 +45,9 @@ export default defineConfig({
       },
       destructive: {
         DEFAULT: 'hsl(var(--destructive))',
+        text: 'hsl(var(--destructive-text))',
+        muted: 'hsl(var(--destructive-muted))',
+        border: 'hsl(var(--destructive-border))',
         foreground: 'hsl(var(--destructive-foreground))',
       },
       success: {
@@ -49,6 +55,12 @@ export default defineConfig({
         foreground: 'hsl(var(--success-foreground))',
         muted: 'hsl(var(--success-muted))',
         border: 'hsl(var(--success-border))',
+      },
+      warning: {
+        DEFAULT: 'hsl(var(--warning))',
+        foreground: 'hsl(var(--warning-foreground))',
+        muted: 'hsl(var(--warning-muted))',
+        border: 'hsl(var(--warning-border))',
       },
       muted: {
         DEFAULT: 'hsl(var(--muted))',
@@ -105,13 +117,13 @@ export default defineConfig({
     'text-accent-foreground',
     'hover:bg-accent',
     'hover:text-accent-foreground',
-    'text-primary',
+    'text-primary-text',
     'bg-popover',
     'text-popover-foreground',
     'bg-destructive/10',
-    'text-destructive',
+    'text-destructive-text',
     'hover:bg-destructive/10',
-    'hover:text-destructive-foreground',
+    'hover:text-destructive-text',
     'bg-success',
     'text-success',
     'border-success-border',

@@ -309,7 +309,7 @@ export const useAppStore = defineStore('app', {
       this.sidebarCollapsed = collapsed
     },
     getEditorTheme() {
-      return this.uiThemeType === ThemeType.DARK ? 'vs-dark' : 'vs'
+      return this.uiThemeType === ThemeType.DARK ? 'sqlkit-dark' : 'sqlkit-light'
     },
 
     // ── Provider CRUD ────────────────────────────────────────────────────

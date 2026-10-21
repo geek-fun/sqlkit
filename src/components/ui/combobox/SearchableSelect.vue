@@ -298,7 +298,7 @@ watch(searchQuery, () => {
             :id="`${listboxId}-create`"
             role="option"
             :data-highlighted="navigableItems[highlightedIndex]?.type === 'create' ? '' : undefined"
-            class="text-sm text-green-600 px-1.5 py-1 outline-none flex gap-2 cursor-pointer select-none italic transition-colors items-center relative hover:bg-accent" :class="[
+            class="text-sm text-primary-text px-1.5 py-1 outline-none flex gap-2 cursor-pointer select-none italic transition-colors items-center relative hover:bg-accent" :class="[
               navigableItems[highlightedIndex]?.type === 'create' && 'bg-accent',
             ]"
             @click="selectOption(searchQuery.trim())"

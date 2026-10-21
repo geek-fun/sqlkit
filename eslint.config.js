@@ -23,6 +23,7 @@ export default antfu({
     '**/dist/**',
     '**/node_modules/**',
     '**/.tauri/**',
+    '.impeccable/hook.cache.json',
     'AGENTS.md',
     'docs/**',
     'src-tauri/gen/**',

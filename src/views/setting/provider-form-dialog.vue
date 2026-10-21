@@ -317,7 +317,7 @@ watch(() => props.open, (open) => {
             :placeholder="t('pages.settings.ai.form.namePlaceholder')"
             :class="{ 'border-destructive': formErrors.name }"
           />
-          <p v-if="formErrors.name" class="text-sm text-destructive">
+          <p v-if="formErrors.name" class="text-sm text-destructive-text">
             {{ formErrors.name }}
           </p>
         </div>
@@ -335,7 +335,7 @@ watch(() => props.open, (open) => {
               'cursor-not-allowed opacity-60': isApiCompatibilityReadonly,
             }"
           />
-          <p v-if="formErrors.apiCompatibility" class="text-sm text-destructive">
+          <p v-if="formErrors.apiCompatibility" class="text-sm text-destructive-text">
             {{ formErrors.apiCompatibility }}
           </p>
         </div>
@@ -408,7 +408,7 @@ watch(() => props.open, (open) => {
             :placeholder="t('pages.settings.ai.form.baseUrlPlaceholder')"
             :class="{ 'border-destructive': formErrors.baseUrl }"
           />
-          <p v-if="formErrors.baseUrl" class="text-sm text-destructive">
+          <p v-if="formErrors.baseUrl" class="text-sm text-destructive-text">
             {{ formErrors.baseUrl }}
           </p>
         </div>

@@ -50,12 +50,12 @@ function formatTime(seconds: number) {
   <div class="space-y-3">
     <div class="flex items-center justify-between">
       <div role="status" aria-live="polite" class="text-xs text-foreground font-medium flex gap-1.5 items-center">
-        <span class="i-carbon-circle-dash text-primary h-3.5 w-3.5" :class="{ 'animate-spin': props.isRunning }" />
+        <span class="i-carbon-circle-dash text-primary-text h-3.5 w-3.5" :class="{ 'animate-spin': props.isRunning }" />
         <span>{{ props.progress?.phase || t('transfer.progress.preparing') }}</span>
       </div>
       <div class="text-[11px] text-muted-foreground font-mono tabular-nums" aria-live="off">
         {{ formatTime(elapsedSeconds) }} elapsed
-        <span v-if="remainingSeconds > 0" class="text-muted-foreground/70 ml-1.5">
+        <span v-if="remainingSeconds > 0" class="text-muted-foreground ml-1.5">
           ~{{ formatTime(remainingSeconds) }} left
         </span>
       </div>
@@ -86,7 +86,7 @@ function formatTime(seconds: number) {
 
     <div
       v-if="props.progress && props.progress.errorCount > 0"
-      class="text-[11px] text-destructive tracking-wide font-medium px-2 py-1 rounded-sm bg-destructive/10 flex gap-1.5 uppercase items-center"
+      class="text-[11px] text-destructive-text tracking-wide font-medium px-2 py-1 rounded-sm bg-destructive/10 flex gap-1.5 uppercase items-center"
       role="alert"
       aria-live="assertive"
     >
@@ -107,7 +107,7 @@ function formatTime(seconds: number) {
       <Button
         variant="outline"
         size="sm"
-        class="text-xs text-destructive border-destructive/30 h-8 hover:text-destructive hover:bg-destructive/10"
+        class="text-xs text-destructive-text border-destructive/30 h-8 hover:text-destructive-text hover:bg-destructive/10"
         :disabled="!props.isRunning"
         @click="emit('cancel')"
       >

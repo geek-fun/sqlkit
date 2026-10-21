@@ -269,15 +269,9 @@ defineExpose({ getValue, setValue, handleFormat })
 <style scoped>
 .sql-editor-wrapper {
   position: relative;
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 0.375rem;
+  border: 1px solid hsl(var(--border));
   overflow: hidden;
-  background-color: var(--background-color, #ffffff);
-}
-
-.dark .sql-editor-wrapper {
-  --border-color: #374151;
-  --background-color: #1e1e1e;
+  background-color: hsl(var(--background));
 }
 
 .sql-editor-container {

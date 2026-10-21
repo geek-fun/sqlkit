@@ -32,7 +32,7 @@ const trafficLightInset = computed(() => {
 
 <template>
   <div
-    class="border-b bg-muted/30 flex shrink-0 gap-1 h-10 items-center overflow-hidden"
+    class="border-b bg-chrome flex shrink-0 gap-1 h-10 items-center overflow-hidden"
     :style="{ paddingLeft: trafficLightInset }"
     :class="[
       isMac ? '' : 'flex-row-reverse',
@@ -46,7 +46,7 @@ const trafficLightInset = computed(() => {
       <TooltipProvider>
         <Tooltip v-if="!hideAiButton">
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" class="h-8 w-8" @click="emit('toggleAi')">
+            <Button variant="ghost" size="icon" class="h-8 w-8" :aria-label="$t('aside.aiAssistant')" @click="emit('toggleAi')">
               <span class="i-carbon-chat-bot h-4 w-4" />
             </Button>
           </TooltipTrigger>
@@ -55,11 +55,11 @@ const trafficLightInset = computed(() => {
 
         <Tooltip>
           <TooltipTrigger as-child>
-            <Button variant="ghost" size="icon" class="h-8 w-8 relative" @click="emit('toggleTaskManager')">
+            <Button variant="ghost" size="icon" class="h-8 w-8 relative" :aria-label="$t('transfer.tasks.title')" @click="emit('toggleTaskManager')">
               <span class="i-carbon-list-boxes h-4 w-4" />
               <span
                 v-if="taskCount > 0"
-                class="text-[9px] text-white font-bold px-1 rounded-full bg-red-500 flex h-4 min-w-4 items-center justify-center absolute -right-0.5 -top-0.5"
+                class="text-[9px] text-secondary-foreground font-bold px-1 rounded-full bg-secondary flex h-4 min-w-4 items-center justify-center absolute -right-0.5 -top-0.5"
               >
                 {{ taskCount > 9 ? '9+' : taskCount }}
               </span>

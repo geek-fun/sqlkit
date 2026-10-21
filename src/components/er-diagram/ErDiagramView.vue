@@ -622,7 +622,7 @@ onUnmounted(() => {
 
       <!-- Error state -->
       <div v-else-if="error" class="flex flex-col gap-2 items-center inset-0 justify-center absolute">
-        <p class="text-sm text-destructive">
+        <p class="text-sm text-destructive-text">
           {{ error }}
         </p>
         <Button variant="outline" size="sm" @click="fetchSchemaData">
