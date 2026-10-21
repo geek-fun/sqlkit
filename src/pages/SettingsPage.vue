@@ -1,17 +1,14 @@
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { SettingsFeedback } from '@/components/settings'
-import { Button } from '@/components/ui/button'
+import { SettingsAbout } from '@/components/settings/about'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 // Separator is rendered inline as a styled div
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PaidGate, ProBadge } from '@/components/upgrade'
-import { useAppUpdater } from '@/composables/useAppUpdater'
 import { ThemeType, useAppStore } from '@/store/appStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import AiSettings from '@/views/setting/ai-settings.vue'
@@ -21,19 +18,7 @@ import PlanSection from '@/views/setting/plan-section.vue'
 
 const appStore = useAppStore()
 const { t, locale: _locale } = useI18n()
-const { checkForUpdates, downloadAndInstall, isChecking, isDownloading, isInstalling, updateAvailable, updateInfo, downloadProgress, updateError, isRestarting } = useAppUpdater()
-
-const version = ref('')
 const entitlementStore = useEntitlementStore()
-
-onMounted(async () => {
-  try {
-    version.value = await invoke<string>('get_app_version')
-  }
-  catch {
-    version.value = import.meta.env.VITE_APP_VERSION ?? '0.0.0'
-  }
-})
 
 const preferencesSaved = ref(false)
 watch(() => [appStore.themeType, appStore.editorConfig, appStore.queryConfig], () => {
@@ -153,18 +138,6 @@ function handleQueryTimeoutChange(val: string | number) {
 
 const autoSave = computed(() => appStore.queryConfig.autoSave)
 const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave)
-
-async function handleCheckUpdates() {
-  if (updateAvailable.value) {
-    await downloadAndInstall()
-    return
-  }
-  await checkForUpdates(true)
-  // If an update was found, automatically start downloading
-  if (updateAvailable.value && updateInfo.value) {
-    await downloadAndInstall()
-  }
-}
 </script>
 
 <template>
@@ -208,9 +181,6 @@ async function handleCheckUpdates() {
             </TabsTrigger>
             <TabsTrigger value="jre">
               {{ t('pages.settings.jre.title') }}
-            </TabsTrigger>
-            <TabsTrigger value="about">
-              {{ t('pages.settings.about.title') }}
             </TabsTrigger>
           </TabsList>
 
@@ -266,38 +236,7 @@ async function handleCheckUpdates() {
                       </p>
                     </button>
                   </div>
-
-                  <!-- Check for Updates -->
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-1">
-                      <Label>{{ t('pages.settings.updates.checkForUpdates') }}</Label>
-                      <p class="text-xs text-muted-foreground">
-                        {{ t('pages.settings.updates.checkForUpdatesHelp') }}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      :disabled="isChecking || isDownloading || isInstalling || isRestarting"
-                      @click="handleCheckUpdates"
-                    >
-                      <!-- Spinning circle while checking or installing -->
-                      <span
-                        v-if="isChecking || isInstalling"
-                        class="i-carbon-circle-dash mr-2 shrink-0 h-4 w-4 animate-spin"
-                      />
-
-                      {{ isChecking ? t('pages.settings.updates.checking') : isDownloading && downloadProgress !== null ? `${t('pages.settings.updates.downloading')} ${downloadProgress}%` : isInstalling ? t('pages.settings.updates.installing') : updateAvailable ? t('pages.settings.updates.updateAvailable') : t('pages.settings.updates.check') }}
-                    </Button>
-                  </div>
                 </div>
-                <SettingsFeedback
-                  v-if="isChecking || isDownloading || isInstalling || isRestarting || updateError"
-                  :state="updateError ? 'error' : 'pending'"
-                  :label="isRestarting ? t('updater.restarting') : t(`pages.settings.feedback.${updateError ? 'failed' : isInstalling ? 'installing' : isDownloading ? 'downloading' : 'checking'}`)"
-                  :detail="updateError"
-                  :progress="downloadProgress"
-                />
               </CardContent>
             </Card>
             <section aria-labelledby="settings-account-plan-title" class="space-y-3">
@@ -311,6 +250,7 @@ async function handleCheckUpdates() {
               </div>
               <PlanSection />
             </section>
+            <SettingsAbout />
           </TabsContent>
 
           <!-- Editor Tab -->
@@ -578,77 +518,6 @@ async function handleCheckUpdates() {
           <!-- JRE & Drivers Tab -->
           <TabsContent value="jre" class="mt-0">
             <JreDriverSection />
-          </TabsContent>
-
-          <!-- About Tab -->
-          <TabsContent value="about" class="mt-0">
-            <Card>
-              <CardHeader>
-                <CardTitle>{{ t('pages.settings.about.title') }}</CardTitle>
-                <CardDescription>{{ t('pages.settings.about.description') }}</CardDescription>
-              </CardHeader>
-              <CardContent class="space-y-5">
-                <!-- Version -->
-                <div class="flex items-center justify-between">
-                  <Label>{{ t('pages.settings.about.version') }}</Label>
-                  <span class="text-sm text-muted-foreground font-mono">{{ version }}</span>
-                </div>
-
-                <!-- License -->
-                <div class="flex items-center justify-between">
-                  <Label>{{ t('pages.settings.about.license') }}</Label>
-                  <span class="text-sm text-muted-foreground">{{ t('pages.settings.about.licenseName') }}</span>
-                </div>
-
-                <div class="border-t border-border/40" />
-
-                <!-- Repository -->
-                <a
-                  href="https://github.com/geek-fun/sqlkit"
-                  target="_blank"
-                  class="p-2 rounded-md flex transition-colors items-center justify-between -mx-2 hover:bg-muted/50"
-                >
-                  <Label>{{ t('pages.settings.about.repository') }}</Label>
-                  <div class="flex gap-2 items-center">
-                    <span class="text-sm text-muted-foreground">geek-fun/sqlkit</span>
-                    <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
-                  </div>
-                </a>
-
-                <!-- Website -->
-                <a
-                  href="https://www.geekfun.club"
-                  target="_blank"
-                  class="p-2 rounded-md flex transition-colors items-center justify-between -mx-2 hover:bg-muted/50"
-                >
-                  <Label>{{ t('pages.settings.about.website') }}</Label>
-                  <div class="flex gap-2 items-center">
-                    <span class="text-sm text-muted-foreground">geekfun.club</span>
-                    <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
-                  </div>
-                </a>
-
-                <!-- Discord -->
-                <a
-                  href="https://discord.gg/5NSUyPK2E"
-                  target="_blank"
-                  class="p-2 rounded-md flex transition-colors items-center justify-between -mx-2 hover:bg-muted/50"
-                >
-                  <Label>{{ t('pages.settings.about.community') }}</Label>
-                  <div class="flex gap-2 items-center">
-                    <span class="text-sm text-muted-foreground">Discord</span>
-                    <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
-                  </div>
-                </a>
-
-                <div class="border-t border-border/40" />
-
-                <!-- Copyright -->
-                <p class="text-xs text-muted-foreground pt-2 text-center">
-                  {{ t('pages.settings.about.copyright', { year: new Date().getFullYear() }) }}
-                </p>
-              </CardContent>
-            </Card>
           </TabsContent>
         </div>
       </Tabs>

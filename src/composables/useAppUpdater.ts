@@ -13,6 +13,8 @@ const skipVersion = useLocalStorage('sqlkit-skip-version', '')
 const updateAvailable = ref(false)
 const updateInfo = ref<Update | null>(null)
 const isChecking = ref(false)
+const isUpToDate = ref(false)
+let includeSkippedInCheck = false
 const isDownloading = ref(false)
 const isInstalling = ref(false)
 const isRestarting = ref(false)
@@ -34,16 +36,23 @@ const updateError = ref('')
 export function useAppUpdater() {
   const { t } = useI18n()
 
-  const checkForUpdates = async (showToast = false): Promise<Update | null> => {
-    if (isChecking.value)
+  const checkForUpdates = async (showToast = false, options: { includeSkipped?: boolean } = {}): Promise<Update | null> => {
+    if (isChecking.value) {
+      includeSkippedInCheck ||= !!options.includeSkipped
+      return null
+    }
+    if (isDownloading.value || isInstalling.value || isRestarting.value)
       return null
 
     try {
       isChecking.value = true
+      isUpToDate.value = false
+      includeSkippedInCheck = !!options.includeSkipped
       updateError.value = ''
       const update = await check()
+      isUpToDate.value = !update
 
-      if (update && update.version !== skipVersion.value) {
+      if (update && (includeSkippedInCheck || update.version !== skipVersion.value)) {
         updateAvailable.value = true
         updateInfo.value = update
 
@@ -56,6 +65,8 @@ export function useAppUpdater() {
         return update
       }
       else {
+        updateAvailable.value = false
+        updateInfo.value = null
         if (showToast) {
           toast.success(t('updater.upToDate'))
         }
@@ -64,8 +75,7 @@ export function useAppUpdater() {
     }
     catch (error) {
       console.error('Failed to check for updates:', error)
-      if (showToast)
-        updateError.value = error instanceof Error ? error.message : String(error)
+      updateError.value = error instanceof Error ? error.message : String(error)
       if (showToast) {
         toast.error(t('updater.checkFailed'), {
           description: error instanceof Error ? error.message : String(error),
@@ -140,6 +150,7 @@ export function useAppUpdater() {
       skipVersion.value = updateInfo.value.version
     }
     updateAvailable.value = false
+    isUpToDate.value = false
     updateInfo.value = null
     updateError.value = ''
     downloadedBytes.value = 0
@@ -148,6 +159,7 @@ export function useAppUpdater() {
 
   const dismissUpdate = () => {
     updateAvailable.value = false
+    isUpToDate.value = false
     updateInfo.value = null
     updateError.value = ''
     downloadedBytes.value = 0
@@ -162,6 +174,7 @@ export function useAppUpdater() {
     updateAvailable,
     updateInfo,
     isChecking,
+    isUpToDate,
     isDownloading,
     isInstalling,
     isRestarting,
