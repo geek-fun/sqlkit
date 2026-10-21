@@ -64,6 +64,15 @@ describe.each(['light', 'dark'] as const)('%s theme', (name) => {
     },
   )
 
+  it.each(['table', 'view', 'procedure', 'function', 'database'])(
+    'keeps %s recognition icons readable on neutral surfaces',
+    (role) => {
+      ;['background', 'chrome', 'card', 'accent'].forEach((surface) => {
+        expect(contrast(tokens[`icon-${role}`], tokens[surface])).toBeGreaterThanOrEqual(4.5)
+      })
+    },
+  )
+
   it.each(['keyword', 'string', 'number', 'comment'])(
     'keeps SQL %s tokens readable',
     (token) => {

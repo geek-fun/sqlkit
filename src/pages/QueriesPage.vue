@@ -1262,9 +1262,9 @@ function closeResultPanel() {
                 <Tooltip>
                   <TooltipTrigger as-child>
                     <Button
-                      variant="default"
+                      variant="ghost"
                       size="icon"
-                      class="h-7 w-7 disabled:opacity-40"
+                      class="text-icon-execute h-7 w-7 hover:text-icon-execute disabled:opacity-40"
                       :disabled="!activeTab"
                       :aria-label="t('pages.queries.editor.execute')"
                       @click="executeQuery"
@@ -1284,7 +1284,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-muted-foreground h-7 w-7 hover:text-foreground disabled:opacity-40"
+                      class="text-icon-explain h-7 w-7 hover:text-icon-explain disabled:opacity-40"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       :aria-label="t('pages.queries.editor.explain')"
                       @click="handleExplainQuery(explainAnalyzeMode)"
@@ -1303,8 +1303,8 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-muted-foreground h-7 w-7 hover:text-foreground disabled:opacity-40"
-                      :class="explainAnalyzeMode ? 'bg-accent text-accent-foreground' : ''"
+                      class="text-icon-explain h-7 w-7 hover:text-icon-explain disabled:opacity-40"
+                      :class="explainAnalyzeMode ? 'bg-accent ring-1 ring-input' : ''"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       :aria-pressed="explainAnalyzeMode"
                       :aria-label="t('pages.queries.explain.analyzeToggle', { mode: explainAnalyzeMode ? 'ON' : 'OFF' })"
@@ -1327,7 +1327,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-muted-foreground h-7 w-7 hover:text-foreground disabled:opacity-40"
+                      class="text-icon-format h-7 w-7 hover:text-icon-format disabled:opacity-40"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
                       :aria-label="t('pages.queries.editor.format')"
                       @click="handleToolbarFormat"
@@ -1350,7 +1350,7 @@ function closeResultPanel() {
                     <Button
                       variant="ghost"
                       size="icon"
-                      class="text-muted-foreground h-7 w-7 hover:text-foreground disabled:opacity-40"
+                      class="text-icon-save h-7 w-7 hover:text-icon-save disabled:opacity-40"
                       :disabled="!activeTab || !activeTab.content.trim()"
                       :aria-label="t('pages.queries.shortcuts.saveAs')"
                       @click="handleDownloadQuery"
