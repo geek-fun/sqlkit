@@ -78,6 +78,11 @@ The table records CSS HSL components, used as `hsl(var(--token))`. The frontmatt
 | `--warning-foreground` | `0.00 0.00% 100.00%` | `220.00 12.00% 9.80%` | Text on warning fills |
 | `--warning-muted` | `39.00 100.00% 96.08%` | `36.67 20.45% 17.25%` | Warning feedback surface |
 | `--warning-border` | `39.10 67.94% 74.31%` | `37.36 32.12% 32.35%` | Warning feedback boundary |
+| `--icon-table` | `142.43 71.81% 29.22%` | `143.02 47.25% 64.31%` | Table objects / Execute recognition |
+| `--icon-view` | `262.12 83.26% 57.84%` | `265.41 80.95% 79.41%` | Views / EXPLAIN recognition |
+| `--icon-procedure` | `224.28 76.33% 48.04%` | `218.46 100.00% 77.06%` | Procedures / collection groups / Save recognition |
+| `--icon-function` | `35.65 100.00% 27.06%` | `36.61 79.73% 70.98%` | Functions / Format recognition |
+| `--icon-database` | `43.91 100.00% 27.06%` | `45.00 55.17% 65.88%` | Database recognition |
 
 Dark mode uses the approved softly cool graphite palette. Preserve blue primary actions. Use `primary-text` for blue text and icons, and `destructive-text` for error text and icons; solid fill tokens are not readable-text tokens. `success` and `warning` are paired with dark foregrounds in dark mode and white foregrounds in light mode.
 
@@ -87,7 +92,7 @@ Dark mode uses the approved softly cool graphite palette. Preserve blue primary 
 | --- | --- | --- |
 | Blue `primary / primary-text` | Primary actions, links, selected controls, small active indicators | Success, ordinary badges, large panel backgrounds |
 | Neutrals `foreground / muted / secondary / accent` | Body text, supporting information, toolbars, navigation backgrounds, counts, ordinary attributes, disconnected states | Important errors or risks hidden through low contrast |
-| Green `success` | Successful connection tests, connected states, successful execution, completed transfers | Execute buttons, boolean true, auto-increment attributes, decorative selling points |
+| Green `success` | Successful connection tests, connected states, successful execution, completed transfers | Filled Execute buttons, boolean true, auto-increment attributes, decorative selling points |
 | Red `destructive / destructive-text` | Execution failures, connection failures, deletion confirmations | Ordinary task counts, disconnected states, boolean false, decoration |
 | Amber `warning` | Actual warnings, risks, exceptional states requiring attention | JSON format, primary keys, ordinary unsaved indicators, arbitrary toolbar buttons |
 
@@ -97,15 +102,15 @@ Use neutral icons and text for ordinary information; do not introduce a separate
 
 1. **Start with neutrals, then add emphasis.** Most backgrounds, borders, body text, and icons in a resting workspace use existing neutral tokens. Establish hierarchy through typography, spacing, and position first.
 2. **Aim for accents to occupy no more than roughly 10% of the UI.** This is a review heuristic for the app shell, toolbars, panels, and forms, not a pixel-counting requirement. Evaluate SQL syntax highlighting, actual data charts, and local error feedback separately for readability; these exceptions must not expand decorative color use.
-3. **Use at most one solid primary action per operation context.** This is usually Execute in a query workspace or Save in a form dialog. Other actions use outline / secondary / ghost. An independent dialog may have its own primary action. Focus rings and status dots do not count as a second solid primary action.
+3. **Use at most one solid primary action per operation context.** Use a solid action only when the context benefits from it, such as Save in a form dialog. Query toolbar actions, including Execute, use compact ghost buttons with colored icons and neutral hover surfaces. An independent dialog may have its own primary action. Focus rings and status dots do not count as a second solid primary action.
 4. **Success, warning, and failure may coexist when backed by actual state.** Default to an icon / status dot with text, adding a local, subdued background when needed. Do not tint an entire row, card, or panel.
-5. **Features do not own colors.** Do not give copy / export / format / EXPLAIN or individual filter operators a separate color. The result copy/export icons have the bounded exception below.
+5. **Features do not own colors.** Do not tint feature surfaces or filter operators by category. The object-type, query-action, and result copy/export icons have bounded recognition exceptions below.
 
 ### Allowed and avoided treatments
 
 | Context | Default treatment | Avoid |
 | --- | --- | --- |
-| Toolbars | Neutral icons and text; `accent` on hover | Blue / purple / orange / green buttons side by side |
+| Query toolbar | Small colored action icons, ghost buttons, neutral `accent` on hover | Solid blue Execute tiles or colored button backgrounds |
 | Navigation / tabs | Neutral backgrounds and font weight; small blue indicators when needed | Solid saturated blue blocks or multicolor navigation entries |
 | Attribute badges | Explicitly select `outline` or `secondary` on `Badge` | Solid blue badges chosen merely because that variant is the default |
 | Connection cards | Name, engine icon, status text / dot | A different colored background for each database engine |
@@ -113,6 +118,10 @@ Use neutral icons and text for ordinary information; do not introduce a separate
 | AI assistant / Ultimate indicators | The same neutral containers and small primary accents | A separate purple theme, rainbow gradients, glowing borders |
 
 ### Color exceptions
+
+- The object browser uses small recognition icons: green table objects, violet views, blue procedures, amber functions, and gold database icons. Tables category nodes use a blue `table-properties` icon while individual tables use a green `table` icon. Labels, counts, chevrons, row backgrounds, and other chrome remain neutral. Materialized views retain a distinct layers glyph. These icon colors identify object types and do not indicate connection or execution state.
+- The query toolbar uses green Execute, violet EXPLAIN / ANALYZE, amber Format, and blue Save icons. All use compact ghost buttons with neutral hover and pressed surfaces; Execute has no persistent solid primary background. Enabled ANALYZE also retains its pressed state and an outline. Accessible labels and distinct glyphs remain required.
+- Recognition colors live in `--icon-table / view / procedure / function / database`, with light/dark definitions and `icon-*` UnoCSS mappings. Query-action mappings reuse this palette without borrowing the status token names. These are foreground-only icon roles; do not use them for button fills, panels, badges, text labels, or status feedback.
 
 - Result copy/export icons retain their established format colors: sky blue for CSV, amber for JSON, and emerald for INSERT, including the overflow menu and light/dark variants. This is an icon-only recognition cue; buttons and menu surfaces remain neutral, and labels still identify each action. These colors do not indicate status or extend to other format controls.
 - Monaco SQL syntax highlighting, code diffs, and actual data charts may use multiple colors when those colors explain content. Do not extend their palettes into application controls.
@@ -298,7 +307,7 @@ Interactive components must cover default, hover, focus-visible, active / select
 ### Don't
 
 - Do not assign a color to every feature, database type, filter operator, or file format.
-- Do not use success green for Execute, error red for ordinary counts, or warning colors for ordinary attributes.
+- Do not use success-status tokens for Execute, error red for ordinary counts, or warning colors for ordinary attributes. Execute uses its bounded recognition icon role.
 - Do not replace SQLKit's blue theme, force pure-gray neutral surfaces, or switch to monochrome primary buttons to match the reference project.
 - Do not add rainbow badges, gradient AI panels, large colored icon containers, or light effects without functional value.
 - Do not use historical hardcoding, default Badge styling, or unimplemented tokens as the design basis for new UI.
@@ -320,7 +329,7 @@ Check each affected surface. Documentation-only changes need source, link, and i
 ### Theme maintenance
 
 - Keep the CSS token source, UnoCSS mappings, Monaco adapter, and this specification synchronized.
-- Shared badges default to neutral secondary. Connection and transfer status signals use semantic tokens; database attributes, booleans, filter operators, task counts, feature icons, and vendor icon containers remain neutral.
+- Shared badges default to neutral secondary. Connection and transfer status signals use semantic tokens; database attributes, booleans, filter operators, task counts, and vendor icon containers remain neutral. Object-type and query-action icons retain the bounded recognition palette above.
 - Theme preview tiles scope the same light/dark tokens instead of maintaining a second miniature palette.
 - Automated contrast checks cover text on workspace, chrome, raised, selection, and semantic feedback surfaces, plus foregrounds on solid actions. Editor theme tests cover light/dark switching and token inheritance.
 - Continue to verify real content, narrow windows, keyboard focus, system appearance changes, and native window controls on the target operating systems. Theme tests do not replace native-platform interaction checks.
