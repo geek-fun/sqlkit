@@ -67,7 +67,6 @@ export function useSidebarChatAgent() {
         [activeTab.name || 'active']: {
           connectionId: activeTab.connectionId,
           dbType: 'SQL',
-          permissions: { read: true, create: false, update: false, delete: false },
         },
       }
     }

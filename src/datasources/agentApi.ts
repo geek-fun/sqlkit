@@ -247,6 +247,7 @@ export const agentApi = {
       session_id: string
       tool_call_id: string
       tool_name: string
+      risk_level?: 'safe' | 'elevated' | 'destructive'
       arguments: unknown
     }) => void,
   ): Promise<() => void> =>

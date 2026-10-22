@@ -328,3 +328,7 @@ Check each affected surface. Documentation-only changes need source, link, and i
 - Theme preview tiles scope the same light/dark tokens instead of maintaining a second miniature palette.
 - Automated contrast checks cover text on workspace, chrome, raised, selection, and semantic feedback surfaces, plus foregrounds on solid actions. Editor theme tests cover light/dark switching and token inheritance.
 - Continue to verify real content, narrow windows, keyboard focus, system appearance changes, and native window controls on the target operating systems. Theme tests do not replace native-platform interaction checks.
+
+### AI permission controls
+
+Connection dialogs expose a collapsed AI permissions section shared by Data Studio and external MCP. Default to system inheritance, show effective allowed actions, and reveal per-action Inherit / Allow / Deny under Customize. The system settings page edits action defaults, without a separate connection allowlist or MCP exposure switch. Preserve shared Select, Label, Button, neutral surfaces, localized English/Chinese copy, keyboard focus, and loading/error/retry states. See [AI permissions](docs/AI_PERMISSIONS.md) for enforcement and migration behavior.
