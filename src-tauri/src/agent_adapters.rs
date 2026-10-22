@@ -7,7 +7,6 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use crate::mcp_bridge::McpConfig;
 use data_studio_agent as lib;
 use data_studio_agent::storage;
 use data_studio_agent::traits::{CancelMap, ConfirmMap, EventEmitter};
@@ -69,29 +68,29 @@ pub async fn run_agent_loop(
             .unwrap_or(false)
     };
 
-    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
+    let policy_app = app.clone();
+    let permission_connections = connections.clone();
     let should_deny = move |tool_name: &str, conn_id: Option<&str>| -> bool {
-        // Reload per call so permission changes made in Settings apply to the
-        // next tool call instead of being snapshotted for the whole run.
-        let policy = McpConfig::load(&app_data_dir).policy;
-        match data_studio_agent::capabilities::registry::registry().get(tool_name) {
-            Some(cap) => {
-                // Allowlist set but no connection specified: a DB capability would
-                // fall back to the default connection, bypassing the allowlist.
-                // AppLocal tools (list_connections etc.) need no connection.
-                if !policy.allowed_connection_ids.is_empty()
-                    && conn_id.is_none()
-                    && !matches!(
-                        cap.source_kind,
-                        data_studio_agent::capabilities::types::SourceKind::AppLocal
-                    )
-                {
-                    return true;
-                }
-                !policy.allows(cap.risk_level, conn_id)
-            }
-            None => false,
+        let Some(cap) = data_studio_agent::capabilities::registry::registry().get(tool_name) else {
+            return true;
+        };
+        if matches!(
+            cap.source_kind,
+            data_studio_agent::capabilities::types::SourceKind::AppLocal
+                | data_studio_agent::capabilities::types::SourceKind::File
+        ) {
+            return false;
         }
+        let Some(id) = conn_id
+            .and_then(|id| permission_connections.get(id))
+            .and_then(|cfg| cfg.get("connectionId"))
+            .and_then(Value::as_str)
+        else {
+            return true;
+        };
+        crate::mcp_bridge::load_permission_policy(&policy_app)
+            .map(|policy| !policy.effective_permissions(id).any_allowed())
+            .unwrap_or(true)
     };
 
     lib::loop_runner::run_agent_loop(

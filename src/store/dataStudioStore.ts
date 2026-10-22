@@ -6,6 +6,7 @@ import { agentApi } from '@/datasources/agentApi'
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type DataSourcePermissions = {
+  manage?: boolean
   read: boolean
   create: boolean
   update: boolean
@@ -445,7 +446,7 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
     },
 
-    updateSessionSourcePermissions(sourceId: string, permissions: DataSourcePermissions) {
+    async updateSessionSourcePermissions(sourceId: string, permissions: DataSourcePermissions) {
       const session = this.activeSession
       if (!session)
         return
@@ -456,16 +457,18 @@ export const useDataStudioStore = defineStore('dataStudio', {
               ...s,
               sources: s.sources.map(src =>
                 src.sourceId === sourceId
-                  ? { ...src, permissions: { ...permissions } }
+                  ? { ...src, permissions: { ...permissions }, permissionsMode: 'custom' as const }
                   : src,
               ),
               updated_at: Date.now(),
             }
           : s,
       )
+      const updated = this.sessions.find(s => s.id === session.id)
+      await agentApi.updateSessionMeta(session.id, JSON.stringify(updated?.sources ?? []))
     },
 
-    updateSessionSourceMode(sourceId: string, permissionsMode: SourcePermissionsMode) {
+    async updateSessionSourceMode(sourceId: string, permissionsMode: SourcePermissionsMode) {
       const session = this.activeSession
       if (!session)
         return
@@ -483,6 +486,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
             }
           : s,
       )
+      const updated = this.sessions.find(s => s.id === session.id)
+      await agentApi.updateSessionMeta(session.id, JSON.stringify(updated?.sources ?? []))
     },
 
     // ── Session Management ─────────────────────────────────────────────────

@@ -268,6 +268,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            crate::mcp_bridge::get_ai_permissions,
+            crate::mcp_bridge::save_ai_permissions,
             // SSH profile management + host-key store
             crate::ssh::commands::list_ssh_profiles,
             crate::ssh::commands::save_ssh_profile,

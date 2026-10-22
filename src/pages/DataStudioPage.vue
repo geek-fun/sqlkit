@@ -451,7 +451,7 @@ function syncAllProviderModels() {
                             @click="addSourceMode = 'Ask'"
                           >
                             <span class="i-carbon-locked h-3.5 w-3.5" />
-                            <span>{{ t('dataStudio.modifySource.modeDefault') }}</span>
+                            <span>{{ t('aiPermissions.conversationReadOnly') }}</span>
                           </button>
                           <button
                             class="mode-btn" :class="[addSourceMode === 'Inherit' && 'mode-btn--active']"

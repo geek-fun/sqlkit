@@ -1,276 +1,188 @@
 <script setup lang="ts">
-import type { DatabaseType } from '@/store/connectionStore'
-import type { DataSourcePermissions, SourcePermissionsMode } from '@/store/dataStudioStore'
+import type { AiAction, AiPermissions } from '@/common'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { AI_ACTIONS, aiPreset, getAiPolicy, resolveAiPermissions } from '@/common'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDataStudioStore } from '@/store/dataStudioStore'
 
-const props = defineProps<{
-  open: boolean
-  sourceIdx: number
-}>()
-
-const emit = defineEmits<{
-  'update:open': [value: boolean]
-}>()
-
+const props = defineProps<{ open: boolean, sourceIdx: number }>()
+const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 const { t } = useI18n()
-const dataStudioStore = useDataStudioStore()
-const { getDatabaseIcon } = useDatabaseIcon()
-
-const currentSource = computed(() => {
-  const session = dataStudioStore.activeSession
-  const activeSources = session?.sources.filter(s => !s.detached) ?? []
-  return activeSources[props.sourceIdx] ?? null
-})
-
-const sessionPermissionsMode = computed(
-  () => dataStudioStore.activeSession?.permissionsMode ?? 'Ask',
-)
-
-const permissionKeys: (keyof DataSourcePermissions)[] = ['read', 'create', 'update', 'delete']
-
-const localMode = ref<SourcePermissionsMode>('inherit')
-const localPermissions = ref<DataSourcePermissions>({
-  read: true,
-  create: false,
-  update: false,
-  delete: false,
-})
+const store = useDataStudioStore()
+const source = computed(() => store.activeSession?.sources.filter(s => !s.detached)[props.sourceIdx])
+const base = ref<AiPermissions>({})
+const local = ref<AiPermissions>({})
+const mode = ref<'inherit' | 'custom'>('inherit')
+const loaded = ref(false)
+const failedAction = ref<'load' | 'save' | 'detach'>('load')
+const loading = ref(false)
+const saving = ref(false)
+const error = ref('')
 const detachConfirming = ref(false)
-
-const activeInheritedPerms = computed<(keyof DataSourcePermissions)[]>(() => {
-  const write = sessionPermissionsMode.value === 'Auto'
-  return permissionKeys.filter(p => p === 'read' || write)
-})
-
-const permColors: Record<string, string> = {
-  read: 'text-primary',
-  create: 'text-primary',
-  update: 'text-amber-600 dark:text-amber-500',
-  delete: 'text-red-600 dark:text-red-500',
-}
-
-const permTagColors: Record<string, string> = {
-  read: 'bg-primary/10 text-primary',
-  create: 'bg-primary/10 text-primary',
-  update: 'bg-amber-500/10 text-amber-600 dark:text-amber-500',
-  delete: 'bg-red-500/10 text-red-600 dark:text-red-500',
-}
-
-watch(() => props.open, (open) => {
-  if (open && currentSource.value) {
-    localMode.value = currentSource.value.permissionsMode ?? 'inherit'
-    localPermissions.value = { ...currentSource.value.permissions }
-    detachConfirming.value = false
-  }
-})
-
-function togglePermission(perm: keyof DataSourcePermissions) {
-  if (perm === 'read')
+const allowed = computed(() => AI_ACTIONS.filter(action => base.value[action] && (mode.value === 'inherit' || local.value[action] === true)))
+let request = 0
+const load = async () => {
+  const current = ++request
+  const active = source.value
+  if (!active)
     return
-  localPermissions.value = { ...localPermissions.value, [perm]: !localPermissions.value[perm] }
-}
-
-function handleSave() {
-  const session = dataStudioStore.activeSession
-  const source = currentSource.value
-  if (!session || !source)
-    return
-
-  if (localMode.value === 'inherit') {
-    dataStudioStore.updateSessionSourceMode(source.sourceId, 'inherit')
+  loaded.value = false
+  failedAction.value = 'load'
+  loading.value = true
+  error.value = ''
+  detachConfirming.value = false
+  mode.value = active.permissionsMode ?? 'inherit'
+  local.value = { ...active.permissions }
+  try {
+    const attached = store.attachedSources.find(item => item.sourceId === active.sourceId)
+    const policy = await getAiPolicy()
+    if (current !== request)
+      return
+    base.value = attached?.kind === 'database'
+      ? resolveAiPermissions(policy.permission_defaults, policy.connection_permissions[String(attached.connectionId)])
+      : aiPreset('read')
+    loaded.value = true
   }
-  else {
-    dataStudioStore.updateSessionSourcePermissions(source.sourceId, {
-      ...localPermissions.value,
-      read: true,
-    })
+  catch (e) {
+    if (current === request)
+      error.value = String(e)
   }
-  emit('update:open', false)
+  finally {
+    if (current === request)
+      loading.value = false
+  }
 }
-
-function handleDetach() {
-  const session = dataStudioStore.activeSession
-  const source = currentSource.value
-  if (!session || !source)
+watch(() => [props.open, source.value?.sourceId], () => {
+  if (props.open)
+    void load()
+}, { immediate: true })
+const update = (action: AiAction, checked: boolean) => {
+  local.value = { ...local.value, [action]: checked }
+}
+const save = async () => {
+  const session = store.activeSession
+  const current = source.value
+  if (!session || !current || loading.value || saving.value || !loaded.value)
     return
-  dataStudioStore.detachSourceFromSession(source.sourceId)
-  emit('update:open', false)
+  saving.value = true
+  error.value = ''
+  failedAction.value = 'save'
+  try {
+    if (mode.value === 'inherit') {
+      await store.updateSessionSourceMode(current.sourceId, 'inherit')
+    }
+    else {
+      const permissions = { read: local.value.read === true, create: local.value.create === true, update: local.value.update === true, delete: local.value.delete === true, manage: local.value.manage === true }
+      await store.updateSessionSourcePermissions(current.sourceId, permissions)
+    }
+    emit('update:open', false)
+  }
+  catch (e) { error.value = String(e) }
+  finally { saving.value = false }
 }
+const detach = async () => {
+  const session = store.activeSession
+  const current = source.value
+  if (!session || !current || saving.value)
+    return
+  saving.value = true
+  error.value = ''
+  failedAction.value = 'detach'
+  try {
+    await store.detachSourceFromSession(current.sourceId)
+    emit('update:open', false)
+  }
+  catch (e) { error.value = String(e) }
+  finally { saving.value = false }
+}
+const retry = () => failedAction.value === 'load' ? load() : failedAction.value === 'save' ? save() : detach()
 </script>
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="sm:max-w-[480px]">
-      <DialogHeader>
-        <div class="flex gap-3 items-center">
-          <div
-            class="border border-border rounded-xl bg-muted flex shrink-0 h-10 w-10 items-center justify-center"
-          >
-            <img
-              v-if="currentSource"
-              :src="getDatabaseIcon(currentSource.databaseType as DatabaseType)"
-              class="h-5 w-5 object-contain"
-              :alt="currentSource.databaseType"
-            >
-          </div>
-          <div>
-            <DialogTitle>{{ t('dataStudio.modifySource.title') }}</DialogTitle>
-            <p class="text-sm text-muted-foreground mt-0.5">
-              {{ currentSource?.alias }}
-            </p>
+    <DialogContent class="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[480px]">
+      <DialogHeader class="text-left space-y-2">
+        <DialogTitle class="pr-6">
+          {{ t('dataStudio.modifySource.title') }}
+        </DialogTitle>
+        <p v-if="source?.alias" class="text-sm font-medium break-all">
+          {{ source.alias }}
+        </p>
+        <DialogDescription class="text-xs leading-relaxed">
+          {{ t('aiPermissions.conversationHelp') }}
+        </DialogDescription>
+      </DialogHeader>
+      <p v-if="loading" role="status" class="text-sm text-muted-foreground py-3">
+        {{ t('aiPermissions.loading') }}
+      </p>
+      <div v-if="error" role="alert" class="space-y-2">
+        <p class="text-sm text-destructive-text break-words">
+          {{ error }}
+        </p>
+        <Button type="button" variant="outline" size="sm" :disabled="loading || saving" @click="retry">
+          {{ t('aiPermissions.retry') }}
+        </Button>
+      </div>
+      <fieldset v-if="!loading && loaded" :disabled="saving" class="py-2 border-0 min-w-0 space-y-3">
+        <div class="space-y-2">
+          <Label for="conversation-permission-mode">{{ t('aiPermissions.title') }}</Label>
+          <Select v-model="mode" :disabled="saving">
+            <SelectTrigger id="conversation-permission-mode" class="text-left" aria-describedby="conversation-effective">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="inherit">
+                {{ t('aiPermissions.useConnection') }}
+              </SelectItem>
+              <SelectItem value="custom">
+                {{ t('aiPermissions.limitConversation') }}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p id="conversation-effective" class="text-xs text-muted-foreground leading-relaxed" aria-live="polite">
+            {{ t('aiPermissions.effective') }}: {{ allowed.map(action => t(`aiPermissions.${action}`)).join(', ') || t('aiPermissions.none') }}
+          </p>
+        </div>
+        <div v-if="mode === 'custom'" class="border-t border-border">
+          <div v-for="action in AI_ACTIONS" :key="action" class="py-3 border-b border-border flex gap-3 items-center last:pb-0 last:border-b-0">
+            <Checkbox :id="`conversation-${action}`" class="shrink-0" :checked="local[action] === true && base[action] === true" :disabled="!base[action] || saving" :aria-describedby="!base[action] ? `conversation-denied-${action}` : undefined" @update:checked="update(action, $event === true)" />
+            <div class="min-w-0 space-y-1">
+              <Label :for="`conversation-${action}`" class="leading-snug" :class="{ 'text-muted-foreground': !base[action] }">{{ t(`aiPermissions.${action}`) }}</Label>
+              <p v-if="!base[action]" :id="`conversation-denied-${action}`" class="text-xs text-muted-foreground leading-snug">
+                {{ t('aiPermissions.deniedByConnection') }}
+              </p>
+            </div>
           </div>
         </div>
-      </DialogHeader>
-
-      <div class="py-2 flex flex-col gap-3 min-h-[180px]">
-        <p class="text-xs text-muted-foreground tracking-wide font-medium px-0.5 uppercase">
-          {{ t('dataStudio.modifySource.accessPermissions') }}
-        </p>
-
-        <!-- Inherit card -->
-        <button
-          type="button"
-          class="p-4 text-left border-2 rounded-xl w-full transition-colors focus:outline-none"
-          :class="
-            localMode === 'inherit'
-              ? 'border-primary bg-primary/5'
-              : 'border-border hover:border-border/80 hover:bg-muted/30'
-          "
-          @click="localMode = 'inherit'"
-        >
-          <div class="flex gap-3 items-start">
-            <div
-              class="mt-0.5 border-2 rounded-full flex shrink-0 h-4 w-4 transition-colors items-center justify-center"
-              :class="localMode === 'inherit' ? 'border-primary' : 'border-muted-foreground/40'"
-            >
-              <div v-if="localMode === 'inherit'" class="rounded-full bg-primary h-2 w-2" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <div class="flex gap-2 items-center">
-                <span class="text-sm font-medium">
-                  {{ t('dataStudio.modifySource.inheritTitle') }}
-                </span>
-                <span
-                  class="text-xs text-muted-foreground font-medium px-1.5 py-0.5 rounded-md bg-muted inline-flex gap-1 items-center"
-                >
-                  <span
-                    class="h-3 w-3"
-                    :class="
-                      sessionPermissionsMode === 'Auto'
-                        ? 'i-carbon-flash text-amber-500'
-                        : 'i-carbon-user-activity text-blue-500'
-                    "
-                  />
-                  {{ sessionPermissionsMode }}
-                </span>
-              </div>
-              <p class="text-xs text-muted-foreground mt-0.5">
-                {{ t('dataStudio.modifySource.inheritDesc') }}
-              </p>
-              <div v-if="localMode === 'inherit'" class="mt-2.5 flex flex-wrap gap-1.5">
-                <span
-                  v-for="perm in activeInheritedPerms"
-                  :key="perm"
-                  class="text-xs font-medium px-2 py-0.5 rounded-md inline-flex gap-1 items-center"
-                  :class="permTagColors[perm]"
-                >
-                  <span class="i-carbon-checkmark h-3.5 w-3.5" />
-                  {{ t(`dataStudio.modifySource.${perm}`) }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </button>
-
-        <!-- Custom card -->
-        <button
-          type="button"
-          class="p-4 text-left border-2 rounded-xl w-full transition-colors focus:outline-none"
-          :class="
-            localMode === 'custom'
-              ? 'border-primary bg-primary/5'
-              : 'border-border hover:border-border/80 hover:bg-muted/30'
-          "
-          @click="localMode = 'custom'"
-        >
-          <div class="flex gap-3 items-start">
-            <div
-              class="mt-0.5 border-2 rounded-full flex shrink-0 h-4 w-4 transition-colors items-center justify-center"
-              :class="localMode === 'custom' ? 'border-primary' : 'border-muted-foreground/40'"
-            >
-              <div v-if="localMode === 'custom'" class="rounded-full bg-primary h-2 w-2" />
-            </div>
-            <div class="flex-1 min-w-0">
-              <span class="text-sm font-medium">
-                {{ t('dataStudio.modifySource.customTitle') }}
-              </span>
-              <p class="text-xs text-muted-foreground mt-0.5">
-                {{ t('dataStudio.modifySource.customDesc') }}
-              </p>
-
-              <div v-if="localMode === 'custom'" class="mt-3" @click.stop>
-                <div class="gap-1 grid grid-cols-2">
-                  <label
-                    v-for="perm in permissionKeys"
-                    :key="perm"
-                    class="px-1 py-1.5 rounded-lg flex gap-3 select-none items-center"
-                    :class="[
-                      perm === 'read'
-                        ? 'opacity-60 cursor-not-allowed'
-                        : 'cursor-pointer hover:bg-muted/50',
-                      permColors[perm],
-                    ]"
-                  >
-                    <input
-                      type="checkbox"
-                      :checked="localPermissions[perm]"
-                      :disabled="perm === 'read'"
-                      class="accent-primary h-4 w-4"
-                      @change="togglePermission(perm)"
-                    >
-                    <span class="text-sm">{{ t(`dataStudio.modifySource.${perm}`) }}</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        </button>
-      </div>
-
-      <DialogFooter class="flex items-center justify-between sm:justify-between">
-        <div class="flex flex-col gap-1">
-          <div v-if="detachConfirming">
-            <span class="text-xs text-muted-foreground">
-              {{ t('dataStudio.detachSource.message') }}
-            </span>
-            <div class="mt-1.5 flex gap-1.5">
-              <Button variant="destructive" size="sm" @click="handleDetach">
-                <span class="i-carbon-unlink mr-1 h-3.5 w-3.5" />
-                {{ t('dataStudio.detachSource.confirm') }}
-              </Button>
-              <Button variant="outline" size="sm" @click="detachConfirming = false">
-                {{ t('common.buttons.cancel') }}
-              </Button>
-            </div>
-          </div>
-          <Button v-else variant="ghost" class="text-destructive-text" @click="detachConfirming = true">
-            <span class="i-carbon-unlink mr-1.5 h-3.5 w-3.5" />
+      </fieldset>
+      <p v-if="detachConfirming" class="text-sm leading-relaxed">
+        {{ t('dataStudio.detachSource.message') }}
+      </p>
+      <DialogFooter class="pt-3 border-t border-border flex flex-wrap gap-2">
+        <template v-if="detachConfirming">
+          <Button type="button" variant="outline" :disabled="saving" @click="detachConfirming = false">
+            {{ t('aiPermissions.cancel') }}
+          </Button>
+          <Button type="button" variant="destructive" :disabled="saving" @click="detach">
+            {{ t('dataStudio.detachSource.confirm') }}
+          </Button>
+        </template>
+        <template v-else>
+          <Button type="button" variant="ghost" :disabled="saving" class="mr-auto" @click="detachConfirming = true">
             {{ t('dataStudio.detachSource.title') }}
           </Button>
-        </div>
-        <div class="flex gap-2">
-          <Button variant="outline" @click="emit('update:open', false)">
-            {{ t('common.buttons.cancel') }}
+          <Button type="button" variant="outline" :disabled="saving" @click="emit('update:open', false)">
+            {{ t('aiPermissions.cancel') }}
           </Button>
-          <Button @click="handleSave">
-            {{ t('dataStudio.modifySource.saveChanges') }}
+          <Button type="button" :disabled="loading || saving || !loaded" @click="save">
+            {{ t(saving ? 'aiPermissions.saving' : 'dataStudio.modifySource.saveChanges') }}
           </Button>
-        </div>
+        </template>
       </DialogFooter>
     </DialogContent>
   </Dialog>
