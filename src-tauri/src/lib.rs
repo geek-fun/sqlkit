@@ -42,7 +42,6 @@ pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 pub static GUARDIAN: OnceLock<Arc<crate::connection::guardian::ConnectionGuardian>> =
     OnceLock::new();
 
-use agent::executor::SqlKitToolExecutor;
 use agent::query_history::{add_query_history_entry, load_query_history};
 use agent::session_store::{
     clear_agent_session_messages, clear_session_confirmation_rules, create_agent_session,
@@ -190,8 +189,6 @@ pub fn run() {
             let cancel_map: lib::traits::CancelMap = Arc::new(Mutex::new(HashMap::new()));
             app.manage(confirm_map);
             app.manage(cancel_map);
-            let executor: Arc<dyn lib::ToolExecutor> = Arc::new(SqlKitToolExecutor);
-            app.manage(executor);
             app.manage(crate::mcp_bridge::McpServerHandle::new());
 
             {
@@ -270,6 +267,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             crate::ai_permissions::get_ai_permissions,
+            ai_permissions::invocation::get_ai_context,
             crate::ai_permissions::save_ai_permissions,
             // SSH profile management + host-key store
             crate::ssh::commands::list_ssh_profiles,

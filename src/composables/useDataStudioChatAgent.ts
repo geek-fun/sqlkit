@@ -93,6 +93,7 @@ export function useDataStudioChatAgent() {
           return acc
 
         acc[sessionSource.alias] = {
+          sourceId: sessionSource.sourceId,
           connectionId: String(connection.id),
           dbType: attachedSource.databaseType,
           permissions: sessionSource.permissionsMode === 'custom' ? sessionSource.permissions : undefined,

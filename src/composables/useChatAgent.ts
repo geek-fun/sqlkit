@@ -368,13 +368,14 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const connectionConfig = contextSnapshot?.connections
         ? Object.fromEntries(
             Object.entries(contextSnapshot.connections).flatMap(([alias, conn]) => {
-              const entry = { connectionId: String(conn.connectionId), dbType: conn.dbType, permissions: conn.permissions }
+              const entry = { sourceId: conn.sourceId, connectionId: String(conn.connectionId), dbType: conn.dbType }
               return [[String(conn.connectionId), entry], [alias, entry]]
             }),
           )
         : {}
 
       const settings: Record<string, unknown> = {
+        contextKind: config.feature,
         systemPrompt: assembledSystemPrompt,
         provider: modelConfig.provider.name,
         model: modelConfig.model.label,
@@ -491,27 +492,15 @@ export function useChatAgent(config: UseChatAgentConfig) {
         return
       }
 
-      let schemaContext = ''
-      if (connections && Object.keys(connections).length > 0) {
-        const schemaParts: string[] = []
-        for (const [alias, conn] of Object.entries(connections)) {
-          try {
-            const schemaResult = await agentApi.invokeCapability('sqlkit__get_schema', {}, String(conn.connectionId))
-            if (schemaResult && schemaResult !== '[]' && !schemaResult.startsWith('[')) {
-              schemaParts.push(`-- Source: ${alias} (${conn.dbType})`)
-              schemaParts.push(schemaResult)
-            }
-          }
-          catch {
-            // Schema fetching is best-effort; continue without it
-          }
-        }
-        if (schemaParts.length > 0) {
-          schemaContext = schemaParts.join('\n')
-        }
+      const aiContext = await agentApi.getAiContext(sessionId, connections, config.feature)
+      const canReadContext = Object.values(connections).length > 0
+        && Object.values(connections).every(conn => aiContext.readableConnectionIds.includes(String(conn.connectionId)))
+      const safeContext = {
+        ...context,
+        schema: canReadContext ? context?.schema : undefined,
+        activePanel: canReadContext ? context?.activePanel : undefined,
       }
-
-      await runAgentLoop(sessionId, options.content, schemaContext, context ?? { connections: {} })
+      await runAgentLoop(sessionId, options.content, aiContext.schema, safeContext)
     }
     catch (err) {
       localError.value = err instanceof Error ? err.message : String(err)
