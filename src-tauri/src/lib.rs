@@ -19,6 +19,7 @@ pub mod menu;
 // Agent / AI modules
 pub mod agent;
 pub mod agent_adapters;
+pub(crate) mod ai_permissions;
 pub mod capabilities;
 pub mod common;
 pub mod db;
@@ -268,8 +269,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            crate::mcp_bridge::get_ai_permissions,
-            crate::mcp_bridge::save_ai_permissions,
+            crate::ai_permissions::get_ai_permissions,
+            crate::ai_permissions::save_ai_permissions,
             // SSH profile management + host-key store
             crate::ssh::commands::list_ssh_profiles,
             crate::ssh::commands::save_ssh_profile,
