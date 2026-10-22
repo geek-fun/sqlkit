@@ -342,8 +342,6 @@ async fn handle_invoke(
     if let Some(reason) = entitlement_denied(&state) {
         return Json(InvokeResponse::error(403, reason));
     }
-    // Snapshot so an in-flight request keeps its policy if the user hot-swaps
-    // permissions mid-request.
     let policy = match load_permission_policy(&state.handle) {
         Ok(policy) => policy,
         Err(e) => return Json(InvokeResponse::error(500, e)),
@@ -403,27 +401,20 @@ async fn invoke_with_policy(policy: &AiPolicy, payload: InvokeRequest) -> Invoke
         return InvokeResponse::error(403, msg);
     }
 
-    let config = match payload.connection_id {
-        Some(ref id) => match resolve_connection(id).await {
-            Ok(cfg) => Some(cfg),
-            Err(e) => return InvokeResponse::error(400, e),
-        },
-        None => None,
-    };
-
-    match registry::invoke_capability_inner(&payload.name, payload.args, config).await {
+    let config = payload
+        .connection_id
+        .as_ref()
+        .map(|id| json!({"connectionId": id}))
+        .unwrap_or(Value::Null);
+    match crate::ai_permissions::invoke_ai(&payload.name, &payload.args, &config, None).await {
         Ok(data) => match serde_json::from_str::<Value>(&data) {
-            Ok(mut parsed) => {
-                if payload.name.ends_with("__list_connections") {
-                    if let Some(connections) = parsed.get("connections") {
-                        parsed["connections"] = filter_ai_connections(connections.clone(), policy);
-                    }
-                }
-                InvokeResponse::ok(parsed)
-            }
+            Ok(parsed) => InvokeResponse::ok(parsed),
             Err(_) => InvokeResponse::ok(json!({"result": data})),
         },
-        Err(msg) => InvokeResponse::error(400, msg),
+        Err(data_studio_agent::tool_executor::ToolExecutionError::Denied(msg)) => {
+            InvokeResponse::error(403, msg)
+        }
+        Err(error) => InvokeResponse::error(400, error.to_string()),
     }
 }
 
@@ -662,13 +653,6 @@ fn to_metadata(cap: &Capability) -> Value {
         "riskLevel": cap.risk_level,
         "requiredPermission": cap.required_permission
     })
-}
-
-async fn resolve_connection(connection_id: &str) -> Result<Value, String> {
-    // Shared resolver: connects saved-but-inactive connections in-process;
-    // credentials never leave the app. AiPolicy auth already ran upstream.
-    crate::capabilities::sql::resolve_adapter(connection_id).await?;
-    Ok(json!({ "connectionId": connection_id }))
 }
 
 // ---------------------------------------------------------------------------
@@ -1162,7 +1146,7 @@ mod tests {
     }
 
     #[test]
-    fn test_handle_invoke_full_access_allows_risky_but_fails_invoke() {
+    fn test_handle_invoke_without_host_fails_closed() {
         init_registry_for_tests();
         let tools = registry::registry().agent_tools();
         let Some(risky) = tools
@@ -1185,9 +1169,8 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().unwrap();
         let resp = rt.block_on(invoke_with_policy(&full, req));
 
-        // Policy passes; with no connection config the capability itself fails,
-        // proving execution reached the invoke path.
-        assert_eq!(resp.status, 400);
+        assert_eq!(resp.status, 403);
+        assert!(resp.message.unwrap().contains("App not initialized"));
     }
 
     #[test]
