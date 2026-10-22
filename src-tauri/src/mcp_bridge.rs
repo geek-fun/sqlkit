@@ -2,12 +2,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
 
+use crate::ai_permissions::{
+    load_permission_policy, read_permission_config, AiPolicy, AI_POLICY_LOCK,
+};
 use axum::extract::State;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Json;
-use data_studio_agent::capabilities::permissions::McpPolicy;
 use data_studio_agent::capabilities::registry;
 use data_studio_agent::capabilities::types::{Capability, SourceKind};
 use serde::{Deserialize, Serialize};
@@ -46,7 +48,7 @@ pub struct McpConfig {
     #[serde(default = "default_auto_start")]
     pub auto_start: bool,
     #[serde(default)]
-    pub policy: McpPolicy,
+    pub policy: AiPolicy,
 }
 
 fn default_auto_start() -> bool {
@@ -89,87 +91,9 @@ impl Default for McpConfig {
         Self {
             port: None,
             auto_start: true,
-            policy: McpPolicy::default(),
+            policy: AiPolicy::default(),
         }
     }
-}
-
-static AI_POLICY_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-
-pub(crate) fn load_permission_policy<R: tauri::Runtime>(
-    app: &tauri::AppHandle<R>,
-) -> Result<McpPolicy, String> {
-    let _guard = AI_POLICY_LOCK.lock().map_err(|e| e.to_string())?;
-    load_permission_policy_inner(app)
-}
-
-fn read_permission_config(dir: &Path) -> Result<McpConfig, String> {
-    Ok(match std::fs::read_to_string(dir.join("mcp-config.json")) {
-        Ok(raw) => {
-            serde_json::from_str(&raw).map_err(|e| format!("Cannot load AI permissions: {e}"))?
-        }
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => McpConfig::default(),
-        Err(error) => return Err(format!("Cannot load AI permissions: {error}")),
-    })
-}
-
-fn load_permission_policy_inner<R: tauri::Runtime>(
-    app: &tauri::AppHandle<R>,
-) -> Result<McpPolicy, String> {
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let mut config = read_permission_config(&dir)?;
-    if config.policy.permission_defaults.is_none() {
-        let store = app.store(".store.dat").map_err(|e| e.to_string())?;
-        let ids = store
-            .get("connections")
-            .and_then(|v| v.as_array().cloned())
-            .unwrap_or_default()
-            .iter()
-            .filter_map(|c| {
-                c.get("id").and_then(|id| match id {
-                    Value::String(id) => Some(id.clone()),
-                    Value::Number(id) => Some(id.to_string()),
-                    _ => None,
-                })
-            })
-            .collect::<Vec<_>>();
-        config.policy.migrate_permissions(&ids);
-        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-        config.save(&dir)?;
-    }
-    Ok(config.policy)
-}
-
-#[tauri::command]
-pub fn get_ai_permissions(app: AppHandle) -> Result<McpPolicy, String> {
-    load_permission_policy(&app)
-}
-
-#[tauri::command]
-pub fn save_ai_permissions(
-    defaults: Option<data_studio_agent::capabilities::permissions::PermissionRules>,
-    connection_id: Option<String>,
-    permissions: Option<data_studio_agent::capabilities::permissions::PermissionRules>,
-    app: AppHandle,
-) -> Result<McpPolicy, String> {
-    let _guard = AI_POLICY_LOCK.lock().map_err(|e| e.to_string())?;
-    let mut policy = load_permission_policy_inner(&app)?;
-    if let Some(defaults) = defaults {
-        policy.permission_defaults = Some(defaults.resolve(&Default::default()));
-    }
-    if let Some(id) = connection_id {
-        let rules = permissions.unwrap_or_default();
-        if rules == Default::default() {
-            policy.connection_permissions.remove(&id);
-        } else {
-            policy.connection_permissions.insert(id, rules);
-        }
-    }
-    let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let mut config = read_permission_config(&dir)?;
-    config.policy = policy.clone();
-    config.save(&dir)?;
-    Ok(policy)
 }
 
 // ---------------------------------------------------------------------------
@@ -224,7 +148,7 @@ struct BridgeState {
 // Handlers
 // ---------------------------------------------------------------------------
 
-fn tools_payload(policy: &McpPolicy) -> Value {
+fn tools_payload(policy: &AiPolicy) -> Value {
     let reg = registry::registry();
     let caps = reg.agent_tools();
     let notice = policy.policy_notice();
@@ -343,7 +267,7 @@ fn db_type_str(c: &serde_json::Value) -> String {
 
 /// Saved connections restricted to the policy allowlist, so MCP clients only
 /// learn about connections they are permitted to reach.
-fn list_allowed_connections(policy: &McpPolicy) -> Value {
+fn list_allowed_connections(policy: &AiPolicy) -> Value {
     if policy.permission_defaults.is_some() {
         return filter_ai_connections(list_connections(), policy);
     }
@@ -353,7 +277,7 @@ fn list_allowed_connections(policy: &McpPolicy) -> Value {
     filter_connections_by_allowlist(list_connections(), policy)
 }
 
-fn filter_connections_by_allowlist(connections: Value, policy: &McpPolicy) -> Value {
+fn filter_connections_by_allowlist(connections: Value, policy: &AiPolicy) -> Value {
     let filtered: Vec<Value> = connections
         .as_array()
         .map(|arr| {
@@ -375,7 +299,7 @@ fn filter_connections_by_allowlist(connections: Value, policy: &McpPolicy) -> Va
 /// the global mode + confirm_destructive gate, not per-connection overrides.
 fn check_policy(
     cap: &Capability,
-    policy: &McpPolicy,
+    policy: &AiPolicy,
     connection_id: Option<&str>,
 ) -> Result<(), String> {
     if policy.allows(cap.risk_level, connection_id) {
@@ -396,7 +320,7 @@ fn check_policy(
 /// AppLocal capabilities need no connection, so they stay exempt.
 fn allowlist_missing_connection_reason(
     cap: &Capability,
-    policy: &McpPolicy,
+    policy: &AiPolicy,
     connection_id: Option<&str>,
 ) -> Option<String> {
     if connection_id.is_none()
@@ -429,7 +353,7 @@ async fn handle_invoke(
 
 // Split from handle_invoke so tests can run it without a Tauri runtime —
 // BridgeState holds a Wry AppHandle, which tauri::test mocks cannot provide.
-async fn invoke_with_policy(policy: &McpPolicy, payload: InvokeRequest) -> InvokeResponse {
+async fn invoke_with_policy(policy: &AiPolicy, payload: InvokeRequest) -> InvokeResponse {
     if let (Some(envelope), Some(argument)) = (
         payload.connection_id.as_deref(),
         payload.args.get("connection_id").and_then(Value::as_str),
@@ -742,7 +666,7 @@ fn to_metadata(cap: &Capability) -> Value {
 
 async fn resolve_connection(connection_id: &str) -> Result<Value, String> {
     // Shared resolver: connects saved-but-inactive connections in-process;
-    // credentials never leave the app. McpPolicy auth already ran upstream.
+    // credentials never leave the app. AiPolicy auth already ran upstream.
     crate::capabilities::sql::resolve_adapter(connection_id).await?;
     Ok(json!({ "connectionId": connection_id }))
 }
@@ -777,7 +701,7 @@ pub async fn save_mcp_config(
     port: Option<u16>,
     auto_start: bool,
     restart: Option<bool>,
-    policy: Option<McpPolicy>,
+    policy: Option<AiPolicy>,
     app: AppHandle,
 ) -> Result<String, String> {
     use tauri::Manager;
@@ -832,7 +756,7 @@ pub async fn save_mcp_config(
 /// Persist the MCP policy and hot-swap it into the running bridge without a
 /// restart, so permission changes never interrupt in-flight LLM requests.
 #[tauri::command]
-pub async fn save_mcp_policy(policy: McpPolicy, app: AppHandle) -> Result<String, String> {
+pub async fn save_mcp_policy(policy: AiPolicy, app: AppHandle) -> Result<String, String> {
     use tauri::Manager;
     crate::entitlement::ensure_local_ultimate(
         &app.state::<crate::entitlement::EntitlementState>(),
@@ -857,7 +781,7 @@ pub async fn save_mcp_policy(policy: McpPolicy, app: AppHandle) -> Result<String
 #[cfg(test)]
 mod tests {
     use super::*;
-    use data_studio_agent::capabilities::permissions::McpPermissionMode;
+    use crate::ai_permissions::McpPermissionMode;
     use data_studio_agent::capabilities::types::RiskLevel;
 
     fn init_registry_for_tests() {
@@ -888,7 +812,7 @@ mod tests {
         let cfg = McpConfig::default();
         assert_eq!(cfg.port, None);
         assert!(cfg.auto_start);
-        assert_eq!(cfg.policy, McpPolicy::default());
+        assert_eq!(cfg.policy, AiPolicy::default());
     }
 
     #[test]
@@ -903,10 +827,10 @@ mod tests {
         let cfg = McpConfig {
             port: Some(9444),
             auto_start: false,
-            policy: McpPolicy {
+            policy: AiPolicy {
                 mode: McpPermissionMode::DataReadWrite,
                 confirm_destructive: false,
-                ..McpPolicy::default()
+                ..AiPolicy::default()
             },
         };
         cfg.save(&dir).unwrap();
@@ -931,7 +855,7 @@ mod tests {
         let cfg = McpConfig::load(&dir);
         assert_eq!(cfg.port, None);
         assert!(cfg.auto_start);
-        assert_eq!(cfg.policy, McpPolicy::default());
+        assert_eq!(cfg.policy, AiPolicy::default());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 
@@ -1001,7 +925,7 @@ mod tests {
     #[test]
     fn test_tools_payload_is_flat_with_metadata() {
         init_registry_for_tests();
-        let v = tools_payload(&McpPolicy::default());
+        let v = tools_payload(&AiPolicy::default());
         let tools = v["tools"].as_array().unwrap();
         assert!(!tools.is_empty());
         for t in tools {
@@ -1027,7 +951,7 @@ mod tests {
             return;
         }
 
-        let v = tools_payload(&McpPolicy::default());
+        let v = tools_payload(&AiPolicy::default());
         let names: std::collections::HashSet<&str> = v["tools"]
             .as_array()
             .unwrap()
@@ -1044,9 +968,9 @@ mod tests {
             );
         }
 
-        let full = McpPolicy {
+        let full = AiPolicy {
             mode: McpPermissionMode::FullAccess,
-            ..McpPolicy::default()
+            ..AiPolicy::default()
         };
         let v_full = tools_payload(&full);
         assert_eq!(v_full["tools"].as_array().unwrap().len(), caps.len());
@@ -1056,7 +980,7 @@ mod tests {
     fn test_tools_payload_appends_policy_notice_when_gated() {
         init_registry_for_tests();
         // Default DataReadWrite gates Destructive → notice appended
-        let v = tools_payload(&McpPolicy::default());
+        let v = tools_payload(&AiPolicy::default());
         let tools = v["tools"].as_array().unwrap();
         assert!(!tools.is_empty());
         for t in tools {
@@ -1068,9 +992,9 @@ mod tests {
             assert!(desc.contains("destructive operations"));
         }
         // FullAccess + confirm on → no gate → no notice
-        let full = McpPolicy {
+        let full = AiPolicy {
             mode: McpPermissionMode::FullAccess,
-            ..McpPolicy::default()
+            ..AiPolicy::default()
         };
         let v_full = tools_payload(&full);
         for t in v_full["tools"].as_array().unwrap() {
@@ -1095,15 +1019,15 @@ mod tests {
             return;
         };
 
-        let err = check_policy(risky, &McpPolicy::default(), None).unwrap_err();
+        let err = check_policy(risky, &AiPolicy::default(), None).unwrap_err();
         assert!(err.contains("blocked by MCP policy"));
         // Error carries actionable guidance for the agent to relay
         assert!(err.contains("requires FullAccess permission mode"));
 
-        let full_no_confirm = McpPolicy {
+        let full_no_confirm = AiPolicy {
             mode: McpPermissionMode::FullAccess,
             confirm_destructive: false,
-            ..McpPolicy::default()
+            ..AiPolicy::default()
         };
         if let Some(destructive) = caps
             .iter()
@@ -1123,7 +1047,7 @@ mod tests {
         };
 
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let resp = rt.block_on(invoke_with_policy(&McpPolicy::default(), req));
+        let resp = rt.block_on(invoke_with_policy(&AiPolicy::default(), req));
 
         assert_eq!(resp.status, 404);
         assert!(resp.message.unwrap().contains("Unknown capability"));
@@ -1146,15 +1070,15 @@ mod tests {
             return;
         };
 
-        let allowlist = McpPolicy {
+        let allowlist = AiPolicy {
             allowed_connection_ids: vec!["conn-1".into()],
-            ..McpPolicy::default()
+            ..AiPolicy::default()
         };
         // DB capability without a connection_id → denied by allowlist
         assert!(allowlist_missing_connection_reason(db_cap, &allowlist, None).is_some());
         assert!(allowlist_missing_connection_reason(db_cap, &allowlist, Some("conn-1")).is_none());
         // Empty allowlist → no restriction
-        assert!(allowlist_missing_connection_reason(db_cap, &McpPolicy::default(), None).is_none());
+        assert!(allowlist_missing_connection_reason(db_cap, &AiPolicy::default(), None).is_none());
         // AppLocal capabilities never need a connection
         assert!(allowlist_missing_connection_reason(app_local_cap, &allowlist, None).is_none());
     }
@@ -1175,10 +1099,10 @@ mod tests {
             args: json!({}),
             connection_id: None,
         };
-        let allowlist = McpPolicy {
+        let allowlist = AiPolicy {
             mode: McpPermissionMode::FullAccess,
             allowed_connection_ids: vec!["conn-1".into()],
-            ..McpPolicy::default()
+            ..AiPolicy::default()
         };
 
         let rt = tokio::runtime::Runtime::new().unwrap();
@@ -1197,13 +1121,13 @@ mod tests {
         ]);
 
         // Empty allowlist matches nothing (the caller short-circuits on it)
-        let none = filter_connections_by_allowlist(conns.clone(), &McpPolicy::default());
+        let none = filter_connections_by_allowlist(conns.clone(), &AiPolicy::default());
         assert_eq!(none.as_array().unwrap().len(), 0);
 
         // Non-empty allowlist → only listed connections survive
-        let allowlist = McpPolicy {
+        let allowlist = AiPolicy {
             allowed_connection_ids: vec!["conn-2".into()],
-            ..McpPolicy::default()
+            ..AiPolicy::default()
         };
         let filtered = filter_connections_by_allowlist(conns, &allowlist);
         let arr = filtered.as_array().unwrap();
@@ -1231,7 +1155,7 @@ mod tests {
         };
 
         let rt = tokio::runtime::Runtime::new().unwrap();
-        let resp = rt.block_on(invoke_with_policy(&McpPolicy::default(), req));
+        let resp = rt.block_on(invoke_with_policy(&AiPolicy::default(), req));
 
         assert_eq!(resp.status, 403);
         assert!(resp.message.unwrap().contains("blocked by MCP policy"));
@@ -1254,9 +1178,9 @@ mod tests {
             connection_id: None,
         };
 
-        let full = McpPolicy {
+        let full = AiPolicy {
             mode: McpPermissionMode::FullAccess,
-            ..McpPolicy::default()
+            ..AiPolicy::default()
         };
         let rt = tokio::runtime::Runtime::new().unwrap();
         let resp = rt.block_on(invoke_with_policy(&full, req));
@@ -1296,10 +1220,10 @@ mod tests {
     }
     #[test]
     fn ai_permission_roundtrip_preserves_partial_decisions_and_service_settings() {
-        use data_studio_agent::capabilities::permissions::PermissionRules;
+        use crate::ai_permissions::PermissionRules;
         let dir = std::env::temp_dir().join(format!("sqlkit-ai-chain-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(&dir).unwrap();
-        let mut policy = McpPolicy {
+        let mut policy = AiPolicy {
             permission_defaults: Some(PermissionRules::explicit(true, false, false, false, false)),
             ..Default::default()
         };
@@ -1333,8 +1257,8 @@ mod tests {
 
     #[test]
     fn ai_connection_discovery_filters_numeric_and_string_ids_by_effective_permissions() {
-        use data_studio_agent::capabilities::permissions::PermissionRules;
-        let mut policy = McpPolicy {
+        use crate::ai_permissions::PermissionRules;
+        let mut policy = AiPolicy {
             permission_defaults: Some(PermissionRules::explicit(false, false, false, false, false)),
             ..Default::default()
         };
@@ -1359,7 +1283,7 @@ mod tests {
     }
 }
 
-fn filter_ai_connections(connections: Value, policy: &McpPolicy) -> Value {
+fn filter_ai_connections(connections: Value, policy: &AiPolicy) -> Value {
     json!(connections
         .as_array()
         .into_iter()

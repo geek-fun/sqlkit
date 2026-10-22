@@ -87,8 +87,8 @@ http = "1"
 log = "0.4"
 futures = "0.3"
 rand = "0.8"
-# Pin the shared AI permission chain to a reproducible revision.
-data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", rev = "c36fb2b16a4031053c3990dcd4d4b8e84d4d597f" }
+# Pin the shared agent runtime to a reproducible revision.
+data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", rev = "b1cfd5cdf7ffd269763de558cd9062e0e1e55895" }
 
 # Archive extraction (JRE downloads)
 flate2 = "1.0"
