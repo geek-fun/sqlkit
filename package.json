@@ -82,7 +82,7 @@
     "@types/dagre": "^0.7.54",
     "@vueuse/core": "^14.1.0",
     "dagre": "^0.8.5",
-    "dompurify": "^3.4.10",
+    "dompurify": "^3.4.17",
     "highlight.js": "^11.11.1",
     "json-with-bigint": "^3.5.8",
     "json5": "^2.2.3",
@@ -132,5 +132,8 @@
     "unocss-preset-shadcn": "^1.0.1",
     "vite": "^6.0.3",
     "vue-tsc": "^2.1.10"
+  },
+  "overrides": {
+    "dompurify": "$dompurify"
   }
 }
