@@ -1,4 +1,5 @@
 import type { ServerConnection } from '@/store/connectionStore'
+import { invoke } from '@tauri-apps/api/core'
 import { createPinia, setActivePinia } from 'pinia'
 import { isSshTunnelStrippedError } from '@/common'
 import { connectionApi } from '@/datasources/connectionApi'
@@ -521,6 +522,38 @@ describe('connectionStore', () => {
         expect(store.connections).toHaveLength(1)
         expect(store.connections[0].id).toBe('conn-2')
         expect(connectionApi.delete).toHaveBeenCalledWith('conn-1')
+      })
+
+      it('keeps deletion successful when AI permission cleanup fails', async () => {
+        const cleanupError = new Error('Permission store is unavailable')
+        const warning = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+        connectionApi.delete.mockResolvedValueOnce(undefined)
+        jest.mocked(invoke).mockRejectedValueOnce(cleanupError)
+        const store = useConnectionStore()
+        const removed = createMockConnection({ id: 'removed' })
+        const remaining = createMockConnection({ id: 'remaining' })
+        store.connections = [removed, remaining]
+
+        try {
+          await expect(store.removeConnection(removed)).resolves.toBeUndefined()
+          expect(store.connections).toEqual([remaining])
+          expect(warning).toHaveBeenCalledWith('Connection deleted, but AI permission cleanup failed:', cleanupError)
+        }
+        finally {
+          warning.mockRestore()
+        }
+      })
+
+      it('preserves the connection and permissions when deletion fails', async () => {
+        const deletionError = new Error('Could not delete connection')
+        connectionApi.delete.mockRejectedValueOnce(deletionError)
+        const store = useConnectionStore()
+        const connection = createMockConnection({ id: 'preserved' })
+        store.connections = [connection]
+
+        await expect(store.removeConnection(connection)).rejects.toThrow(deletionError)
+        expect(store.connections).toEqual([connection])
+        expect(invoke).not.toHaveBeenCalledWith('save_ai_permissions', expect.anything())
       })
 
       it('does nothing when connection has no id', async () => {

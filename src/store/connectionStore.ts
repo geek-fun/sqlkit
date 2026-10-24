@@ -742,7 +742,12 @@ export const useConnectionStore = defineStore('connectionStore', {
 
       await connectionApi.delete(connection.id)
       this.connections = this.connections.filter(c => c.id !== connection.id)
-      await saveAiPermissions(connection.id, {})
+      try {
+        await saveAiPermissions(connection.id, {})
+      }
+      catch (error) {
+        console.warn('Connection deleted, but AI permission cleanup failed:', error)
+      }
     },
 
     connectionsUsingProfile(profileId: string): ServerConnection[] {
