@@ -87,8 +87,9 @@ http = "1"
 log = "0.4"
 futures = "0.3"
 rand = "0.8"
-# data-studio-agent: pinned to latest release tag.
-data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", tag = "v0.1.9" }
+# Pin the shared agent runtime to a reproducible revision.
+# Requires the host hooks from data-studio-agent #35; older release tags are incompatible.
+data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", rev = "dc58625cdc721b64ef46a27bd6dcf1257fdd6f7b" }
 
 # Archive extraction (JRE downloads)
 flate2 = "1.0"

@@ -247,6 +247,8 @@ export const agentApi = {
       session_id: string
       tool_call_id: string
       tool_name: string
+      risk_level?: 'safe' | 'elevated' | 'destructive'
+      confirmation_required?: boolean
       arguments: unknown
     }) => void,
   ): Promise<() => void> =>
@@ -258,6 +260,9 @@ export const agentApi = {
       tool_call_id: string
       envelope: ToolEnvelope
       error?: boolean
+      denied?: boolean
+      tool_name?: string
+      arguments?: unknown
     }) => void,
   ): Promise<() => void> =>
     listen('agent-loop-tool-result', e => handler(e.payload as any)),
@@ -351,13 +356,8 @@ export const agentApi = {
     return parseStringResult<any>(result)
   },
 
-  // Capability invocation — returns raw string
-  invokeCapability: (
-    name: string,
-    args: Record<string, unknown>,
-    connectionId?: string,
-  ): Promise<string> =>
-    invoke<string>('invoke_capability', { name, args, connectionId }),
+  getAiContext: (sessionId: string, connections: Record<string, unknown>, contextKind: string): Promise<{ readableConnectionIds: string[], schema: string }> =>
+    invoke('get_ai_context', { sessionId, connections, contextKind }),
 }
 
 // Standalone function exports

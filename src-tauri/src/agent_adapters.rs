@@ -5,9 +5,7 @@
 //! to the shared library.
 
 use std::collections::HashMap;
-use std::sync::Arc;
 
-use crate::mcp_bridge::McpConfig;
 use data_studio_agent as lib;
 use data_studio_agent::storage;
 use data_studio_agent::traits::{CancelMap, ConfirmMap, EventEmitter};
@@ -49,9 +47,6 @@ pub async fn run_agent_loop(
     let confirm_map: ConfirmMap = confirm_state.inner().clone();
     let cancel_state: State<CancelMap> = app.state::<CancelMap>();
     let cancel_map: CancelMap = cancel_state.inner().clone();
-    let executor_state: State<Arc<dyn lib::ToolExecutor>> =
-        app.state::<Arc<dyn lib::ToolExecutor>>();
-    let executor: Arc<dyn lib::ToolExecutor> = executor_state.inner().clone();
 
     let connections: HashMap<String, Value> = settings
         .get("connections")
@@ -62,6 +57,20 @@ pub async fn run_agent_loop(
         .cloned()
         .unwrap_or(Value::Null);
 
+    let studio = match settings.get("contextKind").and_then(Value::as_str) {
+        Some("dataStudio") => true,
+        Some("sidebarAssistant") => false,
+        _ => return Err("Unknown AI context".into()),
+    };
+    let executor = crate::agent::executor::SqlKitToolExecutor {
+        access: crate::ai_permissions::AgentAccess {
+            session_id: session_id.clone(),
+            connections: connections.clone(),
+            studio,
+            db: db_state.inner().clone(),
+        },
+    };
+
     let is_parallel_ok = |name: &str| -> bool {
         data_studio_agent::capabilities::registry::registry()
             .get(name)
@@ -69,30 +78,8 @@ pub async fn run_agent_loop(
             .unwrap_or(false)
     };
 
-    let app_data_dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
-    let should_deny = move |tool_name: &str, conn_id: Option<&str>| -> bool {
-        // Reload per call so permission changes made in Settings apply to the
-        // next tool call instead of being snapshotted for the whole run.
-        let policy = McpConfig::load(&app_data_dir).policy;
-        match data_studio_agent::capabilities::registry::registry().get(tool_name) {
-            Some(cap) => {
-                // Allowlist set but no connection specified: a DB capability would
-                // fall back to the default connection, bypassing the allowlist.
-                // AppLocal tools (list_connections etc.) need no connection.
-                if !policy.allowed_connection_ids.is_empty()
-                    && conn_id.is_none()
-                    && !matches!(
-                        cap.source_kind,
-                        data_studio_agent::capabilities::types::SourceKind::AppLocal
-                    )
-                {
-                    return true;
-                }
-                !policy.allows(cap.risk_level, conn_id)
-            }
-            None => false,
-        }
-    };
+    // Required by the shared loop API; authorization is owned by the executor at both stages.
+    let legacy_deny_hook = |_: &str, _: Option<&str>| false;
 
     lib::loop_runner::run_agent_loop(
         &session_id,
@@ -100,13 +87,13 @@ pub async fn run_agent_loop(
         &settings,
         &store,
         &emitter,
-        executor.as_ref(),
+        &executor,
         connections,
         fallback,
         &confirm_map,
         &cancel_map,
         &is_parallel_ok,
-        &should_deny,
+        &legacy_deny_hook,
     )
     .await
 }

@@ -19,6 +19,7 @@ pub mod menu;
 // Agent / AI modules
 pub mod agent;
 pub mod agent_adapters;
+pub(crate) mod ai_permissions;
 pub mod capabilities;
 pub mod common;
 pub mod db;
@@ -41,7 +42,6 @@ pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 pub static GUARDIAN: OnceLock<Arc<crate::connection::guardian::ConnectionGuardian>> =
     OnceLock::new();
 
-use agent::executor::SqlKitToolExecutor;
 use agent::query_history::{add_query_history_entry, load_query_history};
 use agent::session_store::{
     clear_agent_session_messages, clear_session_confirmation_rules, create_agent_session,
@@ -55,7 +55,7 @@ use agent_adapters::{
     get_all_tools, get_tool_full_result, list_llm_models, run_agent_loop, run_agent_step,
     validate_llm_config,
 };
-use capabilities::commands::{get_available_tools, invoke_capability};
+use capabilities::commands::get_available_tools;
 use data_studio_agent as lib;
 use data_studio_agent::storage;
 
@@ -189,8 +189,6 @@ pub fn run() {
             let cancel_map: lib::traits::CancelMap = Arc::new(Mutex::new(HashMap::new()));
             app.manage(confirm_map);
             app.manage(cancel_map);
-            let executor: Arc<dyn lib::ToolExecutor> = Arc::new(SqlKitToolExecutor);
-            app.manage(executor);
             app.manage(crate::mcp_bridge::McpServerHandle::new());
 
             {
@@ -268,6 +266,9 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            crate::ai_permissions::get_ai_permissions,
+            ai_permissions::invocation::get_ai_context,
+            crate::ai_permissions::save_ai_permissions,
             // SSH profile management + host-key store
             crate::ssh::commands::list_ssh_profiles,
             crate::ssh::commands::save_ssh_profile,
@@ -277,7 +278,6 @@ pub fn run() {
             crate::ssh::commands::unpin_ssh_host,
             crate::common::http_client::detect_system_proxy,
             // Agent commands
-            invoke_capability,
             get_available_tools,
             run_agent_step,
             validate_llm_config,

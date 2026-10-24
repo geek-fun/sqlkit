@@ -366,7 +366,7 @@ pub(crate) fn register_write_tools(reg: &mut CapabilityRegistry) {
 
     reg.register(Capability {
         name: "sqlkit__execute_delete",
-        description: "Execute a destructive DELETE or TRUNCATE statement. DESTRUCTIVE: permanently removes data. Requires Full Access with Confirm Destructive in Settings → MCP Bridge.",
+        description: "Execute a destructive DELETE or TRUNCATE statement. DESTRUCTIVE: permanently removes data. Requires Delete data permission for this connection.",
         handler: Arc::new(ExecuteDeleteHandler),
         input_schema: json!({"type": "object", "properties": {
             "connection_id": connection_id_schema(),
@@ -381,7 +381,7 @@ pub(crate) fn register_write_tools(reg: &mut CapabilityRegistry) {
 
     reg.register(Capability {
         name: "sqlkit__execute_ddl",
-        description: "Execute a DDL statement (CREATE, ALTER, DROP, and other schema changes). DESTRUCTIVE for DROP/ALTER: permanently changes schema. Requires Full Access with Confirm Destructive in Settings → MCP Bridge.",
+        description: "Execute a DDL statement (CREATE, ALTER, DROP, and other schema changes). Changes database structure. Requires Manage structure & administration permission for this connection.",
         handler: Arc::new(ExecuteDdlHandler),
         input_schema: json!({"type": "object", "properties": {
             "connection_id": connection_id_schema(),

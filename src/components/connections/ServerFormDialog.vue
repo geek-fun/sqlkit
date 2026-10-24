@@ -7,6 +7,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { shouldStripSshTunnel, UPGRADE_URL } from '@/common'
+import { ConnectionPermissionEditor } from '@/components/ai-permissions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
@@ -61,6 +62,7 @@ const isOpen = computed({
 })
 
 const isEditing = computed(() => !!props.connection?.id)
+const aiPermissionEditor = ref<InstanceType<typeof ConnectionPermissionEditor> | null>(null)
 const formSectionTab = ref<'basic' | 'advanced'>('basic')
 
 const defaultPorts: Record<string, number> = {
@@ -896,6 +898,8 @@ function mapDatabaseTypeToBackend(type: DatabaseType): string {
 }
 
 function handleSave() {
+  if (aiPermissionEditor.value && !aiPermissionEditor.value.ready)
+    return
   if (!validateForm()) {
     return
   }
@@ -1486,6 +1490,8 @@ function handleSave() {
               :db-type="formData.type"
               :errors="formErrors"
             />
+
+            <ConnectionPermissionEditor ref="aiPermissionEditor" v-model="formData.aiPermissions" :connection-id="formData.id" />
 
             <SshTunnelConfigPanel
               :model-value="formData.sshTunnel"

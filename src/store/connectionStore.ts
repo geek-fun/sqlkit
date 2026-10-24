@@ -1,7 +1,8 @@
+import type { AiPermissions } from '@/common'
 import type { SslConfig } from '@/types/connection'
 import { listen } from '@tauri-apps/api/event'
 import { defineStore } from 'pinia'
-import { markSshTunnelStripped, shouldStripSshTunnel } from '@/common'
+import { getAiPolicy, markSshTunnelStripped, saveAiPermissions, shouldStripSshTunnel } from '@/common'
 import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
 import { connectionApi } from '../datasources'
 import { useEntitlementStore } from './entitlementStore'
@@ -429,6 +430,7 @@ export type ServerConnection = {
   isConnected?: boolean
   lastUsed?: Date
   serverVersion?: string
+  aiPermissions?: AiPermissions
   prompt?: string
 }
 
@@ -704,14 +706,26 @@ export const useConnectionStore = defineStore('connectionStore', {
           prompt: connection.prompt || null,
         }
 
-        const resultId = await connectionApi.save(serverConfig)
+        const previousPermissions = connection.aiPermissions === undefined ? undefined : (await getAiPolicy()).connection_permissions[serverConfig.id] ?? {}
+        if (connection.aiPermissions !== undefined)
+          await saveAiPermissions(serverConfig.id, connection.aiPermissions)
+        let resultId: string
+        try {
+          resultId = await connectionApi.save(serverConfig)
+        }
+        catch (error) {
+          if (previousPermissions !== undefined)
+            await saveAiPermissions(serverConfig.id, previousPermissions)
+          throw error
+        }
 
+        const { aiPermissions: _draftPermissions, ...savedConnection } = connection
         const existingIndex = this.connections.findIndex(c => c.id === resultId)
         if (existingIndex >= 0) {
-          this.connections[existingIndex] = { ...connection, id: resultId }
+          this.connections[existingIndex] = { ...savedConnection, id: resultId }
         }
         else {
-          this.connections.push({ ...connection, id: resultId })
+          this.connections.push({ ...savedConnection, id: resultId })
         }
 
         return { success: true, message: 'Connection saved successfully' }
@@ -728,6 +742,12 @@ export const useConnectionStore = defineStore('connectionStore', {
 
       await connectionApi.delete(connection.id)
       this.connections = this.connections.filter(c => c.id !== connection.id)
+      try {
+        await saveAiPermissions(connection.id, {})
+      }
+      catch (error) {
+        console.warn('Connection deleted, but AI permission cleanup failed:', error)
+      }
     },
 
     connectionsUsingProfile(profileId: string): ServerConnection[] {
