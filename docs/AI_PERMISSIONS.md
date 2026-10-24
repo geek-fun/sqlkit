@@ -16,8 +16,10 @@ Both applications pin the shared agent runtime to an exact Git revision in their
 
 The application-owned `ai_permissions` module resolves policy, migrates legacy settings, classifies database payloads, and gates both MCP and built-in agent execution. The shared agent routes requests through an application preparation hook and carries its confirmation risk and context; it does not resolve this permission chain. Execution rechecks the application policy on every attempt.
 
-AI schema reads use the same application gate as tool calls. Cached schema and editor context are included only when the associated connections permit reading. Manual UI capability invocations retain their existing access behavior.
+AI schema reads use the same application gate as tool calls. Cached schema and editor context are included only when the associated connections permit reading. Manual database UI commands retain their existing access behavior. SQLKit does not expose a generic capability invocation command to the WebView.
 
 Agent executors are bound to a conversation and its connection/source identities. Before dispatch they reload connection policy, current attachment restrictions, and confirmation rules. Detaching or deleting a source prevents subsequent dispatches. The sidebar uses its bound active connection without requiring a Data Studio attachment.
 
 Preparation rejects denied calls before displaying confirmation. A queued call whose confirmation requirements become stricter returns to the existing approval flow. Permission denials are terminal and do not trigger transport retries; approval never bypasses a later denial. Rechecks occur at dispatch and do not cancel operations already dispatched or erase context already sent to a model.
+
+The host-hook API is introduced by [data-studio-agent #35](https://github.com/geek-fun/data-studio-agent/pull/35). Merge that runtime implementation before merging its consumers. Keep the exact compatible revision until a release containing these hooks exists; after the runtime is merged and released, update both the manifest and lockfile to that release. Older release tags do not provide this API.

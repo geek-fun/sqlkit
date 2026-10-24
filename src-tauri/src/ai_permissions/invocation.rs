@@ -230,15 +230,20 @@ pub async fn get_ai_context(
         if readable.iter().any(|value| value == id) {
             continue;
         }
+        let schema = invoke_ai("sqlkit__get_schema", &json!({}), config, Some(&access)).await;
+        if matches!(
+            schema,
+            Err(ToolExecutionError::Denied(_) | ToolExecutionError::ConfirmationRequired)
+        ) {
+            continue;
+        }
+        // Refresh access after the read before including schema or cached editor context.
         if authorize("sqlkit__get_schema", &json!({}), config, Some(&access)).is_err() {
             continue;
         }
-        if let Ok(schema) = invoke_ai("sqlkit__get_schema", &json!({}), config, Some(&access)).await
-        {
+        readable.push(id.to_owned());
+        if let Ok(schema) = schema {
             schemas.push(format!("-- Source: {alias}\n{schema}"));
-        }
-        if authorize("sqlkit__get_schema", &json!({}), config, Some(&access)).is_ok() {
-            readable.push(id.to_owned());
         }
     }
     Ok(json!({"readableConnectionIds": readable, "schema": schemas.join("\n")}))

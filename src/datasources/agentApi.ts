@@ -358,14 +358,6 @@ export const agentApi = {
 
   getAiContext: (sessionId: string, connections: Record<string, unknown>, contextKind: string): Promise<{ readableConnectionIds: string[], schema: string }> =>
     invoke('get_ai_context', { sessionId, connections, contextKind }),
-
-  // Capability invocation — returns raw string
-  invokeCapability: (
-    name: string,
-    args: Record<string, unknown>,
-    connectionId?: string,
-  ): Promise<string> =>
-    invoke<string>('invoke_capability', { name, args, connectionId }),
 }
 
 // Standalone function exports

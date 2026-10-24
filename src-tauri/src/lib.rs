@@ -55,7 +55,7 @@ use agent_adapters::{
     get_all_tools, get_tool_full_result, list_llm_models, run_agent_loop, run_agent_step,
     validate_llm_config,
 };
-use capabilities::commands::{get_available_tools, invoke_capability};
+use capabilities::commands::get_available_tools;
 use data_studio_agent as lib;
 use data_studio_agent::storage;
 
@@ -278,7 +278,6 @@ pub fn run() {
             crate::ssh::commands::unpin_ssh_host,
             crate::common::http_client::detect_system_proxy,
             // Agent commands
-            invoke_capability,
             get_available_tools,
             run_agent_step,
             validate_llm_config,

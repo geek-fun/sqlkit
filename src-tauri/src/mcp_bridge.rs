@@ -762,6 +762,23 @@ pub async fn save_mcp_policy(policy: AiPolicy, app: AppHandle) -> Result<String,
     serde_json::to_string(&json!({"status": "ok"})).map_err(|e| e.to_string())
 }
 
+fn filter_ai_connections(connections: Value, policy: &AiPolicy) -> Value {
+    json!(connections
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|connection| {
+            let id = match &connection["id"] {
+                Value::String(id) => id.clone(),
+                Value::Number(id) => id.to_string(),
+                _ => return false,
+            };
+            policy.effective_permissions(&id).any_allowed()
+        })
+        .cloned()
+        .collect::<Vec<_>>())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1264,21 +1281,4 @@ mod tests {
         );
         assert_eq!(filter_ai_connections(filtered, &policy), json!([]));
     }
-}
-
-fn filter_ai_connections(connections: Value, policy: &AiPolicy) -> Value {
-    json!(connections
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter(|connection| {
-            let id = match &connection["id"] {
-                Value::String(id) => id.clone(),
-                Value::Number(id) => id.to_string(),
-                _ => return false,
-            };
-            policy.effective_permissions(&id).any_allowed()
-        })
-        .cloned()
-        .collect::<Vec<_>>())
 }

@@ -78,7 +78,7 @@ pub async fn run_agent_loop(
             .unwrap_or(false)
     };
 
-    // The executor owns authorization before confirmation and again before execution.
+    // Required by the shared loop API; authorization is owned by the executor at both stages.
     let legacy_deny_hook = |_: &str, _: Option<&str>| false;
 
     lib::loop_runner::run_agent_loop(
