@@ -23,7 +23,7 @@ const options = computed(() => [
 </script>
 
 <template>
-  <div class="space-y-3">
+  <div class="space-y-2">
     <Label :id="`${id}-label`">{{ t('aiPermissions.accessLevel') }}</Label>
     <RadioGroup
       :model-value="modelValue"
@@ -36,7 +36,7 @@ const options = computed(() => [
         v-for="value in options"
         :key="value"
         :for="`${id}-${value}`"
-        class="text-sm font-medium px-4 py-3 border rounded-lg flex gap-3 cursor-pointer transition-colors items-start has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
+        class="text-sm font-medium px-3 py-2.5 border rounded-lg flex gap-2.5 cursor-pointer transition-colors items-center has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring"
         :class="[
           modelValue === value ? 'border-primary bg-primary/5' : 'border-input hover:bg-accent/50',
           disabled && 'cursor-not-allowed opacity-50',
@@ -46,26 +46,24 @@ const options = computed(() => [
           :id="`${id}-${value}`"
           :value="value"
           :aria-labelledby="`${id}-${value}-title`"
-          :aria-describedby="`${id}-${value}-description`"
-          class="mt-0.5 shrink-0"
+          :aria-describedby="`${id}-description`"
+          class="shrink-0"
         />
-        <span class="min-w-0 space-y-1">
-          <span :id="`${id}-${value}-title`" class="leading-snug block">
-            {{ t(`aiPermissions.${value === 'read' ? 'readPreset' : value}`) }}
-          </span>
-          <span :id="`${id}-${value}-description`" class="text-xs text-muted-foreground leading-relaxed font-normal block">
-            {{ t(`aiPermissions.${value}Help`) }}
-          </span>
+        <span :id="`${id}-${value}-title`" class="leading-snug min-w-0">
+          {{ t(`aiPermissions.${value === 'read' ? 'readPreset' : value}`) }}
         </span>
       </Label>
     </RadioGroup>
+    <p :id="`${id}-description`" class="text-xs text-muted-foreground leading-relaxed">
+      {{ t(`aiPermissions.${modelValue}Help`) }}
+    </p>
   </div>
 </template>
 
 <style scoped>
 .access-level-options {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
-  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
+  gap: 0.5rem;
 }
 </style>

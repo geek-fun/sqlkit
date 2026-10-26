@@ -114,14 +114,17 @@ describe('aI permission chain', () => {
     expect(AI_ACTIONS.every(action => aiPreset('none')[action] === false)).toBe(true)
   })
 
-  it('describes every access level inside its own selectable container', async () => {
+  it('describes the selected access level below the option group', async () => {
     const wrapper = mount(DefaultPermissionEditor)
     await flushPromises()
     ;['none', 'read', 'data', 'full', 'custom'].forEach((value) => {
       const option = wrapper.get(`label[for="ai-default-preset-${value}"]`)
-      expect(option.text()).toContain(`aiPermissions.${value}Help`)
-      expect(option.get('input').attributes('aria-describedby')).toBe(`ai-default-preset-${value}-description`)
+      expect(option.text()).not.toContain(`${value}Help`)
+      expect(option.get('input').attributes('aria-describedby')).toBe('ai-default-preset-description')
     })
+    expect(wrapper.get('#ai-default-preset-description').text()).toMatch(/aiPermissions\.\w+Help/)
+    await wrapper.get('input[value="full"]').setValue()
+    expect(wrapper.get('#ai-default-preset-description').text()).toContain('aiPermissions.fullHelp')
   })
 
   it('loads saved decisions and displays effective access from the whole chain', async () => {

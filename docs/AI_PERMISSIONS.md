@@ -26,7 +26,7 @@ The host-hook API is introduced by [data-studio-agent #35](https://github.com/ge
 
 ## Permission controls
 
-Settings separate MCP service controls from the AI defaults shared by Data Studio and external MCP clients. Access levels use the existing settings radio pattern, with a short description inside each option. Custom is an access choice that reveals individual actions; it edits the same values as the presets. Choosing Custom alone does not change permissions.
+Settings separate MCP service controls from the AI defaults shared by Data Studio and external MCP clients. Access levels use the existing settings radio pattern; a short description below the option group updates with the selected access level. Custom is an access choice that reveals individual actions; it edits the same values as the presets. Choosing Custom alone does not change permissions.
 
 Connection dialogs default to system inheritance. Each custom action offers Use default (with the current decision), Allow, or Deny, alongside its effective decision and source. Within the connection section, saved custom combinations show their action controls automatically. Choosing a preset sets explicit decisions for every action; choosing Use system default clears them.
 
