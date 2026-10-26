@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Cheaper Inference provider preset in AI settings (OpenAI compatible, base URL `https://api.cheaperinference.com/v1`)
+
 ## [1.0.0] - 2026-10-18
 
 ### Added
