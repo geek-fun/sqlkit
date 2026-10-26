@@ -23,3 +23,11 @@ Agent executors are bound to a conversation and its connection/source identities
 Preparation rejects denied calls before displaying confirmation. A queued call whose confirmation requirements become stricter returns to the existing approval flow. Permission denials are terminal and do not trigger transport retries; approval never bypasses a later denial. Rechecks occur at dispatch and do not cancel operations already dispatched or erase context already sent to a model.
 
 The host-hook API is introduced by [data-studio-agent #35](https://github.com/geek-fun/data-studio-agent/pull/35). Merge that runtime implementation before merging its consumers. Keep the exact compatible revision until a release containing these hooks exists; after the runtime is merged and released, update both the manifest and lockfile to that release. Older release tags do not provide this API.
+
+## Permission controls
+
+Settings separate MCP service controls from the AI defaults shared by Data Studio and external MCP clients. Access levels use the existing settings radio pattern, with a short description inside each option. Custom is an access choice that reveals individual actions; it edits the same values as the presets. Choosing Custom alone does not change permissions.
+
+Connection dialogs default to system inheritance. Each custom action offers Use default (with the current decision), Allow, or Deny, alongside its effective decision and source. Within the connection section, saved custom combinations show their action controls automatically. Choosing a preset sets explicit decisions for every action; choosing Use system default clears them.
+
+Editing AI permission defaults and per-connection decisions requires the existing local Ultimate entitlement, including eligible version-locked releases. Community users see the existing upgrade prompt in connection dialogs. Ordinary connection edits preserve saved decisions. Permission cleanup after deletion remains available only when the connection no longer exists; it cannot reset the permissions of a saved connection.
