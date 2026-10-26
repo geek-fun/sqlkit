@@ -44,7 +44,7 @@ const gradientId = `dfg-${Math.random().toString(36).slice(2, 8)}-${bucket.value
 <template>
   <svg
     viewBox="0 0 64 64"
-    class="block h-full w-full"
+    class="h-full w-full block"
     role="img"
     :aria-label="initial"
   >
