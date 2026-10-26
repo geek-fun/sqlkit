@@ -706,9 +706,10 @@ export const useConnectionStore = defineStore('connectionStore', {
           prompt: connection.prompt || null,
         }
 
-        const previousPermissions = connection.aiPermissions === undefined ? undefined : (await getAiPolicy()).connection_permissions[serverConfig.id] ?? {}
-        if (connection.aiPermissions !== undefined)
-          await saveAiPermissions(serverConfig.id, connection.aiPermissions)
+        const permissionDraft = useEntitlementStore().isLocalUltimate ? connection.aiPermissions : undefined
+        const previousPermissions = permissionDraft === undefined ? undefined : (await getAiPolicy()).connection_permissions[serverConfig.id] ?? {}
+        if (permissionDraft !== undefined)
+          await saveAiPermissions(serverConfig.id, permissionDraft)
         let resultId: string
         try {
           resultId = await connectionApi.save(serverConfig)

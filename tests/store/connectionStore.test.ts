@@ -456,6 +456,26 @@ describe('connectionStore', () => {
     })
 
     describe('saveConnection', () => {
+      it('saves ordinary edits without changing permission drafts when Ultimate is unavailable', async () => {
+        connectionApi.save.mockResolvedValue('community-connection')
+        const store = useConnectionStore()
+        const result = await store.saveConnection(createMockConnection({ id: 'community-connection', aiPermissions: { delete: true } }))
+        expect(result.success).toBe(true)
+        expect(connectionApi.save).toHaveBeenCalled()
+        expect(invoke).not.toHaveBeenCalledWith('save_ai_permissions', expect.anything())
+        expect(store.connections[0].aiPermissions).toBeUndefined()
+      })
+
+      it('persists permission changes for local Ultimate users', async () => {
+        useEntitlementStore().view = { localUltimate: true } as never
+        connectionApi.save.mockResolvedValue('ultimate-connection')
+        jest.mocked(invoke).mockResolvedValueOnce({ connection_permissions: {} })
+        const store = useConnectionStore()
+        const result = await store.saveConnection(createMockConnection({ id: 'ultimate-connection', aiPermissions: { update: false } }))
+        expect(result.success).toBe(true)
+        expect(invoke).toHaveBeenCalledWith('save_ai_permissions', { connectionId: 'ultimate-connection', permissions: { update: false } })
+      })
+
       it('should add new connection', async () => {
         connectionApi.save.mockResolvedValue('new-uuid-123')
 
