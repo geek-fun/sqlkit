@@ -1080,6 +1080,8 @@ export const zhCN = {
         requiredAction: '所需权限：{action}',
         reviewPermissions: '检查权限',
         reviewHelp: '保存权限不会执行已阻止的操作。返回对话后，点击「重试请求」继续。',
+        reviewConnectionHelp: '仅修改此连接的权限，不影响系统默认权限。保存后返回对话，再重试请求。',
+        connectionUnavailable: '无法确定原保存的连接。请在对话中重新添加连接，再检查其权限。',
         backToChat: '返回对话',
         retryRequest: '重试请求',
         retryPrompt: '请使用工具 {tool} 和以下原始参数重试刚才被阻止或拒绝的请求：\n{args}\n重新检查当前权限，并在需要时请求批准。不要重复之前已经成功的操作。',

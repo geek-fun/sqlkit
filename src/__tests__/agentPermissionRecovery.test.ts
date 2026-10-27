@@ -1,19 +1,21 @@
 /** @jest-environment jsdom */
 import { flushPromises, mount } from '@vue/test-utils'
+import { reactive } from 'vue'
 import { saveAiPermissions } from '@/common'
 import ToolPermissionReview from '@/components/ai-permissions/ToolPermissionReview.vue'
 import { agentApi } from '@/datasources/agentApi'
 
 const mockRemoveRule = jest.fn().mockResolvedValue(undefined)
+const mockConnection = jest.fn()
+const mockEntitlement = reactive({ isLocalUltimate: true })
 jest.mock('@/common', () => ({ saveAiPermissions: jest.fn() }))
 jest.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
 jest.mock('@/store/dataStudioStore', () => ({ useDataStudioStore: () => ({ activeSession: { id: 'chat', sources: [] }, removeConfirmationRule: mockRemoveRule }) }))
 jest.mock('@/datasources/agentApi', () => ({ agentApi: { loadConfirmationRules: jest.fn() } }))
-jest.mock('@/components/upgrade', () => ({ PaidGate: { props: ['feature'], template: '<slot />' } }))
+jest.mock('@/store', () => ({ useConnectionStore: () => ({ getConnectionById: mockConnection }), useEntitlementStore: () => mockEntitlement }))
 jest.mock('@/components/ui/button', () => ({ Button: { template: '<button><slot /></button>' } }))
 jest.mock('@/components/ui/dialog', () => Object.fromEntries(['Dialog', 'DialogContent', 'DialogDescription', 'DialogFooter', 'DialogHeader', 'DialogTitle'].map(name => [name, { template: '<section><slot /></section>' }])))
 jest.mock('@/views/data-studio/components/modify-source-modal.vue', () => ({ __esModule: true, default: { template: '<div />' } }))
-jest.mock('@/components/ai-permissions/DefaultPermissionEditor.vue', () => ({ __esModule: true, default: { template: '<div>System defaults</div>' } }))
 jest.mock('@/components/ai-permissions/ConnectionPermissionEditor.vue', () => ({
   __esModule: true,
   default: {
@@ -33,6 +35,8 @@ const openReview = (source = denial.source as 'connection' | 'system' | 'rule') 
 describe('permission recovery', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    mockConnection.mockReturnValue({ id: 'db', name: 'Development database' })
+    mockEntitlement.isLocalUltimate = true
     jest.mocked(saveAiPermissions).mockResolvedValue({ permission_defaults: {}, connection_permissions: {} })
   })
 
@@ -42,6 +46,8 @@ describe('permission recovery', () => {
     expect(wrapper.text()).toContain('Connection db')
     expect(wrapper.text()).not.toContain('System defaults')
     const save = wrapper.findAll('button').find(button => button.text() === 'dataStudio.modifySource.saveChanges')!
+    const back = wrapper.findAll('button').find(button => button.text() === 'dataStudio.agent.message.backToChat')!
+    expect(save.element.parentElement).toBe(back.element.parentElement)
     await save.trigger('click')
     await flushPromises()
     expect(saveAiPermissions).toHaveBeenCalledWith('db', { manage: true })
@@ -49,10 +55,37 @@ describe('permission recovery', () => {
     expect(wrapper.emitted('retryToolCall')).toBeUndefined()
   })
 
-  it('opens system defaults when inheritance caused the denial', () => {
+  it('edits only the blocked connection when inheritance caused the denial', async () => {
     const wrapper = openReview('system')
-    expect(wrapper.text()).toContain('System defaults')
-    expect(wrapper.text()).not.toContain('Connection db')
+    await flushPromises()
+    expect(wrapper.text()).toContain('Connection db')
+    expect(wrapper.text()).not.toContain('System defaults')
+    expect(wrapper.text()).toContain('dataStudio.agent.message.reviewConnectionHelp')
+    const save = wrapper.findAll('button').find(button => button.text() === 'dataStudio.modifySource.saveChanges')!
+    await save.trigger('click')
+    await flushPromises()
+    expect(saveAiPermissions).toHaveBeenCalledWith('db', { manage: true })
+  })
+
+  it('never falls back to editing defaults when a connection cannot be identified', () => {
+    const wrapper = mount(ToolPermissionReview, { props: { open: true, denial: { ...denial, source: 'system', connectionId: undefined }, toolName: 'ddl', sessionId: 'chat' } })
+    expect(wrapper.text()).toContain('dataStudio.agent.message.connectionUnavailable')
+    expect(wrapper.text()).not.toContain('dataStudio.modifySource.saveChanges')
+    expect(saveAiPermissions).not.toHaveBeenCalled()
+  })
+
+  it('does not offer edits for a deleted connection', () => {
+    mockConnection.mockReturnValue(undefined)
+    const wrapper = openReview()
+    expect(wrapper.text()).toContain('dataStudio.agent.message.connectionUnavailable')
+    expect(wrapper.text()).not.toContain('dataStudio.modifySource.saveChanges')
+    expect(saveAiPermissions).not.toHaveBeenCalled()
+  })
+
+  it('keeps the connection permission entitlement gate on recovery', () => {
+    mockEntitlement.isLocalUltimate = false
+    const wrapper = openReview()
+    expect(wrapper.text()).not.toContain('dataStudio.modifySource.saveChanges')
     expect(saveAiPermissions).not.toHaveBeenCalled()
   })
 

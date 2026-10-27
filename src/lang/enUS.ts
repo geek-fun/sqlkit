@@ -1080,6 +1080,8 @@ export const enUS = {
         requiredAction: 'Required: {action}',
         reviewPermissions: 'Review permissions',
         reviewHelp: 'Saving permission changes does not run the blocked action. Return to chat and choose Retry request when ready.',
+        reviewConnectionHelp: 'Changes apply only to this connection. System defaults stay unchanged. Save, then return to chat to retry the request.',
+        connectionUnavailable: 'The saved connection could not be identified. Reattach the connection in chat before reviewing its permissions.',
         backToChat: 'Back to chat',
         retryRequest: 'Retry request',
         retryPrompt: 'Retry the previously blocked or rejected request using {tool} with these original arguments:\n{args}\nRecheck current permissions and request any required approval. Do not repeat earlier successful actions.',

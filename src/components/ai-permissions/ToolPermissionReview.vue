@@ -5,17 +5,20 @@ import { useI18n } from 'vue-i18n'
 import { saveAiPermissions } from '@/common'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { PaidGate } from '@/components/upgrade'
 import { agentApi } from '@/datasources/agentApi'
+import { useConnectionStore, useEntitlementStore } from '@/store'
 import { useDataStudioStore } from '@/store/dataStudioStore'
 import ModifySourceModal from '@/views/data-studio/components/modify-source-modal.vue'
 import ConnectionPermissionEditor from './ConnectionPermissionEditor.vue'
-import DefaultPermissionEditor from './DefaultPermissionEditor.vue'
 
 const props = defineProps<{ open: boolean, denial: AccessDenial, toolName: string, sessionId: string }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
 const { t } = useI18n()
 const store = useDataStudioStore()
+const connectionStore = useConnectionStore()
+const entitlementStore = useEntitlementStore()
+const connection = computed(() => props.denial.connectionId ? connectionStore.getConnectionById(props.denial.connectionId) : undefined)
+const reviewConnection = computed(() => props.denial.source !== 'rule' && props.denial.source !== 'conversation' && connection.value !== undefined)
 const rules = ref<AiPermissions>({})
 const editor = ref<InstanceType<typeof ConnectionPermissionEditor> | null>(null)
 const saving = ref(false)
@@ -30,7 +33,7 @@ watch(() => [props.open, props.denial], () => {
   ruleRemoved.value = false
 })
 const saveConnection = async () => {
-  if (!props.denial.connectionId || !editor.value?.ready || saving.value)
+  if (!reviewConnection.value || !props.denial.connectionId || !entitlementStore.isLocalUltimate || !editor.value?.ready || saving.value)
     return
   saving.value = true
   error.value = ''
@@ -70,8 +73,11 @@ const removeRule = async () => {
     <DialogContent class="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-xl">
       <DialogHeader>
         <DialogTitle>{{ t('dataStudio.agent.message.reviewPermissions') }}</DialogTitle>
-        <DialogDescription>{{ t('dataStudio.agent.message.reviewHelp') }}</DialogDescription>
+        <DialogDescription>{{ t(reviewConnection ? 'dataStudio.agent.message.reviewConnectionHelp' : 'dataStudio.agent.message.reviewHelp') }}</DialogDescription>
       </DialogHeader>
+      <p v-if="reviewConnection" class="text-sm font-medium break-words">
+        {{ t('dataStudio.agent.message.connectionLabel', { name: connection?.name }) }}
+      </p>
       <p v-if="error" role="alert" class="text-sm text-destructive-text break-words">
         {{ error }}
       </p>
@@ -82,25 +88,25 @@ const removeRule = async () => {
         <p v-if="ruleRemoved" role="status" class="text-sm">
           {{ t('dataStudio.agent.message.ruleRemoved') }}
         </p>
-        <Button v-else type="button" variant="outline" :disabled="saving" @click="removeRule">
-          {{ t('dataStudio.agent.message.removeDenyRule') }}
-        </Button>
       </template>
       <p v-else-if="denial.source === 'conversation'" class="text-sm leading-relaxed">
         {{ t('dataStudio.agent.message.sourceUnavailable') }}
       </p>
-      <PaidGate v-else feature="mcp_bridge">
-        <DefaultPermissionEditor v-if="denial.source === 'system' || !denial.connectionId" />
-        <fieldset v-else :disabled="saving" class="min-w-0 space-y-4">
-          <ConnectionPermissionEditor ref="editor" v-model="rules" :connection-id="denial.connectionId" initially-expanded />
-          <Button type="button" :disabled="saving || !editor?.ready" @click="saveConnection">
-            {{ t(saving ? 'aiPermissions.saving' : 'dataStudio.modifySource.saveChanges') }}
-          </Button>
-        </fieldset>
-      </PaidGate>
-      <DialogFooter>
+      <fieldset v-else-if="reviewConnection" :disabled="saving" class="min-w-0">
+        <ConnectionPermissionEditor ref="editor" v-model="rules" :connection-id="denial.connectionId" initially-expanded />
+      </fieldset>
+      <p v-else class="text-sm leading-relaxed">
+        {{ t('dataStudio.agent.message.connectionUnavailable') }}
+      </p>
+      <DialogFooter class="pt-4 border-t border-border">
         <Button type="button" variant="outline" :disabled="saving" @click="emit('update:open', false)">
           {{ t('dataStudio.agent.message.backToChat') }}
+        </Button>
+        <Button v-if="denial.source === 'rule' && !ruleRemoved" type="button" :disabled="saving" @click="removeRule">
+          {{ t('dataStudio.agent.message.removeDenyRule') }}
+        </Button>
+        <Button v-else-if="reviewConnection && entitlementStore.isLocalUltimate" type="button" :disabled="saving || !editor?.ready" @click="saveConnection">
+          {{ t(saving ? 'aiPermissions.saving' : 'dataStudio.modifySource.saveChanges') }}
         </Button>
       </DialogFooter>
     </DialogContent>
