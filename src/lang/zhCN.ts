@@ -1073,6 +1073,7 @@ export const zhCN = {
         toolBlocked: '已阻止',
         toolRejected: '已拒绝',
         blockedNotice: '权限不足，操作未执行',
+        historicalBlockedNotice: '上次尝试因权限被阻止，操作未执行',
         rejectedNotice: '你已拒绝，操作未执行',
         interruptedNotice: '无法确认执行结果',
         unavailableNotice: '操作不可用，尚未执行',

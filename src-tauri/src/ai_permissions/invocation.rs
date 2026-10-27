@@ -258,7 +258,45 @@ pub async fn get_ai_context(
             schemas.push(format!("-- Source: {alias}\n{schema}"));
         }
     }
-    Ok(json!({"readableConnectionIds": readable, "schema": schemas.join("\n")}))
+    let policy = load_permission_policy(&app)?;
+    let session = access.current("")?;
+    let effective_permissions =
+        connection_permission_context(&policy, &access.connections, &session.restrictions);
+    Ok(
+        json!({"readableConnectionIds": readable, "schema": schemas.join("\n"), "effectivePermissions": effective_permissions}),
+    )
+}
+
+fn connection_permission_context(
+    policy: &AiPolicy,
+    connections: &std::collections::HashMap<String, Value>,
+    restrictions: &std::collections::HashMap<String, super::PermissionRules>,
+) -> std::collections::HashMap<String, super::PermissionRules> {
+    connections
+        .iter()
+        .filter_map(|(alias, config)| {
+            let id = config["connectionId"].as_str()?;
+            let restriction = restrictions.get(id)?;
+            let effective = policy.effective_permissions(id);
+            let allowed = |action| {
+                effective.get(action) == Some(true)
+                    && restriction.get(action) != Some(false)
+                    && (action != super::chain::Permission::Manage
+                        || restriction.manage == Some(true))
+            };
+            use super::chain::Permission::{Create, Delete, Manage, Read, Update};
+            Some((
+                alias.clone(),
+                super::PermissionRules::explicit(
+                    allowed(Read),
+                    allowed(Create),
+                    allowed(Update),
+                    allowed(Delete),
+                    allowed(Manage),
+                ),
+            ))
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -293,6 +331,53 @@ mod tests {
             permission_defaults: Some(PermissionRules::explicit(true, true, true, true, true)),
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn persisted_connection_grant_refreshes_retry_context_and_still_requires_ddl_approval() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut config = crate::mcp_bridge::McpConfig::default();
+        config.policy.permission_defaults =
+            Some(PermissionRules::explicit(true, true, true, true, false));
+        config.save(dir.path()).unwrap();
+        let target = json!({"connectionId":"42"});
+        let connections = HashMap::from([
+            ("example".into(), target.clone()),
+            ("outside".into(), json!({"connectionId":"99"})),
+        ]);
+        let mut ddl = cap();
+        ddl.name = "sqlkit__execute_ddl";
+        ddl.required_permission = "manage";
+        ddl.risk_level = RiskLevel::Destructive;
+        let args = json!({"sql":"CREATE TABLE example(id INT)"});
+        assert!(evaluate(config.policy.clone(), &ddl, &args, &target, Some(session())).is_err());
+        config.policy.connection_permissions.insert(
+            "42".into(),
+            PermissionRules::explicit(true, true, true, true, true),
+        );
+        config.save(dir.path()).unwrap();
+        let current = super::super::read_permission_config(dir.path())
+            .unwrap()
+            .policy;
+        assert_eq!(
+            current.permission_defaults.as_ref().unwrap().manage,
+            Some(false)
+        );
+        let decision = evaluate(current.clone(), &ddl, &args, &target, Some(session())).unwrap();
+        assert!(decision.confirmation);
+        let context =
+            connection_permission_context(&current, &connections, &session().restrictions);
+        assert_eq!(context["example"].manage, Some(true));
+        assert!(!context.contains_key("outside"));
+        let mut restricted = session();
+        restricted.restrictions.get_mut("42").unwrap().manage = Some(false);
+        assert_eq!(
+            connection_permission_context(&current, &connections, &restricted.restrictions)
+                ["example"]
+                .manage,
+            Some(false)
+        );
+        assert!(evaluate(current, &ddl, &args, &target, Some(restricted)).is_err());
     }
     fn session() -> SessionAccess {
         SessionAccess {

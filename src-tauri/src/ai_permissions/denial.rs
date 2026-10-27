@@ -18,12 +18,16 @@ pub(crate) struct AccessDenial {
 
 impl AccessDenial {
     pub fn permission(action: Permission, id: &str, source: &str) -> Self {
+        let source_label = match source {
+            "system" => "SQLKit system AI defaults",
+            "connection" => "this connection's AI permissions",
+            "conversation" => "this conversation's source restrictions",
+            _ => "SQLKit AI permissions",
+        };
         Self {
             kind: "permission".into(),
             source: source.into(),
-            message: format!(
-                "{action:?} access denied for connection '{id}' by {source} permissions"
-            ),
+            message: format!("{action:?} access denied for connection '{id}' by {source_label}"),
             connection_id: Some(id.into()),
             source_id: None,
             action: Some(action),

@@ -12,6 +12,7 @@ const props = defineProps<{
   message: any
   iterationIndex?: number
   canRetry?: boolean
+  historical?: boolean
 }>()
 const emit = defineEmits<{
   reviewPermissions: [toolCall: AgentToolCall]
@@ -34,7 +35,7 @@ const connectionLabel = (call: AgentToolCall) => {
 }
 const outcomeTitle = (call: AgentToolCall) => {
   const key = call.status === 'denied'
-    ? call.denial?.kind === 'user' ? 'rejectedNotice' : call.denial?.kind === 'unavailable' ? 'unavailableNotice' : 'blockedNotice'
+    ? call.denial?.kind === 'user' ? 'rejectedNotice' : call.denial?.kind === 'unavailable' ? 'unavailableNotice' : props.historical ? 'historicalBlockedNotice' : 'blockedNotice'
     : call.status === 'interrupted' ? 'interruptedNotice' : 'toolError'
   return t(`dataStudio.agent.message.${key}`)
 }
@@ -404,7 +405,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
         <template v-for="tc in message.toolCalls" :key="tc.id">
           <details
             class="activity-item-details"
-            :open="tc.status === 'error' || tc.status === 'denied' || tc.status === 'executing'"
+            :open="tc.status === 'error' || tc.status === 'executing'"
           >
             <summary class="activity-item">
               <span class="activity-icon" :class="toolIcon(tc.toolName)" />
@@ -439,7 +440,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
               <span
                 v-if="
                   toolResultText(tc)
-                    && (tc.status === 'done' || tc.status === 'error' || tc.status === 'denied' || tc.status === 'executing')
+                    && (tc.status === 'done' || tc.status === 'error' || tc.status === 'executing')
                 "
                 class="result-preview"
                 :class="`result-preview-${resultStatus(tc)}`"

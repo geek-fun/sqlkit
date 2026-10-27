@@ -3,15 +3,16 @@ import { invoke } from '@tauri-apps/api/core'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { flushPromises, mount } from '@vue/test-utils'
 import { defineComponent, reactive } from 'vue'
-import { AI_ACTIONS, aiPreset, resolveAiPermissions } from '@/common/aiPermissions'
+import { AI_ACTIONS, aiPreset, getAiPolicy, resolveAiPermissions } from '@/common/aiPermissions'
 import ConnectionPermissionEditor from '@/components/ai-permissions/ConnectionPermissionEditor.vue'
 import DefaultPermissionEditor from '@/components/ai-permissions/DefaultPermissionEditor.vue'
+import ToolPermissionReview from '@/components/ai-permissions/ToolPermissionReview.vue'
 import SourcePermissionModal from '@/views/data-studio/components/modify-source-modal.vue'
 
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }))
 jest.mock('@/common', () => ({ ...jest.requireActual('@/common/aiPermissions'), UPGRADE_URL: 'https://example.test/upgrade' }))
 const mockEntitlement = reactive({ isLocalUltimate: true })
-jest.mock('@/store', () => ({ useEntitlementStore: () => mockEntitlement }))
+jest.mock('@/store', () => ({ useEntitlementStore: () => mockEntitlement, useConnectionStore: () => ({ getConnectionById: (id: string) => ({ id, name: 'Development database' }) }) }))
 jest.mock('@tauri-apps/plugin-opener', () => ({ openUrl: jest.fn() }))
 jest.mock('@/components/upgrade', () => ({ ProBadge: { template: '<span>Ultimate</span>' } }))
 jest.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
@@ -68,6 +69,26 @@ const openEditor = async (id?: string) => {
 }
 
 describe('aI permission chain', () => {
+  it('persists Full access from the real recovery editor without changing the denying defaults', async () => {
+    let saved = { permission_defaults: aiPreset('data'), connection_permissions: {} as Record<string, Record<string, boolean>> }
+    mockEntitlement.isLocalUltimate = true
+    mockInvoke.mockImplementation(async (command, args) => {
+      if (command === 'save_ai_permissions') {
+        const update = args as { connectionId: string, permissions: Record<string, boolean> }
+        saved = { ...saved, connection_permissions: { ...saved.connection_permissions, [update.connectionId]: update.permissions } }
+      }
+      return saved
+    })
+    const wrapper = mount(ToolPermissionReview, { props: { open: true, denial: { kind: 'permission', source: 'system', connectionId: 'dev', action: 'manage', message: 'Manage denied' }, toolName: 'ddl', sessionId: 'session' } })
+    await flushPromises()
+    await wrapper.get('input[value="full"]').setValue()
+    await wrapper.findAll('button').find(button => button.text() === 'dataStudio.modifySource.saveChanges')!.trigger('click')
+    await flushPromises()
+    const reloaded = await getAiPolicy()
+    expect(reloaded.permission_defaults.manage).toBe(false)
+    expect(reloaded.connection_permissions.dev).toEqual(aiPreset('full'))
+    expect(resolveAiPermissions(reloaded.permission_defaults, reloaded.connection_permissions.dev).manage).toBe(true)
+  })
   beforeEach(() => {
     mockEntitlement.isLocalUltimate = true
     mockStore.updateSessionSourcePermissions.mockReset()

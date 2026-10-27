@@ -4,7 +4,7 @@ import type { AgentToolCall, AgentToolCallStatus, ConfirmationRule } from '@/sto
 import type { ChatContextConfig, ChatMessage, ChatMessageStatus, ChatPermissions, ChatSession, ChatSessionStatus, SendMessageOptions } from '@/types/chat'
 import { ulid } from 'ulidx'
 import { computed, ref } from 'vue'
-import { assembleSystemPrompt, buildAgentModeInstructions } from '@/common'
+import { assembleSystemPrompt, buildAgentModeInstructions, buildAgentPermissionInstructions } from '@/common'
 import { agentApi } from '@/datasources/agentApi'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
@@ -176,24 +176,12 @@ function buildSystemPrompt({ schema, sources, permissionsMode }: {
 
     for (const source of sources) {
       const dbType = source.databaseType ?? 'SQL'
-      const permParts: string[] = []
-
-      if (source.permissions) {
-        if (source.permissions.read)
-          permParts.push('read')
-        if (source.permissions.create)
-          permParts.push('create')
-        if (source.permissions.update)
-          permParts.push('update')
-        if (source.permissions.delete)
-          permParts.push('delete')
-      }
-
-      const permStr = permParts.length > 0 ? ` (permissions: ${permParts.join(', ')})` : ''
-      parts.push(`- ${source.connectionId}: ${dbType}${permStr}`)
+      parts.push(`- ${source.connectionId}: ${dbType}`)
     }
 
     parts.push('')
+
+    parts.push(...buildAgentPermissionInstructions(sources), '')
 
     // Database-specific knowledge blocks
     const dbTypes = sources.map(s => s.databaseType ?? '').filter(Boolean)
@@ -483,6 +471,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
         && Object.values(connections).every(conn => aiContext.readableConnectionIds.includes(String(conn.connectionId)))
       const safeContext = {
         ...context,
+        connections: Object.fromEntries(Object.entries(connections).map(([alias, connection]) => [alias, { ...connection, permissions: aiContext.effectivePermissions[alias] }])),
         schema: canReadContext ? context?.schema : undefined,
         activePanel: canReadContext ? context?.activePanel : undefined,
       }
