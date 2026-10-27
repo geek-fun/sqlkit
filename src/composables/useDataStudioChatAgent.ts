@@ -139,7 +139,7 @@ export function useDataStudioChatAgent() {
       updateToolCallStatus: (messageId: string, toolCallId: string, status: AgentToolCallStatus, _result?: string, _durationMs?: number, _sessionId?: string) =>
         dataStudioStore.updateToolCallStatus(messageId, toolCallId, status),
       setSessionStatus: (sessionId: string, status: ChatSessionStatus) =>
-        dataStudioStore.setSessionStatus(sessionId, status as 'idle' | 'running' | 'waiting_confirmation' | 'error' | 'stopped'),
+        dataStudioStore.setSessionStatus(sessionId, status),
       setSessionStopped: (sessionId, reason, message) =>
         dataStudioStore.setSessionStopped(sessionId, reason as any, message),
       clearSessionStop: (sessionId: string) => dataStudioStore.clearSessionStop(sessionId),

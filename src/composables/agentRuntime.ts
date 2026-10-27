@@ -215,7 +215,7 @@ async function initAgentRuntime(): Promise<void> {
   )
 
   unlisteners.push(
-    await agentApi.onAgentLoopToolResult(({ session_id, tool_call_id, envelope, error, denied, tool_name, arguments: args }) => {
+    await agentApi.onAgentLoopToolResult(({ session_id, tool_call_id, envelope, error, denied, denial, tool_name, arguments: args }) => {
       clearToolTimeout(tool_call_id)
       const store = useDataStudioStore()
       store.setSessionActiveTool(session_id, null)
@@ -242,6 +242,7 @@ async function initAgentRuntime(): Promise<void> {
             riskLevel: 'safe',
             requiresConfirmation: false,
             result: envelope.summary,
+            denial,
           }
           store.setMessageToolCalls(target.id, [...(target.toolCalls ?? []), rejected], session_id)
         }
@@ -257,6 +258,11 @@ async function initAgentRuntime(): Promise<void> {
           session_id,
         )
 
+        if (denial) {
+          const updated = getSessionById(store.sessions, session_id)?.messages.find(message => message.id === assistantMsg.id)
+          store.setMessageToolCalls(assistantMsg.id, (updated?.toolCalls ?? []).map(call => call.id === tool_call_id ? { ...call, denial } : call), session_id)
+        }
+
         if (envelope.full_result) {
           store.toolResultFullBodies = {
             ...store.toolResultFullBodies,
@@ -264,6 +270,30 @@ async function initAgentRuntime(): Promise<void> {
           }
         }
       }
+    }),
+  )
+
+  unlisteners.push(
+    await agentApi.onAgentLoopBlocked(({ session_id }) => {
+      const store = useDataStudioStore()
+      const session = getSessionById(store.sessions, session_id)
+      session?.messages.forEach((message) => {
+        const unresolved = message.toolCalls?.some(call => ['pending', 'confirmed', 'executing'].includes(call.status))
+        if (unresolved) {
+          store.setMessageToolCalls(message.id, (message.toolCalls ?? []).map((call) => {
+            if (!['pending', 'confirmed', 'executing'].includes(call.status))
+              return call
+            clearToolTimeout(call.id)
+            return { ...call, status: 'interrupted', requiresConfirmation: false }
+          }), session_id)
+        }
+        if (message.status === 'streaming')
+          store.setMessageStatus(message.id, 'done', session_id)
+      })
+      store.setSessionStatus(session_id, 'blocked')
+      store.clearSessionProgress(session_id)
+      store.setSessionActiveTool(session_id, null)
+      store.removeOrphanedStreamingMessages(session_id)
     }),
   )
 

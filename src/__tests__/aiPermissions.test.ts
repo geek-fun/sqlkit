@@ -131,19 +131,16 @@ describe('aI permission chain', () => {
     const wrapper = await openEditor('dev')
     expect(wrapper.vm.rules).toEqual({ update: true, delete: false })
     expect(wrapper.text()).toContain('aiPermissions.effective: aiPermissions.read, aiPermissions.update')
-    expect(wrapper.findAll('select')).toHaveLength(5)
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(5)
     expect(wrapper.text()).toContain('aiPermissions.fromConnection')
-    expect(wrapper.text()).toContain('aiPermissions.fromSystem')
   })
 
-  it('supports inherit, explicit allow and explicit deny independently', async () => {
+  it('supports explicit allow and deny independently per action', async () => {
     const wrapper = await openEditor('dev')
-    const actionSelect = () => wrapper.findAll('select')[2]
-    await actionSelect().setValue('deny')
+    const updateSwitch = () => wrapper.get('input#ai-dev-update')
+    await updateSwitch().setValue(false)
     expect(wrapper.vm.rules).toEqual({ update: false, delete: false })
-    await actionSelect().setValue('inherit')
-    expect(wrapper.vm.rules).toEqual({ delete: false })
-    await actionSelect().setValue('allow')
+    await updateSwitch().setValue(true)
     expect(wrapper.vm.rules).toEqual({ update: true, delete: false })
   })
 
@@ -151,7 +148,7 @@ describe('aI permission chain', () => {
     const wrapper = await openEditor('dev')
     await wrapper.get('input[value="custom"]').setValue()
     expect(wrapper.vm.rules).toEqual({ update: true, delete: false })
-    expect(wrapper.findAll('select')).toHaveLength(5)
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(5)
   })
 
   it('new connections inherit and presets preserve explicit decisions', async () => {
@@ -167,12 +164,12 @@ describe('aI permission chain', () => {
     const wrapper = await openEditor()
     await wrapper.get('input[value="custom"]').setValue()
     expect(wrapper.vm.rules).toEqual({})
-    expect(wrapper.findAll('select')).toHaveLength(5)
-    await wrapper.findAll('select')[1].setValue('allow')
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(5)
+    await wrapper.findAll('input[type="checkbox"]')[1].setValue(true)
     expect(wrapper.vm.rules).toEqual({ create: true })
     await wrapper.get('input[value="inherit"]').setValue()
     expect(wrapper.vm.rules).toEqual({})
-    expect(wrapper.findAll('select')).toHaveLength(0)
+    expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(0)
   })
 
   it('shows custom defaults on load and keeps action editing open when values match a preset', async () => {

@@ -23,7 +23,6 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { ProBadge } from '@/components/upgrade'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { useDownloadEvents } from '@/composables/useDownloadEvents'
 import { toast } from '@/composables/useNotifications'
@@ -1491,8 +1490,6 @@ function handleSave() {
               :errors="formErrors"
             />
 
-            <ConnectionPermissionEditor ref="aiPermissionEditor" v-model="formData.aiPermissions" :connection-id="formData.id" />
-
             <SshTunnelConfigPanel
               :model-value="formData.sshTunnel"
               :remote-host="formData.host"
@@ -1500,17 +1497,9 @@ function handleSave() {
               @update:model-value="formData.sshTunnel = $event"
             />
 
-            <button
-              v-if="isPromptGated"
-              type="button"
-              class="px-3 py-2.5 text-left border rounded-lg border-dashed flex gap-2.5 w-full cursor-pointer transition-colors items-center hover:bg-accent/50"
-              @click="openUpgrade"
-            >
-              <ProBadge size="xs" />
-              <span class="text-sm text-muted-foreground">{{ t('connection.prompt.ultimateOnly') }}</span>
-              <span class="text-xs text-primary-text font-medium ml-auto px-2 py-1 rounded-md bg-primary/10 shrink-0">{{ t('plan.upgrade.cta') }}</span>
-            </button>
-            <div v-else class="p-3 border rounded-lg space-y-2">
+            <ConnectionPermissionEditor ref="aiPermissionEditor" v-model="formData.aiPermissions" :connection-id="formData.id" />
+
+            <div v-if="!isPromptGated" class="p-3 border rounded-lg space-y-2">
               <div class="flex gap-2 items-center">
                 <Label>{{ t('connection.prompt.label') }}</Label>
                 <Badge v-if="promptValue" variant="secondary">

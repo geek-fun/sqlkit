@@ -114,7 +114,11 @@ pub(crate) fn prepare_agent_call(
     args: &Value,
     config: &Value,
 ) -> Result<ToolCallPreparation, String> {
-    let authorization = authorize(name, args, config, Some(access))?;
+    let authorization = authorize(name, args, config, Some(access)).map_err(|error| {
+        super::AccessDenial::from_error(&error)
+            .with_context(config)
+            .encode()
+    })?;
     let mut config = if config.is_object() {
         config.clone()
     } else {
@@ -146,7 +150,16 @@ pub(crate) async fn invoke_ai(
     config: &Value,
     access: Option<&AgentAccess>,
 ) -> Result<String, ToolExecutionError> {
-    let initial = authorize(name, args, config, access).map_err(ToolExecutionError::Denied)?;
+    let denial = |error: String| {
+        ToolExecutionError::Denied(if access.is_some() {
+            super::AccessDenial::from_error(&error)
+                .with_context(config)
+                .encode()
+        } else {
+            super::display_denial(&error)
+        })
+    };
+    let initial = authorize(name, args, config, access).map_err(&denial)?;
     if access.is_some() {
         check_confirmation(config, initial.confirmation)?;
     }
@@ -155,8 +168,7 @@ pub(crate) async fn invoke_ai(
         None => None,
     };
     // Resolution can await connection/SSH setup. Revalidate at dispatch after it completes.
-    let authorization =
-        authorize(name, args, config, access).map_err(ToolExecutionError::Denied)?;
+    let authorization = authorize(name, args, config, access).map_err(&denial)?;
     if access.is_some() {
         check_confirmation(config, authorization.confirmation)?;
     }
@@ -354,6 +366,32 @@ mod tests {
             Err(ToolExecutionError::ConfirmationRequired)
         );
         assert!(check_confirmation(&json!({"__ai_confirmation_required":true}), true).is_ok());
+    }
+    #[test]
+    fn denials_identify_the_decision_source_without_changing_precedence() {
+        let config = json!({"connectionId":"42"});
+        let args = json!({"sql":"UPDATE t SET x=1"});
+        let mut system = policy();
+        system.permission_defaults.as_mut().unwrap().update = Some(false);
+        let denied_source = |policy, session| {
+            let error = evaluate(policy, &cap(), &args, &config, Some(session))
+                .err()
+                .unwrap();
+            super::super::AccessDenial::decode(&error).unwrap().source
+        };
+        assert_eq!(denied_source(system, session()), "system");
+        let mut connection = policy();
+        connection.connection_permissions.insert(
+            "42".into(),
+            PermissionRules {
+                update: Some(false),
+                ..Default::default()
+            },
+        );
+        assert_eq!(denied_source(connection, session()), "connection");
+        let mut conversation = session();
+        conversation.restrictions.get_mut("42").unwrap().update = Some(false);
+        assert_eq!(denied_source(policy(), conversation), "conversation");
     }
     #[test]
     fn discovery_is_limited_to_current_scope_and_effective_actions() {

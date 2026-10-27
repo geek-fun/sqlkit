@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { SessionProgress } from '@/store/dataStudioStore'
+import type { AgentToolCall, SessionProgress } from '@/store/dataStudioStore'
 import type { ChatMessage } from '@/types/chat'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AgentMessageBubble from '@/components/agent-message-bubble.vue'
+import { ToolPermissionReview } from '@/components/ai-permissions'
 import ContextIndicator from '@/components/context-indicator.vue'
 import ModelPicker from '@/components/model-picker.vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -60,6 +61,20 @@ const { llmSettings } = storeToRefs(appStore)
 const inputText = ref('')
 const scrollAreaRef = ref<{ viewportElement: HTMLElement | null } | null>(null)
 const contextIndicatorRef = ref<{ refresh: () => Promise<void> } | null>(null)
+const reviewingTool = ref<AgentToolCall | null>(null)
+const recoveryBusy = computed(() => props.isLoading || (props.progress?.phase === 'preparing' && !props.error))
+const retryToolCall = (tool: AgentToolCall) => {
+  if (recoveryBusy.value)
+    return
+  emit('send', t('dataStudio.agent.message.retryPrompt', { tool: tool.toolName, args: tool.args }))
+  forceScrollToBottom()
+}
+const awaitingDecision = computed(() => {
+  if (props.isLoading)
+    return false
+  const lastUser = props.messages.reduce((index, message, current) => message.role === 'user' ? current : index, -1)
+  return props.messages.slice(lastUser + 1).some(message => message.toolCalls?.some(call => call.status === 'denied' && call.denial?.kind !== 'user'))
+})
 
 // ── Smart scroll ──────────────────────────────────────────────────────
 
@@ -255,6 +270,9 @@ onBeforeUnmount(() => {
           :key="msg.id"
           :message="msg"
           :iteration-index="iterationIndexMap[msg.id]"
+          :can-retry="!recoveryBusy"
+          @review-permissions="reviewingTool = $event"
+          @retry-tool-call="retryToolCall"
         />
 
         <!-- Tool confirmation cards -->
@@ -312,6 +330,10 @@ onBeforeUnmount(() => {
 
     <!-- Input area -->
     <div class="chat-input-area">
+      <p v-if="awaitingDecision" role="status" class="text-xs text-warning mb-2 px-1 flex gap-2 items-center">
+        <span aria-hidden="true" class="i-carbon-pause shrink-0 h-4 w-4" />
+        {{ t('dataStudio.agent.message.awaitingPermissionDecision') }}
+      </p>
       <div v-if="stopReason && stopMessage" class="loop-stopped-banner" role="status">
         <div class="loop-stopped-banner__body">
           <span class="loop-stopped-banner__icon i-carbon-pause-filled" />
@@ -389,6 +411,15 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+    <ToolPermissionReview
+      v-if="reviewingTool && sessionId"
+      :key="reviewingTool.id"
+      :open="true"
+      :denial="reviewingTool.denial ?? { kind: 'permission', source: 'unknown', message: reviewingTool.result ?? '' }"
+      :tool-name="reviewingTool.toolName"
+      :session-id="sessionId"
+      @update:open="!$event && (reviewingTool = null)"
+    />
   </div>
 </template>
 

@@ -4,7 +4,7 @@ import type { AgentToolCall, AgentToolCallStatus, ConfirmationRule } from '@/sto
 import type { ChatContextConfig, ChatMessage, ChatMessageStatus, ChatPermissions, ChatSession, ChatSessionStatus, SendMessageOptions } from '@/types/chat'
 import { ulid } from 'ulidx'
 import { computed, ref } from 'vue'
-import { assembleSystemPrompt } from '@/common'
+import { assembleSystemPrompt, buildAgentModeInstructions } from '@/common'
 import { agentApi } from '@/datasources/agentApi'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
@@ -214,21 +214,7 @@ function buildSystemPrompt({ schema, sources, permissionsMode }: {
   }
 
   // Mode instructions
-  const isAuto = permissionsMode === 'AUTO'
-  if (isAuto) {
-    parts.push('## Mode: AUTO')
-    parts.push(
-      'You are in AUTO mode. You may execute queries automatically.',
-      'For destructive operations (DROP, TRUNCATE, ALTER, DELETE without WHERE), you must still request confirmation before proceeding.',
-    )
-  }
-  else {
-    parts.push('## Mode: ASK')
-    parts.push(
-      'You are in ASK mode (default). Before executing any query, explain what you plan to do and ask for confirmation.',
-      'The user must explicitly approve each operation before you execute it.',
-    )
-  }
+  parts.push(...buildAgentModeInstructions(permissionsMode === 'AUTO'))
   parts.push('')
 
   // Tool usage rules
@@ -547,6 +533,15 @@ export function useChatAgent(config: UseChatAgentConfig) {
       return tc?.toolName ?? ''
     }
 
+    const markRejected = () => {
+      const message = config.sessionStore.activeSession.value?.messages.find(item => item.id === assistantMsgId)
+      if (message) {
+        config.sessionStore.setMessageToolCalls(sessionId, assistantMsgId, (message.toolCalls ?? []).map(call => call.id === toolCallId
+          ? { ...call, status: 'denied', requiresConfirmation: false, denial: { kind: 'user', source: 'unknown', message: 'Rejected by you' } }
+          : call))
+      }
+    }
+
     switch (action) {
       case 'allow_once': {
         config.sessionStore.setSessionStatus(sessionId, 'running')
@@ -573,6 +568,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
       case 'deny': {
         config.sessionStore.setSessionStatus(sessionId, 'running')
         config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'denied', undefined, undefined, sessionId)
+        markRejected()
         await agentApi.confirmToolCall(toolCallId, false)
         break
       }
@@ -588,6 +584,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
         config.addConfirmationRule?.(denyRule)
         config.sessionStore.setSessionStatus(sessionId, 'running')
         config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'denied', undefined, undefined, sessionId)
+        markRejected()
         await agentApi.confirmToolCall(toolCallId, false)
         break
       }
@@ -595,6 +592,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
       case 'cancel': {
         // Mark tool call as denied first, then cancel the loop
         config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'denied', undefined, undefined, sessionId)
+        markRejected()
         config.sessionStore.setSessionStatus(sessionId, 'idle')
         await cancelSessionHandler()
         break

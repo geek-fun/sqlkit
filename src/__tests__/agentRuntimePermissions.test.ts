@@ -15,6 +15,9 @@ const mockStore = {
   setSessionStatus: jest.fn(),
   updateToolCallStatus: jest.fn(),
   findConfirmationRule: jest.fn(),
+  setMessageStatus: jest.fn(),
+  clearSessionProgress: jest.fn(),
+  removeOrphanedStreamingMessages: jest.fn(),
   setMessageToolCalls: jest.fn((messageId: string, calls: AgentToolCall[], _sessionId: string) => {
     mockSession.messages = mockSession.messages.map(message => message.id === messageId ? { ...message, toolCalls: calls } : message)
   }),
@@ -39,6 +42,7 @@ jest.mock('@/datasources/agentApi', () => {
     onAgentLoopThinkingDelta: register('onAgentLoopThinkingDelta'),
     onAgentLoopToolCall: register('onAgentLoopToolCall'),
     onAgentLoopToolResult: register('onAgentLoopToolResult'),
+    onAgentLoopBlocked: register('onAgentLoopBlocked'),
     onAgentLoopToolRetry: register('onAgentLoopToolRetry'),
     onAgentLoopWaitingLlm: register('onAgentLoopWaitingLlm'),
     onAgentLoopWarning: register('onAgentLoopWarning'),
@@ -107,9 +111,28 @@ describe('agent permission events', () => {
     expect(mockStore.updateToolCallStatus).toHaveBeenCalledWith('assistant', 'call', 'denied', 'Permission revoked', undefined, 'chat')
   })
 
+  it('retains the denial source and pauses without converting it to a session error', () => {
+    const denial = { kind: 'permission', source: 'connection', connectionId: 'db', action: 'manage', message: 'Manage denied' }
+    mockHandlers.onAgentLoopToolResult({ ...call(), denied: true, denial, envelope: { summary: denial.message } })
+    expect(mockSession.messages[0].toolCalls[0].denial).toEqual(denial)
+    mockHandlers.onAgentLoopBlocked({ session_id: 'chat', tool_call_id: 'call', denial })
+    expect(mockStore.setSessionStatus).toHaveBeenCalledWith('chat', 'blocked')
+    expect(mockStore.setMessageStatus).toHaveBeenCalledWith('assistant', 'done', 'chat')
+    expect(mockConfirm).not.toHaveBeenCalled()
+    expect(mockStore.setSessionStatus).not.toHaveBeenCalledWith('chat', 'error')
+  })
+
   it('retains existing confirmation behavior for runtimes without host metadata', () => {
     mockHandlers.onAgentLoopToolCall({ ...call(), risk_level: 'destructive' })
     expect(mockConfirm).not.toHaveBeenCalled()
     expect(mockSession.messages[0].toolCalls[0].requiresConfirmation).toBe(true)
+  })
+
+  it('settles other queued calls when a permission block pauses the run', () => {
+    mockHandlers.onAgentLoopToolCall(call(false))
+    mockHandlers.onAgentLoopBlocked({ session_id: 'chat', tool_call_id: 'blocked' })
+    expect(mockSession.messages[0].toolCalls[0].status).toBe('interrupted')
+    jest.advanceTimersByTime(61_000)
+    expect(mockStore.updateToolCallStatus).not.toHaveBeenCalled()
   })
 })
