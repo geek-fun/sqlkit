@@ -263,7 +263,7 @@ describe('aI permission chain', () => {
     await wrapper.findAll('button').find(button => button.text() === 'dataStudio.detachSource.title')!.trigger('click')
     expect(wrapper.text()).toContain('dataStudio.detachSource.message')
     expect(mockStore.detachSourceFromSession).not.toHaveBeenCalled()
-    await wrapper.findAll('button').find(button => button.text() === 'aiPermissions.cancel')!.trigger('click')
+    await wrapper.findAll('button').find(button => button.text() === 'common.buttons.cancel')!.trigger('click')
     expect(wrapper.text()).not.toContain('dataStudio.detachSource.message')
     expect(wrapper.emitted('update:open')).toBeUndefined()
   })

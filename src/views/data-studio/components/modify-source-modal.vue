@@ -4,11 +4,12 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AI_ACTIONS, aiPreset, getAiPolicy, resolveAiPermissions } from '@/common'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Switch } from '@/components/ui/switch'
 import { useDataStudioStore } from '@/store/dataStudioStore'
+
+type SourceMode = 'inherit' | 'custom'
 
 const props = defineProps<{ open: boolean, sourceIdx: number }>()
 const emit = defineEmits<{ 'update:open': [value: boolean] }>()
@@ -17,13 +18,17 @@ const store = useDataStudioStore()
 const source = computed(() => store.activeSession?.sources.filter(s => !s.detached)[props.sourceIdx])
 const base = ref<AiPermissions>({})
 const local = ref<AiPermissions>({})
-const mode = ref<'inherit' | 'custom'>('inherit')
+const mode = ref<SourceMode>('inherit')
 const loaded = ref(false)
 const failedAction = ref<'load' | 'save' | 'detach'>('load')
 const loading = ref(false)
 const saving = ref(false)
 const error = ref('')
 const detachConfirming = ref(false)
+const modeOptions: { value: SourceMode, label: string }[] = [
+  { value: 'inherit', label: 'dataStudio.modifySource.inheritTitle' },
+  { value: 'custom', label: 'aiPermissions.custom' },
+]
 const allowed = computed(() => AI_ACTIONS.filter(action => base.value[action] && (mode.value === 'inherit' || local.value[action] === true)))
 let request = 0
 const load = async () => {
@@ -105,19 +110,21 @@ const retry = () => failedAction.value === 'load' ? load() : failedAction.value 
 
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
-    <DialogContent class="max-h-[85vh] max-w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[480px]">
-      <DialogHeader class="text-left space-y-2">
-        <DialogTitle class="pr-6">
-          {{ t('dataStudio.modifySource.title') }}
-        </DialogTitle>
-        <p v-if="source?.alias" class="text-sm font-medium break-all">
-          {{ source.alias }}
-        </p>
-        <DialogDescription class="text-xs leading-relaxed">
-          {{ t('aiPermissions.conversationHelp') }}
-        </DialogDescription>
+    <DialogContent class="max-h-[90vh] overflow-y-auto sm:max-w-[480px]">
+      <DialogHeader>
+        <div class="flex gap-3 items-center">
+          <div class="border border-border rounded-xl bg-muted flex shrink-0 h-10 w-10 items-center justify-center">
+            <span class="i-lucide-database h-5 w-5" />
+          </div>
+          <div class="min-w-0">
+            <DialogTitle>{{ t('dataStudio.modifySource.title') }}</DialogTitle>
+            <p v-if="source?.alias" class="text-sm text-muted-foreground mt-0.5 truncate">
+              {{ source.alias }}
+            </p>
+          </div>
+        </div>
       </DialogHeader>
-      <p v-if="loading" role="status" class="text-sm text-muted-foreground py-3">
+      <p v-if="loading" role="status" class="text-sm text-muted-foreground py-2">
         {{ t('aiPermissions.loading') }}
       </p>
       <div v-if="error" role="alert" class="space-y-2">
@@ -128,56 +135,80 @@ const retry = () => failedAction.value === 'load' ? load() : failedAction.value 
           {{ t('aiPermissions.retry') }}
         </Button>
       </div>
-      <fieldset v-if="!loading && loaded" :disabled="saving" class="py-2 border-0 min-w-0 space-y-3">
+      <fieldset v-if="!loading && loaded" :disabled="saving" class="m-0 p-0 border-0 min-w-0 space-y-3">
         <div class="space-y-2">
-          <Label for="conversation-permission-mode">{{ t('aiPermissions.title') }}</Label>
-          <Select v-model="mode" :disabled="saving">
-            <SelectTrigger id="conversation-permission-mode" class="text-left" aria-describedby="conversation-effective">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="inherit">
-                {{ t('aiPermissions.useConnection') }}
-              </SelectItem>
-              <SelectItem value="custom">
-                {{ t('aiPermissions.limitConversation') }}
-              </SelectItem>
-            </SelectContent>
-          </Select>
+          <Label id="conversation-permission-mode">
+            {{ t('dataStudio.modifySource.accessPermissions') }}
+          </Label>
+          <div class="gap-2 grid grid-cols-2" role="group" aria-labelledby="conversation-permission-mode">
+            <button
+              v-for="option in modeOptions"
+              :key="option.value"
+              type="button"
+              class="px-3 py-2.5 text-left border rounded-lg flex gap-2.5 cursor-pointer transition-colors items-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              :class="mode === option.value ? 'border-primary bg-primary/5' : 'border-input hover:bg-accent/50'"
+              :aria-pressed="mode === option.value"
+              @click="mode = option.value"
+            >
+              <span
+                class="border-2 rounded-full flex shrink-0 h-4 w-4 items-center justify-center"
+                :class="mode === option.value ? 'border-primary' : 'border-muted-foreground/40'"
+              >
+                <span v-if="mode === option.value" class="rounded-full bg-primary h-2 w-2" />
+              </span>
+              <span class="text-sm leading-snug font-medium">{{ t(option.label) }}</span>
+            </button>
+          </div>
           <p id="conversation-effective" class="text-xs text-muted-foreground leading-relaxed" aria-live="polite">
             {{ t('aiPermissions.effective') }}: {{ allowed.map(action => t(`aiPermissions.${action}`)).join(', ') || t('aiPermissions.none') }}
           </p>
         </div>
         <div v-if="mode === 'custom'" class="border-t border-border">
-          <div v-for="action in AI_ACTIONS" :key="action" class="py-3 border-b border-border flex gap-3 items-center last:pb-0 last:border-b-0">
-            <Checkbox :id="`conversation-${action}`" class="shrink-0" :checked="local[action] === true && base[action] === true" :disabled="!base[action] || saving" :aria-describedby="!base[action] ? `conversation-denied-${action}` : undefined" @update:checked="update(action, $event === true)" />
-            <div class="min-w-0 space-y-1">
-              <Label :for="`conversation-${action}`" class="leading-snug" :class="{ 'text-muted-foreground': !base[action] }">{{ t(`aiPermissions.${action}`) }}</Label>
-              <p v-if="!base[action]" :id="`conversation-denied-${action}`" class="text-xs text-muted-foreground leading-snug">
+          <div v-for="action in AI_ACTIONS" :key="action" class="py-2 border-b border-border flex gap-3 items-center justify-between last:pb-0 last:border-b-0">
+            <div class="min-w-0 space-y-0.5">
+              <Label :for="`conversation-${action}`" class="leading-snug" :class="{ 'text-muted-foreground': !base[action] }">
+                {{ t(`aiPermissions.${action}`) }}
+              </Label>
+              <p v-if="!base[action]" class="text-xs text-muted-foreground leading-snug">
                 {{ t('aiPermissions.deniedByConnection') }}
               </p>
+            </div>
+            <div class="flex shrink-0 gap-3 items-center">
+              <span class="text-xs text-muted-foreground">
+                {{ t(local[action] === true ? 'aiPermissions.allow' : 'aiPermissions.deny') }}
+              </span>
+              <Switch
+                :id="`conversation-${action}`"
+                :checked="local[action] === true"
+                :disabled="!base[action] || saving"
+                @update:checked="update(action, $event)"
+              />
             </div>
           </div>
         </div>
       </fieldset>
-      <p v-if="detachConfirming" class="text-sm leading-relaxed">
-        {{ t('dataStudio.detachSource.message') }}
-      </p>
-      <DialogFooter class="pt-3 border-t border-border flex flex-wrap gap-2">
-        <template v-if="detachConfirming">
-          <Button type="button" variant="outline" :disabled="saving" @click="detachConfirming = false">
-            {{ t('aiPermissions.cancel') }}
-          </Button>
-          <Button type="button" variant="destructive" :disabled="saving" @click="detach">
-            {{ t('dataStudio.detachSource.confirm') }}
-          </Button>
-        </template>
+      <DialogFooter class="flex flex-wrap gap-2 items-center justify-between sm:justify-between">
+        <div v-if="detachConfirming" class="mr-auto flex flex-col gap-1.5 min-w-0">
+          <span class="text-xs text-muted-foreground leading-snug">
+            {{ t('dataStudio.detachSource.message') }}
+          </span>
+          <div class="flex gap-1.5">
+            <Button type="button" variant="destructive" size="sm" :disabled="saving" @click="detach">
+              <span class="i-lucide-unlink mr-1 h-3.5 w-3.5" />
+              {{ t('dataStudio.detachSource.confirm') }}
+            </Button>
+            <Button type="button" variant="outline" size="sm" :disabled="saving" @click="detachConfirming = false">
+              {{ t('common.buttons.cancel') }}
+            </Button>
+          </div>
+        </div>
         <template v-else>
-          <Button type="button" variant="ghost" :disabled="saving" class="mr-auto" @click="detachConfirming = true">
+          <Button type="button" variant="ghost" class="text-destructive-text mr-auto" :disabled="saving" @click="detachConfirming = true">
+            <span class="i-lucide-unlink mr-1.5 h-4 w-4" />
             {{ t('dataStudio.detachSource.title') }}
           </Button>
           <Button type="button" variant="outline" :disabled="saving" @click="emit('update:open', false)">
-            {{ t('aiPermissions.cancel') }}
+            {{ t('common.buttons.cancel') }}
           </Button>
           <Button type="button" :disabled="loading || saving || !loaded" @click="save">
             {{ t(saving ? 'aiPermissions.saving' : 'dataStudio.modifySource.saveChanges') }}
