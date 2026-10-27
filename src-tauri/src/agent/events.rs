@@ -170,7 +170,10 @@ mod tests {
             cancel_map: cancel_map.clone(),
             blocked: Mutex::new(None),
         };
-        let settings = json!({"baseUrl":format!("http://{address}"),"model":"gpt-4o-mini","apiKey":"synthetic","proxyMode":"none","tools":[{"type":"function","function":{"name":"sqlkit__execute_ddl","parameters":{"type":"object"}}}],"maxIterations":3});
+        // An Anthropic-family model keeps token accounting on the cheap
+        // character heuristic; the OpenAI tiktoken encoders are rebuilt per
+        // message and can blow the loop timeout on CI runners.
+        let settings = json!({"baseUrl":format!("http://{address}"),"model":"claude-3-5-haiku","apiKey":"synthetic","proxyMode":"none","tools":[{"type":"function","function":{"name":"sqlkit__execute_ddl","parameters":{"type":"object"}}}],"maxIterations":3});
         let result = tokio::time::timeout(
             std::time::Duration::from_secs(10),
             data_studio_agent::loop_runner::run_agent_loop(
