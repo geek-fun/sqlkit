@@ -45,10 +45,18 @@ describe('tool outcome notices', () => {
     expect(notice.text()).toContain('connection’s AI permissions')
     expect(wrapper.get('.tool-verb-label').text()).toBe('Blocked')
     expect(notice.element.closest('details')).toBeNull()
+    expect(wrapper.get('.activity-item-details').attributes('open')).toBeUndefined()
+    expect(wrapper.find('.result-preview-denied').exists()).toBe(false)
     await notice.findAll('button')[0].trigger('click')
     expect(wrapper.emitted('reviewPermissions')?.[0]).toEqual([call])
     await notice.findAll('button')[1].trigger('click')
     expect(wrapper.emitted('retryToolCall')?.[0]).toEqual([call])
+  })
+
+  it('labels an earlier denial as history after the user sends a new request', async () => {
+    const wrapper = render()
+    await wrapper.setProps({ historical: true })
+    expect(wrapper.get('[role="alert"]').text()).toContain('Previous attempt blocked')
   })
 
   it('distinguishes user rejection without offering to change permissions', () => {

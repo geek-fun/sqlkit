@@ -1073,6 +1073,7 @@ export const enUS = {
         toolBlocked: 'Blocked',
         toolRejected: 'Rejected',
         blockedNotice: 'Blocked by permissions — action not executed',
+        historicalBlockedNotice: 'Previous attempt blocked — action not executed',
         rejectedNotice: 'Rejected by you — action not executed',
         interruptedNotice: 'Execution outcome unavailable',
         unavailableNotice: 'Action unavailable — action not executed',

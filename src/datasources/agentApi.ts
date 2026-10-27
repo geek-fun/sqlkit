@@ -1,4 +1,4 @@
-import type { AccessDenial } from '@/common/aiPermissions'
+import type { AccessDenial, AiPermissions } from '@/common/aiPermissions'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { jsonify } from '@/common/jsonify'
@@ -371,7 +371,7 @@ export const agentApi = {
     return parseStringResult<any>(result)
   },
 
-  getAiContext: (sessionId: string, connections: Record<string, unknown>, contextKind: string): Promise<{ readableConnectionIds: string[], schema: string }> =>
+  getAiContext: (sessionId: string, connections: Record<string, unknown>, contextKind: string): Promise<{ readableConnectionIds: string[], schema: string, effectivePermissions: Record<string, Required<AiPermissions>> }> =>
     invoke('get_ai_context', { sessionId, connections, contextKind }),
 }
 

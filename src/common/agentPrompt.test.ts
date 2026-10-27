@@ -1,4 +1,4 @@
-import { assembleSystemPrompt, buildAgentModeInstructions } from './agentPrompt'
+import { assembleSystemPrompt, buildAgentModeInstructions, buildAgentPermissionInstructions } from './agentPrompt'
 
 describe('assembleSystemPrompt', () => {
   it('joins layers in developer, global, connections, sidebar order', () => {
@@ -35,6 +35,15 @@ describe('assembleSystemPrompt', () => {
 })
 
 describe('agent mode contract', () => {
+  it('refreshes manage access after a connection grant instead of replaying a historical default denial', () => {
+    const denied = buildAgentPermissionInstructions([{ connectionId: 'example', permissions: { read: true, manage: false } }]).join('\n')
+    const granted = buildAgentPermissionInstructions([{ connectionId: 'example', permissions: { read: true, manage: true } }]).join('\n')
+    expect(denied).toContain('denied actions: manage')
+    expect(granted).toContain('allowed actions: read, manage; denied actions: none')
+    expect(granted).toContain('Never claim a new attempt failed without a new tool result from this turn')
+    expect(granted).toContain('submit a fresh tool call')
+    expect(granted).toContain('not operating-system or database privileges')
+  })
   it.each([false, true])('keeps reads automatic and all deletes and DDL subject to application approval (auto=%s)', (auto) => {
     const prompt = buildAgentModeInstructions(auto).join('\n')
     expect(prompt).toContain('read-only queries and metadata reads execute automatically in both modes')

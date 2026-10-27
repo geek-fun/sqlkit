@@ -69,11 +69,11 @@ const retryToolCall = (tool: AgentToolCall) => {
   emit('send', t('dataStudio.agent.message.retryPrompt', { tool: tool.toolName, args: tool.args }))
   forceScrollToBottom()
 }
+const currentTurnStart = computed(() => props.messages.reduce((index, message, current) => message.role === 'user' ? current : index, -1))
 const awaitingDecision = computed(() => {
   if (props.isLoading)
     return false
-  const lastUser = props.messages.reduce((index, message, current) => message.role === 'user' ? current : index, -1)
-  return props.messages.slice(lastUser + 1).some(message => message.toolCalls?.some(call => call.status === 'denied' && call.denial?.kind !== 'user'))
+  return props.messages.slice(currentTurnStart.value + 1).some(message => message.toolCalls?.some(call => call.status === 'denied' && call.denial?.kind !== 'user'))
 })
 
 // ── Smart scroll ──────────────────────────────────────────────────────
@@ -266,11 +266,12 @@ onBeforeUnmount(() => {
 
         <!-- Message bubbles -->
         <AgentMessageBubble
-          v-for="msg in messages"
+          v-for="(msg, index) in messages"
           :key="msg.id"
           :message="msg"
           :iteration-index="iterationIndexMap[msg.id]"
           :can-retry="!recoveryBusy"
+          :historical="index < currentTurnStart"
           @review-permissions="reviewingTool = $event"
           @retry-tool-call="retryToolCall"
         />
