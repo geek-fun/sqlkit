@@ -94,7 +94,7 @@ const selectPreset = (value: string) => {
     <fieldset v-if="!loading && loaded" :disabled="saving" class="p-0 border-0 max-w-lg min-w-0 space-y-4">
       <AccessLevelPicker id="ai-default-preset" :model-value="preset" :disabled="saving" @update:model-value="selectPreset" />
       <div v-if="preset === 'custom'" class="border-t border-border">
-        <div v-for="action in AI_ACTIONS" :key="action" class="py-3 border-b border-border flex gap-4 items-center justify-between last:border-b-0">
+        <div v-for="action in AI_ACTIONS" :key="action" class="py-2 border-b border-border flex gap-4 items-center justify-between last:border-b-0">
           <Label :for="`ai-default-${action}`" class="leading-snug">{{ t(`aiPermissions.${action}`) }}</Label>
           <div class="flex shrink-0 gap-3 items-center">
             <span class="text-xs text-muted-foreground">{{ t(rules[action] ? 'aiPermissions.allow' : 'aiPermissions.deny') }}</span>

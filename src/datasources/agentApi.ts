@@ -1,3 +1,4 @@
+import type { AccessDenial } from '@/common/aiPermissions'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { jsonify } from '@/common/jsonify'
@@ -19,6 +20,14 @@ export type AgentMessage = {
   role: string
   content: string
   created_at: string
+  tool_calls?: Array<{
+    id: string
+    tool_name: string
+    arguments: string
+    status: string
+    result?: string | null
+    denial?: AccessDenial | null
+  }>
 }
 
 export type ToolEnvelope = {
@@ -261,11 +270,17 @@ export const agentApi = {
       envelope: ToolEnvelope
       error?: boolean
       denied?: boolean
+      denial?: AccessDenial
       tool_name?: string
       arguments?: unknown
     }) => void,
   ): Promise<() => void> =>
     listen('agent-loop-tool-result', e => handler(e.payload as any)),
+
+  onAgentLoopBlocked: (
+    handler: (payload: { session_id: string, tool_call_id: string, denial: AccessDenial }) => void,
+  ): Promise<() => void> =>
+    listen('agent-loop-blocked', e => handler(e.payload as any)),
 
   onAgentLoopToolRetry: (
     handler: (payload: {

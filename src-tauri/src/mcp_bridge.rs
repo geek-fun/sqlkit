@@ -398,7 +398,7 @@ async fn invoke_with_policy(policy: &AiPolicy, payload: InvokeRequest) -> Invoke
     } else {
         check_policy(cap, policy, payload.connection_id.as_deref())
     } {
-        return InvokeResponse::error(403, msg);
+        return InvokeResponse::error(403, crate::ai_permissions::display_denial(&msg));
     }
 
     let config = payload

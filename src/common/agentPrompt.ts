@@ -10,6 +10,17 @@ export type SystemPromptLayers = {
   sidebarContext?: string
 }
 
+export const buildAgentModeInstructions = (auto: boolean): string[] => [
+  `## Mode: ${auto ? 'AUTO' : 'ASK'}`,
+  'Permitted read-only queries and metadata reads execute automatically in both modes.',
+  auto
+    ? 'Permitted inserts and updates execute automatically in AUTO mode.'
+    : 'Permitted inserts and updates require approval in ASK mode.',
+  'All permitted deletes and structure/administration changes require approval in both modes, including CREATE, ALTER, DROP, DELETE with or without WHERE, and TRUNCATE.',
+  'Submit the tool call so the application can apply current permissions and saved confirmation rules and display any required approval card. Do not substitute a conversational approval question for that card.',
+  'Approval does not grant a denied permission. If an action is blocked or rejected, do not retry it or use another tool to bypass the decision. Wait for an explicit user request to retry.',
+]
+
 const isNonEmpty = (value: string | undefined | null): value is string => Boolean(value?.trim())
 
 export const assembleSystemPrompt = (layers: SystemPromptLayers): string => {

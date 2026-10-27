@@ -28,6 +28,16 @@ The host-hook API is introduced by [data-studio-agent #35](https://github.com/ge
 
 Settings separate MCP service controls from the AI defaults shared by Data Studio and external MCP clients. Access levels use the existing settings radio pattern; a short description below the option group updates with the selected access level. Custom is an access choice that reveals individual actions; it edits the same values as the presets. Choosing Custom alone does not change permissions.
 
-Connection dialogs default to system inheritance. Each custom action offers Use default (with the current decision), Allow, or Deny, alongside its effective decision and source. Within the connection section, saved custom combinations show their action controls automatically. Choosing a preset sets explicit decisions for every action; choosing Use system default clears them.
+Connection dialogs group the agent prompt with the AI permissions section, separate from the SSL and SSH tunnel blocks. They default to system inheritance. Custom actions use switches: inherited actions show Use default (with the current decision), explicit actions show their decision with the connection source, and toggling sets an explicit decision. Within the connection section, saved custom combinations show their action controls automatically. Choosing a preset sets explicit decisions for every action; choosing Use system default clears them.
 
 Editing AI permission defaults and per-connection decisions requires the existing local Ultimate entitlement, including eligible version-locked releases. Community users see the existing upgrade prompt in connection dialogs. Ordinary connection edits preserve saved decisions. Permission cleanup after deletion remains available only when the connection no longer exists; it cannot reset the permissions of a saved connection.
+
+## Blocked actions and conversation history
+
+Ask and Auto both run permitted reads automatically. Ask requests approval for ordinary data writes; Auto runs them automatically. Both modes request approval for permitted deletes and structure/administration changes unless a saved confirmation rule applies. The application displays the approval card when the agent submits a tool call; model instructions do not replace that gate. Approval does not grant an action denied by the connection chain or conversation restrictions.
+
+A policy denial records the tool result and pauses the agent through the existing runtime cancellation boundary. The host persists the conversation as blocked and reports that state after the run has settled. Already dispatched work is not undone. Other unresolved calls show an unavailable outcome instead of success. Explicit user rejection remains distinct from a policy block.
+
+Each denied call retains a visible notice with its connection, required action, and decision source when recorded. Review permissions opens the existing system, connection, source, or confirmation-rule control. Saving never executes the blocked action. Retry request starts a new agent turn with the original tool arguments, fresh permissions, and normal confirmation; it does not replay earlier successful work automatically or bypass the application gate.
+
+History loads persisted tool-call statuses and correlated results rather than assuming every call succeeded. Denials and failures remain visible after reopening. Interrupted or missing outcomes are shown as unavailable; legacy records whose permission source was never recorded retain a generic permission notice.

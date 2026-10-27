@@ -110,7 +110,7 @@ fn intersect(a: &PermissionRules, b: &PermissionRules) -> PermissionRules {
 impl SessionAccess {
     pub fn confirmation_required(&self, risk: RiskLevel) -> Result<bool, String> {
         match self.rule.as_deref() {
-            Some("deny") => Err("Tool call denied by conversation rule".into()),
+            Some("deny") => Err(super::AccessDenial::rule().encode()),
             Some("allow") => Ok(false),
             _ => Ok(match risk {
                 RiskLevel::Safe => false,
