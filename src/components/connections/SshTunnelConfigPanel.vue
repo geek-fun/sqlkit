@@ -11,19 +11,10 @@ import { UPGRADE_URL } from '@/common'
 import SshProfileDialog from '@/components/connections/SshProfileDialog.vue'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { ProBadge } from '@/components/upgrade'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import { emptySshProfile, profileToTransportLayer, runSshTest, useSshProfileStore } from '@/store/sshProfileStore'
+import SshTunnelDetailsDialog from './SshTunnelDetailsDialog.vue'
 
 const props = defineProps<{
   modelValue?: SSHTunnelConfig
@@ -46,8 +37,9 @@ const profileStore = useSshProfileStore()
 const enabled = computed(() => props.modelValue?.enabled ?? false)
 const isGated = computed(() => !entitlementStore.isLocalUltimate)
 const detectedProxy = ref<string | null>(null)
-const configHosts = ref<Array<{ host: string, hostName?: string, port?: number, user?: string, identityFile?: string }>>([])
-const showConfigHosts = ref(false)
+const legacyDialogRef = ref<InstanceType<typeof SshTunnelDetailsDialog> | null>(null)
+const converting = ref(false)
+const conversionError = ref('')
 const profileDialogRef = ref<InstanceType<typeof SshProfileDialog> | null>(null)
 const testing = ref(false)
 const testResult = ref<TestSshResult | null>(null)
@@ -64,11 +56,6 @@ const unusedProfiles = computed(() =>
 
 const useSystemProxy = computed(() => props.modelValue?.useSystemProxy ?? false)
 
-/**
- * Legacy single-tunnel connections (pre-profiles schema): enabled with inline
- * fields and no hop chain. They keep editing their inline fields; new
- * configurations always go through profiles.
- */
 const legacyInline = computed(() =>
   enabled.value
   && (props.modelValue?.profileIds?.length ?? 0) === 0
@@ -118,7 +105,7 @@ function patch(value: Partial<SSHTunnelConfig>) {
 }
 
 function addHop(id: string) {
-  if (!id)
+  if (!id || legacyInline.value)
     return
   patch({ profileIds: [...(props.modelValue?.profileIds ?? []), id] })
 }
@@ -128,22 +115,17 @@ function addHop(id: string) {
  *  profile stays in the global store and can be re-added via the selector
  *  anytime — the profile itself is never deleted.
  */
-function detachHop(index: number) {
-  const ids = [...(props.modelValue?.profileIds ?? [])]
-  ids.splice(index, 1)
-  patch({ profileIds: ids })
+const detachHop = (index: number) => {
+  patch({ profileIds: (props.modelValue?.profileIds ?? []).filter((_, i) => i !== index) })
 }
 
-function moveHop(from: number, to: number) {
-  const ids = [...(props.modelValue?.profileIds ?? [])]
+const moveHop = (from: number, to: number) => {
+  const ids = props.modelValue?.profileIds ?? []
   if (from < 0 || to < 0 || from >= ids.length || to >= ids.length || from === to)
     return
-  const [moved] = ids.splice(from, 1)
-  ids.splice(to, 0, moved as string)
-  patch({ profileIds: ids })
+  const remaining = ids.filter((_, index) => index !== from)
+  patch({ profileIds: [...remaining.slice(0, to), ids[from]!, ...remaining.slice(to)] })
 }
-
-// ── Drag-to-reorder (SortableJS, DocKit-style drag handle) ──
 
 const hopListRef = ref<HTMLElement | null>(null)
 let sortable: Sortable | null = null
@@ -154,12 +136,15 @@ function initSortable() {
   sortable = Sortable.create(hopListRef.value, {
     animation: 150,
     handle: '.ssh-hop-handle',
-    // The reorder is committed through state (patch), never through the DOM
-    // mutation Sortable performed — Vue re-renders from profileIds.
     onEnd: (evt) => {
       const { oldIndex, newIndex } = evt
       if (oldIndex === undefined || newIndex === undefined || oldIndex === newIndex)
         return
+      const parent = evt.item.parentNode
+      if (parent) {
+        parent.removeChild(evt.item)
+        parent.insertBefore(evt.item, parent.children[oldIndex] ?? null)
+      }
       moveHop(oldIndex, newIndex)
     },
   })
@@ -170,20 +155,16 @@ function destroySortable() {
   sortable = null
 }
 
-watch(() => hopProfiles.value.length, (count, previous) => {
-  // The list mounts when the chain goes from empty to populated; re-init then.
-  if (count > 0 && !previous)
-    requestAnimationFrame(initSortable)
-})
-
-onMounted(() => {
-  if (hopProfiles.value.length > 0)
-    initSortable()
-})
+watch(hopListRef, () => {
+  destroySortable()
+  initSortable()
+}, { flush: 'post' })
 
 onBeforeUnmount(destroySortable)
 
 function openNewProfile() {
+  if (legacyInline.value)
+    return
   profileDialogRef.value?.show()
 }
 
@@ -199,25 +180,40 @@ function onProfileSaved(profile: SshProfile) {
     addHop(profile.id)
 }
 
-/** Convert a legacy inline config into a reusable profile and hop onto it. */
-async function convertLegacyToProfile() {
-  const mv = props.modelValue
-  if (!mv)
+const openLegacyDetails = () => {
+  if (props.modelValue)
+    legacyDialogRef.value?.show(props.modelValue)
+}
+
+const detachLegacy = () => patch({ host: '', username: '', privateKey: '', password: '', privateKeyPassphrase: '' })
+
+const convertLegacyToProfile = async () => {
+  const config = props.modelValue
+  if (!config || !legacyInline.value || converting.value)
     return
-  const saved = await profileStore.save({
-    ...emptySshProfile(),
-    name: t('components.serverForm.ssh.convertedProfileName', { host: mv.host || 'SSH' }),
-    host: mv.host || '',
-    port: mv.port ?? 22,
-    username: mv.username || '',
-    authMethod: mv.authMethod === 'privateKey' ? 'key' : (mv.authMethod || 'password'),
-    password: mv.password || '',
-    keyPath: mv.privateKey || '',
-    keyPassphrase: mv.privateKeyPassphrase || '',
-  })
-  // Reset inline fields and hop onto the new profile — the chain now owns
-  // the credentials and the inline shape stays cleared.
-  patch({ profileIds: [saved.id], host: '', username: '', privateKey: '', password: '', privateKeyPassphrase: '' })
+  converting.value = true
+  conversionError.value = ''
+  try {
+    const saved = await profileStore.save({
+      ...emptySshProfile(),
+      name: t('components.serverForm.ssh.convertedProfileName', { host: config.host || 'SSH' }),
+      host: config.host || '',
+      port: config.port ?? 22,
+      username: config.username || '',
+      authMethod: config.authMethod === 'privateKey' ? 'key' : (config.authMethod || 'password'),
+      password: config.password || '',
+      keyPath: config.privateKey || '',
+      keyPassphrase: config.privateKeyPassphrase || '',
+      useSshAgent: config.authMethod === 'agent',
+    })
+    patch({ profileIds: [saved.id], host: '', username: '', privateKey: '', password: '', privateKeyPassphrase: '' })
+  }
+  catch (error) {
+    conversionError.value = String(error)
+  }
+  finally {
+    converting.value = false
+  }
 }
 
 type TestSshResult = {
@@ -255,29 +251,6 @@ async function testFirstHop() {
   finally {
     testing.value = false
   }
-}
-
-async function loadConfigHosts() {
-  try {
-    configHosts.value = await invoke('list_ssh_config_hosts')
-    showConfigHosts.value = true
-  }
-  catch {
-    configHosts.value = []
-    showConfigHosts.value = true
-  }
-}
-
-function applyConfigHost(host: { host: string, hostName?: string, port?: number, user?: string, identityFile?: string }) {
-  patch({
-    enabled: true,
-    host: host.hostName || host.host,
-    port: host.port ?? 22,
-    username: host.user ?? '',
-    authMethod: host.identityFile ? 'privateKey' : 'password',
-    privateKey: host.identityFile ?? '',
-  })
-  showConfigHosts.value = false
 }
 
 /**
@@ -351,6 +324,7 @@ onMounted(detectProxy)
         <div class="ml-auto max-w-[320px] min-w-0 w-[280px]">
           <SearchableSelect
             model-value=""
+            :disabled="legacyInline"
             :options="unusedProfiles.map(p => ({ label: `${p.name} (${p.username}@${p.host})`, value: p.id }))"
             :search-threshold="0"
             :placeholder="t('components.serverForm.ssh.addProfilePlaceholder')"
@@ -364,6 +338,7 @@ onMounted(detectProxy)
           type="button"
           class="shrink-0 h-7 w-7"
           :title="t('components.serverForm.ssh.newProfile')"
+          :disabled="legacyInline"
           @click="openNewProfile"
         >
           <Plus class="h-4 w-4" />
@@ -487,6 +462,14 @@ onMounted(detectProxy)
                 {{ profile.username }}@{{ profile.host }}:{{ profile.port }}
               </div>
             </div>
+            <template v-if="hopProfiles.length > 1">
+              <Button variant="ghost" size="icon" type="button" class="shrink-0 h-6 w-6" :disabled="index === 0" :aria-label="t('components.serverForm.ssh.moveUp')" :title="t('components.serverForm.ssh.moveUp')" @click="moveHop(index, index - 1)">
+                <span class="i-carbon-chevron-up h-3.5 w-3.5" />
+              </Button>
+              <Button variant="ghost" size="icon" type="button" class="shrink-0 h-6 w-6" :disabled="index === hopProfiles.length - 1" :aria-label="t('components.serverForm.ssh.moveDown')" :title="t('components.serverForm.ssh.moveDown')" @click="moveHop(index, index + 1)">
+                <span class="i-carbon-chevron-down h-3.5 w-3.5" />
+              </Button>
+            </template>
             <Button variant="ghost" size="icon" type="button" class="h-6 w-6" :title="t('components.serverForm.ssh.editProfile')" @click="openEditProfile(profile)">
               <Pencil class="h-3.5 w-3.5" />
             </Button>
@@ -504,6 +487,38 @@ onMounted(detectProxy)
         </div>
       </div>
 
+      <div v-if="legacyInline" class="space-y-2">
+        <div class="px-2.5 py-1.5 border rounded-md bg-background flex gap-2 items-center">
+          <span class="text-[10px] text-muted-foreground font-bold shrink-0 w-4">1</span>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate">
+              {{ props.modelValue?.host }}
+            </div>
+            <div class="text-xs text-muted-foreground truncate">
+              {{ props.modelValue?.username }}@{{ props.modelValue?.host }}:{{ props.modelValue?.port ?? 22 }}
+            </div>
+          </div>
+          <Button variant="ghost" size="icon" type="button" class="shrink-0 h-6 w-6" :disabled="converting" :aria-label="t('components.serverForm.ssh.editTunnel')" :title="t('components.serverForm.ssh.editTunnel')" @click="openLegacyDetails">
+            <Pencil class="h-3.5 w-3.5" />
+          </Button>
+          <Button variant="ghost" size="icon" type="button" class="text-muted-foreground shrink-0 h-6 w-6 hover:text-destructive-text" :disabled="converting" :aria-label="t('components.serverForm.ssh.detachAction')" :title="t('components.serverForm.ssh.detachAction')" @click="detachLegacy">
+            <span class="i-carbon-unlink h-3.5 w-3.5" />
+          </Button>
+        </div>
+        <div class="flex flex-wrap gap-2 items-center justify-between">
+          <p class="text-xs text-muted-foreground flex-1 min-w-48">
+            {{ t('components.serverForm.ssh.convertHint') }}
+          </p>
+          <Button variant="outline" type="button" size="sm" :disabled="converting" @click="convertLegacyToProfile">
+            <span v-if="converting" class="i-carbon-circle-dash h-3.5 w-3.5 animate-spin" />
+            {{ t('components.serverForm.ssh.convertToProfile') }}
+          </Button>
+        </div>
+        <p v-if="conversionError" role="alert" class="text-sm text-destructive-text break-words">
+          {{ conversionError }}
+        </p>
+      </div>
+
       <!-- Chain preview: proxy → hops → target -->
       <p v-if="chainSegments.length > 1" class="text-[11px] text-muted-foreground font-mono break-words">
         {{ chainSegments.join('  →  ') }}
@@ -512,97 +527,7 @@ onMounted(detectProxy)
         {{ t('components.serverForm.ssh.hopOrderHint') }}
       </p>
 
-      <!-- Legacy manual (inline) config — pre-profiles connections keep editing
-         their inline fields; new configurations always go through profiles -->
-      <template v-if="legacyInline">
-        <p class="text-[11px] text-amber-600 dark:text-amber-400">
-          {{ t('components.serverForm.ssh.legacyManual') }}
-        </p>
-        <div class="space-y-2">
-          <Label for="ssh-host">{{ t('components.serverForm.ssh.sshHost') }}</Label>
-          <Input id="ssh-host" :model-value="props.modelValue?.host" placeholder="ssh.example.com" @update:model-value="(v: string | number) => patch({ host: String(v) })" />
-        </div>
-
-        <div class="gap-4 grid grid-cols-2">
-          <div class="space-y-2">
-            <Label for="ssh-port">{{ t('components.serverForm.ssh.sshPort') }}</Label>
-            <Input id="ssh-port" :model-value="props.modelValue?.port ?? 22" type="number" placeholder="22" @update:model-value="(v: string | number) => patch({ port: Number(v) })" />
-          </div>
-          <div class="space-y-2">
-            <Label for="ssh-user">{{ t('components.serverForm.ssh.username') }}</Label>
-            <Input id="ssh-user" :model-value="props.modelValue?.username" placeholder="username" autocomplete="off" @update:model-value="(v: string | number) => patch({ username: String(v) })" />
-          </div>
-        </div>
-
-        <div class="space-y-2">
-          <Label for="ssh-auth">{{ t('components.serverForm.ssh.authMethod') }}</Label>
-          <Select :model-value="props.modelValue?.authMethod ?? 'password'" @update:model-value="(v: string | number) => patch({ authMethod: String(v) as SSHTunnelConfig['authMethod'] })">
-            <SelectTrigger id="ssh-auth">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectGroup>
-                <SelectItem value="password">
-                  {{ t('components.serverForm.ssh.password') }}
-                </SelectItem>
-                <SelectItem value="privateKey">
-                  {{ t('components.serverForm.ssh.privateKey') }}
-                </SelectItem>
-                <SelectItem value="agent">
-                  {{ t('components.serverForm.ssh.sshAgent') }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <template v-if="(props.modelValue?.authMethod ?? 'password') === 'password'">
-          <div class="space-y-2">
-            <Label for="ssh-password">{{ t('components.serverForm.ssh.sshPassword') }}</Label>
-            <Input id="ssh-password" :model-value="props.modelValue?.password" type="password" autocomplete="off" @update:model-value="(v: string | number) => patch({ password: String(v) })" />
-          </div>
-        </template>
-
-        <template v-if="props.modelValue?.authMethod === 'privateKey'">
-          <div class="space-y-2">
-            <Label for="ssh-key">{{ t('components.serverForm.ssh.privateKeyPath') }}</Label>
-            <Input id="ssh-key" :model-value="props.modelValue?.privateKey" placeholder="/path/to/id_rsa" @update:model-value="(v: string | number) => patch({ privateKey: String(v) })" />
-          </div>
-          <div class="space-y-2">
-            <Label for="ssh-passphrase">{{ t('components.serverForm.ssh.passphraseOptional') }}</Label>
-            <Input id="ssh-passphrase" :model-value="props.modelValue?.privateKeyPassphrase" type="password" autocomplete="off" @update:model-value="(v: string | number) => patch({ privateKeyPassphrase: String(v) })" />
-          </div>
-        </template>
-
-        <template v-if="props.modelValue?.authMethod === 'agent'">
-          <p class="text-sm text-muted-foreground">
-            {{ t('components.serverForm.ssh.agentHelpText') }}
-          </p>
-        </template>
-
-        <div class="flex flex-wrap gap-2 items-center">
-          <Button variant="outline" type="button" size="sm" @click="loadConfigHosts">
-            {{ t('components.serverForm.ssh.importFromConfig') }}
-          </Button>
-          <Button variant="outline" type="button" size="sm" @click="convertLegacyToProfile">
-            {{ t('components.serverForm.ssh.convertToProfile') }}
-          </Button>
-        </div>
-        <div v-if="showConfigHosts" class="border rounded-md max-h-40 overflow-y-auto divide-y">
-          <button
-            v-for="host in configHosts"
-            :key="host.host"
-            type="button"
-            class="text-sm px-3 py-1.5 text-left w-full hover:bg-muted"
-            @click="applyConfigHost(host)"
-          >
-            {{ host.host }}
-            <span class="text-xs text-muted-foreground ml-1">
-              {{ host.user ? `${host.user}@` : '' }}{{ host.hostName || '' }}{{ host.port ? `:${host.port}` : '' }}
-            </span>
-          </button>
-        </div>
-      </template>
+      <SshTunnelDetailsDialog ref="legacyDialogRef" @save="patch" />
 
       <SshProfileDialog ref="profileDialogRef" @save="onProfileSaved" />
     </template>
