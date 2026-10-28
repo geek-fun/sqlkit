@@ -7,9 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-28
+
 ### Added
 
+- AI permissions use one policy across Data Studio and MCP clients: a per-connection access level overrides the system default, and individual actions can be tuned in Custom. Editing permissions requires Ultimate.
+- Blocked agent actions can be recovered in place — the denial names the connection, required action, and source, with Review permissions and Retry request that starts a fresh turn without replaying earlier work.
+- Layered agent prompts: a global system prompt in AI settings plus an optional prompt per connection give the agent business context wherever it runs (#187).
+- Query results and table views are paginated — choose rows per page, jump to the first or last page, or show all returned rows. Sorting applies to the visible page.
+- Table and result footers show the active database, affected rows, execution time, and per-tab counts for columns, indexes, foreign keys, and triggers.
+- Table context menus lead with View Data and open View Structure directly on the schema sub-page; each tab remembers the sub-page you last viewed.
+- Database menus gain Create Script, which opens a new query tab for that database.
 - Cheaper Inference provider preset in AI settings (OpenAI compatible, base URL `https://api.cheaperinference.com/v1`)
+
+### Changed
+
+- The workspace uses a graphite dark theme with consistent semantic colors, while keeping existing data, status, and database-type recognition cues.
+- Settings consolidates account, plan, theme, and update controls into a General tab, and pagination uses the same controls in table views and result grids.
+- SSH tunnel details are read-only until you explicitly edit them, so saved hop chains no longer show open editable fields in the connection form.
+- Monaco scrollbars match the app's thin scrollbars.
+
+### Fixed
+
+- Sessions now survive app restarts: you stay signed in with entitlements restored, and overlapping session refreshes no longer invalidate each other.
+- Idle connections recover before a database action runs — metadata browsing, queries, edits, DDL, transfers, and AI/MCP tools replace a dead session instead of failing.
+- PostgreSQL scripts that return multiple result sets keep all of them and let you switch between result sets.
+- Permission changes apply immediately to agent dispatches, and earlier denials remain labeled as previous attempts instead of implying current access.
+- About shows the running app version and is consolidated into Settings.
+- The source permission modal follows the permission editor's radio cards and switch rows, with an explicit detach confirmation (#199).
+
+### Security
+
+- Upgraded DOMPurify to pick up upstream security fixes, including the copy bundled with Monaco.
+- Removed an unused command that allowed generic capability invocation from the WebView, and limited permission cleanup to connections that no longer exist.
 
 ## [1.0.0] - 2026-10-18
 
