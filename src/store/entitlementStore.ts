@@ -1,7 +1,11 @@
 import type { EntitlementView, SessionPhase } from '../common'
 import { invoke } from '@tauri-apps/api/core'
 import { defineStore } from 'pinia'
-import { isEntitlementError, isSessionRejected, sessionPhaseFromTokens } from '../common'
+import {
+  isEntitlementError,
+  isSessionRejected,
+  sessionPhaseFromTokens,
+} from '../common'
 import { useAccountStore } from './accountStore'
 import { useDeviceStore } from './deviceStore'
 
@@ -13,7 +17,10 @@ const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 // Terminal failure without a cached view — a synthetic answer so the UI
 // lands on Unknown (with its retry CTA) instead of an endless Checking…
-function unknownView(lastError: string, sessionPhase: SessionPhase): EntitlementView {
+function unknownView(
+  lastError: string,
+  sessionPhase: SessionPhase,
+): EntitlementView {
   return {
     ultimateActive: false,
     versionLocked: false,
@@ -77,19 +84,20 @@ export const useEntitlementStore = defineStore('entitlement', {
     async clearSessionState(): Promise<void> {
       const accountStore = useAccountStore()
       const lease = accountStore.refreshToken || null
-      await this.clearCachedEntitlement()
       accountStore.clearAuth()
+      this.sessionRejections = 0
       useDeviceStore().$reset()
       void invoke('revoke_session', { refreshToken: lease }).catch(() => {})
+      await this.clearCachedEntitlement()
     },
     async handleSessionLoss(): Promise<void> {
       const accountStore = useAccountStore()
       const hadIdentity = accountStore.isLoggedIn
-      await this.clearSessionState()
-      this.sessionRejections = 0
+      const clearing = this.clearSessionState()
       if (hadIdentity) {
         this.sessionLostNotice = Date.now()
       }
+      await clearing
     },
     async resolveSessionRejection(): Promise<void> {
       this.sessionRejections += 1
@@ -101,40 +109,56 @@ export const useEntitlementStore = defineStore('entitlement', {
     },
     async attemptSessionRecovery(): Promise<'recovered' | 'lost'> {
       const accountStore = useAccountStore()
+      const revision = accountStore.sessionRevision
       const lease = accountStore.refreshToken || ''
       if (lease.trim()) {
         try {
-          const refreshed = await invoke<{ access_token: string, refresh_token: string }>(
-            'rotate_session_now',
-            { refreshToken: lease },
+          const refreshed = await invoke<{
+            access_token: string
+            refresh_token: string
+          }>('rotate_session_now', { refreshToken: lease })
+          if (accountStore.sessionRevision !== revision)
+            return 'recovered'
+          accountStore.applySessionRefresh(
+            lease,
+            refreshed.access_token,
+            refreshed.refresh_token,
           )
-          accountStore.setToken(refreshed.access_token)
-          accountStore.setRefreshToken(refreshed.refresh_token)
           this.sessionRejections = 0
         }
         catch (e) {
+          if (accountStore.sessionRevision !== revision)
+            return 'recovered'
+          if (accountStore.refreshToken !== lease)
+            return 'recovered'
           if (isSessionRejected(e)) {
             await this.resolveSessionRejection()
             return 'lost'
           }
         }
       }
-      return (await this.refreshEntitlement(true)) === 'lost' ? 'lost' : 'recovered'
+      return (await this.refreshEntitlement(true)) === 'lost'
+        ? 'lost'
+        : 'recovered'
     },
     async seedFromHandoff(payload: {
       ultimateExpiresAt?: string | null
       versionLockHorizon?: string | null
       cancelScheduledAt?: string | null
     }): Promise<void> {
-      const { ultimateExpiresAt, versionLockHorizon, cancelScheduledAt } = payload
+      const revision = useAccountStore().sessionRevision
+      const { ultimateExpiresAt, versionLockHorizon, cancelScheduledAt }
+        = payload
       if (!ultimateExpiresAt && !versionLockHorizon)
         return
       try {
-        this.view = await invoke<EntitlementView>('seed_entitlement', {
+        const seeded = await invoke<EntitlementView>('seed_entitlement', {
           ultimateExpiresAt: ultimateExpiresAt ?? null,
           versionLockHorizon: versionLockHorizon ?? null,
           cancelScheduledAt: cancelScheduledAt ?? null,
         })
+        if (useAccountStore().sessionRevision === revision)
+          this.view = seeded
       }
       catch {
         // best effort — the refresh below still verifies
@@ -142,27 +166,52 @@ export const useEntitlementStore = defineStore('entitlement', {
     },
     // only a real server answer (fetchedAtMs) may surface as a confirmed plan
     async hydrate(): Promise<void> {
+      const revision = useAccountStore().sessionRevision
       if (!useAccountStore().isLoggedIn) {
         this.view = null
         return
       }
-      const cached = await invoke<EntitlementView>('get_entitlement', { tokenPresent: true }).catch(() => null)
+      const cached = await invoke<EntitlementView>('get_entitlement', {
+        tokenPresent: true,
+      }).catch(() => null)
+      if (useAccountStore().sessionRevision !== revision)
+        return
       if (cached?.fetchedAtMs != null)
         this.view = cached
     },
     async refreshEntitlement(force = false): Promise<'ok' | 'lost'> {
       const accountStore = useAccountStore()
+      const revision = accountStore.sessionRevision
       if (!accountStore.isLoggedIn) {
         await this.clearCachedEntitlement()
         return 'ok'
       }
       for (let attempt = 0; ; attempt += 1) {
+        if (accountStore.sessionRevision !== revision)
+          return 'ok'
+        const lease = accountStore.refreshToken
         try {
           const view = await invoke<EntitlementView>('refresh_entitlement', {
             token: accountStore.token,
             refreshToken: accountStore.refreshToken || null,
             force,
           })
+          if (accountStore.sessionRevision !== revision)
+            return 'ok'
+          if (view.refreshedSession) {
+            const rotated = view.refreshedSession
+            accountStore.applySessionRefresh(
+              rotated.previous_refresh_token,
+              rotated.access_token,
+              rotated.refresh_token,
+            )
+          }
+          if (
+            view.sessionPhase === 'expired'
+            && accountStore.refreshToken !== lease
+          ) {
+            return 'ok'
+          }
           this.view = view
           if (view.sessionPhase === 'expired') {
             await this.handleSessionLoss()
@@ -172,7 +221,11 @@ export const useEntitlementStore = defineStore('entitlement', {
           return 'ok'
         }
         catch (e) {
+          if (accountStore.sessionRevision !== revision)
+            return 'ok'
           if (isSessionRejected(e)) {
+            if (accountStore.refreshToken !== lease)
+              return 'ok'
             await this.resolveSessionRejection()
             return 'lost'
           }
@@ -183,7 +236,9 @@ export const useEntitlementStore = defineStore('entitlement', {
               this.view = unknownView(
                 isEntitlementError(e)
                   ? 'entitlement check failed'
-                  : typeof e === 'string' ? e : String(e),
+                  : typeof e === 'string'
+                    ? e
+                    : String(e),
                 'signed-in',
               )
             }
@@ -194,13 +249,13 @@ export const useEntitlementStore = defineStore('entitlement', {
       }
     },
     async clearCachedEntitlement(): Promise<void> {
+      this.view = null
       try {
         await invoke<EntitlementView>('clear_entitlement')
       }
       catch {
         // best effort — the local view reset below always applies
       }
-      this.view = null
     },
   },
 })

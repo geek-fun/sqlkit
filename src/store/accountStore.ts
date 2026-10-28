@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 
 type AccountState = {
+  sessionRevision: number
   token: string
   /**
    * Device-bound 30-day lease (geekfun#59) — lives with the session so a
@@ -17,6 +18,7 @@ type AccountState = {
 
 export const useAccountStore = defineStore('account', {
   state: (): AccountState => ({
+    sessionRevision: 0,
     token: '',
     refreshToken: '',
     username: '',
@@ -24,12 +26,18 @@ export const useAccountStore = defineStore('account', {
     userId: '',
     avatar: '',
   }),
-  persist: true,
+  persist: { pick: ['token', 'refreshToken', 'username', 'email', 'userId', 'avatar'] },
   getters: {
     isLoggedIn: (state): boolean => state.token.length > 0,
   },
   actions: {
+    applySessionRefresh(previousRefreshToken: string, accessToken: string, refreshToken: string): void {
+      if (!this.isLoggedIn || !previousRefreshToken || this.refreshToken !== previousRefreshToken)
+        return
+      this.$patch({ token: accessToken, refreshToken })
+    },
     setAuth(token: string, username: string, email: string, userId = '', avatar = '') {
+      this.sessionRevision += 1
       this.token = token
       this.username = username
       this.email = email
@@ -45,6 +53,7 @@ export const useAccountStore = defineStore('account', {
       this.refreshToken = token
     },
     clearAuth() {
+      this.sessionRevision += 1
       this.token = ''
       this.refreshToken = ''
       this.username = ''
