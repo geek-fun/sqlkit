@@ -66,12 +66,15 @@ pub struct ActivatedResult {
     pub device_id: String,
     pub limit: u32,
     pub used: u32,
-    /// Device-bound 30-day lease — persisted into the session store.
-    /// The backend keeps `access_token`-style snake_case for token fields;
-    /// `refreshToken` is aliased because camelCase responses were observed
-    /// in the wild and a silent None here is what kills session renewal.
-    #[serde(rename = "refresh_token", alias = "refreshToken", default)]
+    /// Accept the API's snake_case token and expose camelCase over IPC.
+    #[serde(alias = "refresh_token", default)]
     pub refresh_token: Option<String>,
+    #[serde(
+        alias = "access_token",
+        default,
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub access_token: Option<String>,
 }
 
 fn device_limit_error(info: &DeviceLimitInfo) -> String {
@@ -196,6 +199,7 @@ pub async fn activate_device(
     }
     let payload = state.payload();
 
+    let mut rotated_access = None;
     let mut attempt = post_activate(&token, &payload, replace_device_id.as_deref()).await;
     if let ActivateAttempt::Unauthorized = attempt {
         let lease = refresh_token.as_deref().unwrap_or("").trim();
@@ -206,6 +210,7 @@ pub async fn activate_device(
                     json!({
                         "accessToken": refreshed.access_token,
                         "refreshToken": refreshed.refresh_token,
+                        "previousRefreshToken": refreshed.previous_refresh_token,
                     }),
                 );
                 attempt = post_activate(
@@ -214,6 +219,7 @@ pub async fn activate_device(
                     replace_device_id.as_deref(),
                 )
                 .await;
+                rotated_access = Some(refreshed.access_token);
             }
         }
     }
@@ -221,7 +227,10 @@ pub async fn activate_device(
     match attempt {
         // The device-bound lease rides back to the frontend, which persists
         // it alongside the rest of the account session.
-        ActivateAttempt::Ok(result) => Ok(result),
+        ActivateAttempt::Ok(mut result) => {
+            result.access_token = rotated_access;
+            Ok(result)
+        }
         ActivateAttempt::LimitReached(info) => Err(device_limit_error(&info)),
         ActivateAttempt::Unauthorized => Err("session expired — please sign in again".to_string()),
         ActivateAttempt::Failed(message) => Err(message),
@@ -296,6 +305,9 @@ mod tests {
         });
         let result: ActivatedResult = serde_json::from_value(raw).expect("result");
         assert_eq!(result.refresh_token.as_deref(), Some("opaque-lease"));
+        let ipc = serde_json::to_value(&result).expect("IPC result");
+        assert_eq!(ipc["refreshToken"], "opaque-lease");
+        assert!(ipc.get("refresh_token").is_none());
 
         // camelCase lease responses must land too — a silent None here is
         // exactly what broke session renewal in the field.

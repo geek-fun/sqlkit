@@ -4,9 +4,19 @@ export const SSH_TUNNEL_STRIPPED_ERROR_TYPE = 'SSH_TUNNEL_STRIPPED'
 
 export const UPGRADE_URL = 'https://www.geekfun.club/pricing'
 
-export type PaidFeature = 'ai' | 'er_diagram' | 'transfer' | 'ssh_tunnel' | 'mcp_bridge'
+export type PaidFeature
+  = | 'ai'
+    | 'er_diagram'
+    | 'transfer'
+    | 'ssh_tunnel'
+    | 'mcp_bridge'
 
 export type EntitlementView = {
+  refreshedSession?: {
+    access_token: string
+    refresh_token: string
+    previous_refresh_token: string
+  }
   ultimateActive: boolean
   versionLocked: boolean
   localUltimate: boolean
