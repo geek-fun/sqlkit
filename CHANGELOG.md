@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Runcrate provider preset in AI settings (OpenAI compatible, base URL `https://api.runcrate.ai/v1`)
+
 ## [1.0.1] - 2026-10-28
 
 ### Added

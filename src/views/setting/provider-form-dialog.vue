@@ -54,6 +54,7 @@ const presets = computed<Preset[]>(() => [
   { id: 'opper', name: 'Opper', apiCompatibility: 'openai', baseUrl: 'https://api.opper.ai/v3/compat', kind: 'opper' },
   { id: 'api-route', name: 'API Route', apiCompatibility: 'openai', baseUrl: 'https://global.api-route.com/v1', kind: 'api-route' },
   { id: 'cheaper-inference', name: 'Cheaper Inference', apiCompatibility: 'openai', baseUrl: 'https://api.cheaperinference.com/v1', kind: 'cheaper-inference' },
+  { id: 'runcrate', name: 'Runcrate', apiCompatibility: 'openai', baseUrl: 'https://api.runcrate.ai/v1', kind: 'runcrate' },
   { id: 'anthropic', name: 'Anthropic', apiCompatibility: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', kind: 'anthropic' },
   { id: 'gemini', name: 'Google Gemini', apiCompatibility: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', kind: 'gemini' },
   { id: 'grok', name: 'Grok', apiCompatibility: 'openai', baseUrl: 'https://api.x.ai/v1', kind: 'grok' },
