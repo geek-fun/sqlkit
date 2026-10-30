@@ -266,7 +266,7 @@ defineExpose({ refresh })
   border-radius: 999px;
   background: hsl(var(--background));
   color: hsl(var(--muted-foreground));
-  font-size: 11px;
+  font-size: var(--font-size-dense);
   font-variant-numeric: tabular-nums;
   line-height: 1;
   cursor: pointer;
@@ -297,7 +297,7 @@ defineExpose({ refresh })
   border-radius: 4px;
   background: hsl(38 92% 48% / 0.18);
   color: hsl(38 92% 38%);
-  font-size: 9px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
   letter-spacing: 0.06em;
   line-height: 1.4;
@@ -313,7 +313,7 @@ defineExpose({ refresh })
   border-radius: 6px;
   background: hsl(38 92% 48% / 0.08);
   color: hsl(38 92% 30%);
-  font-size: 11px;
+  font-size: var(--font-size-dense);
   line-height: 1.4;
 }
 
@@ -368,7 +368,7 @@ defineExpose({ refresh })
   background: hsl(var(--popover));
   color: hsl(var(--popover-foreground));
   box-shadow: 0 8px 24px hsl(0 0% 0% / 0.12);
-  font-size: 12px;
+  font-size: var(--font-size-dense);
 }
 
 .context-indicator__popover-header {
@@ -384,7 +384,7 @@ defineExpose({ refresh })
 }
 
 .context-indicator__popover-model {
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   color: hsl(var(--muted-foreground));
   max-width: 140px;
   overflow: hidden;
@@ -406,7 +406,7 @@ defineExpose({ refresh })
 }
 
 .context-indicator__grid dt {
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   color: hsl(var(--muted-foreground));
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -432,7 +432,7 @@ defineExpose({ refresh })
   border-radius: 6px;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-size: 11px;
+  font-size: var(--font-size-dense);
   cursor: pointer;
   transition:
     background-color 120ms ease,

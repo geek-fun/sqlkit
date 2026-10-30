@@ -537,7 +537,7 @@ watch(sortableColumns, (columns) => {
          instead of the whole bar disappearing -->
     <div
       v-if="!hideToolbar"
-      class="px-3 py-1 border-b bg-muted/20 flex flex-shrink-0 gap-1 items-center"
+      class="px-3 border-b bg-muted/20 flex flex-shrink-0 gap-1 h-9 items-center"
     >
       <Button variant="ghost" size="sm" class="text-xs px-2 h-6" :disabled="sortedRows.length === 0" @click="copyAllAs('csv')">
         {{ $t('components.dataGrid.export.copyAllCsv') }}
@@ -653,7 +653,7 @@ watch(sortableColumns, (columns) => {
                 class="flex gap-1.5 min-w-0 items-baseline"
               >
                 <span class="text-xs font-medium shrink-0 truncate" :class="columnTypes?.[col] ? 'max-w-[70%]' : 'max-w-full'" :title="col">{{ col }}</span>
-                <span v-if="columnTypes?.[col]" class="column-type text-[10px] text-foreground/60 font-mono font-normal max-w-24 min-w-0 truncate" :title="columnTypes[col]">
+                <span v-if="columnTypes?.[col]" class="column-type text-caption text-foreground/60 font-mono font-normal max-w-24 min-w-0 truncate" :title="columnTypes[col]">
                   {{ columnTypes?.[col] }}
                 </span>
               </span>
@@ -677,7 +677,7 @@ watch(sortableColumns, (columns) => {
                 <!-- Multi-sort priority -->
                 <span
                   v-if="isMultiSort && sort.getSortPriority(col)"
-                  class="text-[10px] text-primary-text leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
+                  class="text-caption text-primary-text leading-tight font-bold px-1 rounded bg-primary/10 flex-shrink-0"
                 >{{ sort.getSortPriority(col) }}</span>
                 <!-- Filter indicator -->
                 <span
@@ -695,7 +695,7 @@ watch(sortableColumns, (columns) => {
             >
               <span class="flex gap-1.5 min-w-0 items-baseline">
                 <span class="text-xs font-medium shrink-0 truncate" :class="columnTypes?.[col] ? 'max-w-[70%]' : 'max-w-full'" :title="col">{{ col }}</span>
-                <span v-if="columnTypes?.[col]" class="column-type text-[10px] text-foreground/60 font-mono font-normal max-w-24 min-w-0 truncate" :title="columnTypes[col]">
+                <span v-if="columnTypes?.[col]" class="column-type text-caption text-foreground/60 font-mono font-normal max-w-24 min-w-0 truncate" :title="columnTypes[col]">
                   {{ columnTypes?.[col] }}
                 </span>
               </span>
@@ -809,7 +809,7 @@ watch(sortableColumns, (columns) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  class="text-[10px] text-primary-text px-1 flex-shrink-0 h-5"
+                  class="text-caption text-primary-text px-1 flex-shrink-0 h-6"
                   @click.stop="openJsonDialog(sortedRows[virtualRow.index][col], col)"
                 >{{ $t('components.dataGrid.json.expand') }}</Button>
               </span>
@@ -832,35 +832,35 @@ watch(sortableColumns, (columns) => {
             >
               <DropdownMenu>
                 <DropdownMenuTrigger class="rounded flex h-6 w-6 items-center justify-center hover:bg-muted">
-                  <span class="i-carbon-overflow-menu-vertical h-4 w-4" />
+                  <span class="i-carbon-overflow-menu-vertical h-3.5 w-3.5" />
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" :side-offset="4">
                   <DropdownMenuItem @click="openEditDialog(virtualRow.index)">
-                    <span class="i-carbon-edit mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.edit') }}
+                    <span class="i-carbon-edit mr-2" />{{ $t('components.dataGrid.row.edit') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="openDuplicateDialog(virtualRow.index)">
-                    <span class="i-carbon-copy mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.duplicate') }}
+                    <span class="i-carbon-copy mr-2" />{{ $t('components.dataGrid.row.duplicate') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="openDetailsDialog(virtualRow.index)">
-                    <span class="i-carbon-information mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.details') }}
+                    <span class="i-carbon-information mr-2" />{{ $t('components.dataGrid.row.details') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem @click="copyUtil.copyRowsAs([sortedRows[virtualRow.index]], columns, 'csv', tableName)">
-                    <span class="i-carbon-table-split mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.copyAsCsv') }}
+                    <span class="i-carbon-table-split mr-2" />{{ $t('components.dataGrid.row.copyAsCsv') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="copyUtil.copyRowsAs([sortedRows[virtualRow.index]], columns, 'json', tableName)">
-                    <span class="i-carbon-code mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.copyAsJson') }}
+                    <span class="i-carbon-code mr-2" />{{ $t('components.dataGrid.row.copyAsJson') }}
                   </DropdownMenuItem>
                   <DropdownMenuItem @click="copyUtil.copyRowsAs([sortedRows[virtualRow.index]], columns, 'insert', tableName)">
-                    <span class="i-carbon-sql mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.copyAsInsert') }}
+                    <span class="i-carbon-sql mr-2" />{{ $t('components.dataGrid.row.copyAsInsert') }}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     class="text-destructive-text focus:text-destructive-text"
                     @click="openDeleteDialog(virtualRow.index)"
                   >
-                    <span class="i-carbon-trash-can mr-2 h-3.5 w-3.5" />{{ $t('components.dataGrid.row.delete') }}
+                    <span class="i-carbon-trash-can mr-2" />{{ $t('components.dataGrid.row.delete') }}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

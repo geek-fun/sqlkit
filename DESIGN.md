@@ -136,16 +136,20 @@ Preserve established icon and data colors during surface or theme refactors. Use
 
 ### Fonts and hierarchy
 
-The global body size is currently 14px, and `src/assets/index.css` does not define a custom brand font. Keep system sans-serif fonts with platform Chinese fallbacks. Do not introduce decorative fonts or remote font dependencies for the client. Keep Monaco's monospace editor font; SQL, types, object identifiers, and code snippets may use the existing `font-mono` utility.
+The global body size is `var(--font-size-form)` (14px), and `src/assets/index.css` does not define a custom brand font. Keep system sans-serif fonts with platform Chinese fallbacks. Do not introduce decorative fonts or remote font dependencies for the client. Keep Monaco's monospace editor font; SQL, types, object identifiers, and code snippets may use the existing `font-mono` utility.
+
+The type scale is token-driven. `index.css` defines `--font-size-caption / dense / body / form / title / page-title` (11 / 12 / 13 / 14 / 16 / 20px); `uno.config.ts` maps the two sizes missing from the default scale (`text-caption` = 11px, `text-body` = 13px), and the rest reuse default utilities (`text-xs` = 12, `text-sm` = 14, `text-base` = 16, `text-xl` = 20). Business components must use these utilities or the CSS variables — never a bare px/rem font size. Monaco's editor font size remains a user setting.
 
 The following hierarchy constrains new UI; it does not require rewriting all existing page titles.
 
-| Role | Size / weight | Usage |
+| Role | Token / utility | Usage |
 | --- | --- | --- |
-| Page title | 20–24px / 600 | Standalone pages such as Connections and Settings; do not add large headings to editor workspaces |
-| Dialog / section title | 14–18px / 500–600 | Dialog titles and major groups |
-| Body / form | 14px / 400 | Descriptions, inputs, buttons; matches the current `text-sm` |
-| Dense data / supporting labels | 12px / 400–500 | Result grids, object trees, toolbars, status bars |
+| Page title | `text-xl` (20px / 600) | Standalone pages such as Connections and Settings; do not add large headings to editor workspaces |
+| Dialog / panel / card title | `text-base` (16px / 600) | Dialog titles, side-panel headers, card and section titles |
+| Body / form | `text-sm` (14px / 400) | Descriptions, inputs, buttons |
+| Sidebar lists and menus | `text-body` (13px / 400–500) | Connection selector rows, saved-query names, dropdown items outside dense surfaces |
+| Dense data / supporting labels | `text-xs` (12px / 400–500) | Result grids, object trees, query tabs, toolbars, status bars |
+| Captions and badges | `text-caption` (11px / 500) | Attribute badges, timestamps, task counters; the readable lower bound — 9–10px text is forbidden |
 
 - Use roughly 1.4–1.6 line height for ordinary text. Code follows editor settings; fixed-height table rows must not clip text.
 - Do not use 9–10px text for states, prices, field meanings, or instructions users must read. Adjust the layout first when space is tight.
@@ -163,11 +167,12 @@ Retain the existing app shell: top window bar → left feature navigation → cu
 | --- | --- | --- |
 | Initial window | 1600 × 1000 | `src-tauri/tauri.conf.json`; not a minimum window size |
 | Window bar | 40px | `h-10` in `AppHeader.vue` |
-| Feature navigation | 64px wide, 40 × 40px entries | `AppSidebar.vue` |
+| Feature navigation | 56px wide, 36 × 36px entries, 20px icons | `AppSidebar.vue` |
 | Query sidebar | Initially 250px, resize range 200–400px | `QueriesPage.vue` |
+| Object tree rows | 24px row height, 12px text, 14px icons | `SchemaTree.vue` |
 | Query tabs | 35px high, maximum 200px per tab | `QueryTabs.vue` |
-| Result toolbar | 36px high | `QueryResultPanel.vue` |
-| Standard buttons / inputs | 32px high | `ui/button`, `ui/input` |
+| Result toolbar | 36px high (result panel and grid toolbars share this) | `QueryResultPanel.vue`, `DataGrid.vue` |
+| Standard buttons / inputs | 32px high; 24 / 28 / 36px via `xs` / `sm` / `lg` | `ui/button`, `ui/input` |
 | Virtual result rows | 32px estimated height | `grid/DataGrid.vue`; not a shared height for every table |
 
 ### Spacing and containers
@@ -204,7 +209,9 @@ Keep `--radius: 0.5rem`: `lg` is 8px, `md` is 6px, and `sm` is 4px. Use `rounded
 
 - Use corner radius to convey component hierarchy rather than inventing per-page values. Keep continuous straight edges for data grids, split panes, and editors.
 - Limit `rounded-full` to suitable elements such as avatars, small status dots, and existing badges. Do not make every button pill-shaped.
-- Toolbar icons are usually 14–16px and main navigation icons 20px; the visible icon is smaller than its hit target. Keep standard action targets at 32px. Compact grid actions should generally be at least 24px with sufficient spacing and keyboard access.
+- Icon scale: 12px for inline glyphs (chevrons, close buttons, badge icons), 14px for tree, tab, and compact toolbar icons, 16px for standard buttons, menu items, and input adornments, 20px for main navigation. Dropdown-menu icons inherit the shared `size-4` from `DropdownMenuItem`; do not override per menu. The visible icon is smaller than its hit target; keep standard action targets at 32px and compact grid actions at least 24px with sufficient spacing and keyboard access.
+- Database vendor logos use three sizes: 14px inside lists and tabs, 16px in dropdown selected states and forms, 20px on cards and landing states (`DbTypeIcon` defaults to 16).
+- Status dots use 8px (`h-2 w-2`) inline within rows and 10px (`h-2.5 w-2.5`) as a standalone indicator beside a control.
 - Reuse the component's existing Carbon / Lucide style. Do not add icon libraries for color or decoration, or mix emoji into an action group.
 
 ## Components
@@ -217,7 +224,7 @@ Interactive components must cover default, hover, focus-visible, active / select
 
 ### Buttons and toolbars
 
-- `default`: the single primary action, retaining `bg-primary text-primary-foreground`. Current default height is 32px; large is 36px.
+- `default`: the single primary action, retaining `bg-primary text-primary-foreground`. Heights: `xs` 24px, `sm` 28px, default 32px, `lg` 36px; icon buttons mirror this via `icon-xs` / `icon-sm` / `icon`. Use `sm` for sidebar and toolbar rows instead of overriding heights per component.
 - `outline / secondary`: secondary actions; `ghost`: toolbar and infrequent actions; `link`: explicit text links.
 - `destructive`: genuinely destructive actions such as deletion. Ordinary disconnect and stop-query actions do not automatically become solid red buttons because they stop something.
 - Loading states prevent duplicate submission and keep readable labels. Provide cancellation for cancellable long tasks rather than disabling the entire panel.

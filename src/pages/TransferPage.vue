@@ -34,10 +34,10 @@ const tabConfig = computed(() => [
         <!-- Header -->
         <header class="px-6 py-3 border-b border-border/40 flex shrink-0 items-center justify-between">
           <div class="flex gap-3 items-center">
-            <h1 class="text-base tracking-tight font-semibold">
+            <h1 class="text-xl tracking-tight font-semibold">
               {{ t('transfer.title') }}
             </h1>
-            <p class="text-[11px] text-muted-foreground">
+            <p class="text-caption text-muted-foreground">
               {{ t('transfer.subtitle') }}
             </p>
           </div>

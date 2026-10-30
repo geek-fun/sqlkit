@@ -240,7 +240,7 @@ onUnmounted(() => {
 }
 
 .header-title {
-  font-size: 16px;
+  font-size: var(--font-size-title);
   font-weight: 700;
 }
 

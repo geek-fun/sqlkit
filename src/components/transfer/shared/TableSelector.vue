@@ -92,7 +92,7 @@ const selectedTableInfo = computed(() =>
 <template>
   <div class="space-y-3">
     <div class="space-y-1.5">
-      <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.tableLabel') }}</Label>
+      <Label class="text-caption text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.tableLabel') }}</Label>
       <Select v-model="selectedTable" :disabled="!tables.length || loading">
         <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
           <SelectValue :placeholder="t('transfer.connection.tablePlaceholder')" />
@@ -106,7 +106,7 @@ const selectedTableInfo = computed(() =>
           >
             <div class="flex gap-4 w-full items-center justify-between">
               <span>{{ tbl.name }}</span>
-              <span v-if="tbl.rowCount" class="text-[10px] text-muted-foreground font-mono px-1 rounded-sm bg-muted/60 tabular-nums">
+              <span v-if="tbl.rowCount" class="text-caption text-muted-foreground font-mono px-1 rounded-sm bg-muted/60 tabular-nums">
                 {{ tbl.rowCount.toLocaleString() }} rows
               </span>
             </div>
@@ -115,7 +115,7 @@ const selectedTableInfo = computed(() =>
       </Select>
     </div>
 
-    <div v-if="selectedTableInfo" class="text-[11px] text-muted-foreground flex gap-2 items-center">
+    <div v-if="selectedTableInfo" class="text-caption text-muted-foreground flex gap-2 items-center">
       <span v-if="selectedTableInfo.rowCount" class="font-mono tabular-nums">
         {{ selectedTableInfo.rowCount.toLocaleString() }} rows
       </span>

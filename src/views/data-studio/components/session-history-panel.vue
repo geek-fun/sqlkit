@@ -131,7 +131,7 @@ function formatTime(session: AgentSession): string {
 }
 
 .history-title {
-  font-size: 11px;
+  font-size: var(--font-size-dense);
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -167,7 +167,7 @@ function formatTime(session: AgentSession): string {
 }
 
 .empty-hint {
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   color: hsl(var(--muted-foreground));
   text-align: center;
   padding: 20px 0;
@@ -205,7 +205,7 @@ function formatTime(session: AgentSession): string {
 }
 
 .session-name {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   font-weight: 500;
   color: hsl(var(--foreground));
   white-space: nowrap;
@@ -214,7 +214,7 @@ function formatTime(session: AgentSession): string {
 }
 
 .session-meta {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   color: hsl(var(--muted-foreground));
 }
 

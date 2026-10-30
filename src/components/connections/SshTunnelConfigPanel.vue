@@ -378,12 +378,12 @@ onMounted(detectProxy)
         v-if="detectedProxy && useSystemProxy"
         class="px-2.5 py-1.5 border border-primary/40 rounded-md bg-primary/5 flex gap-2 items-center"
       >
-        <span class="text-[10px] text-muted-foreground font-bold shrink-0 w-4">0</span>
+        <span class="text-caption text-muted-foreground font-bold shrink-0 w-4">0</span>
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium">
             {{ t('components.serverForm.ssh.systemProxy') }}
           </div>
-          <div class="text-[11px] text-muted-foreground font-mono truncate">
+          <div class="text-caption text-muted-foreground font-mono truncate">
             {{ detectedProxy }}
           </div>
         </div>
@@ -405,12 +405,12 @@ onMounted(detectProxy)
         v-else-if="!detectedProxy && useSystemProxy"
         class="px-2.5 py-1.5 border border-amber-500/50 rounded-md bg-amber-50 flex gap-2 items-center dark:bg-amber-900/20"
       >
-        <span class="text-[10px] text-muted-foreground font-bold shrink-0 w-4">0</span>
+        <span class="text-caption text-muted-foreground font-bold shrink-0 w-4">0</span>
         <div class="flex-1 min-w-0">
           <div class="text-sm font-medium">
             {{ t('components.serverForm.ssh.systemProxy') }}
           </div>
-          <div class="text-[11px] text-amber-600 truncate dark:text-amber-400">
+          <div class="text-caption text-amber-600 truncate dark:text-amber-400">
             {{ t('components.serverForm.ssh.systemProxyNotDetected') }}
           </div>
         </div>
@@ -453,12 +453,12 @@ onMounted(detectProxy)
             class="px-2.5 py-1.5 border rounded-md bg-background flex gap-2 items-center"
           >
             <span class="ssh-hop-handle i-carbon-draggable text-muted-foreground shrink-0 h-3.5 w-3.5 cursor-grab" />
-            <span class="text-[10px] text-muted-foreground font-bold w-4">{{ index + 1 }}</span>
+            <span class="text-caption text-muted-foreground font-bold w-4">{{ index + 1 }}</span>
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium truncate">
                 {{ profile.name }}
               </div>
-              <div class="text-[11px] text-muted-foreground truncate">
+              <div class="text-caption text-muted-foreground truncate">
                 {{ profile.username }}@{{ profile.host }}:{{ profile.port }}
               </div>
             </div>
@@ -489,7 +489,7 @@ onMounted(detectProxy)
 
       <div v-if="legacyInline" class="space-y-2">
         <div class="px-2.5 py-1.5 border rounded-md bg-background flex gap-2 items-center">
-          <span class="text-[10px] text-muted-foreground font-bold shrink-0 w-4">1</span>
+          <span class="text-caption text-muted-foreground font-bold shrink-0 w-4">1</span>
           <div class="flex-1 min-w-0">
             <div class="text-sm font-medium truncate">
               {{ props.modelValue?.host }}
@@ -520,10 +520,10 @@ onMounted(detectProxy)
       </div>
 
       <!-- Chain preview: proxy → hops → target -->
-      <p v-if="chainSegments.length > 1" class="text-[11px] text-muted-foreground font-mono break-words">
+      <p v-if="chainSegments.length > 1" class="text-caption text-muted-foreground font-mono break-words">
         {{ chainSegments.join('  →  ') }}
       </p>
-      <p v-if="hopProfiles.length > 1" class="text-[11px] text-muted-foreground">
+      <p v-if="hopProfiles.length > 1" class="text-caption text-muted-foreground">
         {{ t('components.serverForm.ssh.hopOrderHint') }}
       </p>
 

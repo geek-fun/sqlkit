@@ -92,6 +92,20 @@
   --syntax-comment: 112.50 7.55% 58.43%;
 }
 
+:root {
+  /* Type scale (see DESIGN.md Typography). text-caption / text-body map to
+     --font-size-caption / --font-size-body via uno.config.ts; the other sizes
+     reuse the default utilities text-xs (12) / text-sm (14) / text-base (16) /
+     text-xl (20). Business components must use these variables or utilities
+     instead of bare px/rem font sizes. */
+  --font-size-caption: 11px;
+  --font-size-dense: 12px;
+  --font-size-body: 13px;
+  --font-size-form: 14px;
+  --font-size-title: 16px;
+  --font-size-page-title: 20px;
+}
+
 * {
   border-color: hsl(var(--border));
 }
@@ -107,7 +121,7 @@ body,
 body {
   background-color: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-size: 14px;
+  font-size: var(--font-size-form);
 }
 
 [data-tauri-drag-region] {

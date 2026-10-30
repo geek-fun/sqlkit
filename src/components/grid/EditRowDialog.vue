@@ -216,8 +216,8 @@ function handleClose(open: boolean) {
           <div class="flex gap-2 items-center">
             <Label class="text-xs font-medium whitespace-nowrap">
               {{ col }}
-              <span v-if="primaryKeys.includes(col)" class="text-[10px] text-amber-500 ml-1">(PK)</span>
-              <span v-if="columnTypes[col]" class="text-[10px] text-muted-foreground font-mono ml-1">{{ columnTypes[col] }}</span>
+              <span v-if="primaryKeys.includes(col)" class="text-caption text-amber-500 ml-1">(PK)</span>
+              <span v-if="columnTypes[col]" class="text-caption text-muted-foreground font-mono ml-1">{{ columnTypes[col] }}</span>
             </Label>
             <div class="flex-1" />
             <!-- NULL toggle for non-PK columns -->

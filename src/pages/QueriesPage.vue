@@ -1399,7 +1399,7 @@ function closeResultPanel() {
                       <DbTypeIcon
                         v-if="activeConnection.type"
                         :type="activeConnection.type"
-                        :size="24"
+                        :size="20"
                       />
                       <span class="text-lg font-semibold">{{ activeConnection.name }}</span>
                     </div>

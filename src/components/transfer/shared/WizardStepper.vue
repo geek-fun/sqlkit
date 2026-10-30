@@ -29,7 +29,7 @@ const props = defineProps<{
 
       <!-- Step Circle -->
       <div
-        class="text-[11px] font-mono rounded-full flex h-6 w-6 ring-4 ring-background transition-colors items-center justify-center relative z-10"
+        class="text-caption font-mono rounded-full flex h-6 w-6 ring-4 ring-background transition-colors items-center justify-center relative z-10"
         :class="[
           index === props.currentStep
             ? 'bg-primary text-primary-foreground shadow-none'
@@ -43,7 +43,7 @@ const props = defineProps<{
 
       <!-- Step Label -->
       <div
-        class="text-[11px] mt-2 text-center transition-colors"
+        class="text-caption mt-2 text-center transition-colors"
         :class="[
           index === props.currentStep ? 'text-foreground font-medium' : index < props.currentStep ? 'text-foreground font-normal' : 'text-muted-foreground',
         ]"

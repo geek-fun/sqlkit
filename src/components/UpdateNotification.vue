@@ -78,7 +78,7 @@ const buttonsDisabled = computed(() =>
         </div>
 
         <div class="flex-1 min-w-0">
-          <div class="text-[16px] text-foreground font-bold mb-0.5">
+          <div class="text-base text-foreground font-bold mb-0.5">
             {{ t('updater.updateAvailable') }}
           </div>
           <div class="text-sm text-muted-foreground">

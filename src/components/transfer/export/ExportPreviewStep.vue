@@ -87,27 +87,27 @@ onMounted(() => {
   <div class="space-y-4">
     <div class="text-xs gap-2.5 grid grid-cols-2">
       <div class="space-y-1">
-        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.connection.label') }}</Label>
+        <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.connection.label') }}</Label>
         <div class="text-foreground font-mono tabular-nums">
           {{ sourceInfo.connection }}
         </div>
       </div>
       <div class="space-y-1">
-        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.connection.databaseLabel') }}</Label>
+        <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.connection.databaseLabel') }}</Label>
         <div class="text-foreground font-mono tabular-nums">
           {{ sourceInfo.database }}
         </div>
       </div>
       <div class="space-y-1">
-        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.connection.tableLabel') }}</Label>
+        <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.connection.tableLabel') }}</Label>
         <div class="text-foreground font-mono tabular-nums">
           {{ sourceInfo.table }}
         </div>
       </div>
       <div class="space-y-1">
-        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.selectFormat') }}</Label>
+        <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.selectFormat') }}</Label>
         <div>
-          <Badge class="text-[10px] text-primary-text font-mono px-1.5 py-0.5 border border-primary/60 bg-primary/[0.04] uppercase hover:bg-primary/[0.08]" variant="outline">
+          <Badge class="text-caption text-primary-text font-mono px-1.5 py-0.5 border border-primary/60 bg-primary/[0.04] uppercase hover:bg-primary/[0.08]" variant="outline">
             {{ sourceInfo.format }}
           </Badge>
         </div>
@@ -117,8 +117,8 @@ onMounted(() => {
     <Card class="border-border/40 shadow-sm overflow-hidden">
       <CardContent class="p-0 flex flex-col">
         <div class="px-3 py-2 border-b border-border/40 bg-muted/20 flex items-center justify-between">
-          <Label id="preview-label" class="text-[11px] tracking-wide font-semibold flex gap-1.5 uppercase items-center"><span class="i-carbon-view text-muted-foreground" /> {{ t('transfer.export.preview') }} <span class="text-muted-foreground font-normal normal-case">(first {{ props.previewRows || 10 }} rows)</span></Label>
-          <div class="text-[10px] text-muted-foreground font-mono tabular-nums">
+          <Label id="preview-label" class="text-caption tracking-wide font-semibold flex gap-1.5 uppercase items-center"><span class="i-carbon-view text-muted-foreground" /> {{ t('transfer.export.preview') }} <span class="text-muted-foreground font-normal normal-case">(first {{ props.previewRows || 10 }} rows)</span></Label>
+          <div class="text-caption text-muted-foreground font-mono tabular-nums">
             <span v-if="estimatedRows">~{{ estimatedRows.toLocaleString() }} rows • </span>{{ sourceInfo.columns }} cols
           </div>
         </div>
@@ -126,7 +126,7 @@ onMounted(() => {
           role="region"
           aria-labelledby="preview-label"
           tabindex="0"
-          class="text-[11px] leading-snug font-mono p-3 bg-card max-h-[200px] whitespace-pre overflow-auto tabular-nums focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+          class="text-caption leading-snug font-mono p-3 bg-card max-h-[200px] whitespace-pre overflow-auto tabular-nums focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
         >
           {{ previewData || t('transfer.import.loadingPreview') }}
         </div>
@@ -134,7 +134,7 @@ onMounted(() => {
     </Card>
 
     <div class="pt-2 space-y-1.5">
-      <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.outputFile') }}</Label>
+      <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.outputFile') }}</Label>
       <div class="flex gap-2">
         <div class="flex-1 relative">
           <span class="i-carbon-document text-muted-foreground left-2.5 top-1/2 absolute -translate-y-1/2" />

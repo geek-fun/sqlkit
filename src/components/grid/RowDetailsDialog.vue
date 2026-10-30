@@ -51,7 +51,7 @@ const isNull = (v: unknown): boolean => v === null || v === undefined
         >
           <span class="text-sm text-muted-foreground font-medium flex-shrink-0 w-48">
             {{ col }}
-            <span v-if="columnTypes?.[col]" class="text-[10px] font-mono ml-1">({{ columnTypes[col] }})</span>
+            <span v-if="columnTypes?.[col]" class="text-caption font-mono ml-1">({{ columnTypes[col] }})</span>
           </span>
           <span
             class="text-sm font-mono flex-1 whitespace-pre-wrap break-all"

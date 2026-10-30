@@ -53,7 +53,7 @@ function formatTime(seconds: number) {
         <span class="i-carbon-circle-dash text-primary-text h-3.5 w-3.5" :class="{ 'animate-spin': props.isRunning }" />
         <span>{{ props.progress?.phase || t('transfer.progress.preparing') }}</span>
       </div>
-      <div class="text-[11px] text-muted-foreground font-mono tabular-nums" aria-live="off">
+      <div class="text-caption text-muted-foreground font-mono tabular-nums" aria-live="off">
         {{ formatTime(elapsedSeconds) }} elapsed
         <span v-if="remainingSeconds > 0" class="text-muted-foreground ml-1.5">
           ~{{ formatTime(remainingSeconds) }} left
@@ -86,7 +86,7 @@ function formatTime(seconds: number) {
 
     <div
       v-if="props.progress && props.progress.errorCount > 0"
-      class="text-[11px] text-destructive-text tracking-wide font-medium px-2 py-1 rounded-sm bg-destructive/10 flex gap-1.5 uppercase items-center"
+      class="text-caption text-destructive-text tracking-wide font-medium px-2 py-1 rounded-sm bg-destructive/10 flex gap-1.5 uppercase items-center"
       role="alert"
       aria-live="assertive"
     >

@@ -143,7 +143,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
         <DbTypeIcon
           v-if="getTabDbType(tab)"
           :type="getTabDbType(tab)!"
-          :size="12"
+          :size="14"
           class="flex-shrink-0"
         />
 

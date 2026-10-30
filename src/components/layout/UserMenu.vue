@@ -124,7 +124,7 @@ async function handleLogout() {
             {{ accountStore.email }}
           </p>
           <span
-            class="text-[10px] font-semibold mt-1.5 px-2 py-0.5 rounded-full inline-flex items-center"
+            class="text-caption font-semibold mt-1.5 px-2 py-0.5 rounded-full inline-flex items-center"
             :class="planBadge.cls"
           >
             <Loader2
@@ -135,10 +135,10 @@ async function handleLogout() {
           </span>
           <!-- The re-login instruction outranks any cached benefit copy: the
                session verdict is the only verified fact while degraded. -->
-          <p v-if="entitlementStore.sessionExpired" class="text-[11px] text-amber-500 mt-1">
+          <p v-if="entitlementStore.sessionExpired" class="text-caption text-amber-500 mt-1">
             {{ t('plan.section.sessionExpired') }}
           </p>
-          <p v-else-if="expiryText" class="text-[11px] text-muted-foreground mt-1">
+          <p v-else-if="expiryText" class="text-caption text-muted-foreground mt-1">
             {{ expiryText }}
           </p>
         </div>
@@ -157,7 +157,7 @@ async function handleLogout() {
           v-if="!recovering && !entitlementStore.sessionExpired && entitlementStore.hasEntitlementError"
           @click="runRecovery"
         >
-          <RefreshCw class="mr-2 h-3.5 w-3.5" />
+          <RefreshCw class="mr-2" />
           {{ t('plan.section.refresh') }}
         </DropdownMenuItem>
         <DropdownMenuItem
@@ -165,11 +165,11 @@ async function handleLogout() {
           :disabled="refreshing || recovering"
           @click="handleRefresh"
         >
-          <RefreshCw class="mr-2 h-3.5 w-3.5" :class="{ 'animate-spin': refreshing }" />
+          <RefreshCw class="mr-2" :class="{ 'animate-spin': refreshing }" />
           {{ t('plan.section.refresh') }}
         </DropdownMenuItem>
         <DropdownMenuItem :disabled="recovering" @click="openUrl(`${CONSOLE_BASE_URL}`)">
-          <Settings class="mr-2 h-3.5 w-3.5" />
+          <Settings class="mr-2" />
           {{ t('plan.section.manage') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
@@ -178,7 +178,7 @@ async function handleLogout() {
           :disabled="recovering"
           @click="handleLogout"
         >
-          <LogOut class="mr-2 h-3.5 w-3.5" />
+          <LogOut class="mr-2" />
           {{ t('plan.section.logout') }}
         </DropdownMenuItem>
       </template>
@@ -187,7 +187,7 @@ async function handleLogout() {
           <p class="text-sm text-foreground font-semibold">
             {{ t('plan.section.notLoggedIn') }}
           </p>
-          <p class="text-[11px] text-muted-foreground mt-1">
+          <p class="text-caption text-muted-foreground mt-1">
             {{ t('plan.pricing') }}
           </p>
         </div>

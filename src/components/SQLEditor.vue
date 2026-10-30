@@ -313,11 +313,11 @@ defineExpose({ getValue, setValue, handleFormat })
   gap: 16px;
   padding: 6px 12px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .sql-context-menu li .shortcut {
-  font-size: 11px;
+  font-size: var(--font-size-dense);
   opacity: 0.5;
   white-space: nowrap;
 }

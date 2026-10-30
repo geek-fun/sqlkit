@@ -138,7 +138,7 @@ watch(() => props.connectionId, async (connId) => {
       :placeholder="t('sidebar.database.placeholder')"
       :search-placeholder="t('sidebar.search')"
       :loading="props.loading"
-      class="text-xs flex-1 h-8"
+      class="text-body flex-1 h-8"
       @update:model-value="handleSelect"
     >
       <template #selected-prepend>
@@ -176,37 +176,37 @@ watch(() => props.connectionId, async (connId) => {
         </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem :disabled="!props.modelValue" @click="handleAction('createScript')">
-          <span class="i-lucide-file-plus-2 mr-2 h-3.5 w-3.5" aria-hidden="true" /> {{ t('sidebar.actionMenu.createScript') }}
+          <span class="i-lucide-file-plus-2 mr-2" aria-hidden="true" /> {{ t('sidebar.actionMenu.createScript') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem v-if="capabilities.newDatabase" @click="handleAction('newDatabase')">
-          <span class="i-carbon-data-base mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.newDatabase') }}
+          <span class="i-carbon-data-base mr-2" /> {{ t('sidebar.actionMenu.newDatabase') }}
         </DropdownMenuItem>
         <DropdownMenuItem v-if="capabilities.newSchema" @click="handleAction('newSchema')">
-          <span class="i-carbon-folder-open mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.newSchema') }}
+          <span class="i-carbon-folder-open mr-2" /> {{ t('sidebar.actionMenu.newSchema') }}
         </DropdownMenuItem>
         <DropdownMenuItem @click="handleAction('newTable')">
-          <span class="i-carbon-table mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.newTable') }}
+          <span class="i-carbon-table mr-2" /> {{ t('sidebar.actionMenu.newTable') }}
         </DropdownMenuItem>
         <DropdownMenuItem v-if="capabilities.views" @click="handleAction('newView')">
-          <span class="i-carbon-view mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.newView') }}
+          <span class="i-carbon-view mr-2" /> {{ t('sidebar.actionMenu.newView') }}
         </DropdownMenuItem>
         <DropdownMenuItem v-if="capabilities.functions" @click="handleAction('newFunction')">
-          <span class="i-carbon-function-math mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.newFunction') }}
+          <span class="i-carbon-function-math mr-2" /> {{ t('sidebar.actionMenu.newFunction') }}
         </DropdownMenuItem>
         <DropdownMenuItem v-if="capabilities.procedures" @click="handleAction('newProcedure')">
-          <span class="i-carbon-document mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.newProcedure') }}
+          <span class="i-carbon-document mr-2" /> {{ t('sidebar.actionMenu.newProcedure') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem :disabled="!props.modelValue" @click="handleAction('showErDiagram')">
-          <span class="i-carbon-data-vis-3 mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.showErDiagram') }}
+          <span class="i-carbon-data-vis-3 mr-2" /> {{ t('sidebar.actionMenu.showErDiagram') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator v-if="capabilities.backup || capabilities.export" />
         <DropdownMenuItem v-if="capabilities.backup" @click="handleAction('backupDatabase')">
-          <span class="i-carbon-download mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.backupDatabase') }}
+          <span class="i-carbon-download mr-2" /> {{ t('sidebar.actionMenu.backupDatabase') }}
         </DropdownMenuItem>
         <DropdownMenuItem v-if="capabilities.export" @click="handleAction('exportDatabase')">
-          <span class="i-carbon-export mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.exportDatabase') }}
+          <span class="i-carbon-export mr-2" /> {{ t('sidebar.actionMenu.exportDatabase') }}
         </DropdownMenuItem>
         <DropdownMenuSeparator v-if="capabilities.dropDatabase" />
         <DropdownMenuItem
@@ -214,7 +214,7 @@ watch(() => props.connectionId, async (connId) => {
           class="text-destructive-text focus:text-destructive-text"
           @click="handleAction('dropDatabase')"
         >
-          <span class="i-carbon-trash-can mr-2 h-3.5 w-3.5" /> {{ t('sidebar.actionMenu.dropDatabase') }}
+          <span class="i-carbon-trash-can mr-2" /> {{ t('sidebar.actionMenu.dropDatabase') }}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -63,7 +63,7 @@ function formatDuration(seconds: number) {
         <h3 class="text-sm tracking-wide font-medium">
           {{ isSuccess ? t('transfer.result.success') : t('transfer.result.failed') }}
         </h3>
-        <p class="text-[11px] text-muted-foreground font-mono tabular-nums">
+        <p class="text-caption text-muted-foreground font-mono tabular-nums">
           {{ formatDuration(durationSeconds) }}
         </p>
       </div>
@@ -73,28 +73,28 @@ function formatDuration(seconds: number) {
     <div class="gap-3 grid grid-cols-2 sm:grid-cols-4">
       <Card class="border-border/40 rounded-md bg-muted/20 shadow-none">
         <CardContent class="p-3 flex flex-col justify-center">
-          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">{{ t('transfer.result.processed') }}</span>
+          <span class="text-caption text-muted-foreground tracking-widest font-medium uppercase">{{ t('transfer.result.processed') }}</span>
           <span class="text-lg font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.processedRows.toLocaleString() }}</span>
         </CardContent>
       </Card>
 
       <Card v-if="props.result.skippedRows > 0" class="border-border/40 rounded-md bg-muted/20 shadow-none">
         <CardContent class="p-3 flex flex-col justify-center">
-          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">{{ t('transfer.result.skipped') }}</span>
+          <span class="text-caption text-muted-foreground tracking-widest font-medium uppercase">{{ t('transfer.result.skipped') }}</span>
           <span class="text-lg font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.skippedRows.toLocaleString() }}</span>
         </CardContent>
       </Card>
 
       <Card v-if="props.result.outputSizeBytes" class="border-border/40 rounded-md bg-muted/20 shadow-none">
         <CardContent class="p-3 flex flex-col justify-center">
-          <span class="text-[10px] text-muted-foreground tracking-widest font-medium uppercase">{{ t('transfer.import.fileSize') }}</span>
+          <span class="text-caption text-muted-foreground tracking-widest font-medium uppercase">{{ t('transfer.import.fileSize') }}</span>
           <span class="text-lg font-mono font-semibold mt-0.5 tabular-nums">{{ formatFileSize(props.result.outputSizeBytes) }}</span>
         </CardContent>
       </Card>
 
       <Card v-if="props.result.errorCount > 0" class="border-destructive/20 rounded-md bg-destructive/5 shadow-none">
         <CardContent class="p-3 flex flex-col justify-center">
-          <span class="text-[10px] text-destructive-text tracking-widest font-medium uppercase">{{ t('transfer.result.errorCount') }}</span>
+          <span class="text-caption text-destructive-text tracking-widest font-medium uppercase">{{ t('transfer.result.errorCount') }}</span>
           <span class="text-lg text-destructive-text font-mono font-semibold mt-0.5 tabular-nums">{{ props.result.errorCount.toLocaleString() }}</span>
         </CardContent>
       </Card>
@@ -104,12 +104,12 @@ function formatDuration(seconds: number) {
     <div v-if="props.result.errors.length > 0" class="space-y-1.5">
       <div class="px-1 flex gap-2 items-center">
         <span class="i-carbon-list text-muted-foreground h-3.5 w-3.5" />
-        <h4 class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">
+        <h4 class="text-caption text-muted-foreground tracking-wide font-medium uppercase">
           Log Details
         </h4>
       </div>
       <div class="border border-border/40 rounded-md bg-muted/40">
-        <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border text-[11px] leading-snug font-mono p-3 max-h-40 overflow-auto">
+        <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border text-caption leading-snug font-mono p-3 max-h-40 overflow-auto">
           <div
             v-for="(error, index) in props.result.errors.slice(0, 10)"
             :key="index"

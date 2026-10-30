@@ -50,7 +50,7 @@ const currentDatabase = computed(() =>
       <span class="text-sm font-semibold truncate">{{ activeConnection.name }}</span>
       <span
         v-if="isConnected"
-        class="text-[10px] text-green-600 font-medium px-1.5 py-0.5 rounded-full bg-green-500/20 dark:text-green-400"
+        class="text-caption text-green-600 font-medium px-1.5 py-0.5 rounded-full bg-green-500/20 dark:text-green-400"
       >
         connected
       </span>

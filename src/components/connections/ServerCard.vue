@@ -109,7 +109,7 @@ const connectTooltip = computed(() =>
       <Tooltip>
         <TooltipTrigger as-child>
           <div
-            class="rounded-full h-2.5 w-2.5 right-4 top-4 absolute"
+            class="rounded-full h-2 w-2 right-4 top-4 absolute"
             :class="statusColor"
           />
         </TooltipTrigger>
@@ -123,7 +123,7 @@ const connectTooltip = computed(() =>
       <!-- Database type icon -->
       <div class="flex items-start justify-between">
         <div
-          class="p-1.5 rounded-lg flex h-10 w-10 items-center justify-center"
+          class="p-1.5 rounded-lg flex h-9 w-9 items-center justify-center"
           :class="getDatabaseColor(connection.type)"
         >
           <img
@@ -136,10 +136,10 @@ const connectTooltip = computed(() =>
 
       <!-- Connection name -->
       <div>
-        <h3 class="text-lg leading-tight font-semibold truncate">
+        <h3 class="text-base leading-tight font-semibold truncate">
           {{ connection.name }}
         </h3>
-        <p class="text-sm text-muted-foreground mt-1 truncate" :title="connectionUrl">
+        <p class="text-body text-muted-foreground mt-1 truncate" :title="connectionUrl">
           {{ connectionUrl }}
         </p>
       </div>

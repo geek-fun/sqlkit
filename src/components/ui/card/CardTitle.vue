@@ -19,7 +19,7 @@ const delegatedProps = computed(() => {
 </script>
 
 <template>
-  <Primitive v-bind="delegatedProps" :class="cn('text-2xl font-semibold leading-none tracking-tight', props.class)">
+  <Primitive v-bind="delegatedProps" :class="cn('text-base font-semibold leading-none tracking-tight', props.class)">
     <slot />
   </Primitive>
 </template>

@@ -81,7 +81,7 @@ watch(() => transferStore.importRequest.filePath, () => {
 
         <div class="mb-3 gap-4 grid grid-cols-2">
           <div class="space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.conflict.label') }}</Label>
+            <Label class="text-caption text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.conflict.label') }}</Label>
             <Select v-model="conflictStrategy">
               <SelectTrigger class="text-xs h-8">
                 <SelectValue />
@@ -100,7 +100,7 @@ watch(() => transferStore.importRequest.filePath, () => {
           </div>
 
           <div class="space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.batchSize') }}</Label>
+            <Label class="text-caption text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.batchSize') }}</Label>
             <Input
               v-model.number="batchSize"
               type="number"
@@ -132,12 +132,12 @@ watch(() => transferStore.importRequest.filePath, () => {
             <div class="i-carbon-table" />
             {{ t('transfer.import.dataPreview') }}
           </div>
-          <span class="text-[10px] text-muted-foreground tracking-wide font-mono uppercase">{{ t('transfer.import.previewRows') }}</span>
+          <span class="text-caption text-muted-foreground tracking-wide font-mono uppercase">{{ t('transfer.import.previewRows') }}</span>
         </div>
 
         <div class="border border-border/40 rounded-sm overflow-hidden">
           <div v-if="previewData.length > 0" class="max-h-[240px] overflow-auto">
-            <table class="text-[10px] text-left w-full whitespace-nowrap border-collapse">
+            <table class="text-caption text-left w-full whitespace-nowrap border-collapse">
               <thead class="bg-muted/40 shadow-border/40 shadow-sm top-0 sticky z-10">
                 <tr>
                   <th v-for="col in previewColumns" :key="col" class="text-muted-foreground tracking-wide font-medium px-2 py-1.5 border-b border-border/40 uppercase">
@@ -154,7 +154,7 @@ watch(() => transferStore.importRequest.filePath, () => {
               </tbody>
             </table>
           </div>
-          <div v-else class="text-[11px] text-muted-foreground py-6 text-center bg-muted/20">
+          <div v-else class="text-caption text-muted-foreground py-6 text-center bg-muted/20">
             <div v-if="isLoading" class="flex flex-col gap-2 items-center justify-center">
               <div class="i-carbon-circle-dash opacity-50 animate-spin" />
               {{ t('transfer.import.loadingPreview') }}

@@ -85,14 +85,14 @@ function handleFileInput(e: Event) {
       <h3 class="text-sm text-foreground tracking-tight font-medium">
         {{ t('transfer.import.dropzone.title') }}
       </h3>
-      <p class="text-[11px] text-muted-foreground mt-0.5">
+      <p class="text-caption text-muted-foreground mt-0.5">
         {{ t('transfer.import.dropzone.instruction') }}
       </p>
       <div class="mt-3 flex flex-wrap gap-1.5 justify-center">
         <span
           v-for="f in formats"
           :key="f"
-          class="text-[10px] text-muted-foreground tracking-wider font-mono px-1.5 py-0.5 rounded-sm bg-muted/60 uppercase"
+          class="text-caption text-muted-foreground tracking-wider font-mono px-1.5 py-0.5 rounded-sm bg-muted/60 uppercase"
         >
           {{ f }}
         </span>
