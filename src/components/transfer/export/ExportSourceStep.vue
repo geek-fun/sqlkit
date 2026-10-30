@@ -83,7 +83,7 @@ watch(() => props.modelValue, (newValue) => {
 
       <div class="gap-2.5 grid grid-cols-1 md:grid-cols-2">
         <div class="space-y-1.5">
-          <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ $t('transfer.export.whereClause') }}</Label>
+          <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ $t('transfer.export.whereClause') }}</Label>
           <Input
             v-model="whereClause"
             :placeholder="$t('transfer.export.whereClausePlaceholder')"
@@ -91,7 +91,7 @@ watch(() => props.modelValue, (newValue) => {
           />
         </div>
         <div class="space-y-1.5">
-          <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ $t('transfer.export.orderBy') }}</Label>
+          <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ $t('transfer.export.orderBy') }}</Label>
           <Input
             v-model="orderBy"
             :placeholder="$t('transfer.export.orderByPlaceholder')"
@@ -99,7 +99,7 @@ watch(() => props.modelValue, (newValue) => {
           />
         </div>
         <div class="space-y-1.5">
-          <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ $t('transfer.export.limit') }}</Label>
+          <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ $t('transfer.export.limit') }}</Label>
           <Input
             v-model.number="limit"
             type="number"

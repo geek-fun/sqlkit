@@ -539,11 +539,11 @@ onUnmounted(() => {
       </div>
 
       <!-- Info badges -->
-      <Badge variant="secondary" class="text-[11px] shrink-0 gap-1 h-6" :title="t('components.databaseBrowser.erDiagram.tablesCountBadge', { count: displayedTables.length })">
+      <Badge variant="secondary" class="text-caption shrink-0 gap-1 h-6" :title="t('components.databaseBrowser.erDiagram.tablesCountBadge', { count: displayedTables.length })">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h18v18H3z" /><path d="M21 9H3" /><path d="M9 21V9" /></svg>
         {{ displayedTables.length }}
       </Badge>
-      <Badge variant="secondary" class="text-[11px] shrink-0 gap-1 h-6" :title="t('components.databaseBrowser.erDiagram.relationshipsCountBadge', { count: displayedRelationships.length })">
+      <Badge variant="secondary" class="text-caption shrink-0 gap-1 h-6" :title="t('components.databaseBrowser.erDiagram.relationshipsCountBadge', { count: displayedRelationships.length })">
         <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>
         {{ displayedRelationships.length }}
       </Badge>

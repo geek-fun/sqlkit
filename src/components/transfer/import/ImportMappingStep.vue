@@ -139,16 +139,16 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
           COLUMN MAPPING
         </div>
         <div class="flex gap-2">
-          <Button variant="outline" size="sm" class="text-[11px] px-2 h-6" @click="autoMap">
+          <Button variant="outline" size="sm" class="text-caption px-2 h-6" @click="autoMap">
             Auto-Map
           </Button>
-          <Button variant="ghost" size="sm" class="text-[11px] px-2 h-6" @click="clearAll">
+          <Button variant="ghost" size="sm" class="text-caption px-2 h-6" @click="clearAll">
             Clear All
           </Button>
         </div>
       </div>
 
-      <div v-if="loadingColumns" class="text-[11px] text-muted-foreground py-2 text-center border border-border/40 rounded-sm border-dashed">
+      <div v-if="loadingColumns" class="text-caption text-muted-foreground py-2 text-center border border-border/40 rounded-sm border-dashed">
         Loading target columns...
       </div>
 
@@ -157,7 +157,7 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
           <caption class="sr-only">
             Column mapping between source and target database
           </caption>
-          <thead class="text-[10px] text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase">
+          <thead class="text-caption text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase">
             <tr>
               <th scope="col" class="font-medium px-2 py-1.5 text-left">
                 Source Column
@@ -175,7 +175,7 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
           </thead>
           <tbody>
             <tr v-if="mappings.length === 0" class="border-b border-border/40">
-              <td colspan="4" class="text-[11px] text-muted-foreground px-2 py-4 text-center italic">
+              <td colspan="4" class="text-caption text-muted-foreground px-2 py-4 text-center italic">
                 No columns detected
               </td>
             </tr>
@@ -206,15 +206,15 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
                   </SelectContent>
                 </Select>
               </td>
-              <td class="text-[10px] text-muted-foreground font-mono px-2 py-1 align-middle max-w-[80px] truncate uppercase" :title="mapping.targetType">
+              <td class="text-caption text-muted-foreground font-mono px-2 py-1 align-middle max-w-[80px] truncate uppercase" :title="mapping.targetType">
                 {{ mapping.targetType || '-' }}
               </td>
               <td class="px-2 py-1 align-middle">
-                <span v-if="mapping.targetColumn" class="text-[10px] text-green-600 tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-green-500/10 flex w-fit uppercase items-center">
+                <span v-if="mapping.targetColumn" class="text-caption text-green-600 tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-green-500/10 flex w-fit uppercase items-center">
                   <span class="sr-only">Status: </span>
                   <div class="i-carbon-checkmark mr-1" aria-hidden="true" /> Mapped
                 </span>
-                <span v-else class="text-[10px] text-muted-foreground tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-muted flex w-fit uppercase items-center">
+                <span v-else class="text-caption text-muted-foreground tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-muted flex w-fit uppercase items-center">
                   <span class="sr-only">Status: </span>
                   <div class="i-carbon-subtract mr-1" aria-hidden="true" /> Skipped
                 </span>
@@ -224,7 +224,7 @@ watch(() => transferStore.importRequest.columnMappings, (newMappings) => {
         </table>
       </div>
 
-      <div class="text-[11px] text-muted-foreground tracking-wide flex uppercase justify-end">
+      <div class="text-caption text-muted-foreground tracking-wide flex uppercase justify-end">
         <span class="font-mono mr-1 tabular-nums">{{ mappings.filter(m => m.targetColumn).length }}</span> of
         <span class="font-mono mx-1 tabular-nums">{{ mappings.length }}</span> columns mapped
       </div>

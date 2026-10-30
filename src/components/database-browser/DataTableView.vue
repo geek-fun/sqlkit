@@ -1363,7 +1363,7 @@ watch(
             <div class="flex gap-2 items-center">
               <!-- Column name, type, and PK icon - inline -->
               <Label :for="`edit-field-${col}`" class="text-xs font-medium whitespace-nowrap">
-                {{ col }}<span v-if="columnTypeMap[col]" class="text-[10px] text-muted-foreground font-mono font-normal ml-1">{{ columnTypeMap[col] }}</span><span
+                {{ col }}<span v-if="columnTypeMap[col]" class="text-caption text-muted-foreground font-mono font-normal ml-1">{{ columnTypeMap[col] }}</span><span
                   v-if="columnIsPK[col]"
                   class="i-carbon-key text-amber-500 ml-1.5 h-3 w-3 inline-block"
                 />
@@ -1427,7 +1427,7 @@ watch(
   z-index: 10;
   background-color: hsl(var(--muted));
   padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
+  font-size: var(--font-size-dense);
   font-weight: 500;
   max-width: 200px;
   min-width: 80px;
@@ -1466,7 +1466,7 @@ tr:hover .data-table-actions-col {
 }
 
 .col-type {
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-weight: 400;
   font-family: monospace;
   color: hsl(var(--muted-foreground));

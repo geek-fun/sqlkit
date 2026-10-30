@@ -65,7 +65,7 @@ function handleDblClick() {
     <!-- Row 1: icon + filename + menu -->
     <div class="flex gap-1.5 min-w-0 items-center">
       <span class="i-carbon-document text-muted-foreground shrink-0 h-3.5 w-3.5" />
-      <span class="text-sm font-medium flex-1 min-w-0 truncate" :title="query.file_name">{{ query.file_name }}</span>
+      <span class="text-body font-medium flex-1 min-w-0 truncate" :title="query.file_name">{{ query.file_name }}</span>
       <DropdownMenu>
         <DropdownMenuTrigger as-child>
           <Button
@@ -78,20 +78,20 @@ function handleDblClick() {
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem @select="handleAction('open')">
-            <span class="i-carbon-document mr-2 h-3.5 w-3.5" /> {{ t('sidebar.savedQueries.actions.open') }}
+            <span class="i-carbon-document mr-2" /> {{ t('sidebar.savedQueries.actions.open') }}
           </DropdownMenuItem>
           <DropdownMenuItem @select="handleAction('rename')">
-            <span class="i-carbon-edit mr-2 h-3.5 w-3.5" /> {{ t('sidebar.savedQueries.actions.rename') }}
+            <span class="i-carbon-edit mr-2" /> {{ t('sidebar.savedQueries.actions.rename') }}
           </DropdownMenuItem>
           <DropdownMenuItem @select="handleAction('changeConnection')">
-            <span class="i-carbon-data-base mr-2 h-3.5 w-3.5" /> {{ t('sidebar.savedQueries.actions.changeConnection') }}
+            <span class="i-carbon-data-base mr-2" /> {{ t('sidebar.savedQueries.actions.changeConnection') }}
           </DropdownMenuItem>
           <DropdownMenuItem @select="handleAction('reveal')">
-            <span class="i-carbon-folder-open mr-2 h-3.5 w-3.5" /> {{ t('sidebar.savedQueries.actions.reveal') }}
+            <span class="i-carbon-folder-open mr-2" /> {{ t('sidebar.savedQueries.actions.reveal') }}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem class="text-destructive-text" @select="handleAction('delete')">
-            <span class="i-carbon-trash-can mr-2 h-3.5 w-3.5" /> {{ t('sidebar.savedQueries.actions.delete') }}
+            <span class="i-carbon-trash-can mr-2" /> {{ t('sidebar.savedQueries.actions.delete') }}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

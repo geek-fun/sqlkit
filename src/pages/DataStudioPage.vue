@@ -311,7 +311,7 @@ function syncAllProviderModels() {
               >
                 <span class="i-carbon-time h-3.5 w-3.5" />
               </button>
-              <span class="text-[11px] tracking-wider font-bold px-3 py-0.5 border border-border rounded-full">
+              <span class="text-caption tracking-wider font-bold px-3 py-0.5 border border-border rounded-full">
                 {{ t('dataStudio.title') }}
               </span>
             </div>
@@ -631,7 +631,7 @@ function syncAllProviderModels() {
   border-radius: 9999px;
   background: hsl(var(--muted) / 0.5);
   color: hsl(var(--muted-foreground));
-  font-size: 11px;
+  font-size: var(--font-size-dense);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.15s;
@@ -684,7 +684,7 @@ function syncAllProviderModels() {
 
 .add-source-menu-title {
   padding: 10px 12px 6px;
-  font-size: 11px;
+  font-size: var(--font-size-dense);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -712,7 +712,7 @@ function syncAllProviderModels() {
   border-radius: 6px;
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-  font-size: 13px;
+  font-size: var(--font-size-body);
   outline: none;
 }
 
@@ -776,7 +776,7 @@ function syncAllProviderModels() {
 
 .add-source-item-name {
   display: block;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   font-weight: 500;
   color: hsl(var(--foreground));
   overflow: hidden;
@@ -786,7 +786,7 @@ function syncAllProviderModels() {
 
 .add-source-item-meta {
   display: block;
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   color: hsl(var(--muted-foreground));
   overflow: hidden;
   text-overflow: ellipsis;
@@ -794,7 +794,7 @@ function syncAllProviderModels() {
 }
 
 .add-source-empty {
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   color: hsl(var(--muted-foreground));
   padding: 16px;
   text-align: center;
@@ -829,7 +829,7 @@ function syncAllProviderModels() {
   border-radius: 8px;
   background: transparent;
   color: hsl(var(--muted-foreground));
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   font-weight: 500;
   cursor: pointer;
   transition: all 0.12s;
@@ -863,7 +863,7 @@ function syncAllProviderModels() {
   border-radius: 6px;
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s;
@@ -894,7 +894,7 @@ function syncAllProviderModels() {
   border-radius: 9999px;
   background: hsl(var(--muted) / 0.5);
   color: hsl(var(--foreground));
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   cursor: pointer;
   transition: all 0.15s;
 }
@@ -949,7 +949,7 @@ function syncAllProviderModels() {
 
 .permission-menu-title {
   padding: 4px 8px 6px;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -966,7 +966,7 @@ function syncAllProviderModels() {
   border: none;
   background: transparent;
   color: hsl(var(--foreground));
-  font-size: 13px;
+  font-size: var(--font-size-body);
   text-align: left;
   cursor: pointer;
   transition: background-color 0.12s;

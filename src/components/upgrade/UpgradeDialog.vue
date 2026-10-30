@@ -288,14 +288,14 @@ onUnmounted(() => {
 }
 
 .upgrade-title {
-  font-size: 17px;
+  font-size: var(--font-size-title);
   font-weight: 700;
   letter-spacing: -0.02em;
   color: hsl(var(--foreground));
 }
 
 .upgrade-sub {
-  font-size: 12.5px;
+  font-size: var(--font-size-dense);
   color: hsl(var(--muted-foreground));
 }
 
@@ -315,7 +315,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  font-size: 12.5px;
+  font-size: var(--font-size-dense);
   color: hsl(var(--foreground));
 }
 
@@ -340,7 +340,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background-color: hsl(var(--primary) / 0.14);
   color: hsl(var(--primary-text));
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -371,7 +371,7 @@ onUnmounted(() => {
 }
 
 .upgrade-price__value {
-  font-size: 13.5px;
+  font-size: var(--font-size-body);
   font-weight: 700;
   color: hsl(var(--foreground));
   font-variant-numeric: tabular-nums;
@@ -383,7 +383,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background-color: hsl(var(--primary) / 0.12);
   color: hsl(var(--primary-text));
-  font-size: 10.5px;
+  font-size: var(--font-size-caption);
   font-weight: 700;
 }
 
@@ -412,7 +412,7 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 10.5px;
+  font-size: var(--font-size-caption);
   color: hsl(var(--muted-foreground));
 }
 

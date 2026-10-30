@@ -201,7 +201,7 @@ const shouldShowSchema = computed(() => {
 
     <div v-else class="space-y-3">
       <div class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.label') }}</Label>
+        <Label class="text-caption text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.label') }}</Label>
         <Select
           :model-value="selectedConnectionId"
           :disabled="isConnecting"
@@ -213,11 +213,11 @@ const shouldShowSchema = computed(() => {
                 <span class="font-mono">{{ selectedConnection.name }}</span>
                 <span
                   v-if="isConnected"
-                  class="text-[9px] text-green-600 font-medium ml-1.5"
+                  class="text-caption text-green-600 font-medium ml-1.5"
                 >●</span>
                 <span
                   v-else-if="isConnecting"
-                  class="text-[9px] text-muted-foreground ml-1.5 animate-pulse"
+                  class="text-caption text-muted-foreground ml-1.5 animate-pulse"
                 >●</span>
               </template>
             </SelectValue>
@@ -233,17 +233,17 @@ const shouldShowSchema = computed(() => {
                 <span>{{ conn.name }}</span>
                 <span
                   v-if="connectionStore.getConnectionStatus(conn.id!) === ConnectionStatus.CONNECTED"
-                  class="text-[10px] text-green-600 tracking-wide font-mono px-1 rounded-sm bg-green-500/10 uppercase"
+                  class="text-caption text-green-600 tracking-wide font-mono px-1 rounded-sm bg-green-500/10 uppercase"
                 >
                   {{ t('transfer.connection.connected') }}
                 </span>
                 <span
                   v-else
-                  class="text-[10px] text-muted-foreground tracking-wide font-mono px-1 rounded-sm bg-muted/60 uppercase"
+                  class="text-caption text-muted-foreground tracking-wide font-mono px-1 rounded-sm bg-muted/60 uppercase"
                 >
                   {{ t('transfer.connection.offline') }}
                 </span>
-                <span class="text-[10px] text-muted-foreground font-mono ml-auto">{{ conn.type }}</span>
+                <span class="text-caption text-muted-foreground font-mono ml-auto">{{ conn.type }}</span>
               </div>
             </SelectItem>
           </SelectContent>
@@ -251,7 +251,7 @@ const shouldShowSchema = computed(() => {
       </div>
 
       <div v-if="props.showDatabase" class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.databaseLabel') }}</Label>
+        <Label class="text-caption text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.databaseLabel') }}</Label>
         <Select
           v-model="selectedDatabase"
           :disabled="!isConnected || loadingDatabases || databases.length === 0"
@@ -270,7 +270,7 @@ const shouldShowSchema = computed(() => {
                 <span>{{ db.name }}</span>
                 <span
                   v-if="db.is_system"
-                  class="text-[10px] text-muted-foreground tracking-wide font-mono ml-auto px-1 rounded-sm bg-muted/60 uppercase"
+                  class="text-caption text-muted-foreground tracking-wide font-mono ml-auto px-1 rounded-sm bg-muted/60 uppercase"
                 >
                   {{ t('transfer.connection.system') }}
                 </span>
@@ -278,13 +278,13 @@ const shouldShowSchema = computed(() => {
             </SelectItem>
           </SelectContent>
         </Select>
-        <div v-if="loadingDatabases" class="text-[10px] text-muted-foreground flex items-center">
+        <div v-if="loadingDatabases" class="text-caption text-muted-foreground flex items-center">
           <span class="i-carbon-circle-dash mr-1 animate-spin" /> {{ t('transfer.connection.loadingDatabases') }}
         </div>
       </div>
 
       <div v-if="shouldShowSchema" class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.schemaLabel') }}</Label>
+        <Label class="text-caption text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.schemaLabel') }}</Label>
         <Select
           v-model="selectedSchema"
           :disabled="!selectedDatabase || loadingSchemas || schemas.length === 0"
@@ -303,7 +303,7 @@ const shouldShowSchema = computed(() => {
             </SelectItem>
           </SelectContent>
         </Select>
-        <div v-if="loadingSchemas" class="text-[10px] text-muted-foreground flex items-center">
+        <div v-if="loadingSchemas" class="text-caption text-muted-foreground flex items-center">
           <span class="i-carbon-circle-dash mr-1 animate-spin" /> {{ t('transfer.connection.loadingSchemas') }}
         </div>
       </div>

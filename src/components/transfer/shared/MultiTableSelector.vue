@@ -130,13 +130,13 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
         </div>
       </div>
 
-      <div v-else-if="loading" class="text-[11px] text-muted-foreground p-4 border rounded-md border-dashed bg-muted/20 flex flex-1 items-center justify-center">
+      <div v-else-if="loading" class="text-caption text-muted-foreground p-4 border rounded-md border-dashed bg-muted/20 flex flex-1 items-center justify-center">
         <span class="i-carbon-circle-dash mr-1.5 animate-spin" /> Loading tables...
       </div>
 
       <div v-else-if="tables.length === 0" class="border border-border/40 rounded-md flex-1 overflow-hidden">
         <table class="text-xs w-full">
-          <thead class="text-[10px] text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase">
+          <thead class="text-caption text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase">
             <tr>
               <th scope="col" class="font-medium px-2 py-1.5 text-left w-8">
                 <Checkbox :checked="false" class="h-3.5 w-3.5" disabled />
@@ -154,7 +154,7 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
           </thead>
           <tbody>
             <tr>
-              <td colspan="4" class="text-[11px] text-muted-foreground px-2 py-6 text-center italic">
+              <td colspan="4" class="text-caption text-muted-foreground px-2 py-6 text-center italic">
                 <span class="i-carbon-data-base mr-1.5 opacity-50" /> {{ t('transfer.common.noTablesFound') }}
               </td>
             </tr>
@@ -167,7 +167,7 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
           <caption class="sr-only">
             Available tables for export selection
           </caption>
-          <thead class="text-[10px] text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase top-0 sticky z-10">
+          <thead class="text-caption text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase top-0 sticky z-10">
             <tr>
               <th scope="col" class="font-medium px-2 py-1.5 text-left w-8">
                 <Checkbox
@@ -211,10 +211,10 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
                 <th scope="row" class="font-mono font-normal px-2 py-1.5 text-left align-middle max-w-[180px] truncate">
                   {{ table.name }}
                 </th>
-                <td class="text-[10px] text-muted-foreground font-mono px-2 py-1.5 text-right align-middle tabular-nums">
+                <td class="text-caption text-muted-foreground font-mono px-2 py-1.5 text-right align-middle tabular-nums">
                   {{ table.rowCount?.toLocaleString() || '-' }}
                 </td>
-                <td class="text-[10px] text-muted-foreground px-2 py-1.5 text-right align-middle uppercase">
+                <td class="text-caption text-muted-foreground px-2 py-1.5 text-right align-middle uppercase">
                   {{ table.table_type || 'TABLE' }}
                 </td>
               </tr>
@@ -225,11 +225,11 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
     </div>
 
     <!-- Selection Count Footer -->
-    <div v-if="selectionCount > 0" class="text-[10px] text-primary-text font-mono font-semibold mt-2 flex shrink-0 gap-1 items-center">
+    <div v-if="selectionCount > 0" class="text-caption text-primary-text font-mono font-semibold mt-2 flex shrink-0 gap-1 items-center">
       <span class="i-carbon-checkmark-filled h-3 w-3" />
       {{ selectionCount }} tables selected
     </div>
-    <div v-else class="text-[10px] text-muted-foreground mt-2 shrink-0">
+    <div v-else class="text-caption text-muted-foreground mt-2 shrink-0">
       Select tables to export
     </div>
   </div>

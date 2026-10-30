@@ -101,25 +101,25 @@ watch(filePath, () => {
 
         <div class="gap-2.5 grid grid-cols-2">
           <div>
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.format') }}</Label>
-            <Badge class="text-[10px] font-mono px-1 py-0.5 uppercase" variant="secondary">
+            <Label class="text-caption text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.format') }}</Label>
+            <Badge class="text-caption font-mono px-1 py-0.5 uppercase" variant="secondary">
               {{ formatLabel }}
             </Badge>
           </div>
           <div>
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.encoding') }}</Label>
-            <Badge class="text-[10px] font-mono px-1 py-0.5 uppercase" variant="outline">
+            <Label class="text-caption text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.encoding') }}</Label>
+            <Badge class="text-caption font-mono px-1 py-0.5 uppercase" variant="outline">
               {{ detectionResult.encoding }}
             </Badge>
           </div>
           <div>
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.rows') }}</Label>
+            <Label class="text-caption text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.rows') }}</Label>
             <div class="text-xs font-mono tabular-nums">
               {{ detectionResult.estimatedRows?.toLocaleString() || 'Unknown' }}
             </div>
           </div>
           <div>
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.fileSize') }}</Label>
+            <Label class="text-caption text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.fileSize') }}</Label>
             <div class="text-xs font-mono tabular-nums">
               {{ (detectionResult.fileSizeBytes / 1024).toFixed(1) }} KB
             </div>
@@ -127,17 +127,17 @@ watch(filePath, () => {
         </div>
 
         <div class="pt-2 border-t border-border/40">
-          <Label class="text-[11px] text-muted-foreground tracking-wide mb-2 block uppercase">{{ t('transfer.import.detectedColumns') }}</Label>
+          <Label class="text-caption text-muted-foreground tracking-wide mb-2 block uppercase">{{ t('transfer.import.detectedColumns') }}</Label>
           <div class="flex flex-wrap gap-1.5">
             <Badge
               v-for="col in detectionResult.columns.slice(0, 10)"
               :key="col"
               variant="outline"
-              class="text-[10px] font-mono px-1.5 py-0.5 border-border/40"
+              class="text-caption font-mono px-1.5 py-0.5 border-border/40"
             >
               {{ col }}
             </Badge>
-            <Badge v-if="detectionResult.columns.length > 10" variant="outline" class="text-[10px] font-mono px-1.5 py-0.5 border-dashed">
+            <Badge v-if="detectionResult.columns.length > 10" variant="outline" class="text-caption font-mono px-1.5 py-0.5 border-dashed">
               +{{ detectionResult.columns.length - 10 }} more
             </Badge>
           </div>
