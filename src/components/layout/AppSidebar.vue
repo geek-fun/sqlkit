@@ -26,14 +26,14 @@ const { t } = useI18n()
 </script>
 
 <template>
-  <aside class="border-r bg-chrome flex flex-shrink-0 flex-col h-full w-16 z-50">
+  <aside class="border-r bg-chrome flex flex-shrink-0 flex-col h-full w-14 z-50">
     <!-- User identity (was the logo; the app mark moved to the title bar) -->
-    <div class="border-b flex h-14 items-center justify-center">
+    <div class="border-b flex h-12 items-center justify-center">
       <UserMenu />
     </div>
 
     <!-- Navigation -->
-    <nav class="px-2 py-4 flex-1 overflow-y-auto space-y-2">
+    <nav class="px-1.5 py-3 flex-1 overflow-y-auto space-y-1.5">
       <TooltipProvider>
         <RouterLink
           v-for="item in menuItems"
@@ -45,7 +45,7 @@ const { t } = useI18n()
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                class="mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center relative" :class="[
+                class="mx-auto rounded-md flex h-9 w-9 cursor-pointer transition-colors items-center justify-center relative" :class="[
                   item.id === 'github'
                     ? 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                     : isActive(item.path)
@@ -58,7 +58,7 @@ const { t } = useI18n()
                 <ProBadge
                   v-if="showProDots && item.gated"
                   size="dot"
-                  class="right-1 top-1 absolute"
+                  class="right-0.5 top-0.5 absolute"
                 />
                 <!-- DNS icon -->
                 <svg
@@ -152,14 +152,6 @@ const { t } = useI18n()
 
                 <!-- GitHub icon -->
                 <span v-if="item.icon === 'github'" class="i-lucide-github h-5 w-5" />
-
-                <!-- AI Badge -->
-                <span
-                  v-if="false"
-                  class="text-[8px] text-primary-foreground font-bold px-1 rounded-full bg-primary right-1 top-1 absolute"
-                >
-                  AI
-                </span>
               </button>
             </TooltipTrigger>
             <TooltipContent side="right">
@@ -177,7 +169,7 @@ const { t } = useI18n()
           <Tooltip>
             <TooltipTrigger as-child>
               <button
-                class="mx-auto rounded-md flex h-10 w-10 cursor-pointer transition-colors items-center justify-center" :class="[
+                class="mx-auto rounded-md flex h-9 w-9 cursor-pointer transition-colors items-center justify-center" :class="[
                   isActive('/settings')
                     ? 'bg-secondary text-primary-text border border-border shadow-sm'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',

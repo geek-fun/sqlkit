@@ -46,12 +46,12 @@ const stepLabel = computed(() =>
   >
     <div class="px-3 py-2 border-b border-border/40 flex gap-2.5 items-center">
       <span v-if="icon" class="text-muted-foreground h-3.5 w-3.5" :class="[icon, iconClass]" />
-      <span v-if="stepLabel" class="text-[10px] text-muted-foreground tracking-wide font-mono px-1.5 rounded-sm bg-muted">
+      <span v-if="stepLabel" class="text-caption text-muted-foreground tracking-wide font-mono px-1.5 rounded-sm bg-muted">
         {{ stepLabel }}
       </span>
-      <span class="text-xs text-foreground tracking-wide font-medium uppercase" :class="{ 'flex-1': !scope }">{{ title }}</span>
+      <span class="text-body text-foreground tracking-wide font-medium uppercase" :class="{ 'flex-1': !scope }">{{ title }}</span>
       <ScopeSelector v-if="scope" class="ml-2" :scope="props.scope ?? 'tables'" :disabled="props.scopeDisabled" @update:scope="emit('update:scope', $event)" />
-      <span v-if="summary" class="text-[11px] text-muted-foreground font-mono">
+      <span v-if="summary" class="text-caption text-muted-foreground font-mono">
         {{ summary }}
       </span>
     </div>

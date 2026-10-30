@@ -70,7 +70,7 @@ const timeAgo = computed(() => {
         </div>
         <Badge
           :variant="statusColor"
-          class="text-[10px] tracking-wide font-mono px-1.5 py-0.5 rounded-sm uppercase" :class="[
+          class="text-caption tracking-wide font-mono px-1.5 py-0.5 rounded-sm uppercase" :class="[
             props.task.status === 'completed' ? 'bg-green-500/10 text-green-600 border-transparent' : '',
           ]"
         >
@@ -84,7 +84,7 @@ const timeAgo = computed(() => {
         class="bg-muted h-1"
       />
 
-      <div class="text-[11px] text-muted-foreground font-mono flex items-center justify-between tabular-nums">
+      <div class="text-caption text-muted-foreground font-mono flex items-center justify-between tabular-nums">
         <span>
           {{ props.task.runtime.complete.toLocaleString() }}
           <span v-if="props.task.runtime.total > 0">
@@ -94,7 +94,7 @@ const timeAgo = computed(() => {
         <span>{{ timeAgo }}</span>
       </div>
 
-      <div v-if="props.task.error" class="text-[11px] text-destructive-text">
+      <div v-if="props.task.error" class="text-caption text-destructive-text">
         {{ props.task.error }}
       </div>
 
@@ -103,7 +103,7 @@ const timeAgo = computed(() => {
           v-if="props.task.status !== 'running'"
           variant="ghost"
           size="sm"
-          class="text-[11px] text-muted-foreground tracking-wide px-2.5 h-7 uppercase"
+          class="text-caption text-muted-foreground tracking-wide px-2.5 h-7 uppercase"
           @click="emit('dismiss')"
         >
           {{ t('transfer.tasks.dismiss') }}
@@ -111,7 +111,7 @@ const timeAgo = computed(() => {
         <Button
           variant="outline"
           size="sm"
-          class="text-[11px] px-2.5 border-border/40 flex gap-1.5 h-7"
+          class="text-caption px-2.5 border-border/40 flex gap-1.5 h-7"
           @click="emit('goToTask')"
         >
           <span class="i-carbon-arrow-right h-3 w-3" />

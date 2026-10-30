@@ -73,7 +73,7 @@ function handleSelect(value: string) {
       :search-threshold="1"
       :placeholder="t('sidebar.connection.placeholder')"
       :search-placeholder="t('sidebar.search')"
-      class="text-xs flex-1 h-8"
+      class="text-body flex-1 h-8"
       @update:model-value="handleSelect"
     >
       <template #selected-prepend>
@@ -93,7 +93,7 @@ function handleSelect(value: string) {
     <TooltipProvider>
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="shrink-0 h-3.5 w-3.5 cursor-help" :class="[statusInfo.dotClass]" />
+          <span class="shrink-0 h-2.5 w-2.5 cursor-help" :class="[statusInfo.dotClass]" />
         </TooltipTrigger>
         <TooltipContent side="right">
           {{ t(statusInfo.tooltipKey) }}

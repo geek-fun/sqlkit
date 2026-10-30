@@ -76,7 +76,7 @@ function isFKColumn(colName: string): boolean {
 .er-table-card {
   @apply bg-card border border-border rounded-lg shadow-sm;
   width: 220px;
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   user-select: none;
 }
 .er-table-card--selected {
@@ -102,7 +102,7 @@ function isFKColumn(colName: string): boolean {
   @apply font-mono flex-1 truncate;
 }
 .er-column-type {
-  @apply text-muted-foreground text-[10px] flex-shrink-0;
+  @apply text-muted-foreground text-caption flex-shrink-0;
   max-width: 80px;
   overflow: hidden;
   text-overflow: ellipsis;

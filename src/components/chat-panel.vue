@@ -306,7 +306,7 @@ onBeforeUnmount(() => {
         <span class="i-carbon-pause-filled shrink-0 h-4 w-4" style="color: hsl(38 92% 50%);" />
         <div class="flex flex-col gap-0.5">
           <span class="text-xs font-medium">{{ stopMessage }}</span>
-          <span class="text-[11px] text-muted-foreground">{{ t('dataStudio.agent.continueHint') }}</span>
+          <span class="text-caption text-muted-foreground">{{ t('dataStudio.agent.continueHint') }}</span>
         </div>
       </div>
       <div class="flex shrink-0 gap-1.5">
@@ -446,7 +446,7 @@ onBeforeUnmount(() => {
   outline: none;
   background: transparent;
   color: hsl(var(--foreground));
-  font-size: 13px;
+  font-size: var(--font-size-body);
   resize: none;
   line-height: 1.5;
 }
@@ -541,13 +541,13 @@ onBeforeUnmount(() => {
 }
 
 .loop-stopped-banner__message {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   font-weight: 500;
   line-height: 1.4;
 }
 
 .loop-stopped-banner__hint {
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   color: hsl(var(--muted-foreground));
   line-height: 1.4;
 }
@@ -561,7 +561,7 @@ onBeforeUnmount(() => {
 
 .loop-stopped-banner__action {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;

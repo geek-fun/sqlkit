@@ -395,25 +395,25 @@ onUnmounted(() => {
         <div v-if="detectionResult" class="mt-4 pt-3 border-t border-border/40 space-y-3">
           <div class="gap-2.5 grid grid-cols-2">
             <div>
-              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.format') }}</Label>
-              <Badge class="text-[10px] font-mono px-1 py-0.5 w-fit block uppercase" variant="secondary">
+              <Label class="text-caption text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.format') }}</Label>
+              <Badge class="text-caption font-mono px-1 py-0.5 w-fit block uppercase" variant="secondary">
                 {{ formatLabel }}
               </Badge>
             </div>
             <div>
-              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.encoding') }}</Label>
-              <Badge class="text-[10px] font-mono px-1 py-0.5 w-fit block uppercase" variant="outline">
+              <Label class="text-caption text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.encoding') }}</Label>
+              <Badge class="text-caption font-mono px-1 py-0.5 w-fit block uppercase" variant="outline">
                 {{ detectionResult.encoding }}
               </Badge>
             </div>
             <div>
-              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.rows') }}</Label>
+              <Label class="text-caption text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.detected.rows') }}</Label>
               <div class="text-xs font-mono tabular-nums">
                 {{ detectionResult.estimatedRows?.toLocaleString() || 'Unknown' }}
               </div>
             </div>
             <div>
-              <Label class="text-[11px] text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.fileSize') }}</Label>
+              <Label class="text-caption text-muted-foreground tracking-wide mb-1 block uppercase">{{ t('transfer.import.fileSize') }}</Label>
               <div class="text-xs font-mono tabular-nums">
                 {{ (detectionResult.fileSizeBytes / 1024).toFixed(1) }} KB
               </div>
@@ -421,17 +421,17 @@ onUnmounted(() => {
           </div>
 
           <div class="pt-2 border-t border-border/40">
-            <Label class="text-[11px] text-muted-foreground tracking-wide mb-2 block uppercase">{{ t('transfer.import.detectedColumns') }}</Label>
+            <Label class="text-caption text-muted-foreground tracking-wide mb-2 block uppercase">{{ t('transfer.import.detectedColumns') }}</Label>
             <div class="flex flex-wrap gap-1.5">
               <Badge
                 v-for="col in detectionResult.columns.slice(0, 10)"
                 :key="col"
                 variant="outline"
-                class="text-[10px] font-mono px-1.5 py-0.5 border-border/40"
+                class="text-caption font-mono px-1.5 py-0.5 border-border/40"
               >
                 {{ col }}
               </Badge>
-              <Badge v-if="detectionResult.columns.length > 10" variant="outline" class="text-[10px] font-mono px-1.5 py-0.5 border-dashed">
+              <Badge v-if="detectionResult.columns.length > 10" variant="outline" class="text-caption font-mono px-1.5 py-0.5 border-dashed">
                 +{{ detectionResult.columns.length - 10 }} more
               </Badge>
             </div>
@@ -457,7 +457,7 @@ onUnmounted(() => {
           v-model:database="database"
           v-model:schema="schema"
         />
-        <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
+        <Badge variant="secondary" class="text-caption font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
           SQL can CREATE DATABASE
         </Badge>
       </div>
@@ -476,7 +476,7 @@ onUnmounted(() => {
           <Label for="import-create-db" class="text-xs cursor-pointer select-none">{{ t('transfer.import.createDbIfNotExists') }}</Label>
         </div>
 
-        <Badge v-if="database" variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
+        <Badge v-if="database" variant="secondary" class="text-caption font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
           {{ t('transfer.import.tablesAutoCreated') }}
         </Badge>
       </div>
@@ -509,16 +509,16 @@ onUnmounted(() => {
               COLUMN MAPPING
             </div>
             <div class="flex gap-2">
-              <Button variant="outline" size="sm" class="text-[11px] px-2 h-6" @click="autoMap">
+              <Button variant="outline" size="sm" class="text-caption px-2 h-6" @click="autoMap">
                 Auto-Map
               </Button>
-              <Button variant="ghost" size="sm" class="text-[11px] px-2 h-6" @click="clearAll">
+              <Button variant="ghost" size="sm" class="text-caption px-2 h-6" @click="clearAll">
                 Clear All
               </Button>
             </div>
           </div>
 
-          <div v-if="loadingColumns" class="text-[11px] text-muted-foreground py-2 text-center border border-border/40 rounded-sm border-dashed">
+          <div v-if="loadingColumns" class="text-caption text-muted-foreground py-2 text-center border border-border/40 rounded-sm border-dashed">
             Loading target columns...
           </div>
 
@@ -527,7 +527,7 @@ onUnmounted(() => {
               <caption class="sr-only">
                 Column mapping between source and target database
               </caption>
-              <thead class="text-[10px] text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase">
+              <thead class="text-caption text-muted-foreground tracking-wide border-b border-border/40 bg-muted/40 uppercase">
                 <tr>
                   <th scope="col" class="font-medium px-2 py-1.5 text-left">
                     Source Column
@@ -545,7 +545,7 @@ onUnmounted(() => {
               </thead>
               <tbody>
                 <tr v-if="mappings.length === 0" class="border-b border-border/40">
-                  <td colspan="4" class="text-[11px] text-muted-foreground px-2 py-4 text-center italic">
+                  <td colspan="4" class="text-caption text-muted-foreground px-2 py-4 text-center italic">
                     No columns detected
                   </td>
                 </tr>
@@ -576,15 +576,15 @@ onUnmounted(() => {
                       </SelectContent>
                     </Select>
                   </td>
-                  <td class="text-[10px] text-muted-foreground font-mono px-2 py-1 align-middle max-w-[80px] truncate uppercase" :title="mapping.targetType">
+                  <td class="text-caption text-muted-foreground font-mono px-2 py-1 align-middle max-w-[80px] truncate uppercase" :title="mapping.targetType">
                     {{ mapping.targetType || '-' }}
                   </td>
                   <td class="px-2 py-1 align-middle">
-                    <span v-if="mapping.targetColumn" class="text-[10px] text-green-600 tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-green-500/10 flex w-fit uppercase items-center">
+                    <span v-if="mapping.targetColumn" class="text-caption text-green-600 tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-green-500/10 flex w-fit uppercase items-center">
                       <span class="sr-only">Status: </span>
                       <div class="i-carbon-checkmark mr-1" aria-hidden="true" /> Mapped
                     </span>
-                    <span v-else class="text-[10px] text-muted-foreground tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-muted flex w-fit uppercase items-center">
+                    <span v-else class="text-caption text-muted-foreground tracking-wide font-medium px-1.5 py-0.5 rounded-sm bg-muted flex w-fit uppercase items-center">
                       <span class="sr-only">Status: </span>
                       <div class="i-carbon-subtract mr-1" aria-hidden="true" /> Skipped
                     </span>
@@ -594,7 +594,7 @@ onUnmounted(() => {
             </table>
           </div>
 
-          <div class="text-[11px] text-muted-foreground tracking-wide mt-2 flex uppercase justify-end">
+          <div class="text-caption text-muted-foreground tracking-wide mt-2 flex uppercase justify-end">
             <span class="font-mono mr-1 tabular-nums">{{ mappings.filter(m => m.targetColumn).length }}</span> of
             <span class="font-mono mx-1 tabular-nums">{{ mappings.length }}</span> columns mapped
           </div>
@@ -631,7 +631,7 @@ onUnmounted(() => {
         <template v-else>
           <div class="gap-4 grid grid-cols-2">
             <div class="space-y-1.5">
-              <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.conflict.label') }}</Label>
+              <Label class="text-caption text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.conflict.label') }}</Label>
               <Select v-model="conflictStrategy">
                 <SelectTrigger class="text-xs h-8">
                   <SelectValue />
@@ -650,7 +650,7 @@ onUnmounted(() => {
             </div>
 
             <div class="space-y-1.5">
-              <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.batchSize') }}</Label>
+              <Label class="text-caption text-muted-foreground tracking-wide block uppercase">{{ t('transfer.import.batchSize') }}</Label>
               <Input
                 v-model.number="batchSize"
                 type="number"
@@ -676,7 +676,7 @@ onUnmounted(() => {
           <!-- Excel Options -->
           <div v-if="detectionResult?.format === 'excel'" class="mt-4 pt-3 border-t border-border/40 gap-4 grid grid-cols-2">
             <div class="space-y-1.5">
-              <Label class="text-[11px] text-muted-foreground tracking-wide block uppercase">Sheet Name</Label>
+              <Label class="text-caption text-muted-foreground tracking-wide block uppercase">Sheet Name</Label>
               <Input v-model="excelSheetName" placeholder="Sheet1" class="text-xs h-8" />
             </div>
             <div class="px-2 py-1.5 rounded-sm flex h-fit transition-colors items-center space-x-2 sm:mt-5 hover:bg-muted/40">
@@ -692,11 +692,11 @@ onUnmounted(() => {
                 <div class="i-carbon-table" />
                 {{ t('transfer.import.dataPreview') }}
               </div>
-              <span class="text-[10px] text-muted-foreground tracking-wide font-mono uppercase">{{ t('transfer.import.previewRows') }}</span>
+              <span class="text-caption text-muted-foreground tracking-wide font-mono uppercase">{{ t('transfer.import.previewRows') }}</span>
             </div>
             <div class="border border-border/40 rounded-sm overflow-hidden">
               <div v-if="previewData.length > 0" class="max-h-[240px] overflow-auto">
-                <table class="text-[10px] text-left w-full whitespace-nowrap border-collapse">
+                <table class="text-caption text-left w-full whitespace-nowrap border-collapse">
                   <thead class="bg-muted/40 shadow-border/40 shadow-sm top-0 sticky z-10">
                     <tr>
                       <th v-for="col in previewColumns" :key="col" class="text-muted-foreground tracking-wide font-medium px-2 py-1.5 border-b border-border/40 uppercase">
@@ -713,7 +713,7 @@ onUnmounted(() => {
                   </tbody>
                 </table>
               </div>
-              <div v-else class="text-[11px] text-muted-foreground py-6 text-center bg-muted/20">
+              <div v-else class="text-caption text-muted-foreground py-6 text-center bg-muted/20">
                 <div v-if="isLoadingPreview" class="flex flex-col gap-2 items-center justify-center">
                   <div class="i-carbon-circle-dash opacity-50 animate-spin" />
                   {{ t('transfer.import.loadingPreview') }}

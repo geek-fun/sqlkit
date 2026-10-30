@@ -9,7 +9,7 @@ const props = defineProps<{
 
 const { getDatabaseIcon } = useDatabaseIcon()
 
-const s = props.size ?? 14
+const s = props.size ?? 16
 </script>
 
 <template>

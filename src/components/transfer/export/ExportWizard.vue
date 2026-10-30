@@ -238,13 +238,13 @@ async function startExport() {
 
           <!-- Step 2: Scope selector -->
           <div class="space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.export.scope') }}</Label>
+            <Label class="text-caption text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.export.scope') }}</Label>
             <ScopeSelector :scope="scope" @update:scope="scope = $event" />
           </div>
 
           <!-- Step 3: Database selector (only when scope is 'database' or 'tables') -->
           <div v-if="scope === 'database' || scope === 'tables'" class="space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.databaseLabel') }}</Label>
+            <Label class="text-caption text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.connection.databaseLabel') }}</Label>
             <Select v-model="database" :disabled="!connectionId">
               <SelectTrigger class="text-xs border-border/40 bg-muted/20 h-8">
                 <SelectValue :placeholder="t('transfer.connection.databasePlaceholder')" />
@@ -260,7 +260,7 @@ async function startExport() {
                     <span>{{ db.name }}</span>
                     <span
                       v-if="db.is_system"
-                      class="text-[10px] text-muted-foreground tracking-wide font-mono ml-auto px-1 rounded-sm bg-muted/60 uppercase"
+                      class="text-caption text-muted-foreground tracking-wide font-mono ml-auto px-1 rounded-sm bg-muted/60 uppercase"
                     >
                       System
                     </span>
@@ -271,7 +271,7 @@ async function startExport() {
           </div>
 
           <!-- Scope info badge -->
-          <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
+          <Badge variant="secondary" class="text-caption font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
             {{ scope === 'server' ? 'All databases on this server' : scope === 'database' ? (database ? `All tables in ${database}` : 'Select a database') : (selectedTables.length > 0 ? `${selectedTables.length} tables` : 'Select tables') }}
           </Badge>
         </div>
@@ -301,7 +301,7 @@ async function startExport() {
         <div class="flex flex-row gap-4">
           <!-- Left: Format + Format-specific Options -->
           <div class="flex-1 min-w-0 space-y-2">
-            <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">
+            <Label class="text-caption text-muted-foreground tracking-wide font-medium uppercase">
               {{ t('transfer.format.label', 'Format') }}
             </Label>
 
@@ -328,7 +328,7 @@ async function startExport() {
               <!-- CSV Options -->
               <div v-if="selectedFormat === 'csv'" class="flex gap-3 items-center">
                 <div class="space-y-1.5">
-                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.delimiter') }}</Label>
+                  <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.delimiter') }}</Label>
                   <Select v-model="csvDelimiter">
                     <SelectTrigger class="text-xs font-mono h-8 w-24">
                       <SelectValue />
@@ -355,7 +355,7 @@ async function startExport() {
               <!-- JSONL Options -->
               <div v-if="selectedFormat === 'jsonl'" class="flex gap-3 items-center">
                 <div class="space-y-1.5">
-                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.dateFormat') }}</Label>
+                  <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.dateFormat') }}</Label>
                   <Select v-model="jsonlDateFormat">
                     <SelectTrigger class="text-xs h-8 w-28">
                       <SelectValue />
@@ -375,7 +375,7 @@ async function startExport() {
               <!-- SQL Options -->
               <div v-if="selectedFormat === 'sql'" class="flex flex-wrap gap-3 items-center">
                 <div class="space-y-1.5">
-                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.rowsPerBatch') }}</Label>
+                  <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.rowsPerBatch') }}</Label>
                   <Input v-model.number="sqlBatchSize" type="number" min="1" max="10000" class="text-xs font-mono h-8 w-24" />
                 </div>
                 <div class="flex items-center space-x-2 sm:mt-5">
@@ -391,7 +391,7 @@ async function startExport() {
               <!-- Excel Options -->
               <div v-if="selectedFormat === 'excel'" class="flex gap-3 items-center">
                 <div class="space-y-1.5">
-                  <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.worksheet') }}</Label>
+                  <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.worksheet') }}</Label>
                   <div class="flex gap-3 items-center">
                     <div class="flex items-center space-x-2">
                       <Checkbox id="excel-header" v-model:checked="excelIncludeHeader" class="h-3.5 w-3.5" />
@@ -413,7 +413,7 @@ async function startExport() {
 
           <!-- Right: Output Path -->
           <div class="pl-4 border-l border-border/40 flex-1 min-w-0 space-y-1.5">
-            <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.outputPath') }}</Label>
+            <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.outputPath') }}</Label>
             <div class="flex gap-2 items-center">
               <Button variant="outline" size="sm" class="text-xs px-3 h-8" @click="handleBrowse">
                 <span class="i-carbon-folder mr-1.5" /> {{ t('common.buttons.browse') }}
@@ -423,7 +423,7 @@ async function startExport() {
                 <Input
                   v-model="outputPath"
                   :placeholder="scope === 'tables' ? `/path/to/output.${selectedFormat === 'excel' ? 'xlsx' : selectedFormat}` : '/path/to/export/directory'"
-                  class="text-[11px] font-mono pl-8 h-8"
+                  class="text-caption font-mono pl-8 h-8"
                 />
               </div>
             </div>
@@ -433,10 +433,10 @@ async function startExport() {
         <!-- Row 2: Execute action bar (full width) -->
         <div class="pt-3 border-t border-border/40 flex gap-3 items-center justify-end">
           <div v-if="connectionId" class="mr-auto flex gap-2 items-center">
-            <Badge variant="secondary" class="text-[10px] font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
+            <Badge variant="secondary" class="text-caption font-mono px-1.5 py-0.5 border-border/40 bg-muted/30">
               {{ scope === 'server' ? 'All databases' : scope === 'database' ? (database || 'Select db') : `${selectedTables.length} tables` }}
             </Badge>
-            <Badge variant="outline" class="text-[10px] font-mono px-1.5 py-0.5 uppercase">
+            <Badge variant="outline" class="text-caption font-mono px-1.5 py-0.5 uppercase">
               {{ selectedFormat }}
             </Badge>
           </div>
