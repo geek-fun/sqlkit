@@ -111,7 +111,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
       <div
         v-for="tab in tabs"
         :key="tab.id"
-        class="tab-item group text-xs px-3 border-r border-border flex gap-1 cursor-pointer select-none transition-colors items-center"
+        class="tab-item group text-body px-3 border-r border-border flex gap-1 cursor-pointer select-none transition-colors items-center"
         :class="{
           'bg-background text-foreground font-medium': isActiveTab(tab.id),
           'bg-muted/30 text-muted-foreground hover:bg-background/50 hover:text-foreground': !isActiveTab(tab.id),
