@@ -140,6 +140,8 @@ The global body size is `var(--font-size-form)` (14px), and `src/assets/index.cs
 
 The type scale is token-driven. `index.css` defines `--font-size-caption / dense / body / form / title / page-title` (11 / 12 / 13 / 14 / 16 / 20px); `uno.config.ts` maps the two sizes missing from the default scale (`text-caption` = 11px, `text-body` = 13px), and the rest reuse default utilities (`text-xs` = 12, `text-sm` = 14, `text-base` = 16, `text-xl` = 20). Business components must use these utilities or the CSS variables — never a bare px/rem font size. Monaco's editor font size remains a user setting.
 
+Custom font-size utilities must also be registered in the shared `cn()` helper so component overrides merge sizes independently of semantic text colors.
+
 The following hierarchy constrains new UI; it does not require rewriting all existing page titles.
 
 | Role | Token / utility | Usage |
