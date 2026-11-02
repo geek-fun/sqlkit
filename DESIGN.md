@@ -149,8 +149,8 @@ The following hierarchy constrains new UI; it does not require rewriting all exi
 | Page title | `text-xl` (20px / 600) | Standalone pages such as Connections and Settings; do not add large headings to editor workspaces |
 | Dialog / panel / card title | `text-base` (16px / 600) | Dialog titles, side-panel headers, card and section titles |
 | Body / form | `text-sm` (14px / 400) | Descriptions, inputs, buttons |
-| Sidebar lists and menus | `text-body` (13px / 400–500) | Connection selector rows, saved-query names, dropdown items outside dense surfaces |
-| Dense data / supporting labels | `text-xs` (12px / 400–500) | Result grids, object trees, query tabs, toolbars, status bars |
+| Sidebar lists, trees, and menus | `text-body` (13px / 400–500) | Connection selector rows, object trees, saved-query names, query tabs, dropdown items |
+| Dense data / supporting labels | `text-xs` (12px / 400–500) | Result grids, toolbars, status bars, empty-state hints |
 | Captions and badges | `text-caption` (11px / 500) | Attribute badges, timestamps, task counters; the readable lower bound — 9–10px text is forbidden |
 
 - Use roughly 1.4–1.6 line height for ordinary text. Code follows editor settings; fixed-height table rows must not clip text.
@@ -171,8 +171,8 @@ Retain the existing app shell: top window bar → left feature navigation → cu
 | Window bar | 40px | `h-10` in `AppHeader.vue` |
 | Feature navigation | 56px wide, 36 × 36px entries, 20px icons | `AppSidebar.vue` |
 | Query sidebar | Initially 250px, resize range 200–400px | `QueriesPage.vue` |
-| Object tree rows | 24px row height, 12px text, 14px icons | `SchemaTree.vue` |
-| Query tabs | 35px high, maximum 200px per tab | `QueryTabs.vue` |
+| Object tree rows | 28px row height (20px line + 8px padding), 13px text, 14px icons | `SchemaTree.vue` |
+| Query tabs | 35px high, 13px labels, maximum 200px per tab | `QueryTabs.vue` |
 | Result toolbar | 36px high (result panel and grid toolbars share this) | `QueryResultPanel.vue`, `DataGrid.vue` |
 | Standard buttons / inputs | 32px high; 24 / 28 / 36px via `xs` / `sm` / `lg` | `ui/button`, `ui/input` |
 | Virtual result rows | 32px estimated height | `grid/DataGrid.vue`; not a shared height for every table |
