@@ -197,6 +197,15 @@ function sendMessage() {
   forceScrollToBottom()
 }
 
+function onEnterKeydown(e: KeyboardEvent) {
+  // Ignore Enter used to confirm an IME candidate (e.g. Chinese/Japanese
+  // input methods) — keyCode 229 covers older Safari/WebKit during composition.
+  if (e.isComposing || e.keyCode === 229)
+    return
+  e.preventDefault()
+  sendMessage()
+}
+
 function handleContinue() {
   if (props.isLoading)
     return
@@ -375,7 +384,7 @@ onBeforeUnmount(() => {
           spellcheck="false"
           data-form-type="other"
           :disabled="isLoading"
-          @keydown.enter.exact.prevent="sendMessage"
+          @keydown.enter.exact="onEnterKeydown"
         />
 
         <div class="chat-toolbar">
