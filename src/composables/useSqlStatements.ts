@@ -21,8 +21,8 @@ export type StatementToExecute = {
 // ── Character-based SQL statement splitter ──
 // Replaces the old line-based + regex approach that broke on correlated
 // subqueries spanning multiple lines (e.g. (SELECT count(*) ...) as alias).
-// This is the same algorithm dbx uses in Rust: character-by-character,
-// tracking quote/comment context, and splitting only on `;` outside of quotes.
+// The splitter scans character-by-character, tracking quote/comment context,
+// and splits only on `;` outside of quotes.
 
 type ScannerState = {
   inSingleQuote: boolean
