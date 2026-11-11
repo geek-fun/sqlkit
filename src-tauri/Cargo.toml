@@ -118,7 +118,6 @@ wiremock = "0.6"
 
 [features]
 default = [ "rusqlite/bundled" ]
-ohos = []
 # Use SQLCipher (encrypted SQLite) instead of plain SQLite.
 # Build with: cargo build --no-default-features --features sqlcipher
 sqlcipher = [ "rusqlite/bundled-sqlcipher" ]
