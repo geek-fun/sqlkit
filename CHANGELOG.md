@@ -254,7 +254,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refactor ER diagram to single TB layout with Record position tracking
 - Replace ER diagram SVG rendering with pure HTML for better performance
-- Adopt DBX-style compact toolbar layout
+- Adopt compact toolbar layout
 - Refactor sidebar: move ER diagram button to database actions dropdown
 
 ## [0.7.4] - 2026-07-01
