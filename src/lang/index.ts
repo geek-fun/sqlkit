@@ -1,11 +1,11 @@
 import { createI18n, useI18n } from 'vue-i18n'
 import { enUS } from './enUS'
-import { zhCN } from './zhCN'
-import { zhTW } from './zhTW'
-import { ptBR } from './ptBR'
+import { esES } from './esES'
 import { jaJP } from './jaJP'
 import { koKR } from './koKR'
-import { esES } from './esES'
+import { ptBR } from './ptBR'
+import { zhCN } from './zhCN'
+import { zhTW } from './zhTW'
 
 type AppLocale = 'zhCN' | 'zhTW' | 'enUS' | 'ptBR' | 'jaJP' | 'koKR' | 'esES'
 
@@ -18,14 +18,21 @@ function getStoredLocale(): AppLocale | 'auto' {
 const AVAILABLE_LOCALES: AppLocale[] = ['enUS', 'zhCN', 'zhTW', 'ptBR', 'jaJP', 'koKR', 'esES']
 
 function detectFromNavigator(): AppLocale {
-  if (typeof navigator === 'undefined') return 'enUS'
+  if (typeof navigator === 'undefined')
+    return 'enUS'
   const tag = (navigator.language || '').toLowerCase()
-  if (/^zh-(tw|hk|mo|hant)/.test(tag)) return 'zhTW'
-  if (tag.startsWith('zh')) return 'zhCN'
-  if (tag.startsWith('pt')) return 'ptBR'
-  if (tag.startsWith('ja')) return 'jaJP'
-  if (tag.startsWith('ko')) return 'koKR'
-  if (tag.startsWith('es')) return 'esES'
+  if (/^zh-(?:tw|hk|mo|hant)/.test(tag))
+    return 'zhTW'
+  if (tag.startsWith('zh'))
+    return 'zhCN'
+  if (tag.startsWith('pt'))
+    return 'ptBR'
+  if (tag.startsWith('ja'))
+    return 'jaJP'
+  if (tag.startsWith('ko'))
+    return 'koKR'
+  if (tag.startsWith('es'))
+    return 'esES'
   return 'enUS'
 }
 
@@ -57,4 +64,4 @@ const lang = createI18n({
 
 const useLang = useI18n
 
-export { lang, useLang, detectFromNavigator }
+export { detectFromNavigator, lang, useLang }

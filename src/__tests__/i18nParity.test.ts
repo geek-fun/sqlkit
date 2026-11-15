@@ -1,10 +1,10 @@
 import { enUS } from '@/lang/enUS'
-import { zhCN } from '@/lang/zhCN'
-import { zhTW } from '@/lang/zhTW'
-import { ptBR } from '@/lang/ptBR'
+import { esES } from '@/lang/esES'
 import { jaJP } from '@/lang/jaJP'
 import { koKR } from '@/lang/koKR'
-import { esES } from '@/lang/esES'
+import { ptBR } from '@/lang/ptBR'
+import { zhCN } from '@/lang/zhCN'
+import { zhTW } from '@/lang/zhTW'
 
 type Messages = Record<string, unknown>
 
