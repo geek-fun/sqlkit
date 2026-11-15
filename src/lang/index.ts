@@ -23,7 +23,7 @@ function detectFromNavigator(): AppLocale {
   const tag = (navigator.language || '').toLowerCase()
   if (/^zh-(?:tw|hk|mo|hant)/.test(tag))
     return 'zhTW'
-  if (tag.startsWith('zh'))
+  if (tag === 'zh-cn')
     return 'zhCN'
   if (tag.startsWith('pt'))
     return 'ptBR'
