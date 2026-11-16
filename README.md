@@ -131,6 +131,8 @@ SqlKit is an **agentic database client** — it doesn't just execute SQL, it und
   <img src="https://img.shields.io/badge/Website-geekfun.club-blue?logo=google-chrome&logoColor=white" alt="Website">
 </a>
 
+Closing the SQLKit window keeps background tasks and the MCP server running. Use **Show Window** from the SQLKit menu-bar or system-tray icon to return to your session. Choose **Quit** from that menu to stop the app.
+
 ## Features
 
 ### Agentic Data Studio

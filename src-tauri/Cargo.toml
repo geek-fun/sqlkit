@@ -22,7 +22,10 @@ crate-type = [
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [ "devtools" ] }
+tauri = { version = "2", features = [
+  "devtools",
+  "tray-icon"
+] }
 tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
@@ -121,6 +124,9 @@ default = [ "rusqlite/bundled" ]
 # Use SQLCipher (encrypted SQLite) instead of plain SQLite.
 # Build with: cargo build --no-default-features --features sqlcipher
 sqlcipher = [ "rusqlite/bundled-sqlcipher" ]
+
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = [ "deep-link" ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 system-configuration = "0.7"

@@ -23,6 +23,8 @@ pub(crate) mod ai_permissions;
 pub mod capabilities;
 pub mod common;
 pub mod db;
+#[cfg(desktop)]
+mod desktop;
 pub mod device_activation;
 pub mod device_identity;
 pub mod entitlement;
@@ -130,7 +132,13 @@ pub fn run() {
 
     let store = commands::store::Store::new();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        desktop::show_main_window(app);
+    }));
+
+    builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
@@ -159,6 +167,8 @@ pub fn run() {
                 store.set_app_handle(handle.clone()).await;
             });
             menu::create_menu(app)?;
+            #[cfg(desktop)]
+            desktop::setup(app);
 
             // Initialize the capability registry
             data_studio_agent::capabilities::registry::init_registry(&[
@@ -401,8 +411,18 @@ pub fn run() {
             crate::mcp_bridge::save_mcp_config,
             crate::mcp_bridge::save_mcp_policy,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } = _event
+            {
+                desktop::show_main_window(_app);
+            }
+        });
 }
 
 fn recover_stuck_sessions_inner(conn: &rusqlite::Connection) -> Result<(), String> {
