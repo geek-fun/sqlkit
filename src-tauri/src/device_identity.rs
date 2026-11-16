@@ -282,6 +282,21 @@ pub struct DevicePayload {
     pub name: String,
     pub platform: String,
     pub is_virtual: bool,
+    /// Effective UI locale as a BCP-47 tag (geek-fun/sqlkit#209). Omitted
+    /// unless the session pushes one, so the legacy body stays unchanged.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ui_locale: Option<String>,
+}
+
+impl DevicePayload {
+    /// Attach the effective UI locale; blank values collapse to `None` —
+    /// the server drops malformed tags rather than rejecting the request.
+    pub fn with_ui_locale(mut self, ui_locale: Option<String>) -> Self {
+        self.ui_locale = ui_locale
+            .map(|tag| tag.trim().to_string())
+            .filter(|tag| !tag.is_empty());
+        self
+    }
 }
 
 /// Pure composition (unit-testable): primary survives reinstall; VMs mix in
@@ -313,6 +328,7 @@ pub fn compose_payload(
         name: name.chars().take(100).collect(),
         platform: platform.to_string(),
         is_virtual: identity.is_virtual,
+        ui_locale: None,
     }
 }
 
@@ -438,5 +454,29 @@ mod tests {
         assert_eq!(payload.fingerprint, hmac_hex("fallback|install-only"));
         assert_eq!(payload.components.len(), 1);
         assert_eq!(payload.name, "Linux box");
+    }
+
+    #[test]
+    fn ui_locale_is_optional_and_serializes_as_camel_case() {
+        let identity = RawIdentity {
+            primary: None,
+            secondary: vec![],
+            is_virtual: false,
+        };
+
+        // Without a locale the field stays absent — the legacy body shape.
+        let bare = compose_payload(&identity, "install", "Mac", "macos");
+        let bare_json = serde_json::to_value(&bare).expect("json");
+        assert!(bare_json.get("uiLocale").is_none());
+
+        let tagged = compose_payload(&identity, "install", "Mac", "macos")
+            .with_ui_locale(Some("zh-CN".to_string()));
+        let tagged_json = serde_json::to_value(&tagged).expect("json");
+        assert_eq!(tagged_json["uiLocale"], "zh-CN");
+
+        // Blank input collapses to None instead of shipping whitespace.
+        let blank = compose_payload(&identity, "install", "Mac", "macos")
+            .with_ui_locale(Some("   ".to_string()));
+        assert!(blank.ui_locale.is_none());
     }
 }

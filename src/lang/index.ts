@@ -62,6 +62,20 @@ const lang = createI18n({
   },
 })
 
+const BCP47_BY_LOCALE: Record<AppLocale, string> = {
+  zhCN: 'zh-CN',
+  zhTW: 'zh-TW',
+  enUS: 'en-US',
+  ptBR: 'pt-BR',
+  jaJP: 'ja-JP',
+  koKR: 'ko-KR',
+  esES: 'es-ES',
+}
+
+/** Effective UI locale as a BCP-47 tag — AUTO already resolved at startup. */
+const currentBcp47Locale = (): string =>
+  BCP47_BY_LOCALE[lang.global.locale.value as AppLocale] ?? 'en-US'
+
 const useLang = useI18n
 
-export { detectFromNavigator, lang, useLang }
+export { currentBcp47Locale, detectFromNavigator, lang, useLang }

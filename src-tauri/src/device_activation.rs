@@ -11,6 +11,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::PathBuf;
+use std::sync::RwLock;
 use tauri::{AppHandle, Emitter, State};
 
 use crate::common::console;
@@ -21,16 +22,48 @@ pub const DEVICE_LIMIT_ERROR_TYPE: &str = "DEVICE_LIMIT_REACHED";
 
 pub struct DeviceIdentityState {
     app_data_dir: PathBuf,
+    /// Effective UI locale (BCP-47) pushed from the frontend session
+    /// (geek-fun/sqlkit#209) — rides with every device payload, so a
+    /// language change refreshes `devices.ui_locale` on the next
+    /// activation/refresh.
+    ui_locale: RwLock<Option<String>>,
 }
 
 impl DeviceIdentityState {
     pub fn load(app_data_dir: PathBuf) -> Self {
-        DeviceIdentityState { app_data_dir }
+        DeviceIdentityState {
+            app_data_dir,
+            ui_locale: RwLock::new(None),
+        }
+    }
+
+    pub fn set_ui_locale(&self, locale: Option<String>) {
+        let normalized = locale
+            .map(|tag| tag.trim().to_string())
+            .filter(|tag| !tag.is_empty());
+        if let Ok(mut slot) = self.ui_locale.write() {
+            *slot = normalized;
+        }
+    }
+
+    pub fn ui_locale(&self) -> Option<String> {
+        self.ui_locale.read().ok().and_then(|slot| slot.clone())
     }
 
     pub fn payload(&self) -> device_identity::DevicePayload {
-        device_identity::build_payload(&self.app_data_dir)
+        device_identity::build_payload(&self.app_data_dir).with_ui_locale(self.ui_locale())
     }
+}
+
+/// Record the app's effective UI locale (BCP-47) for device payloads
+/// (geek-fun/sqlkit#209). Bookkeeping only — always succeeds.
+#[tauri::command]
+pub async fn set_ui_locale(
+    locale: Option<String>,
+    state: State<'_, DeviceIdentityState>,
+) -> Result<(), String> {
+    state.set_ui_locale(locale);
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -342,5 +375,19 @@ mod tests {
 
         let with_replace = activation_body(&composed, Some("dev_9"));
         assert_eq!(with_replace["replaceDeviceId"], "dev_9");
+    }
+
+    #[test]
+    fn the_pushed_ui_locale_rides_on_every_built_payload() {
+        let state = DeviceIdentityState::load(std::env::temp_dir().join("sqlkit-ui-locale-test"));
+        assert!(state.ui_locale().is_none());
+
+        state.set_ui_locale(Some("zh-CN".to_string()));
+        assert_eq!(state.ui_locale().as_deref(), Some("zh-CN"));
+        assert_eq!(state.payload().ui_locale.as_deref(), Some("zh-CN"));
+
+        // A blank push clears the locale rather than shipping whitespace.
+        state.set_ui_locale(Some("   ".to_string()));
+        assert!(state.ui_locale().is_none());
     }
 }
