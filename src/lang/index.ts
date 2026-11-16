@@ -78,4 +78,4 @@ const currentBcp47Locale = (): string =>
 
 const useLang = useI18n
 
-export { currentBcp47Locale, detectFromNavigator, lang, useLang }
+export { AVAILABLE_LOCALES, currentBcp47Locale, detectFromNavigator, lang, useLang }
