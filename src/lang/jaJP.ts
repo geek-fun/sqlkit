@@ -591,6 +591,11 @@ export const jaJP = {
         languages: {
           enUS: 'English',
           zhCN: '简体中文',
+          zhTW: '繁體中文',
+          ptBR: 'Português (Brasil)',
+          jaJP: '日本語',
+          koKR: '한국어',
+          esES: 'Español',
           auto: '自動 (システムに従う)',
         },
       },

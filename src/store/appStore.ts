@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { storeApi } from '@/datasources/storeApi'
-import { lang } from '@/lang'
+import { detectFromNavigator, lang } from '@/lang'
 
 export enum ThemeType {
   AUTO = 'auto',
@@ -15,7 +15,12 @@ let systemThemeHandler: ((e: MediaQueryListEvent) => void) | null = null
 export enum LanguageType {
   AUTO = 'auto',
   ZH_CN = 'zhCN',
+  ZH_TW = 'zhTW',
   EN_US = 'enUS',
+  PT_BR = 'ptBR',
+  JA_JP = 'jaJP',
+  KO_KR = 'koKR',
+  ES_ES = 'esES',
 }
 
 export type EditorConfig = {
@@ -286,6 +291,11 @@ export const useAppStore = defineStore('app', {
     },
     setLanguageType(languageType: LanguageType) {
       this.languageType = languageType
+      if (typeof localStorage !== 'undefined')
+        localStorage.setItem('lang', languageType)
+      lang.global.locale.value = languageType === LanguageType.AUTO
+        ? detectFromNavigator()
+        : languageType
     },
     setEditorConfig(config: Partial<EditorConfig>) {
       this.editorConfig = { ...this.editorConfig, ...config }
