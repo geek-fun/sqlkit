@@ -304,12 +304,38 @@ min_jre_version = "11"
 version_error_signatures = [ "driver version not compatible", ]
 
 # ── Apache Cassandra ──
+#
+# Uses ING's open-source Cassandra JDBC wrapper (Apache 2.0), which wraps the
+# Cassandra java-driver 4.x and speaks plain `jdbc:cassandra://` URLs.
+# Maven Central only hosts the thin JAR, so we download the pre-shaded
+# "bundle" JAR (all deps included) from the wrapper's GitHub releases —
+# same direct-download flow as GBase 8a. The bundle supports
+# Cassandra 2.1–4.x, DSE and ScyllaDB.
 
 [databases.cassandra]
 name = "Apache Cassandra"
-class_name = "com.simba.cassandra.jdbc.Driver"
-maven_group = "com.simba"
-maven_artifact = "cassandra-jdbc"
+class_name = "com.ing.data.cassandra.jdbc.CassandraDriver"
+maven_group = "com.ing.data"
+maven_artifact = "cassandra-jdbc-wrapper"
+version_cap = "4.16.7"
+download_url = "https://github.com/ing-bank/cassandra-jdbc-wrapper/releases/download/v4.16.7/cassandra-jdbc-wrapper-4.16.7-bundle.jar"
+jdbc_url_template = "jdbc:cassandra://{host}:{port}/{database}"
+default_port = 9042
+min_jre_version = "11"
+version_error_signatures = [ "driver version not compatible", ]
+
+# ── ScyllaDB ──
+#
+# CQL-compatible wide-column store; shares the Cassandra wrapper bundle,
+# cache dir and JDBC URL scheme above.
+
+[databases.scylladb]
+name = "ScyllaDB"
+class_name = "com.ing.data.cassandra.jdbc.CassandraDriver"
+maven_group = "com.ing.data"
+maven_artifact = "cassandra-jdbc-wrapper"
+version_cap = "4.16.7"
+download_url = "https://github.com/ing-bank/cassandra-jdbc-wrapper/releases/download/v4.16.7/cassandra-jdbc-wrapper-4.16.7-bundle.jar"
 jdbc_url_template = "jdbc:cassandra://{host}:{port}/{database}"
 default_port = 9042
 min_jre_version = "11"

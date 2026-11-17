@@ -214,6 +214,7 @@ impl ServerConfig {
             "informix" => Ok(DatabaseType::Informix),
             "kylin" => Ok(DatabaseType::Kylin),
             "cassandra" => Ok(DatabaseType::Cassandra),
+            "scylladb" => Ok(DatabaseType::ScyllaDB),
             "iris" => Ok(DatabaseType::Iris),
             "access" => Ok(DatabaseType::Access),
             _ => Err(format!("Unsupported database type: {}", self.db_type)),

@@ -112,6 +112,7 @@ const CAPABILITY_MAP: Partial<Record<DatabaseType, DbCapabilities>> = {
   [DatabaseType.INFORMIX]: { ...ALL, materializedViews: false },
   [DatabaseType.KYLIN]: { ...ALL, newDatabase: false, newSchema: false, dropDatabase: false },
   [DatabaseType.CASSANDRA]: { ...NONE, export: true, views: false },
+  [DatabaseType.SCYLLADB]: { ...NONE, export: true, views: false },
   [DatabaseType.IRIS]: { ...ALL, materializedViews: false },
   [DatabaseType.ACCESS]: { ...NONE, export: true, views: true },
   [DatabaseType.FIREBIRD]: { ...ALL, materializedViews: false },

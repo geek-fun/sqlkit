@@ -321,9 +321,17 @@ pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
         return Ok(());
     }
 
-    // Drivers with a direct download URL (non-Maven, e.g. GBase 8a)
+    // Drivers with a direct download URL (non-Maven, e.g. GBase 8a or the
+    // Cassandra wrapper bundle). Name the cached file the way the Java
+    // resolver does (`{artifact}-{version}.jar`, version = cap ?? "1.0.0") so
+    // the pre-flight download satisfies both the pinned-cache lookup and the
+    // bridge's own ResolveDriver short-circuit instead of re-downloading.
     if let Some(download_url) = &config.download_url {
-        let jar_name = config.maven_artifact.clone() + ".jar";
+        let version = config
+            .version_cap
+            .clone()
+            .unwrap_or_else(|| "1.0.0".to_string());
+        let jar_name = format!("{}-{}.jar", config.maven_artifact, version);
         let dest = dest_dir.join(&jar_name);
         if dest.exists() {
             return Ok(());

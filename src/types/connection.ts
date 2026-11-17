@@ -100,6 +100,7 @@ export const CERT_FIELD_DATABASES = [
   'informix',
   'kylin',
   'cassandra',
+  'scylladb',
   'iris',
   'dameng',
   'xugudb',

@@ -2,7 +2,7 @@
 
 use crate::database::{
     adapter::DatabaseAdapter,
-    config::ConnectionConfig,
+    config::{ConnectionConfig, DatabaseType},
     error::{DbError, DbResult},
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
@@ -35,6 +35,28 @@ impl JdbcBridgeAdapter {
             config,
             launcher: None,
             conn_id: None,
+        }
+    }
+
+    /// CQL stores (Cassandra/ScyllaDB) via the wrapper driver: the wrapper maps
+    /// keyspaces to JDBC schemas, not catalogs — its catalog lookup returns
+    /// nothing, so metadata RPCs must carry the keyspace in the schema slot.
+    fn is_cql(&self) -> bool {
+        matches!(
+            self.config.db_type,
+            DatabaseType::Cassandra | DatabaseType::ScyllaDB
+        )
+    }
+
+    fn fold_catalog_into_schema<'a>(
+        &self,
+        database: Option<&'a str>,
+        schema: Option<&'a str>,
+    ) -> (Option<&'a str>, Option<&'a str>) {
+        if self.is_cql() {
+            (None, schema.or(database))
+        } else {
+            (database, schema)
         }
     }
 
@@ -160,6 +182,7 @@ impl JdbcBridgeAdapter {
         schema: Option<&str>,
         table: Option<&str>,
     ) -> DbResult<T> {
+        let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,
@@ -291,6 +314,37 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
+        if self.is_cql() {
+            // The wrapper's catalog listing reports the cluster name, not
+            // keyspaces — read them from system_schema instead.
+            let launcher = self.launcher()?;
+            let data = Self::send_request(
+                launcher,
+                JdbcRequest::new(
+                    JdbcMethod::ExecuteQuery,
+                    serde_json::json!({
+                        "conn_id": self.conn_id,
+                        "sql": "SELECT keyspace_name FROM system_schema.keyspaces",
+                    }),
+                ),
+            )
+            .await?;
+            let result = Self::parse_query_result(data)?;
+            return Ok(result
+                .rows
+                .iter()
+                .filter_map(|row| match row.get("keyspace_name") {
+                    Some(QueryValue::String(name)) => Some(name.clone()),
+                    _ => None,
+                })
+                .map(|name| DatabaseSchema {
+                    is_system: name.starts_with("system"),
+                    name,
+                    description: None,
+                    metadata: HashMap::new(),
+                })
+                .collect());
+        }
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,
@@ -316,6 +370,12 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
+        let (database, schema) = if self.is_cql() {
+            // The wrapper reports keyspaces as schemas — carry the database there.
+            (None, database)
+        } else {
+            (database, None)
+        };
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,
@@ -324,6 +384,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                 serde_json::json!({
                     "conn_id": self.conn_id,
                     "database": database,
+                    "schema": schema,
                 }),
             ),
         )
@@ -337,6 +398,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
+        let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,
@@ -378,6 +440,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
+        let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,

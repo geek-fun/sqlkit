@@ -200,6 +200,7 @@ fn db_type_to_registry_key(db: DatabaseType) -> Option<&'static str> {
         DatabaseType::Informix => Some("informix"),
         DatabaseType::Kylin => Some("kylin"),
         DatabaseType::Cassandra => Some("cassandra"),
+        DatabaseType::ScyllaDB => Some("scylladb"),
         DatabaseType::Iris => Some("iris"),
         DatabaseType::Access => Some("access"),
         DatabaseType::YashanDB => Some("yashandb"),
@@ -238,6 +239,7 @@ mod tests {
         assert!(registry.databases.contains_key("informix"));
         assert!(registry.databases.contains_key("kylin"));
         assert!(registry.databases.contains_key("cassandra"));
+        assert!(registry.databases.contains_key("scylladb"));
         assert!(registry.databases.contains_key("iris"));
         assert!(registry.databases.contains_key("access"));
     }
@@ -248,6 +250,22 @@ mod tests {
         let config = registry.get_config(DatabaseType::Oracle);
         assert!(config.is_some(), "Oracle should have a config");
         assert_eq!(config.unwrap().name, "Oracle Database");
+    }
+
+    #[test]
+    fn test_cassandra_and_scylladb_share_driver_bundle() {
+        let registry = DriverRegistry::load();
+        let cassandra = registry
+            .get_config_by_name("cassandra")
+            .expect("cassandra should have a driver config");
+        let scylla = registry
+            .get_config_by_name("scylladb")
+            .expect("scylladb should have a driver config");
+        // Both entries resolve to the same wrapper bundle JAR and cache dir,
+        // so a single download serves both connection types.
+        assert_eq!(cassandra.maven_artifact, scylla.maven_artifact);
+        assert_eq!(cassandra.download_url, scylla.download_url);
+        assert_eq!(cassandra.version_cap, scylla.version_cap);
     }
 
     #[test]

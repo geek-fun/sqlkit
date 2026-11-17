@@ -61,6 +61,7 @@ export enum DatabaseType {
   INFORMIX = 'INFORMIX',
   KYLIN = 'KYLIN',
   CASSANDRA = 'CASSANDRA',
+  SCYLLADB = 'SCYLLADB',
   IRIS = 'IRIS',
   ACCESS = 'ACCESS',
   FIREBIRD = 'FIREBIRD',
@@ -134,6 +135,7 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.INFORMIX]: 'informix',
   [DatabaseType.KYLIN]: 'kylin',
   [DatabaseType.CASSANDRA]: 'cassandra',
+  [DatabaseType.SCYLLADB]: 'scylladb',
   [DatabaseType.IRIS]: 'iris',
   [DatabaseType.ACCESS]: 'access',
   [DatabaseType.FIREBIRD]: 'firebird',
@@ -205,6 +207,7 @@ export const dbTypeFromBackend: Record<string, DatabaseType> = {
   'informix': DatabaseType.INFORMIX,
   'kylin': DatabaseType.KYLIN,
   'cassandra': DatabaseType.CASSANDRA,
+  'scylladb': DatabaseType.SCYLLADB,
   'iris': DatabaseType.IRIS,
   'access': DatabaseType.ACCESS,
   'firebird': DatabaseType.FIREBIRD,
@@ -243,6 +246,8 @@ const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
   [DatabaseType.CRATEDB]: 'crate',
   [DatabaseType.QUESTDB]: 'qdb',
   [DatabaseType.KINGBASEES]: 'test',
+  [DatabaseType.CASSANDRA]: 'keyspace (default: system)',
+  [DatabaseType.SCYLLADB]: 'keyspace (default: system)',
 }
 
 const requiredDatabaseFor: Set<DatabaseType> = new Set([
@@ -262,6 +267,14 @@ function isDatabaseRequired(type: DatabaseType): boolean {
 }
 
 function resolveDatabase(type: DatabaseType, database?: string): string | null {
+  if (type === DatabaseType.CASSANDRA || type === DatabaseType.SCYLLADB) {
+    // The wrapper driver refuses to connect without a keyspace and an explicit
+    // local datacenter; `system` always exists and `datacenter1` is the stock
+    // single-DC name. A persisted value that already carries the parameter
+    // (composed by the connection form) is passed through untouched.
+    const db = database?.trim() || 'system'
+    return db.includes('localdatacenter=') ? db : `${db}?localdatacenter=datacenter1`
+  }
   return database || defaultDatabaseFor[type] || null
 }
 
