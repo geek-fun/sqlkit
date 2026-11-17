@@ -213,6 +213,7 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
         "informix" => Ok(DatabaseType::Informix),
         "kylin" => Ok(DatabaseType::Kylin),
         "cassandra" => Ok(DatabaseType::Cassandra),
+        "scylladb" => Ok(DatabaseType::ScyllaDB),
         "iris" | "intersystems_iris" => Ok(DatabaseType::Iris),
         "access" | "ms_access" | "microsoft_access" => Ok(DatabaseType::Access),
         _ => Err(format!("Unsupported database type: {}", db_type)),

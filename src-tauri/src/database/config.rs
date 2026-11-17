@@ -137,6 +137,8 @@ pub enum DatabaseType {
     Kylin,
     /// Apache Cassandra — JDBC bridge.
     Cassandra,
+    /// ScyllaDB — CQL-compatible wide-column store, JDBC bridge.
+    ScyllaDB,
     /// InterSystems IRIS — JDBC bridge.
     Iris,
     /// Microsoft Access — JDBC bridge.

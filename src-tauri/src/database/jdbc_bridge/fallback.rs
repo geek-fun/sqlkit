@@ -162,7 +162,10 @@ pub async fn try_driver(
 
     // On the first attempt, try without version_cap (LATEST).
     // If the config has no cap, or we're explicitly using it, send the cap.
-    let effective_cap = if use_cap {
+    // Direct-download drivers are version-pinned by definition: always send
+    // the cap so the Java resolver names the cached JAR deterministically
+    // (a null cap would name it "-1.0.0.jar" and duplicate the download).
+    let effective_cap = if use_cap || config.download_url.is_some() {
         config.version_cap.as_deref()
     } else {
         None
@@ -510,6 +513,7 @@ fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
         "IBM Informix" => DatabaseType::Informix,
         "Apache Kylin" => DatabaseType::Kylin,
         "Apache Cassandra" => DatabaseType::Cassandra,
+        "ScyllaDB" => DatabaseType::ScyllaDB,
         "InterSystems IRIS" => DatabaseType::Iris,
         "Microsoft Access" => DatabaseType::Access,
         _ => DatabaseType::PostgreSQL, // fallback, shouldn't happen

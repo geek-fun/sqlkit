@@ -117,6 +117,7 @@ const defaultPorts: Record<string, number> = {
   [DatabaseType.INFORMIX]: 9088,
   [DatabaseType.KYLIN]: 7070,
   [DatabaseType.CASSANDRA]: 9042,
+  [DatabaseType.SCYLLADB]: 9042,
   [DatabaseType.IRIS]: 1972,
   [DatabaseType.ACCESS]: 0,
   [DatabaseType.FIREBIRD]: 3050,
@@ -137,6 +138,32 @@ const defaultConnection: ServerConnection = {
 }
 
 const formData = ref<ServerConnection>({ ...defaultConnection })
+// CQL stores (Cassandra/ScyllaDB) need an explicit local datacenter for the
+// driver's default load-balancing policy — kept as its own field and composed
+// into the keyspace value on save/test (see resolveDatabase on the store side).
+const isCassandraFamily = computed(() =>
+  formData.value.type === DatabaseType.CASSANDRA || formData.value.type === DatabaseType.SCYLLADB,
+)
+const localDatacenter = ref('datacenter1')
+
+const databaseWithLocalDc = () => {
+  if (!isCassandraFamily.value)
+    return formData.value.database
+  const keyspace = formData.value.database?.trim() || 'system'
+  const dc = localDatacenter.value.trim() || 'datacenter1'
+  return `${keyspace}?localdatacenter=${dc}`
+}
+
+const splitLocalDatacenter = (database?: string) => {
+  if (!isCassandraFamily.value || !database?.includes('localdatacenter='))
+    return
+  const [keyspace, query = ''] = database.split('?')
+  const param = query.split('&').find(p => p.startsWith('localdatacenter='))
+  if (param) {
+    localDatacenter.value = param.slice('localdatacenter='.length) || 'datacenter1'
+    formData.value.database = keyspace
+  }
+}
 const testStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
 const testError = ref<string>('')
 /** The last test ran without the saved SSH tunnel (Ultimate-only feature). */
@@ -229,6 +256,7 @@ watch(() => props.open, (open) => {
   if (open) {
     if (props.connection) {
       formData.value = { ...props.connection }
+      splitLocalDatacenter(formData.value.database)
       // Detect SQLite mode from path
       if (props.connection.type === DatabaseType.SQLITE) {
         if (props.connection.host === ':memory:') {
@@ -792,7 +820,7 @@ async function handleTestConnection() {
       port: formData.value.port,
       username: formData.value.username || '',
       password: formData.value.password || undefined,
-      database: resolveDatabase(formData.value.type, formData.value.database) ?? undefined,
+      database: resolveDatabase(formData.value.type, databaseWithLocalDc()) ?? undefined,
       ssl_mode: sslModeToBackend(formData.value.ssl),
       ssl_ca_cert: formData.value.ssl.caCertPath || null,
       ssl_client_cert: formData.value.ssl.clientCertPath || null,
@@ -902,6 +930,9 @@ function handleSave() {
   if (!validateForm()) {
     return
   }
+
+  if (isCassandraFamily.value)
+    formData.value.database = databaseWithLocalDc()
 
   emit('save', { ...formData.value })
   isOpen.value = false
@@ -1022,6 +1053,17 @@ function handleSave() {
                 <p v-if="formErrors.database" class="text-sm text-destructive-text">
                   {{ formErrors.database }}
                 </p>
+              </div>
+              <div v-if="isCassandraFamily" class="space-y-2">
+                <Label for="local-datacenter">
+                  {{ t('components.serverForm.labels.localDatacenter') }}
+                  <span class="text-destructive-text ml-0.5">*</span>
+                </Label>
+                <Input
+                  id="local-datacenter"
+                  v-model="localDatacenter"
+                  :placeholder="t('components.serverForm.placeholders.localDatacenter')"
+                />
               </div>
             </div>
 
