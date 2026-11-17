@@ -1,6 +1,8 @@
 /** @jest-environment jsdom */
 import { createPinia, setActivePinia } from 'pinia'
-import { AVAILABLE_LOCALES, detectFromNavigator, lang } from '@/lang'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
+import { createApp } from 'vue'
+import { detectFromNavigator, lang } from '@/lang'
 import { enUS } from '@/lang/enUS'
 import { esES } from '@/lang/esES'
 import { jaJP } from '@/lang/jaJP'
@@ -66,8 +68,12 @@ describe('system language detection', () => {
   it.each([
     ['zh-TW', 'zhTW'],
     ['zh-HK', 'zhTW'],
+    ['zh-MO', 'zhTW'],
+    ['zh-Hant', 'zhTW'],
     ['zh-hant-TW', 'zhTW'],
     ['zh-CN', 'zhCN'],
+    ['zh', 'zhCN'],
+    ['zh-SG', 'zhCN'],
     ['pt-BR', 'ptBR'],
     ['pt', 'ptBR'],
     ['ja-JP', 'jaJP'],
@@ -76,8 +82,6 @@ describe('system language detection', () => {
     ['es-MX', 'esES'],
     ['en-US', 'enUS'],
     ['fr-FR', 'enUS'],
-    ['zh', 'enUS'],
-    ['zh-SG', 'enUS'],
   ])('maps navigator language %s to %s', (tag, expected) => {
     setNavigatorLanguage(tag)
     expect(detectFromNavigator()).toBe(expected)
@@ -86,8 +90,10 @@ describe('system language detection', () => {
 
 describe('language switcher', () => {
   beforeEach(() => {
-    setActivePinia(createPinia())
     localStorage.clear()
+    const pinia = createPinia().use(piniaPluginPersistedstate)
+    createApp({}).use(pinia)
+    setActivePinia(pinia)
   })
   afterEach(restoreNavigatorLanguage)
 
@@ -95,7 +101,22 @@ describe('language switcher', () => {
     const selectableLocales = Object.values(LanguageType)
       .filter(value => value !== LanguageType.AUTO)
       .sort()
-    expect(selectableLocales).toEqual([...AVAILABLE_LOCALES].sort())
+    expect(selectableLocales).toEqual(Object.keys(lang.global.messages).sort())
+  })
+
+  it('restores a saved choice from localStorage.lang without a Pinia record', () => {
+    localStorage.setItem('lang', 'jaJP')
+
+    expect(useAppStore().languageType).toBe(LanguageType.JA_JP)
+  })
+
+  it('selects Auto for an invalid lang value even when Pinia has an old preference', () => {
+    localStorage.setItem('lang', 'invalid')
+    localStorage.setItem('app', JSON.stringify({ languageType: 'jaJP', themeType: 'dark' }))
+
+    const appStore = useAppStore()
+    expect(appStore.languageType).toBe(LanguageType.AUTO)
+    expect(appStore.themeType).toBe('dark')
   })
 
   it('writes the choice to localStorage.lang and applies the locale immediately', () => {

@@ -7,46 +7,53 @@ import { ptBR } from './ptBR'
 import { zhCN } from './zhCN'
 import { zhTW } from './zhTW'
 
-type AppLocale = 'zhCN' | 'zhTW' | 'enUS' | 'ptBR' | 'jaJP' | 'koKR' | 'esES'
+enum LanguageType {
+  AUTO = 'auto',
+  ZH_CN = 'zhCN',
+  ZH_TW = 'zhTW',
+  EN_US = 'enUS',
+  PT_BR = 'ptBR',
+  JA_JP = 'jaJP',
+  KO_KR = 'koKR',
+  ES_ES = 'esES',
+}
 
-function getStoredLocale(): AppLocale | 'auto' {
+type AppLocale = Exclude<LanguageType, LanguageType.AUTO>
+
+const availableLocales = Object.values(LanguageType).filter(locale => locale !== LanguageType.AUTO)
+
+const readLanguagePreference = (): LanguageType => {
   if (typeof localStorage === 'undefined')
-    return 'enUS'
-  return (localStorage.getItem('lang') as AppLocale | 'auto') || 'auto'
+    return LanguageType.AUTO
+  const stored = localStorage.getItem('lang')
+  return availableLocales.find(locale => locale === stored) ?? LanguageType.AUTO
 }
 
-const AVAILABLE_LOCALES: AppLocale[] = ['enUS', 'zhCN', 'zhTW', 'ptBR', 'jaJP', 'koKR', 'esES']
-
-function detectFromNavigator(): AppLocale {
+const detectFromNavigator = (): AppLocale => {
   if (typeof navigator === 'undefined')
-    return 'enUS'
+    return LanguageType.EN_US
   const tag = (navigator.language || '').toLowerCase()
-  if (/^zh-(?:tw|hk|mo|hant)/.test(tag))
-    return 'zhTW'
-  if (tag === 'zh-cn')
-    return 'zhCN'
+  if (/^zh-(?:tw|hk|mo|hant)(?:-|$)/.test(tag))
+    return LanguageType.ZH_TW
+  if (tag === 'zh' || tag === 'zh-cn' || tag === 'zh-sg')
+    return LanguageType.ZH_CN
   if (tag.startsWith('pt'))
-    return 'ptBR'
+    return LanguageType.PT_BR
   if (tag.startsWith('ja'))
-    return 'jaJP'
+    return LanguageType.JA_JP
   if (tag.startsWith('ko'))
-    return 'koKR'
+    return LanguageType.KO_KR
   if (tag.startsWith('es'))
-    return 'esES'
-  return 'enUS'
+    return LanguageType.ES_ES
+  return LanguageType.EN_US
 }
 
-function resolveLocale(): AppLocale {
-  const stored = getStoredLocale()
-  // Validate stored locale against available locales; fall back to auto if invalid
-  if (stored !== 'auto' && AVAILABLE_LOCALES.includes(stored))
-    return stored
-  return detectFromNavigator()
-}
+const resolveLocale = (preference: LanguageType): AppLocale =>
+  preference === LanguageType.AUTO ? detectFromNavigator() : preference
 
 const lang = createI18n({
   globalInjection: true,
-  locale: resolveLocale(),
+  locale: resolveLocale(readLanguagePreference()),
   fallbackLocale: 'enUS',
   legacy: false,
   missingWarn: false,
@@ -78,4 +85,4 @@ const currentBcp47Locale = (): string =>
 
 const useLang = useI18n
 
-export { AVAILABLE_LOCALES, currentBcp47Locale, detectFromNavigator, lang, useLang }
+export { currentBcp47Locale, detectFromNavigator, lang, LanguageType, readLanguagePreference, resolveLocale, useLang }
