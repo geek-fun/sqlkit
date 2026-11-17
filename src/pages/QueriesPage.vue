@@ -669,6 +669,9 @@ async function handleDestructiveConfirm() {
 // The Rust get_table_data MySQL branch ignores query.database, requiring
 // the connection to already have a database selected.
 function ensureDatabaseContext(connId: string, database: string) {
+  const type = connectionStore.getConnectionById(connId)?.type
+  if (type === DatabaseType.CASSANDRA || type === DatabaseType.SCYLLADB)
+    return
   const escapedDb = database.replace(/`/g, '``')
   invoke('execute_query', { connectionId: connId, sql: `USE \`${escapedDb}\`` }).catch(() => {
     // Best-effort: some databases don't support USE (e.g. SQLite)

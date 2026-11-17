@@ -38,22 +38,12 @@ impl JdbcBridgeAdapter {
         }
     }
 
-    /// CQL stores (Cassandra/ScyllaDB) via the wrapper driver: the wrapper maps
-    /// keyspaces to JDBC schemas, not catalogs — its catalog lookup returns
-    /// nothing, so metadata RPCs must carry the keyspace in the schema slot.
-    fn is_cql(&self) -> bool {
-        matches!(
-            self.config.db_type,
-            DatabaseType::Cassandra | DatabaseType::ScyllaDB
-        )
-    }
-
     fn fold_catalog_into_schema<'a>(
         &self,
         database: Option<&'a str>,
         schema: Option<&'a str>,
     ) -> (Option<&'a str>, Option<&'a str>) {
-        if self.is_cql() {
+        if self.config.db_type.is_cql() {
             (None, schema.or(database))
         } else {
             (database, schema)
@@ -101,11 +91,32 @@ impl JdbcBridgeAdapter {
 
         // Use fallback chain for JDBC-dependent databases (Oracle, DB2, H2, etc.)
         // For non-registry types, fall back to the old single-driver approach
+        let cql_database = if db_type.is_cql() {
+            let keyspace = self.config.cql_keyspace();
+            if !keyspace.starts_with(|c: char| c.is_ascii_alphabetic())
+                || !keyspace
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || c == b'_')
+            {
+                return Err(DbError::Connection(format!(
+                    "Invalid CQL keyspace: {keyspace}"
+                )));
+            }
+            // The wrapper decodes the URI query and then decodes each parameter.
+            let encoded_dc =
+                url::form_urlencoded::byte_serialize(self.config.cql_datacenter().as_bytes())
+                    .collect::<String>();
+            let dc =
+                url::form_urlencoded::byte_serialize(encoded_dc.as_bytes()).collect::<String>();
+            Some(format!("{keyspace}?localdatacenter={dc}"))
+        } else {
+            None
+        };
         let (_version, conn_id, launcher) = super::fallback::run_fallback_chain(
             db_type,
             &self.config.host,
             self.config.port,
-            self.config.database.as_deref(),
+            cql_database.as_deref().or(self.config.database.as_deref()),
             &self.config.username,
             &self.config.password,
             self.config.oracle_options.as_ref(),
@@ -260,7 +271,24 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
             ),
         )
         .await?;
-        Self::parse_connection_status(data)
+        let mut status = Self::parse_connection_status(data)?;
+        if self.config.db_type.is_cql() {
+            if self.config.db_type == DatabaseType::Cassandra
+                && status
+                    .server_version
+                    .as_deref()
+                    .and_then(|version| version.split('.').next())
+                    .and_then(|major| major.parse::<u32>().ok())
+                    .is_some_and(|major| major < 3)
+            {
+                return Err(DbError::UnsupportedOperation(
+                    "Cassandra 3.0 or later is required for keyspace and table browsing.".into(),
+                ));
+            }
+            // JDBC getCatalog() exposes the cluster name for the CQL wrapper.
+            status.current_database = Some(self.config.cql_keyspace().to_string());
+        }
+        Ok(status)
     }
 
     async fn execute_query(&self, query: &str) -> DbResult<QueryResult> {
@@ -332,7 +360,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
-        if self.is_cql() {
+        if self.config.db_type.is_cql() {
             // The wrapper's catalog listing reports the cluster name, not
             // keyspaces — read them from system_schema instead.
             return Ok(self
@@ -373,7 +401,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
-        let (database, schema) = if self.is_cql() {
+        let (database, schema) = if self.config.db_type.is_cql() {
             // The wrapper reports keyspaces as schemas — carry the database there.
             (None, database)
         } else {
@@ -401,7 +429,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
-        if self.is_cql() {
+        if self.config.db_type.is_cql() {
             // The wrapper's DatabaseMetaData only reports objects of the
             // keyspace bound at connect time and ignores the catalog/schema
             // arguments — so browsing a keyspace picked later in the UI would
@@ -478,12 +506,12 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
-        if self.is_cql() {
+        if self.config.db_type.is_cql() {
             // Same session-keyspace limitation as list_tables: read the column
             // definitions (and primary-key flags) from system_schema.
-            let Some(keyspace) = schema.or(database) else {
-                return Ok(Vec::new());
-            };
+            let keyspace = schema
+                .or(database)
+                .unwrap_or_else(|| self.config.cql_keyspace());
             let sql = format!(
                 "SELECT column_name, kind, position, type FROM system_schema.columns \
                  WHERE keyspace_name = '{}' AND table_name = '{}'",
@@ -496,9 +524,19 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                 .iter()
                 .filter_map(|row| {
                     let name = row.get("column_name").and_then(|v| v.as_string())?;
-                    let kind = row.get("kind").and_then(|v| v.as_string()).unwrap_or_default();
-                    let ty = row.get("type").and_then(|v| v.as_string()).unwrap_or_default();
-                    Some((name, kind.contains("partition_key") || kind.contains("clustering"), ty))
+                    let kind = row
+                        .get("kind")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
+                    let ty = row
+                        .get("type")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
+                    Some((
+                        name,
+                        kind.contains("partition_key") || kind.contains("clustering"),
+                        ty,
+                    ))
                 })
                 .collect();
             // Primary-key columns first, then the rest, mirroring CQL's layout.

@@ -1542,6 +1542,8 @@ export const zhCN = {
       noResults: '执行查询以查看结果',
     },
     dataTableView: {
+      previewRows: '预览 · {count} 行',
+      previewRowLimit: '预览行数上限',
       searchPlaceholder: '搜索所有列...',
       clearSearch: '清除搜索',
       filterPlaceholder: '过滤（SQL WHERE 子句，例如 age > 18 AND status = \'active\'）',

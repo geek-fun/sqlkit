@@ -36,6 +36,19 @@ class SslPropertyMapperTest {
     }
 
     @Test
+    void cqlRequiredModesEnableEncryptionAndUseTheRequestedHostnameCheck() throws Exception {
+        String url = "jdbc:cassandra://localhost:9042/system?localdatacenter=datacenter1";
+        assertTrue(SslPropertyMapper.requiresCqlTls("com.ing.data.cassandra.jdbc.CassandraDriver", "require"));
+        try (var require = SslPropertyMapper.cqlTlsSettings(url, "", null, "require", null, null, null);
+             var verify = SslPropertyMapper.cqlTlsSettings(url, "", null, "verify-full", null, null, null)) {
+            assertEquals("true", require.properties.getProperty("enableSsl"));
+            assertEquals("false", require.properties.getProperty("hostnameVerification"));
+            assertEquals("true", verify.properties.getProperty("enableSsl"));
+            assertEquals("true", verify.properties.getProperty("hostnameVerification"));
+        }
+    }
+
+    @Test
     void knownDriversKeepTheirSslProperties() {
         assertEquals("require", apply("org.postgresql.Driver", "require").getProperty("sslmode"));
         assertEquals("VERIFY_IDENTITY",

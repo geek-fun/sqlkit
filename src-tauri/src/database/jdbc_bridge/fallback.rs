@@ -286,7 +286,15 @@ async fn connect_with_jar(
         }
     };
 
-    let req = JdbcRequest::new(JdbcMethod::Connect, params);
+    // An older bridge would ignore CQL's SSL settings on a standard Connect.
+    let cql_tls = db_type_from_config(config).is_cql()
+        && matches!(ssl_mode, Some("require" | "verify-ca" | "verify-full"));
+    let method = if cql_tls {
+        JdbcMethod::ConnectCqlTls
+    } else {
+        JdbcMethod::Connect
+    };
+    let req = JdbcRequest::new(method, params);
 
     // 30s timeout per attempt
     let conn_result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
@@ -298,6 +306,11 @@ async fn connect_with_jar(
     match conn_result {
         Ok(Ok(resp)) => {
             if let Some(ref err) = resp.error {
+                if cql_tls && err.starts_with("Unknown method") {
+                    return DriverAttempt::Fatal(DbError::Connection(
+                        "The installed JDBC bridge does not support Cassandra or ScyllaDB TLS. Update the bridge in Settings → JRE & Drivers.".into(),
+                    ));
+                }
                 let category = classify_connection_error(
                     db_type_from_config(config),
                     err,
@@ -491,7 +504,6 @@ pub async fn run_fallback_chain(
         }
     }
 }
-
 
 fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
     match config.name.as_str() {

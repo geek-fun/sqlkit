@@ -1603,6 +1603,8 @@ export const koKR = {
       noResults: '쿼리를 실행하면 결과가 표시됩니다',
     },
     dataTableView: {
+      previewRows: '미리 보기 · {count}개 행',
+      previewRowLimit: '미리 보기 행 수 한도',
       searchPlaceholder: '모든 열에서 검색...',
       clearSearch: '검색 지우기',
       filterPlaceholder: '필터 (SQL WHERE 절, 예: age > 18 AND status = \'active\')',

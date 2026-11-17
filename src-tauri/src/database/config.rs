@@ -162,6 +162,10 @@ pub enum DatabaseType {
 }
 
 impl DatabaseType {
+    pub(crate) fn is_cql(self) -> bool {
+        matches!(self, Self::Cassandra | Self::ScyllaDB)
+    }
+
     /// Whether this connection type has an SSL/TLS concept at all.
     ///
     /// Embedded / file-based engines mirror the frontend
@@ -346,8 +350,36 @@ impl ConnectionConfig {
 
     /// Set the database name.
     pub fn with_database(mut self, database: impl Into<String>) -> Self {
-        self.database = Some(database.into());
+        let database = database.into();
+        if self.db_type.is_cql() {
+            // Older connection records store the datacenter in the database value.
+            let (keyspace, params) = database.split_once('?').unwrap_or((&database, ""));
+            if let Some((_, dc)) = url::form_urlencoded::parse(params.as_bytes())
+                .find(|(name, _)| name.eq_ignore_ascii_case("localdatacenter"))
+            {
+                self.options
+                    .insert("localdatacenter".into(), dc.into_owned());
+            }
+            self.database = Some(keyspace.trim().to_string());
+        } else {
+            self.database = Some(database);
+        }
         self
+    }
+
+    pub(crate) fn cql_keyspace(&self) -> &str {
+        self.database
+            .as_deref()
+            .filter(|name| !name.is_empty())
+            .unwrap_or("system")
+    }
+
+    pub(crate) fn cql_datacenter(&self) -> &str {
+        self.options
+            .get("localdatacenter")
+            .map(|dc| dc.trim())
+            .filter(|dc| !dc.is_empty())
+            .unwrap_or("datacenter1")
     }
 
     /// Set the password.

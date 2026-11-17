@@ -151,18 +151,16 @@ const databaseWithLocalDc = () => {
     return formData.value.database
   const keyspace = formData.value.database?.trim() || 'system'
   const dc = localDatacenter.value.trim() || 'datacenter1'
-  return `${keyspace}?localdatacenter=${dc}`
+  return `${keyspace}?localdatacenter=${encodeURIComponent(dc)}`
 }
 
 const splitLocalDatacenter = (database?: string) => {
-  if (!isCassandraFamily.value || !database?.includes('localdatacenter='))
+  if (!isCassandraFamily.value || !database)
     return
   const [keyspace, query = ''] = database.split('?')
-  const param = query.split('&').find(p => p.startsWith('localdatacenter='))
-  if (param) {
-    localDatacenter.value = param.slice('localdatacenter='.length) || 'datacenter1'
-    formData.value.database = keyspace
-  }
+  const dc = [...new URLSearchParams(query)].find(([key]) => key.toLowerCase() === 'localdatacenter')
+  localDatacenter.value = dc?.[1] || 'datacenter1'
+  formData.value.database = keyspace
 }
 const testStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
 const testError = ref<string>('')
@@ -254,6 +252,7 @@ const { platform } = usePlatform()
 
 watch(() => props.open, (open) => {
   if (open) {
+    localDatacenter.value = 'datacenter1'
     if (props.connection) {
       formData.value = { ...props.connection }
       splitLocalDatacenter(formData.value.database)
