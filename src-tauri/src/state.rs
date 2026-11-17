@@ -243,6 +243,13 @@ impl ServerConfig {
                 crate::database::config::duckdb_database_value(&self.host, self.read_only)
                     .map_err(|e| format!("Invalid DuckDB database path: {}", e))?;
             config = config.with_database(database);
+        } else if db_type.is_cql() {
+            config = config.with_database(
+                self.database
+                    .as_deref()
+                    .filter(|name| !name.trim().is_empty())
+                    .unwrap_or("system"),
+            );
         } else if let Some(ref database) = self.database {
             config = config.with_database(database);
         }
@@ -565,6 +572,27 @@ mod tests {
         let reopened: ServerConfig = serde_json::from_value(stored).unwrap();
 
         assert!(reopened.prompt.is_none());
+    }
+
+    #[test]
+    fn cql_split_keeps_the_local_datacenter_on_a_keyspace_switch() {
+        for db_type in ["cassandra", "scylladb"] {
+            let mut server = ServerConfig::new(
+                "CQL".into(),
+                db_type.into(),
+                "127.0.0.1".into(),
+                9042,
+                "".into(),
+            );
+            server.database = Some("system?localdatacenter=dc%2Bwest".into());
+            let mut config = server.to_connection_config().unwrap();
+            assert_eq!(config.cql_keyspace(), "system");
+            assert_eq!(config.cql_datacenter(), "dc+west");
+
+            config.database = Some("events".into());
+            assert_eq!(config.cql_keyspace(), "events");
+            assert_eq!(config.cql_datacenter(), "dc+west");
+        }
     }
 
     #[test]

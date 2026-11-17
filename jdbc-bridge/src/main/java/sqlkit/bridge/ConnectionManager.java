@@ -14,6 +14,7 @@ public class ConnectionManager {
 
     private final Map<String, HikariDataSource> pools = new HashMap<>();
     private final Map<String, DriverClassLoader> loaders = new HashMap<>();
+    private final Map<String, SslPropertyMapper.CqlTlsSettings> cqlTls = new HashMap<>();
 
     /**
      * Driver classes loaded once per JAR set.
@@ -62,7 +63,10 @@ public class ConnectionManager {
 
         final java.sql.Driver driver = sharedDriver(driverClass, driverJars);
         DriverClassLoader loader = loaderFor(driverJars);
-        loaders.put(connId, loader);
+        final SslPropertyMapper.CqlTlsSettings tls = SslPropertyMapper.requiresCqlTls(driverClass, sslMode)
+                ? SslPropertyMapper.cqlTlsSettings(jdbcUrl, username, password, sslMode,
+                    sslCaCert, sslClientCert, sslClientKey)
+                : null;
 
         HikariConfig config = new HikariConfig();
         // Keep HikariCP's read-only flag aligned with the connection the driver
@@ -75,14 +79,22 @@ public class ConnectionManager {
                 java.util.Properties info = new java.util.Properties();
                 if (username != null) info.setProperty("user", username);
                 if (password != null) info.setProperty("password", password);
-                SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
+                if (tls != null) {
+                    info.putAll(tls.properties);
+                } else {
+                    SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
+                }
                 return driver.connect(jdbcUrl, info);
             }
             public java.sql.Connection getConnection(String u, String p) throws java.sql.SQLException {
                 java.util.Properties info = new java.util.Properties();
                 if (u != null) info.setProperty("user", u);
                 if (p != null) info.setProperty("password", p);
-                SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
+                if (tls != null) {
+                    info.putAll(tls.properties);
+                } else {
+                    SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
+                }
                 return driver.connect(jdbcUrl, info);
             }
             public java.io.PrintWriter getLogWriter() { return null; }
@@ -104,18 +116,28 @@ public class ConnectionManager {
         config.setIdleTimeout(600000);
         config.setMaxLifetime(1800000);
 
-        HikariDataSource ds = new HikariDataSource(config);
-
-        // Verify connection works
-        try (Connection c = ds.getConnection()) {
-            // ok
+        HikariDataSource ds = null;
+        try {
+            ds = new HikariDataSource(config);
+            try (Connection c = ds.getConnection()) {
+                // Verify the pool can open a connection.
+            }
         } catch (Exception e) {
-            ds.close();
+            if (ds != null) {
+                ds.close();
+            }
+            if (tls != null) {
+                tls.close();
+            }
             ErrorClassifier.ErrorType errorType = ErrorClassifier.classify(e);
             throw new ClassifiedException("Failed to verify connection: " + e.getMessage(), e, errorType);
         }
 
         pools.put(connId, ds);
+        loaders.put(connId, loader);
+        if (tls != null) {
+            cqlTls.put(connId, tls);
+        }
     }
 
     /** Reuse one {@link DriverClassLoader} per set of driver JARs. */
@@ -174,6 +196,10 @@ public class ConnectionManager {
         // The loader is shared with other connections (see sharedLoaders), so it is
         // only closed when the whole bridge shuts down.
         loaders.remove(connId);
+        SslPropertyMapper.CqlTlsSettings tls = cqlTls.remove(connId);
+        if (tls != null) {
+            tls.close();
+        }
     }
 
     /**
@@ -216,6 +242,8 @@ public class ConnectionManager {
             ds.close();
         }
         pools.clear();
+        cqlTls.values().forEach(SslPropertyMapper.CqlTlsSettings::close);
+        cqlTls.clear();
         for (DriverClassLoader loader : loaders.values()) {
             try { loader.close(); } catch (Exception ignored) { }
         }

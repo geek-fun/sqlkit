@@ -1603,6 +1603,8 @@ export const esES = {
       noResults: 'Ejecuta una consulta para ver resultados',
     },
     dataTableView: {
+      previewRows: 'Vista previa · {count} fila | Vista previa · {count} filas',
+      previewRowLimit: 'Límite de filas de la vista previa',
       searchPlaceholder: 'Buscar en todas las columnas...',
       clearSearch: 'Limpiar búsqueda',
       filterPlaceholder: 'Filtro (cláusula WHERE de SQL, p. ej. age > 18 AND status = \'active\')',

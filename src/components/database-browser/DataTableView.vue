@@ -17,7 +17,7 @@ import { useDataGridSort } from '@/composables/useDataGridSort'
 import { useMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { toast } from '@/composables/useNotifications'
 import { useTableSearch } from '@/composables/useTableSearch'
-import { ConnectionStatus, useConnectionStore } from '@/store'
+import { ConnectionStatus, DatabaseType, useConnectionStore } from '@/store'
 import { collectSortableColumns, sortRowsByState } from '@/utils/gridSort'
 import {
   formatTableValue,
@@ -132,6 +132,10 @@ const invalidated = ref(false)
 
 // --- Connection state ---
 const connectionStore = useConnectionStore()
+const isCqlPreview = computed(() => {
+  const type = connectionStore.getConnectionById(props.connectionId)?.type
+  return type === DatabaseType.CASSANDRA || type === DatabaseType.SCYLLADB
+})
 const isReconnecting = ref(false)
 const connectionError = ref<string | null>(null)
 
@@ -250,6 +254,8 @@ function formatPkSummary(row: Record<string, unknown>): string {
 
 const pageStatus = computed(() => {
   const count = data.value?.rows.length ?? 0
+  if (isCqlPreview.value)
+    return t('components.dataTableView.previewRows', { count })
   if (!countAvailable.value)
     return t('components.pagination.showingWithoutTotal', { start: count > 0 ? offset.value + 1 : 0, end: offset.value + count })
   return t('components.dataGrid.status.showing', {
@@ -284,7 +290,7 @@ async function fetchData() {
           schema: props.schema ?? null,
           filter: appliedFilter.value.trim() || null,
           limit: rowsPerPage.value,
-          offset: offset.value,
+          offset: isCqlPreview.value ? 0 : offset.value,
         },
       })
       data.value = result
@@ -352,7 +358,8 @@ async function ensureConnection(): Promise<boolean> {
 }
 
 async function refresh() {
-  await fetchCount()
+  if (!isCqlPreview.value)
+    await fetchCount()
   await fetchData()
 }
 
@@ -500,7 +507,7 @@ function onGlobalKeydown(e: KeyboardEvent) {
 }
 
 const goToPage = (page: number) => {
-  if (loading.value || countLoading.value || !Number.isSafeInteger(page) || page === currentPage.value)
+  if (isCqlPreview.value || loading.value || countLoading.value || !Number.isSafeInteger(page) || page === currentPage.value)
     return
   setPage(page)
   fetchData()
@@ -1251,6 +1258,7 @@ watch(
         :current-page="currentPage"
         :page-count="totalPages"
         :page-size="rowsPerPage"
+        :preview="isCqlPreview"
         :max-page-size="MAX_FETCH_PAGE_SIZE"
         :database="props.database"
         :disabled="loading || countLoading || isReconnecting || !!connectionError || !!error"

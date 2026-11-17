@@ -1602,6 +1602,8 @@ export const zhTW = {
       noResults: '執行查詢以查看結果',
     },
     dataTableView: {
+      previewRows: '預覽 · {count} 列',
+      previewRowLimit: '預覽列數上限',
       searchPlaceholder: '搜尋所有欄位...',
       clearSearch: '清除搜尋',
       filterPlaceholder: '篩選（SQL WHERE 子句，例如 age > 18 AND status = \'active\'）',

@@ -1603,6 +1603,8 @@ export const ptBR = {
       noResults: 'Execute uma consulta para ver os resultados',
     },
     dataTableView: {
+      previewRows: 'Prévia · {count} linha | Prévia · {count} linhas',
+      previewRowLimit: 'Limite de linhas da prévia',
       searchPlaceholder: 'Pesquisar em todas as colunas...',
       clearSearch: 'Limpar pesquisa',
       filterPlaceholder: 'Filtrar (cláusula WHERE SQL, ex.: age > 18 AND status = \'active\')',

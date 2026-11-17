@@ -1602,6 +1602,8 @@ export const jaJP = {
       noResults: 'クエリを実行すると結果が表示されます',
     },
     dataTableView: {
+      previewRows: 'プレビュー · {count} 行',
+      previewRowLimit: 'プレビューの行数上限',
       searchPlaceholder: 'すべての列を検索...',
       clearSearch: '検索をクリア',
       filterPlaceholder: 'フィルター (SQL WHERE 句、例: age > 18 AND status = \'active\')',

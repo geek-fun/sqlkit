@@ -45,6 +45,7 @@ public class ProtocolHandler {
                     break;
 
                 case "connect":
+                case "connect_cql_tls":
                     handleConnect(params, response);
                     break;
 

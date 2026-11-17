@@ -309,8 +309,8 @@ version_error_signatures = [ "driver version not compatible", ]
 # Cassandra java-driver 4.x and speaks plain `jdbc:cassandra://` URLs.
 # Maven Central only hosts the thin JAR, so we download the pre-shaded
 # "bundle" JAR (all deps included) from the wrapper's GitHub releases —
-# same direct-download flow as GBase 8a. The bundle supports
-# Cassandra 2.1–4.x, DSE and ScyllaDB.
+# same direct-download flow as GBase 8a. SQLKit uses system_schema for
+# metadata and supports Cassandra 3.0 and later and ScyllaDB.
 
 [databases.cassandra]
 name = "Apache Cassandra"

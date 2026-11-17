@@ -107,6 +107,10 @@ fn build_paginated_select(
         .unwrap_or_default();
 
     match db_type {
+        "cql" => format!(
+            "SELECT * FROM {qualified_table}{where_clause} LIMIT {}",
+            limit.max(1)
+        ),
         "sqlserver" => format!(
             "SELECT * FROM {}{} ORDER BY (SELECT NULL) OFFSET {} ROWS FETCH NEXT {} ROWS ONLY",
             qualified_table, where_clause, offset, limit
@@ -363,6 +367,25 @@ async fn get_table_data_inner(
     offset_val: u32,
     db_type: &str,
 ) -> DbResult<QueryResult> {
+    if let ActiveConnection::JdbcBridge(adapter) = connection {
+        let adapter = adapter.lock().await;
+        if adapter.config.db_type.is_cql() {
+            if offset_val != 0 {
+                return Err(crate::database::error::DbError::UnsupportedOperation(
+                    "CQL does not support row offsets. Use a filtered query to browse more rows."
+                        .into(),
+                ));
+            }
+            let keyspace = query
+                .schema
+                .as_deref()
+                .or(query.database.as_deref())
+                .unwrap_or_else(|| adapter.config.cql_keyspace());
+            let qualified = build_qualified_table(Some(keyspace), &query.table, db_type);
+            let sql = build_paginated_select(&qualified, filter_ref, limit_val, 0, "cql");
+            return adapter.execute_query(&sql).await;
+        }
+    }
     let qualified = build_qualified_table(query.schema.as_deref(), &query.table, db_type);
     let sql = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
 
@@ -451,6 +474,18 @@ async fn get_table_count_inner(
     filter_ref: Option<&str>,
     db_type: &str,
 ) -> DbResult<QueryResult> {
+    if let ActiveConnection::JdbcBridge(adapter) = connection {
+        let adapter = adapter.lock().await;
+        if adapter.config.db_type.is_cql() {
+            let keyspace = schema
+                .or(database)
+                .unwrap_or_else(|| adapter.config.cql_keyspace());
+            let qualified = build_qualified_table(Some(keyspace), table, db_type);
+            return adapter
+                .execute_query(&build_count_query(&qualified, filter_ref))
+                .await;
+        }
+    }
     let qualified = build_qualified_table(schema, table, db_type);
     let query = build_count_query(&qualified, filter_ref);
 
@@ -1133,6 +1168,15 @@ mod tests {
             build_paginated_select("\"table\"", Some("id = 1"), 10, 5, "postgres");
         assert!(query_with_filter.contains("WHERE id = 1"));
         assert!(query_with_filter.contains("OFFSET 5"));
+    }
+
+    #[test]
+    fn cql_preview_uses_a_limit_without_an_offset() {
+        let qualified = build_qualified_table(Some("events_keyspace"), "events", "jdbc");
+        assert_eq!(
+            build_paginated_select(&qualified, Some("id = 7"), 100, 0, "cql"),
+            "SELECT * FROM \"events_keyspace\".\"events\" WHERE id = 7 LIMIT 100"
+        );
     }
 
     #[test]

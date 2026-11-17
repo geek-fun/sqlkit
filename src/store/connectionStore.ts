@@ -267,14 +267,8 @@ function isDatabaseRequired(type: DatabaseType): boolean {
 }
 
 function resolveDatabase(type: DatabaseType, database?: string): string | null {
-  if (type === DatabaseType.CASSANDRA || type === DatabaseType.SCYLLADB) {
-    // The wrapper driver refuses to connect without a keyspace and an explicit
-    // local datacenter; `system` always exists and `datacenter1` is the stock
-    // single-DC name. A persisted value that already carries the parameter
-    // (composed by the connection form) is passed through untouched.
-    const db = database?.trim() || 'system'
-    return db.includes('localdatacenter=') ? db : `${db}?localdatacenter=datacenter1`
-  }
+  if (type === DatabaseType.CASSANDRA || type === DatabaseType.SCYLLADB)
+    return database?.trim() || 'system'
   return database || defaultDatabaseFor[type] || null
 }
 
@@ -334,6 +328,7 @@ export function isJdbcDatabase(type: DatabaseType): boolean {
     DatabaseType.INFORMIX,
     DatabaseType.KYLIN,
     DatabaseType.CASSANDRA,
+    DatabaseType.SCYLLADB,
     DatabaseType.IRIS,
     DatabaseType.ACCESS,
     DatabaseType.TDENGINE,
@@ -364,6 +359,7 @@ export const jdbcDatabaseTypes: DatabaseType[] = [
   DatabaseType.INFORMIX,
   DatabaseType.KYLIN,
   DatabaseType.CASSANDRA,
+  DatabaseType.SCYLLADB,
   DatabaseType.IRIS,
   DatabaseType.ACCESS,
   DatabaseType.TDENGINE,
