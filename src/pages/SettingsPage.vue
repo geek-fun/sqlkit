@@ -263,14 +263,14 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                   </p>
                   <RadioGroup
                     :model-value="currentLanguage"
-                    class="flex flex-row flex-wrap gap-3"
+                    class="gap-3 grid grid-cols-2 sm:grid-cols-4"
                     :aria-label="t('pages.settings.general.languageSelect')"
                     @update:model-value="handleLanguageChange($event as string)"
                   >
                     <label
                       v-for="langOpt in languageOptions"
                       :key="langOpt.value"
-                      class="px-4 py-2.5 border rounded-lg flex gap-2.5 min-w-[140px] cursor-pointer transition-all items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1"
+                      class="px-3 py-2.5 border rounded-lg flex gap-2.5 min-w-0 cursor-pointer transition-all items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1"
                       :class="currentLanguage === langOpt.value
                         ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
                         : 'border-input hover:border-primary/50 hover:bg-accent/50'"
@@ -279,8 +279,13 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                         :id="`lang-${langOpt.value}`"
                         :value="langOpt.value"
                         :aria-labelledby="`lang-${langOpt.value}-label`"
+                        class="shrink-0"
                       />
-                      <span :id="`lang-${langOpt.value}-label`" class="text-sm font-medium cursor-pointer">{{ langOpt.label() }}</span>
+                      <span
+                        :id="`lang-${langOpt.value}-label`"
+                        class="text-sm font-medium min-w-0 cursor-pointer truncate"
+                        :title="langOpt.label()"
+                      >{{ langOpt.label() }}</span>
                     </label>
                   </RadioGroup>
                 </div>
