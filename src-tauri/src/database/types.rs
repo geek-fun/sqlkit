@@ -89,6 +89,16 @@ pub enum QueryValue {
     DateTime(String),
 }
 
+impl QueryValue {
+    /// Text of a string-like value, or `None` for any other variant.
+    pub fn as_string(&self) -> Option<String> {
+        match self {
+            QueryValue::String(s) | QueryValue::DateTime(s) => Some(s.clone()),
+            _ => None,
+        }
+    }
+}
+
 /// Represents a single row in a query result.
 pub type QueryRow = HashMap<String, QueryValue>;
 

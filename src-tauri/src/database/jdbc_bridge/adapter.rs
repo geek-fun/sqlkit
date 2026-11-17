@@ -60,6 +60,24 @@ impl JdbcBridgeAdapter {
         }
     }
 
+    /// Run a CQL query and return its rows, bypassing `DatabaseMetaData` for
+    /// introspection (see `list_tables` / `list_columns`).
+    async fn cql_rows(&self, sql: &str) -> DbResult<Vec<QueryRow>> {
+        let launcher = self.launcher()?;
+        let data = Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                JdbcMethod::ExecuteQuery,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "sql": sql,
+                }),
+            ),
+        )
+        .await?;
+        Ok(Self::parse_query_result(data)?.rows)
+    }
+
     /// Ensure all prerequisites are met: JRE, bridge JAR, and JDBC driver.
     /// Uses the fallback chain to try multiple driver versions automatically.
     async fn init_bridge(&mut self) -> DbResult<Arc<Mutex<JdbcBridgeLauncher>>> {
@@ -317,26 +335,11 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         if self.is_cql() {
             // The wrapper's catalog listing reports the cluster name, not
             // keyspaces — read them from system_schema instead.
-            let launcher = self.launcher()?;
-            let data = Self::send_request(
-                launcher,
-                JdbcRequest::new(
-                    JdbcMethod::ExecuteQuery,
-                    serde_json::json!({
-                        "conn_id": self.conn_id,
-                        "sql": "SELECT keyspace_name FROM system_schema.keyspaces",
-                    }),
-                ),
-            )
-            .await?;
-            let result = Self::parse_query_result(data)?;
-            return Ok(result
-                .rows
+            return Ok(self
+                .cql_rows("SELECT keyspace_name FROM system_schema.keyspaces")
+                .await?
                 .iter()
-                .filter_map(|row| match row.get("keyspace_name") {
-                    Some(QueryValue::String(name)) => Some(name.clone()),
-                    _ => None,
-                })
+                .filter_map(|row| row.get("keyspace_name").and_then(|v| v.as_string()))
                 .map(|name| DatabaseSchema {
                     is_system: name.starts_with("system"),
                     name,
@@ -398,6 +401,41 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
+        if self.is_cql() {
+            // The wrapper's DatabaseMetaData only reports objects of the
+            // keyspace bound at connect time and ignores the catalog/schema
+            // arguments — so browsing a keyspace picked later in the UI would
+            // come back empty. Read system_schema directly instead, which also
+            // keeps working when the session keyspace is `system`.
+            let keyspace = schema.or(database);
+            let sql = match keyspace {
+                Some(ks) => format!(
+                    "SELECT table_name FROM system_schema.tables WHERE keyspace_name = '{}'",
+                    ks.replace('\'', "''")
+                ),
+                None => "SELECT keyspace_name, table_name FROM system_schema.tables".to_string(),
+            };
+            let rows = self.cql_rows(&sql).await?;
+            return Ok(rows
+                .iter()
+                .filter_map(|row| {
+                    let table = row.get("table_name")?.as_string()?;
+                    let ks = row
+                        .get("keyspace_name")
+                        .and_then(|v| v.as_string())
+                        .or_else(|| keyspace.map(|k| k.to_string()));
+                    Some(TableInfo {
+                        schema: ks,
+                        name: table,
+                        table_type: "TABLE".to_string(),
+                        row_count: None,
+                        size_bytes: None,
+                        description: None,
+                        metadata: HashMap::new(),
+                    })
+                })
+                .collect());
+        }
         let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
@@ -440,6 +478,48 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
+        if self.is_cql() {
+            // Same session-keyspace limitation as list_tables: read the column
+            // definitions (and primary-key flags) from system_schema.
+            let Some(keyspace) = schema.or(database) else {
+                return Ok(Vec::new());
+            };
+            let sql = format!(
+                "SELECT column_name, kind, position, type FROM system_schema.columns \
+                 WHERE keyspace_name = '{}' AND table_name = '{}'",
+                keyspace.replace('\'', "''"),
+                table.replace('\'', "''")
+            );
+            let mut cols: Vec<(String, bool, String)> = self
+                .cql_rows(&sql)
+                .await?
+                .iter()
+                .filter_map(|row| {
+                    let name = row.get("column_name").and_then(|v| v.as_string())?;
+                    let kind = row.get("kind").and_then(|v| v.as_string()).unwrap_or_default();
+                    let ty = row.get("type").and_then(|v| v.as_string()).unwrap_or_default();
+                    Some((name, kind.contains("partition_key") || kind.contains("clustering"), ty))
+                })
+                .collect();
+            // Primary-key columns first, then the rest, mirroring CQL's layout.
+            cols.sort_by_key(|(_, is_pk, _)| !*is_pk);
+            return Ok(cols
+                .into_iter()
+                .map(|(name, is_primary_key, data_type)| ColumnInfo {
+                    name,
+                    data_type,
+                    nullable: !is_primary_key,
+                    default_value: None,
+                    is_primary_key,
+                    is_auto_increment: false,
+                    max_length: None,
+                    precision: None,
+                    scale: None,
+                    description: None,
+                    metadata: HashMap::new(),
+                })
+                .collect());
+        }
         let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
