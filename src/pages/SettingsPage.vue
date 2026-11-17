@@ -275,8 +275,12 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                         ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
                         : 'border-input hover:border-primary/50 hover:bg-accent/50'"
                     >
-                      <RadioGroupItem :id="`lang-${langOpt.value}`" :value="langOpt.value" />
-                      <span class="text-sm font-medium cursor-pointer">{{ langOpt.label() }}</span>
+                      <RadioGroupItem
+                        :id="`lang-${langOpt.value}`"
+                        :value="langOpt.value"
+                        :aria-labelledby="`lang-${langOpt.value}-label`"
+                      />
+                      <span :id="`lang-${langOpt.value}-label`" class="text-sm font-medium cursor-pointer">{{ langOpt.label() }}</span>
                     </label>
                   </RadioGroup>
                 </div>

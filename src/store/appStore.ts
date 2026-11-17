@@ -1,6 +1,9 @@
+import type { LanguageType } from '@/lang'
 import { defineStore } from 'pinia'
 import { storeApi } from '@/datasources/storeApi'
-import { detectFromNavigator, lang } from '@/lang'
+import { lang, readLanguagePreference, resolveLocale } from '@/lang'
+
+export { LanguageType } from '@/lang'
 
 export enum ThemeType {
   AUTO = 'auto',
@@ -11,17 +14,6 @@ export enum ThemeType {
 // System theme change listener state (managed outside Pinia for lifecycle control)
 let systemThemeMediaQuery: MediaQueryList | null = null
 let systemThemeHandler: ((e: MediaQueryListEvent) => void) | null = null
-
-export enum LanguageType {
-  AUTO = 'auto',
-  ZH_CN = 'zhCN',
-  ZH_TW = 'zhTW',
-  EN_US = 'enUS',
-  PT_BR = 'ptBR',
-  JA_JP = 'jaJP',
-  KO_KR = 'koKR',
-  ES_ES = 'esES',
-}
 
 export type EditorConfig = {
   fontSize: number
@@ -194,7 +186,7 @@ type AppStoreState = {
 export const useAppStore = defineStore('app', {
   state: (): AppStoreState => ({
     themeType: ThemeType.AUTO,
-    languageType: LanguageType.AUTO,
+    languageType: readLanguagePreference(),
     uiThemeType: ThemeType.LIGHT,
     editorConfig: {
       fontSize: 14,
@@ -220,7 +212,6 @@ export const useAppStore = defineStore('app', {
   persist: {
     pick: [
       'themeType',
-      'languageType',
       'uiThemeType',
       'editorConfig',
       'queryConfig',
@@ -290,12 +281,10 @@ export const useAppStore = defineStore('app', {
       this.updateSystemThemeWatcher()
     },
     setLanguageType(languageType: LanguageType) {
-      this.languageType = languageType
       if (typeof localStorage !== 'undefined')
         localStorage.setItem('lang', languageType)
-      lang.global.locale.value = languageType === LanguageType.AUTO
-        ? detectFromNavigator()
-        : languageType
+      this.languageType = languageType
+      lang.global.locale.value = resolveLocale(languageType)
     },
     setEditorConfig(config: Partial<EditorConfig>) {
       this.editorConfig = { ...this.editorConfig, ...config }
