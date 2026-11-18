@@ -61,7 +61,7 @@ tiberius = { version = "0.12", default-features = false, features = [
   "rust_decimal"
 ] }
 tokio-util = { version = "0.7", features = [ "compat" ] }
-rusqlite = { version = "0.32", default-features = false, features = [ "chrono" ] }
+rusqlite = { version = "0.43", default-features = false, features = [ "chrono" ] }
 # C library bundling is selected by cargo features:
 #   default → rusqlite/bundled (SQLite)
 #   sqlcipher → rusqlite/bundled-sqlcipher (SQLCipher, encrypted SQLite)
@@ -90,7 +90,7 @@ http = "1"
 log = "0.4"
 futures = "0.3"
 rand = "0.8"
-data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", tag = "v0.2.0" }
+data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", tag = "v0.2.2" }
 
 # Archive extraction (JRE downloads)
 flate2 = "1.0"
