@@ -135,7 +135,7 @@ public class SslPropertyMapper {
 
     static boolean requiresCqlTls(String driverClass, String mode) {
         return "com.ing.data.cassandra.jdbc.CassandraDriver".equals(driverClass)
-                && ("prefer".equals(mode) || "require".equals(mode) || "verify-ca".equals(mode) || "verify-full".equals(mode));
+                && ("require".equals(mode) || "verify-ca".equals(mode) || "verify-full".equals(mode));
     }
 
     /** Connection-local TLS settings for the Cassandra wrapper. */

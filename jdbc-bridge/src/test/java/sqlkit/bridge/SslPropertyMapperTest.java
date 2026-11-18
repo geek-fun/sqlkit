@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SslPropertyMapperTest {
@@ -46,6 +47,12 @@ class SslPropertyMapperTest {
             assertEquals("true", verify.properties.getProperty("enableSsl"));
             assertEquals("true", verify.properties.getProperty("hostnameVerification"));
         }
+    }
+
+    @Test
+    void cqlPreferModeConnectsPlaintext() {
+        assertFalse(SslPropertyMapper.requiresCqlTls("com.ing.data.cassandra.jdbc.CassandraDriver", "prefer"));
+        assertTrue(apply("com.ing.data.cassandra.jdbc.CassandraDriver", "prefer").isEmpty());
     }
 
     @Test
