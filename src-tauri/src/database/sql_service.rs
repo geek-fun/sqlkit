@@ -128,6 +128,25 @@ pub fn wrap_query(options: WrapQueryOptions) -> SqlBuildResult {
         return SqlBuildResult::err("empty query");
     }
 
+    // ── Step 1b: CQL (Cassandra/ScyllaDB) has no sqlparser dialect ──
+    // No parse, no schema injection, no derived-table wrapping — the engine
+    // is the only validator. Grid sort/filter/paging therefore cannot be
+    // applied server-side: sorting is only legal on clustering keys, and CQL
+    // has no OFFSET, so the wrapper has no faithful translation.
+    if crate::database::config::DatabaseType::slug_is_cql(&options.database_type) {
+        let needs_wrapping = !options.sort.is_empty()
+            || !options.filters.is_empty()
+            || options.limit.is_some()
+            || options.offset.is_some();
+        if needs_wrapping {
+            return SqlBuildResult::err(
+                "grid sort/filter/paging is not available for CQL (Cassandra/ScyllaDB) — \
+                 add ORDER BY / LIMIT to the statement itself",
+            );
+        }
+        return SqlBuildResult::ok(cleaned);
+    }
+
     // ── Step 2: Parse & extract a single statement ──
     let dialect: Box<dyn sqlparser::dialect::Dialect> = match options.database_type.as_str() {
         "postgres" | "duckdb" | "cockroachdb" => Box::new(PostgreSqlDialect {}),

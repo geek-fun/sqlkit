@@ -36,7 +36,7 @@ pub(crate) fn statement_returns_rows(
 /// comments. Returns `None` when the first executable token is not a word
 /// (e.g. `(`) or nothing executable remains (unterminated comment) — those
 /// cases fall through to the parser-based classification.
-fn first_executable_keyword(sql: &str) -> Option<&str> {
+pub(crate) fn first_executable_keyword(sql: &str) -> Option<&str> {
     let bytes = sql.as_bytes();
     let mut i = 0;
     while i < bytes.len() {
