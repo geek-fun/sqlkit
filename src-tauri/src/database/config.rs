@@ -166,6 +166,23 @@ impl DatabaseType {
         matches!(self, Self::Cassandra | Self::ScyllaDB)
     }
 
+    /// Whether a backend slug (`db_type` string as used by the SQL services
+    /// and MCP tools) identifies a CQL engine. Case-insensitive on purpose:
+    /// the slug arrives from several layers with mixed casing.
+    pub(crate) fn slug_is_cql(slug: &str) -> bool {
+        matches!(slug.to_lowercase().as_str(), "cassandra" | "scylladb")
+    }
+
+    /// The backend slug for this type — the same `db_type` string the SQL
+    /// services key their dialect lookups on (matches the serde lowercase
+    /// representation the frontend persists).
+    pub(crate) fn slug(self) -> String {
+        serde_json::to_value(self)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_else(|| "generic".to_string())
+    }
+
     /// Whether this connection type has an SSL/TLS concept at all.
     ///
     /// Embedded / file-based engines mirror the frontend
