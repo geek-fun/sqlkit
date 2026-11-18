@@ -73,7 +73,7 @@ impl JdbcBridgeAdapter {
     async fn init_bridge(&mut self) -> DbResult<Arc<Mutex<JdbcBridgeLauncher>>> {
         let db_type = self.config.db_type;
         let ssl_mode_str = match self.config.ssl_mode {
-            crate::database::config::SslMode::Prefer if db_type.is_cql() => "require",
+            crate::database::config::SslMode::Prefer if db_type.is_cql() => "disable",
             crate::database::config::SslMode::Disable => "disable",
             crate::database::config::SslMode::Prefer => "prefer",
             crate::database::config::SslMode::Require => "require",
