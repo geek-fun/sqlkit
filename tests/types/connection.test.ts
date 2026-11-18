@@ -44,9 +44,9 @@ describe('connection types', () => {
       expect(sslModeFromBackend('invalid')).toEqual({ mode: 'disable' })
     })
 
-    it.each(['CASSANDRA', 'SCYLLADB'])('uses Require for legacy Prefer on %s', (type) => {
-      expect(sslModeFromBackend('prefer', type)).toEqual({ mode: 'require' })
-      expect(sslModeToBackend({ mode: 'prefer' }, type)).toBe('require')
+    it.each(['CASSANDRA', 'SCYLLADB'])('maps legacy Prefer to Disable on %s', (type) => {
+      expect(sslModeFromBackend('prefer', type)).toEqual({ mode: 'disable' })
+      expect(sslModeToBackend({ mode: 'prefer' }, type)).toBe('disable')
       expect(sslModeToBackend({ mode: 'disable' }, type)).toBe('disable')
     })
   })
