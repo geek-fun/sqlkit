@@ -1189,6 +1189,7 @@ export const jaJP = {
         port: 'ポート',
         database: 'データベース',
         localDatacenter: 'ローカルデータセンター',
+        keyspace: 'キースペース',
         username: 'ユーザー名',
         password: 'パスワード',
         ssl: 'SSL/TLS 暗号化を使用',

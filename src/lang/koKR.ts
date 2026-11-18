@@ -1190,6 +1190,7 @@ export const koKR = {
         port: '포트',
         database: '데이터베이스',
         localDatacenter: '로컬 데이터센터',
+        keyspace: '키스페이스',
         username: '사용자 이름',
         password: '비밀번호',
         ssl: 'SSL/TLS 암호화 사용',

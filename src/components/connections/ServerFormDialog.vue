@@ -521,6 +521,8 @@ const showsStandardHostFields = computed(() =>
 )
 
 const databaseLabel = computed(() => {
+  if (isCassandraFamily.value)
+    return t('components.serverForm.labels.keyspace')
   if (isOracle.value && oracleMethod.value === 'basic') {
     return oracleSidOrService.value === 'sid'
       ? t('components.serverForm.oracle.sid')
@@ -1040,7 +1042,7 @@ function handleSave() {
               </div>
               <div class="space-y-2">
                 <Label for="database">
-                  {{ t('components.serverForm.labels.database') }}
+                  {{ databaseLabel }}
                   <span v-if="isDbNameRequired" class="text-destructive-text ml-0.5">*</span>
                 </Label>
                 <Input
