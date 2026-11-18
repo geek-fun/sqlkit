@@ -1189,6 +1189,7 @@ export const zhTW = {
         port: '連接埠',
         database: '資料庫',
         localDatacenter: '本地資料中心',
+        keyspace: '鍵空間',
         username: '使用者名稱',
         password: '密碼',
         ssl: '使用 SSL/TLS 加密',

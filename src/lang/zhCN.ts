@@ -1190,6 +1190,7 @@ export const zhCN = {
         port: '端口',
         database: '数据库',
         localDatacenter: '本地数据中心',
+        keyspace: '键空间',
         username: '用户名',
         password: '密码',
         ssl: '使用SSL/TLS加密',

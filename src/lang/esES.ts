@@ -1190,6 +1190,7 @@ export const esES = {
         port: 'Puerto',
         database: 'Base de datos',
         localDatacenter: 'Datacenter local',
+        keyspace: 'Keyspace',
         username: 'Usuario',
         password: 'Contraseña',
         ssl: 'Usar cifrado SSL/TLS',

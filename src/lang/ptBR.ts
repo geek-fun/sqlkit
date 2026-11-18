@@ -1190,6 +1190,7 @@ export const ptBR = {
         port: 'Porta',
         database: 'Banco de dados',
         localDatacenter: 'Datacenter local',
+        keyspace: 'Keyspace',
         username: 'Usuário',
         password: 'Senha',
         ssl: 'Usar criptografia SSL/TLS',

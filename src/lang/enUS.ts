@@ -1190,6 +1190,7 @@ export const enUS = {
         port: 'Port',
         database: 'Database',
         localDatacenter: 'Local Datacenter',
+        keyspace: 'Keyspace',
         username: 'Username',
         password: 'Password',
         ssl: 'Use SSL/TLS encryption',
