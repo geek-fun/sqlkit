@@ -1,6 +1,20 @@
-import { parseSqlStatements } from '@/composables/useSqlStatements'
+import { getStatementAtLine, parseSqlStatements } from '@/composables/useSqlStatements'
 
 describe('parseSqlStatements', () => {
+  it('selects the whole CQL batch when the cursor is on an inner statement', () => {
+    const batch = [
+      'BEGIN UNLOGGED BATCH',
+      'INSERT INTO events (id, note) VALUES (1, $$APPLY BATCH;$$);',
+      '',
+      'INSERT INTO events (id) VALUES (2);',
+      'APPLY /* end */ BATCH',
+    ].join('\n')
+    const statements = parseSqlStatements(`${batch};\n// Next statement\nSELECT * FROM events;`, true)
+    expect(statements).toHaveLength(2)
+    expect(getStatementAtLine(statements, 4)?.statement).toBe(batch)
+    expect(getStatementAtLine(statements, 7)?.position.startLineNumber).toBe(7)
+  })
+
   describe('simple statements', () => {
     it('parses a single SELECT without semicolon', () => {
       const sql = 'SELECT * FROM users'

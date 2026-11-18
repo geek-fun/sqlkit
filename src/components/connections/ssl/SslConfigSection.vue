@@ -4,9 +4,11 @@ import type { SslConfig, SslMode } from '@/types/connection'
 import { computed } from 'vue'
 import {
   DEFAULT_SSL_MODE,
+  isCqlDatabase,
   isSslSupported,
   needsCertFields,
   needsSqlServerOptions,
+  normalizeSslMode,
 } from '@/types/connection'
 import SslCertFields from './SslCertFields.vue'
 import SslModeSelect from './SslModeSelect.vue'
@@ -53,7 +55,8 @@ function handleModeChange(mode: SslMode) {
 <template>
   <div v-if="showSslSection" class="space-y-3">
     <SslModeSelect
-      :model-value="sslConfig.mode"
+      :model-value="normalizeSslMode(sslConfig.mode, dbType)"
+      :hide-prefer="isCqlDatabase(dbType)"
       :error="sslErrors.mode"
       @update:model-value="handleModeChange"
     />

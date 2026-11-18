@@ -23,6 +23,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { useDataGridCopy } from '@/composables/useDataGridCopy'
 import { useConnectionStore } from '@/store'
 import { formatApiError, isApiError } from '@/types/api'
+import { isCqlDatabase } from '@/types/connection'
 
 type Props = {
   results?: QueryResult | null
@@ -122,6 +123,10 @@ const activeFilters = ref<ColumnFilter[]>([])
 
 // ── Result editability (single-table SELECTs only) ──
 const connectionStore = useConnectionStore()
+const canFilter = computed(() => {
+  const type = props.connectionId ? connectionStore.getConnectionById(props.connectionId)?.type : undefined
+  return !isScriptResult.value && !isCqlDatabase(type)
+})
 
 type SqlEditability = {
   editable: boolean
@@ -200,6 +205,8 @@ watch(() => props.results, (r) => {
 }, { immediate: true })
 
 async function handleFilterChange(filters: ColumnFilter[]) {
+  if (!canFilter.value)
+    return
   activeFilters.value = filters
   await reExecuteFiltered()
 }
@@ -494,7 +501,7 @@ const handleExport = (action: typeof exportActions[number]) => {
           :table-name="isScriptResult ? undefined : editableTableName"
           :primary-keys="editablePrimaryKeys"
           :editability-reason="isScriptResult ? t('components.queryResult.scriptReadOnly') : editability.reason ?? undefined"
-          :filterable="!isScriptResult"
+          :filterable="canFilter"
           :loading="displayExecuting"
           :hide-toolbar="true"
           :hide-batch-actions="true"

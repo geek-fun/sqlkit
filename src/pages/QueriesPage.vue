@@ -28,6 +28,7 @@ import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, us
 import { DatabaseType } from '@/store/connectionStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import { isApiSuccess } from '@/types/api'
+import { isCqlDatabase } from '@/types/connection'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -53,7 +54,7 @@ const { formatSql, resolveDialect } = useSqlFormatter()
 
 // ── Destructive action dialog state ──
 const destructiveDialogOpen = ref(false)
-const destructiveAction = ref<{ type: 'drop' | 'truncate', table: TableInfo, database: string, schema?: string } | null>(null)
+const destructiveAction = ref<{ type: 'drop' | 'truncate', table: TableInfo, connectionId: string, database: string, schema?: string } | null>(null)
 const isDestructiveActionExecuting = ref(false)
 const showOrphanTabDialog = ref(false)
 const orphanTabToHandle = ref<string | null>(null)
@@ -79,6 +80,10 @@ const activeConnection = computed(() => {
 })
 
 const activeTab = computed(() => tabStore.activeTab)
+const isCqlEditor = computed(() => {
+  const connId = activeTab.value?.connectionId
+  return isCqlDatabase(connId ? connectionStore.getConnectionById(connId)?.type : activeConnection.value?.type)
+})
 
 // Single source of truth for the database shown next to a result: the tab's
 // execution database, falling back to the sidebar selection while the tab is
@@ -618,12 +623,18 @@ function handleOpenTableFromErDiagram(tableName: string) {
 }
 
 function handleDropTable(table: TableInfo, database: string, schema?: string) {
-  destructiveAction.value = { type: 'drop', table, database, schema }
+  const connectionId = getActiveConnectionId()
+  if (!connectionId)
+    return
+  destructiveAction.value = { type: 'drop', table, connectionId, database, schema }
   destructiveDialogOpen.value = true
 }
 
 function handleTruncateTable(table: TableInfo, database: string, schema?: string) {
-  destructiveAction.value = { type: 'truncate', table, database, schema }
+  const connectionId = getActiveConnectionId()
+  if (!connectionId)
+    return
+  destructiveAction.value = { type: 'truncate', table, connectionId, database, schema }
   destructiveDialogOpen.value = true
 }
 
@@ -633,26 +644,37 @@ async function handleDestructiveConfirm() {
     return
 
   isDestructiveActionExecuting.value = true
-  const connId = getActiveConnectionId()
-  if (!connId) {
+  const connId = action.connectionId
+  if (!isConnectionActive(connId)) {
     toast.error(t('pages.queries.notifications.noActiveConnection'))
     isDestructiveActionExecuting.value = false
     return
   }
 
-  const schemaPrefix = action.schema ? `"${action.schema}".` : ''
-  const qualifiedName = `${schemaPrefix}"${action.table.name}"`
+  const cql = isCqlDatabase(connectionStore.getConnectionById(connId)?.type)
+  const schema = action.schema || (cql ? action.database : undefined)
+  if (cql && !schema) {
+    toast.error(t('pages.queries.selectDatabase'))
+    isDestructiveActionExecuting.value = false
+    return
+  }
+  const qualifiedName = [schema, action.table.name]
+    .filter((name): name is string => !!name)
+    .map(name => quoteIdentifier(name, undefined))
+    .join('.')
   const sql = action.type === 'drop'
     ? `DROP TABLE IF EXISTS ${qualifiedName};`
     : `TRUNCATE TABLE ${qualifiedName};`
 
   try {
-    await invoke('execute_query', {
+    const response = await invoke<ApiResponse<unknown>>('execute_query', {
       connectionId: connId,
       sql,
     })
+    if (!isApiSuccess(response))
+      throw new Error(response.error.message)
     const actionLabel = action.type === 'drop' ? 'dropped' : 'truncated'
-    toast.success(t('pages.queries.notifications.tableActionSuccess', { action: actionLabel }))
+    toast.success(t('pages.queries.notifications.tableActionSuccess', { action: actionLabel, table: action.table.name }))
     destructiveDialogOpen.value = false
     destructiveAction.value = null
     schemaTreeRef.value?.refresh()
@@ -670,7 +692,7 @@ async function handleDestructiveConfirm() {
 // the connection to already have a database selected.
 function ensureDatabaseContext(connId: string, database: string) {
   const type = connectionStore.getConnectionById(connId)?.type
-  if (type === DatabaseType.CASSANDRA || type === DatabaseType.SCYLLADB)
+  if (isCqlDatabase(type))
     return
   const escapedDb = database.replace(/`/g, '``')
   invoke('execute_query', { connectionId: connId, sql: `USE \`${escapedDb}\`` }).catch(() => {
@@ -1382,6 +1404,7 @@ function closeResultPanel() {
                 v-model="editorContent"
                 height="100%"
                 :dialect="activeMonacoDialect"
+                :cql="isCqlEditor"
                 :completion-context="completionContext"
                 :is-executing="activeTab.isExecuting"
                 :font-size="appStore.editorConfig.fontSize"
@@ -1449,7 +1472,7 @@ function closeResultPanel() {
               :is-executing="activeTab?.isExecuting"
               :execution-time="activeTab?.executionTime"
               :sql="activeTab?.lastExecutedSql ?? activeTab?.content"
-              :connection-id="getConnectionId() ?? undefined"
+              :connection-id="activeTab?.connectionId || undefined"
               :database="activeDatabase"
               :explain-plan="activeTab?.explainPlan ?? null"
               :is-explaining="activeTab?.isExplaining ?? false"

@@ -73,6 +73,7 @@ impl JdbcBridgeAdapter {
     async fn init_bridge(&mut self) -> DbResult<Arc<Mutex<JdbcBridgeLauncher>>> {
         let db_type = self.config.db_type;
         let ssl_mode_str = match self.config.ssl_mode {
+            crate::database::config::SslMode::Prefer if db_type.is_cql() => "require",
             crate::database::config::SslMode::Disable => "disable",
             crate::database::config::SslMode::Prefer => "prefer",
             crate::database::config::SslMode::Require => "require",
@@ -91,7 +92,7 @@ impl JdbcBridgeAdapter {
 
         // Use fallback chain for JDBC-dependent databases (Oracle, DB2, H2, etc.)
         // For non-registry types, fall back to the old single-driver approach
-        let cql_database = if db_type.is_cql() {
+        let database = if db_type.is_cql() {
             let keyspace = self.config.cql_keyspace();
             if !keyspace.starts_with(|c: char| c.is_ascii_alphabetic())
                 || !keyspace
@@ -102,21 +103,16 @@ impl JdbcBridgeAdapter {
                     "Invalid CQL keyspace: {keyspace}"
                 )));
             }
-            // The wrapper decodes the URI query and then decodes each parameter.
-            let encoded_dc =
-                url::form_urlencoded::byte_serialize(self.config.cql_datacenter().as_bytes())
-                    .collect::<String>();
-            let dc =
-                url::form_urlencoded::byte_serialize(encoded_dc.as_bytes()).collect::<String>();
-            Some(format!("{keyspace}?localdatacenter={dc}"))
+            Some(keyspace)
         } else {
-            None
+            self.config.database.as_deref()
         };
         let (_version, conn_id, launcher) = super::fallback::run_fallback_chain(
             db_type,
             &self.config.host,
             self.config.port,
-            cql_database.as_deref().or(self.config.database.as_deref()),
+            database,
+            db_type.is_cql().then(|| self.config.cql_datacenter()),
             &self.config.username,
             &self.config.password,
             self.config.oracle_options.as_ref(),
@@ -293,10 +289,15 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
 
     async fn execute_query(&self, query: &str) -> DbResult<QueryResult> {
         let launcher = self.launcher()?;
-        let statements = split_sql_statements_for_dialect(
-            query,
-            self.config.db_type == super::super::DatabaseType::Oracle,
-        );
+        let statements = if self.config.db_type.is_cql() {
+            crate::database::cql::split_statements(query)
+                .map_err(|error| DbError::InvalidQuery(error.into()))?
+                .into_iter()
+                .map(str::to_owned)
+                .collect()
+        } else {
+            split_sql_statements_for_dialect(query, self.config.db_type == DatabaseType::Oracle)
+        };
         if statements.is_empty() {
             return Ok(QueryResult {
                 columns: Vec::new(),
@@ -965,6 +966,49 @@ fn split_sql_statements_for_dialect(sql: &str, oracle: bool) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    #[ignore = "Requires a disposable Cassandra server and the current JDBC bridge JAR"]
+    async fn cql_bridge_opens_exact_keyspace_and_executes_an_intact_batch() {
+        let port = std::env::var("SQLKIT_CQL_TEST_PORT")
+            .expect("set SQLKIT_CQL_TEST_PORT to the disposable server's local port")
+            .parse()
+            .expect("valid Cassandra port");
+        let config = ConnectionConfig::new(DatabaseType::Cassandra, "127.0.0.1", port, "")
+            .with_ssl_mode(crate::database::SslMode::Disable);
+        let mut admin = JdbcBridgeAdapter::new(config.clone());
+        admin.connect().await.unwrap();
+        let keyspace = format!("CqlTest{}", uuid::Uuid::new_v4().simple());
+        let quoted = format!("\"{keyspace}\"");
+        admin
+            .execute_query(&format!(
+                "CREATE KEYSPACE {quoted} WITH replication = \
+                 {{'class': 'SimpleStrategy', 'replication_factor': 1}}"
+            ))
+            .await
+            .unwrap();
+        let mut scoped = JdbcBridgeAdapter::new(config.with_database(&quoted));
+        let rows = async {
+            scoped.connect().await?;
+            scoped
+                .execute_query(
+                    "CREATE TABLE events (id int PRIMARY KEY); \
+                     BEGIN UNLOGGED BATCH \
+                     INSERT INTO events (id) VALUES (1); \
+                     INSERT INTO events (id) VALUES (2); \
+                     APPLY BATCH; SELECT * FROM events",
+                )
+                .await
+        }
+        .await;
+        scoped.disconnect().await.unwrap();
+        admin
+            .execute_query(&format!("DROP KEYSPACE {quoted}"))
+            .await
+            .unwrap();
+        admin.disconnect().await.unwrap();
+        assert_eq!(rows.unwrap().rows.len(), 2);
+    }
 
     #[test]
     fn comments_preserve_token_boundaries() {

@@ -4,7 +4,7 @@ import { flushPromises, shallowMount } from '@vue/test-utils'
 import QueryResultPanel from '@/components/database-browser/QueryResultPanel.vue'
 
 jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }))
-jest.mock('@/store', () => ({ useConnectionStore: () => ({ getConnectionById: () => ({ type: 'postgresql' }) }) }))
+jest.mock('@/store', () => ({ useConnectionStore: () => ({ getConnectionById: (id: string) => ({ type: id === 'cql' ? 'cassandra' : 'postgresql' }) }) }))
 jest.mock('@/composables/useDataGridCopy', () => ({
   useDataGridCopy: () => ({ copyRowsAs: jest.fn(), exportToFile: jest.fn() }),
 }))
@@ -53,8 +53,8 @@ const empty = resultSet('refund_id', [])
 const last = resultSet('balance', [{ balance: '2700' }])
 const scriptResult = { ...last, resultSets: [first, empty, last] }
 
-const mountPanel = (results: QueryResult | null = scriptResult) => shallowMount(QueryResultPanel, {
-  props: { results, sql: 'BEGIN; SELECT 1; COMMIT;', connectionId: 'test' },
+const mountPanel = (results: QueryResult | null = scriptResult, connectionId = 'test') => shallowMount(QueryResultPanel, {
+  props: { results, sql: 'SELECT * FROM events', connectionId },
   global: { stubs: { DataGrid: false } },
 })
 
@@ -116,5 +116,18 @@ describe('script query results', () => {
     expect(wrapper.findComponent({ name: 'Select' }).exists()).toBe(false)
     expect(wrapper.findComponent({ name: 'DataGrid' }).props('rows')).toEqual(last.rows)
     expect(wrapper.findComponent({ name: 'DataGrid' }).props('filterable')).toBe(true)
+  })
+
+  it('keeps CQL result rows visible without offering server-side filters', async () => {
+    const { invoke } = jest.requireMock('@tauri-apps/api/core')
+    const wrapper = mountPanel(last, 'cql')
+    await flushPromises()
+    invoke.mockClear()
+    const grid = wrapper.findComponent({ name: 'DataGrid' })
+    expect(grid.props('filterable')).toBe(false)
+    expect(grid.props('rows')).toEqual(last.rows)
+    grid.vm.$emit('filter-change', [{ column: 'balance', operator: 'eq', value: '2700' }])
+    await flushPromises()
+    expect(invoke).not.toHaveBeenCalled()
   })
 })

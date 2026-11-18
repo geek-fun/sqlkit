@@ -557,6 +557,24 @@ fn build_pk_where(pk_values: &HashMap<String, JsonValue>, db_type: &str) -> Stri
         .join(" AND ")
 }
 
+async fn cql_mutation_keyspace<'a>(
+    connection: &ActiveConnection,
+    schema: Option<&'a str>,
+    database: Option<&'a str>,
+) -> Result<Option<&'a str>, String> {
+    if let ActiveConnection::JdbcBridge(adapter) = connection {
+        let adapter = adapter.lock().await;
+        if adapter.config.db_type.is_cql() {
+            return schema
+                .filter(|name| !name.is_empty())
+                .or(database.filter(|name| !name.is_empty()))
+                .map(Some)
+                .ok_or_else(|| "A target keyspace is required for CQL row changes".to_string());
+        }
+    }
+    Ok(None)
+}
+
 /// Update a single row in a table identified by its primary key values.
 ///
 /// # Arguments
@@ -584,12 +602,17 @@ pub async fn update_table_row(
     let connection = state.ensure_connection(&connection_id).await?;
 
     let db_type = get_db_type_string(&connection);
+    let cql_keyspace =
+        cql_mutation_keyspace(&connection, schema.as_deref(), database.as_deref()).await?;
+    if cql_keyspace.is_some() && updates.keys().any(|column| pk_values.contains_key(column)) {
+        return Err("CQL primary-key columns cannot be updated".to_string());
+    }
 
     let build_update_sql = |db_type: &str| -> Result<String, String> {
         if pk_values.is_empty() {
             return Err("Cannot update row: no primary key values provided".to_string());
         }
-        let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
+        let qualified = build_qualified_table(cql_keyspace.or(schema.as_deref()), &table, db_type);
         let set_clause = updates
             .iter()
             .map(|(col, val)| {
@@ -716,9 +739,11 @@ pub async fn delete_table_row(
     let connection = state.ensure_connection(&connection_id).await?;
 
     let db_type = get_db_type_string(&connection);
+    let cql_keyspace =
+        cql_mutation_keyspace(&connection, schema.as_deref(), database.as_deref()).await?;
 
     let build_delete_sql = |db_type: &str| -> String {
-        let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
+        let qualified = build_qualified_table(cql_keyspace.or(schema.as_deref()), &table, db_type);
         let where_clause = build_pk_where(&pk_values, db_type);
         format!("DELETE FROM {} WHERE {}", qualified, where_clause)
     };
@@ -1177,6 +1202,30 @@ mod tests {
             build_paginated_select(&qualified, Some("id = 7"), 100, 0, "cql"),
             "SELECT * FROM \"events_keyspace\".\"events\" WHERE id = 7 LIMIT 100"
         );
+    }
+
+    #[tokio::test]
+    async fn cql_row_changes_require_the_selected_keyspace() {
+        let config = crate::database::ConnectionConfig::new(
+            crate::database::DatabaseType::Cassandra,
+            "localhost",
+            9042,
+            "",
+        )
+        .with_database("default_keyspace");
+        let connection = ActiveConnection::JdbcBridge(std::sync::Arc::new(
+            tokio::sync::Mutex::new(JdbcBridgeAdapter::new(config)),
+        ));
+        let target = cql_mutation_keyspace(&connection, None, Some("CaseReview"))
+            .await
+            .unwrap();
+        assert_eq!(
+            build_qualified_table(target, "events", "jdbc"),
+            "\"CaseReview\".\"events\""
+        );
+        assert!(cql_mutation_keyspace(&connection, None, None)
+            .await
+            .is_err());
     }
 
     #[test]
