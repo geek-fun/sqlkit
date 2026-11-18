@@ -425,6 +425,23 @@ impl SQLiteAdapter {
             })
         } else {
             // For non-SELECT queries (INSERT, UPDATE, DELETE, etc.)
+            // rusqlite 0.43 rejects empty / comment-only SQL with Error::Empty;
+            // the editor legitimately produces those (comment-only runs, trailing
+            // comments after statement splitting) — report zero affected rows.
+            if crate::database::sql_classification::first_executable_keyword(query).is_none() {
+                drop(conn_guard);
+                pool.return_conn(conn)?;
+                return Ok(QueryResult {
+                    columns: Vec::new(),
+                    column_types: Vec::new(),
+                    rows: Vec::new(),
+                    rows_affected: Some(0),
+                    execution_time_ms: None,
+                    truncated: false,
+                    result_sets: Vec::new(),
+                });
+            }
+
             let rows_affected = conn_guard
                 .execute(query, [])
                 .map_err(|e| DbError::QueryExecution(format!("Failed to execute query: {}", e)))?;
