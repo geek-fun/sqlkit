@@ -260,6 +260,8 @@ const databasePlaceholderFor: Partial<Record<DatabaseType, string>> = {
   [DatabaseType.ENTERPRISEDB]: 'edb (Oracle-compat) / postgres (PG mode)',
   [DatabaseType.TIMESCALEDB]: 'tsdb (cloud) / postgres (self-hosted)',
   [DatabaseType.REDSHIFT]: 'database name (required)',
+  [DatabaseType.CASSANDRA]: 'keyspace (default: system)',
+  [DatabaseType.SCYLLADB]: 'keyspace (default: system)',
 }
 
 function isDatabaseRequired(type: DatabaseType): boolean {
