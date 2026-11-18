@@ -45,7 +45,7 @@ public class ConnectionManager {
                         boolean credentialsInUrl,
                         String sslMode, String sslCaCert,
                         String sslClientCert, String sslClientKey,
-                        boolean trustServerCertificate) throws ClassifiedException, Exception {
+                        boolean trustServerCertificate, String cqlKeyspace) throws ClassifiedException, Exception {
         if (pools.containsKey(connId)) {
             throw new Exception("Connection already exists: " + connId);
         }
@@ -76,20 +76,16 @@ public class ConnectionManager {
         config.setReadOnly(isReadOnlyUrl(jdbcUrl));
         config.setDataSource(new javax.sql.DataSource() {
             public java.sql.Connection getConnection() throws java.sql.SQLException {
-                java.util.Properties info = new java.util.Properties();
-                if (username != null) info.setProperty("user", username);
-                if (password != null) info.setProperty("password", password);
-                if (tls != null) {
-                    info.putAll(tls.properties);
-                } else {
-                    SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
-                }
-                return driver.connect(jdbcUrl, info);
+                return getConnection(username, password);
             }
             public java.sql.Connection getConnection(String u, String p) throws java.sql.SQLException {
                 java.util.Properties info = new java.util.Properties();
                 if (u != null) info.setProperty("user", u);
                 if (p != null) info.setProperty("password", p);
+                if (cqlKeyspace != null) {
+                    // URL paths are validated as unquoted names by the wrapper.
+                    info.setProperty("databaseName", "\"" + cqlKeyspace.replace("\"", "\"\"") + "\"");
+                }
                 if (tls != null) {
                     info.putAll(tls.properties);
                 } else {

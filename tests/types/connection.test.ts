@@ -43,6 +43,12 @@ describe('connection types', () => {
     it('returns disable for invalid modes', () => {
       expect(sslModeFromBackend('invalid')).toEqual({ mode: 'disable' })
     })
+
+    it.each(['CASSANDRA', 'SCYLLADB'])('uses Require for legacy Prefer on %s', (type) => {
+      expect(sslModeFromBackend('prefer', type)).toEqual({ mode: 'require' })
+      expect(sslModeToBackend({ mode: 'prefer' }, type)).toBe('require')
+      expect(sslModeToBackend({ mode: 'disable' }, type)).toBe('disable')
+    })
   })
 
   describe('sslModeToBackend', () => {

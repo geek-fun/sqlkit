@@ -112,6 +112,12 @@ export const CERT_FIELD_DATABASES = [
 
 const normalizeDbType = (dbType: string): string => dbType.toLowerCase()
 
+export const isCqlDatabase = (dbType?: string) =>
+  dbType != null && ['cassandra', 'scylladb'].includes(normalizeDbType(dbType))
+
+export const normalizeSslMode = (mode: SslMode, dbType?: string): SslMode =>
+  mode === 'prefer' && isCqlDatabase(dbType) ? 'require' : mode
+
 /**
  * Check if database type supports SSL
  */
@@ -146,17 +152,17 @@ export function migrateSslBoolean(ssl: boolean): SslConfig {
 /**
  * Convert SslConfig to backend ssl_mode string
  */
-export function sslModeToBackend(sslConfig: SslConfig): string {
-  return sslConfig.mode
+export function sslModeToBackend(sslConfig: SslConfig, dbType?: string): string {
+  return normalizeSslMode(sslConfig.mode, dbType)
 }
 
 /**
  * Parse backend ssl_mode to SslConfig
  */
-export function sslModeFromBackend(sslMode: string | null | undefined): SslConfig {
+export function sslModeFromBackend(sslMode: string | null | undefined, dbType?: string): SslConfig {
   const mode = (sslMode as SslMode) || 'disable'
   if (SSL_MODES.includes(mode)) {
-    return { mode }
+    return { mode: normalizeSslMode(mode, dbType) }
   }
   return { mode: 'disable' }
 }

@@ -52,88 +52,24 @@ pub(crate) fn classify_sql(db_type: &str, sql: &str) -> Result<SqlKind, String> 
     Ok(classify_statement(&stmt))
 }
 
-/// CQL has no sqlparser dialect. Classify by the first executable keyword —
-/// the same risk buckets the AST classifier produces, derived without a full
-/// parse. Multi-statement scripts cannot be split reliably without a parser
-/// (semicolons may live inside string literals), so they land on Other: the
-/// conservative outcome that keeps write/delete/DDL tools from executing an
-/// ambiguous script under a read-only grant.
+/// Classify exactly one statement as split by the CQL executor.
 fn classify_cql(sql: &str) -> SqlKind {
-    if cql_is_multi_statement(sql) {
+    let Ok(statements) = crate::database::cql::split_statements(sql) else {
         return SqlKind::Other;
+    };
+    let [statement] = statements.as_slice() else {
+        return SqlKind::Other;
+    };
+    match crate::database::sql_classification::first_executable_keyword(statement)
+        .map(str::to_ascii_uppercase)
+        .as_deref()
+    {
+        Some("SELECT") => SqlKind::Read,
+        Some("INSERT" | "UPDATE") => SqlKind::Write,
+        Some("DELETE" | "TRUNCATE") => SqlKind::Delete,
+        Some("CREATE" | "ALTER" | "DROP") => SqlKind::Ddl,
+        _ => SqlKind::Other,
     }
-    match crate::database::sql_classification::first_executable_keyword(sql) {
-        Some(keyword) => match keyword.to_ascii_uppercase().as_str() {
-            "SELECT" => SqlKind::Read,
-            "INSERT" | "UPDATE" => SqlKind::Write,
-            "DELETE" | "TRUNCATE" => SqlKind::Delete,
-            "CREATE" | "ALTER" | "DROP" => SqlKind::Ddl,
-            _ => SqlKind::Other,
-        },
-        None => SqlKind::Other,
-    }
-}
-
-/// Semicolon-aware scan for a second top-level statement: single-quoted
-/// literals (with `''` escapes) and comments are skipped, so semicolons
-/// inside values do not count. Conservative by design — anything executable
-/// after the first top-level `;` reads as a second statement, while trailing
-/// whitespace and comments do not.
-fn cql_is_multi_statement(sql: &str) -> bool {
-    first_top_level_semicolon(sql)
-        .map(|idx| cql_has_executable_tail(&sql[idx + 1..]))
-        .unwrap_or(false)
-}
-
-fn first_top_level_semicolon(sql: &str) -> Option<usize> {
-    let bytes = sql.as_bytes();
-    let mut i = 0;
-    let mut in_string = false;
-    while i < bytes.len() {
-        match bytes[i] {
-            b'\'' if in_string => {
-                if i + 1 < bytes.len() && bytes[i + 1] == b'\'' {
-                    i += 2;
-                    continue;
-                }
-                in_string = false;
-            }
-            b'\'' => in_string = true,
-            b'-' if i + 1 < bytes.len() && bytes[i + 1] == b'-' => {
-                while i < bytes.len() && bytes[i] != b'\n' {
-                    i += 1;
-                }
-            }
-            b'/' if i + 1 < bytes.len() && bytes[i + 1] == b'*' => {
-                i += 2;
-                while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
-                    i += 1;
-                }
-                i += 1;
-            }
-            b';' if !in_string => return Some(i),
-            _ => {}
-        }
-        i += 1;
-    }
-    None
-}
-
-fn cql_has_executable_tail(tail: &str) -> bool {
-    let mut rest = tail;
-    loop {
-        rest = rest.trim_start();
-        if let Some(after) = rest.strip_prefix("--") {
-            rest = after.split_once('\n').map(|(_, r)| r).unwrap_or("");
-            continue;
-        }
-        if let Some(after) = rest.strip_prefix("/*") {
-            rest = after.split_once("*/").map(|(_, r)| r).unwrap_or("");
-            continue;
-        }
-        break;
-    }
-    !rest.is_empty()
 }
 
 /// Merge kinds found in different parts of one statement.
@@ -340,7 +276,7 @@ async fn run_classified(
     let sql = sql_from(args)?;
     let adapter = resolve_adapter(&conn_id).await?;
 
-    let db_type = adapter_db_type(&adapter);
+    let db_type = adapter_db_type(&adapter).await;
     let kind = classify_sql(&db_type, &sql)?;
     if !allowed.contains(&kind) {
         return Err(format!(
@@ -366,17 +302,16 @@ async fn run_classified(
     serde_json::to_string(&result).map_err(|e| e.to_string())
 }
 
-pub(crate) fn adapter_db_type(adapter: &crate::state::ActiveConnection) -> String {
+pub(crate) async fn adapter_db_type(adapter: &crate::state::ActiveConnection) -> String {
     match adapter {
         crate::state::ActiveConnection::Postgres(_) => "postgres".to_string(),
         crate::state::ActiveConnection::MySQL(_) => "mysql".to_string(),
         crate::state::ActiveConnection::SQLite(_) => "sqlite".to_string(),
         crate::state::ActiveConnection::SQLServer(_) => "sqlserver".to_string(),
         crate::state::ActiveConnection::ClickHouse(_) => "clickhouse".to_string(),
-        crate::state::ActiveConnection::JdbcBridge(adapter) => adapter
-            .try_lock()
-            .map(|guard| guard.config.db_type.slug())
-            .unwrap_or_else(|_| "generic".to_string()),
+        crate::state::ActiveConnection::JdbcBridge(adapter) => {
+            adapter.lock().await.config.db_type.slug()
+        }
         crate::state::ActiveConnection::HttpSql(_) => "generic".to_string(),
         crate::state::ActiveConnection::Rqlite(_) => "generic".to_string(),
         crate::state::ActiveConnection::Turso(_) => "generic".to_string(),
@@ -489,6 +424,25 @@ pub(crate) fn register_write_tools(reg: &mut CapabilityRegistry) {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn cql_dialect_does_not_change_while_the_adapter_is_busy() {
+        use crate::database::{ConnectionConfig, DatabaseType, JdbcBridgeAdapter};
+        use crate::state::ActiveConnection;
+        use tokio::sync::Mutex;
+
+        let config = ConnectionConfig::new(DatabaseType::ScyllaDB, "localhost", 9042, "");
+        let adapter = Arc::new(Mutex::new(JdbcBridgeAdapter::new(config)));
+        let connection = ActiveConnection::JdbcBridge(adapter.clone());
+        let busy = adapter.lock().await;
+        assert!(
+            tokio::time::timeout(std::time::Duration::ZERO, adapter_db_type(&connection))
+                .await
+                .is_err()
+        );
+        drop(busy);
+        assert_eq!(adapter_db_type(&connection).await, "scylladb");
+    }
+
     #[test]
     fn classifies_cql_without_a_sqlparser_dialect() {
         assert_eq!(
@@ -496,7 +450,11 @@ mod tests {
             SqlKind::Read
         );
         assert_eq!(
-            classify_sql("scylladb", "SELECT JSON * FROM ks.tbl PER PARTITION LIMIT 1").unwrap(),
+            classify_sql(
+                "scylladb",
+                "SELECT JSON * FROM ks.tbl PER PARTITION LIMIT 1"
+            )
+            .unwrap(),
             SqlKind::Read
         );
         assert_eq!(
@@ -523,14 +481,19 @@ mod tests {
             classify_sql("cassandra", "DROP KEYSPACE ks").unwrap(),
             SqlKind::Ddl
         );
-        assert_eq!(
-            classify_sql("cassandra", "USE ks").unwrap(),
-            SqlKind::Other
-        );
+        assert_eq!(classify_sql("cassandra", "USE ks").unwrap(), SqlKind::Other);
     }
 
     #[test]
     fn cql_multi_statement_detection_ignores_literals_and_comments() {
+        assert_eq!(
+            classify_sql(
+                "cassandra",
+                "SELECT * FROM ks.t WHERE v = '-- note'; SELECT * FROM ks.t",
+            )
+            .unwrap(),
+            SqlKind::Other
+        );
         assert_eq!(
             classify_sql("cassandra", "SELECT * FROM ks.t WHERE v = 'a;b'").unwrap(),
             SqlKind::Read

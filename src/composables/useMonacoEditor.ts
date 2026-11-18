@@ -4,7 +4,7 @@ import type { SqlStatement, StatementToExecute } from './useSqlStatements'
 import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
 
 import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
-import { onBeforeUnmount } from 'vue'
+import { onBeforeUnmount, watch } from 'vue'
 import { ThemeType, useAppStore } from '@/store/appStore'
 import { applyEditorTheme } from './editorTheme'
 import { hasGrammar } from './sqlCompletion/dialects'
@@ -36,6 +36,7 @@ globalThis.MonacoEnvironment = {
 
 export type MonacoEditorOptions = {
   language?: SQLDialect
+  isCql?: () => boolean
   readOnly?: boolean
   minimap?: boolean
   fontSize?: number
@@ -81,7 +82,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
       const model = editor.getModel()
       if (!model)
         return
-      parsedStatements = parseSqlStatements(model.getValue())
+      parsedStatements = parseSqlStatements(model.getValue(), options.isCql?.())
       const decorations = getSqlGutterDecorations(parsedStatements)
       if (gutterDecorations) {
         gutterDecorations.set(decorations)
@@ -91,6 +92,12 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
       }
     }, 150)
   }
+
+  watch(() => options.isCql?.(), refreshGutterDecorations)
+
+  const statementsForExecution = () => options.isCql?.() && editor
+    ? parseSqlStatements(editor.getValue(), true)
+    : parsedStatements
 
   const initEditor = (callbacks: EditorCallbacks) => {
     registeredCallbacks = callbacks
@@ -138,7 +145,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
         && Array.from(target.element.classList).includes(SQL_EXECUTE_GUTTER_CLASS)
         && target.position
       ) {
-        const stmt = getStatementAtLine(parsedStatements, target.position.lineNumber)
+        const stmt = getStatementAtLine(statementsForExecution(), target.position.lineNumber)
         if (stmt) {
           callbacks.onExecuteQuery({ sql: stmt.statement, source: 'statement', found: true })
         }
@@ -165,7 +172,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
       if (!editor)
         return
-      const result = getStatementToExecute(editor, parsedStatements)
+      const result = getStatementToExecute(editor, statementsForExecution())
       if (result.found) {
         callbacks.onExecuteQuery(result)
       }
@@ -261,7 +268,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     executeAtLine: (lineNumber: number) => {
       if (!editor || !registeredCallbacks)
         return
-      const stmt = getStatementAtLine(parsedStatements, lineNumber)
+      const stmt = getStatementAtLine(statementsForExecution(), lineNumber)
       if (stmt) {
         registeredCallbacks.onExecuteQuery({ sql: stmt.statement, source: 'statement', found: true })
       }
@@ -270,7 +277,7 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
       }
     },
     getStatementTextAtLine: (lineNumber: number): string | null => {
-      const stmt = getStatementAtLine(parsedStatements, lineNumber)
+      const stmt = getStatementAtLine(statementsForExecution(), lineNumber)
       return stmt?.statement ?? null
     },
   }

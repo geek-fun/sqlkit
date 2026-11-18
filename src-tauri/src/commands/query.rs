@@ -323,12 +323,7 @@ pub async fn execute_sorted_query(
     let db_type = {
         let connection = state.ensure_connection(&connection_id).await?;
         match &connection {
-            ActiveConnection::JdbcBridge(adapter) => adapter
-                .try_lock()
-                .map(|guard| guard.config.db_type.slug())
-                .unwrap_or_else(|_| {
-                    crate::commands::browse::get_db_type_string(&connection).to_string()
-                }),
+            ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.config.db_type.slug(),
             _ => crate::commands::browse::get_db_type_string(&connection).to_string(),
         }
     };

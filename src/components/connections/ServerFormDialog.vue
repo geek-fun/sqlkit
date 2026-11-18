@@ -29,7 +29,7 @@ import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
 import { jdbcApi } from '@/datasources/jdbcApi'
 import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase, useConnectionStore, useEntitlementStore } from '@/store'
-import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
+import { DEFAULT_SSL_MODE, isCqlDatabase, normalizeSslMode, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import { buildMemoryDatabaseHost, createMemoryDatabaseLabel, isMemoryDatabaseHost, isSameDatabaseFile, memoryDatabaseLabel } from '@/utils/databaseFiles'
 import { classifyDuckDbFailure } from '@/utils/duckdbErrors'
 import ConnectionPromptDialog from './ConnectionPromptDialog.vue'
@@ -141,9 +141,7 @@ const formData = ref<ServerConnection>({ ...defaultConnection })
 // CQL stores (Cassandra/ScyllaDB) need an explicit local datacenter for the
 // driver's default load-balancing policy — kept as its own field and composed
 // into the keyspace value on save/test (see resolveDatabase on the store side).
-const isCassandraFamily = computed(() =>
-  formData.value.type === DatabaseType.CASSANDRA || formData.value.type === DatabaseType.SCYLLADB,
-)
+const isCassandraFamily = computed(() => isCqlDatabase(formData.value.type))
 const localDatacenter = ref('datacenter1')
 
 const databaseWithLocalDc = () => {
@@ -822,7 +820,7 @@ async function handleTestConnection() {
       username: formData.value.username || '',
       password: formData.value.password || undefined,
       database: resolveDatabase(formData.value.type, databaseWithLocalDc()) ?? undefined,
-      ssl_mode: sslModeToBackend(formData.value.ssl),
+      ssl_mode: sslModeToBackend(formData.value.ssl, formData.value.type),
       ssl_ca_cert: formData.value.ssl.caCertPath || null,
       ssl_client_cert: formData.value.ssl.clientCertPath || null,
       ssl_client_key: formData.value.ssl.clientKeyPath || null,
@@ -935,7 +933,10 @@ function handleSave() {
   if (isCassandraFamily.value)
     formData.value.database = databaseWithLocalDc()
 
-  emit('save', { ...formData.value })
+  emit('save', {
+    ...formData.value,
+    ssl: { ...formData.value.ssl, mode: normalizeSslMode(formData.value.ssl.mode, formData.value.type) },
+  })
   isOpen.value = false
 }
 </script>

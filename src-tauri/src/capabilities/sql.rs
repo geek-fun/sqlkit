@@ -497,7 +497,7 @@ impl CapabilityHandler for ExecuteQueryHandler {
 
         // Read-only guard: reject write/delete/ddl statements with actionable
         // guidance so agents migrate to the split write tools.
-        let db_type = crate::capabilities::sql_write::adapter_db_type(&adapter);
+        let db_type = crate::capabilities::sql_write::adapter_db_type(&adapter).await;
         crate::capabilities::sql_write::ensure_read_only(&db_type, sql)?;
 
         // Check connection quality and warn the AI agent about flaky connections

@@ -46,7 +46,8 @@ public class ProtocolHandler {
 
                 case "connect":
                 case "connect_cql_tls":
-                    handleConnect(params, response);
+                case "connect_cql":
+                    handleConnect(params, response, "connect_cql".equals(method));
                     break;
 
                 case "disconnect":
@@ -156,7 +157,7 @@ public class ProtocolHandler {
         return sb.toString();
     }
 
-    private void handleConnect(JsonNode params, ObjectNode response) throws Exception {
+    private void handleConnect(JsonNode params, ObjectNode response, boolean cql) throws Exception {
         String connId = requiredString(params, "conn_id",
                 UUID.randomUUID().toString());
         String url = requiredString(params, "url", null);
@@ -182,7 +183,8 @@ public class ProtocolHandler {
         String sslClientKey = params.has("ssl_client_key") && !params.get("ssl_client_key").isNull() ? params.get("ssl_client_key").asText() : null;
         boolean trustServerCertificate = params.has("trust_server_certificate") && params.get("trust_server_certificate").asBoolean(false);
 
-        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax, credentialsInUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate);
+        String cqlKeyspace = cql ? requiredString(params, "database", null) : null;
+        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax, credentialsInUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, cqlKeyspace);
         response.put("result", connId);
     }
 

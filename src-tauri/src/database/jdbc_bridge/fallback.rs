@@ -105,6 +105,7 @@ pub async fn try_driver(
     host: &str,
     port: u16,
     database: Option<&str>,
+    cql_datacenter: Option<&str>,
     username: &str,
     password: &Option<String>,
     use_cap: bool,
@@ -115,7 +116,15 @@ pub async fn try_driver(
     ssl_client_key: Option<&str>,
     trust_server_certificate: bool,
 ) -> DriverAttempt {
-    let url = build_oracle_url(config, host, port, database, oracle_options);
+    let url = if let Some(dc) = cql_datacenter {
+        // The wrapper decodes the URI query and then decodes each parameter.
+        let encoded = url::form_urlencoded::byte_serialize(dc.as_bytes()).collect::<String>();
+        let encoded = url::form_urlencoded::byte_serialize(encoded.as_bytes()).collect::<String>();
+        let query = format!("?localdatacenter={encoded}");
+        super::registry::build_jdbc_url(config, host, port, Some(&query))
+    } else {
+        build_oracle_url(config, host, port, database, oracle_options)
+    };
 
     // Reuse the app-wide bridge process: a fresh JVM would re-map DuckDB's
     // ~107 MB native library (~1.4 s) on every single connection attempt.
@@ -286,11 +295,10 @@ async fn connect_with_jar(
         }
     };
 
-    // An older bridge would ignore CQL's SSL settings on a standard Connect.
-    let cql_tls = db_type_from_config(config).is_cql()
-        && matches!(ssl_mode, Some("require" | "verify-ca" | "verify-full"));
-    let method = if cql_tls {
-        JdbcMethod::ConnectCqlTls
+    // The bridge must honor the separately supplied keyspace and TLS mode.
+    let cql = db_type_from_config(config).is_cql();
+    let method = if cql {
+        JdbcMethod::ConnectCql
     } else {
         JdbcMethod::Connect
     };
@@ -306,9 +314,9 @@ async fn connect_with_jar(
     match conn_result {
         Ok(Ok(resp)) => {
             if let Some(ref err) = resp.error {
-                if cql_tls && err.starts_with("Unknown method") {
+                if cql && err.starts_with("Unknown method") {
                     return DriverAttempt::Fatal(DbError::Connection(
-                        "The installed JDBC bridge does not support Cassandra or ScyllaDB TLS. Update the bridge in Settings → JRE & Drivers.".into(),
+                        "The installed JDBC bridge does not support the Cassandra and ScyllaDB connection protocol. Update the bridge in Settings → JRE & Drivers.".into(),
                     ));
                 }
                 let category = classify_connection_error(
@@ -372,6 +380,7 @@ pub async fn run_fallback_chain(
     host: &str,
     port: u16,
     database: Option<&str>,
+    cql_datacenter: Option<&str>,
     username: &str,
     password: &Option<String>,
     oracle_options: Option<&OracleConnectionOptions>,
@@ -445,6 +454,7 @@ pub async fn run_fallback_chain(
             host,
             port,
             database,
+            cql_datacenter,
             username,
             password,
             false,
@@ -478,6 +488,7 @@ pub async fn run_fallback_chain(
             host,
             port,
             database,
+            cql_datacenter,
             username,
             password,
             true,

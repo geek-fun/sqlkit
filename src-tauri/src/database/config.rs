@@ -377,7 +377,14 @@ impl ConnectionConfig {
                 self.options
                     .insert("localdatacenter".into(), dc.into_owned());
             }
-            self.database = Some(keyspace.trim().to_string());
+            let keyspace = keyspace.trim();
+            self.database = Some(
+                keyspace
+                    .strip_prefix('"')
+                    .and_then(|name| name.strip_suffix('"'))
+                    .unwrap_or(keyspace)
+                    .to_string(),
+            );
         } else {
             self.database = Some(database);
         }

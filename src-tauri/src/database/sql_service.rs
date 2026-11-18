@@ -122,17 +122,6 @@ pub struct WrapQueryOptions {
 /// 4. Wraps it in a derived table if sort/filter/pagination are needed
 /// 5. Applies WHERE, ORDER BY, and LIMIT/OFFSET clauses
 pub fn wrap_query(options: WrapQueryOptions) -> SqlBuildResult {
-    // ── Step 1: Clean the SQL ──
-    let cleaned = strip_trailing(&options.original_sql);
-    if cleaned.is_empty() {
-        return SqlBuildResult::err("empty query");
-    }
-
-    // ── Step 1b: CQL (Cassandra/ScyllaDB) has no sqlparser dialect ──
-    // No parse, no schema injection, no derived-table wrapping — the engine
-    // is the only validator. Grid sort/filter/paging therefore cannot be
-    // applied server-side: sorting is only legal on clustering keys, and CQL
-    // has no OFFSET, so the wrapper has no faithful translation.
     if crate::database::config::DatabaseType::slug_is_cql(&options.database_type) {
         let needs_wrapping = !options.sort.is_empty()
             || !options.filters.is_empty()
@@ -144,7 +133,24 @@ pub fn wrap_query(options: WrapQueryOptions) -> SqlBuildResult {
                  add ORDER BY / LIMIT to the statement itself",
             );
         }
-        return SqlBuildResult::ok(cleaned);
+        let Ok(statements) = crate::database::cql::split_statements(&options.original_sql) else {
+            return SqlBuildResult::err("invalid CQL statement");
+        };
+        return match statements.as_slice() {
+            [statement]
+                if crate::database::sql_classification::first_executable_keyword(statement)
+                    .is_some_and(|word| word.eq_ignore_ascii_case("SELECT")) =>
+            {
+                SqlBuildResult::ok(statement.to_string())
+            }
+            _ => SqlBuildResult::err("expected a single CQL SELECT statement"),
+        };
+    }
+
+    // ── Step 1: Clean the SQL ──
+    let cleaned = strip_trailing(&options.original_sql);
+    if cleaned.is_empty() {
+        return SqlBuildResult::err("empty query");
     }
 
     // ── Step 2: Parse & extract a single statement ──

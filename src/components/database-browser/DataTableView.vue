@@ -17,7 +17,8 @@ import { useDataGridSort } from '@/composables/useDataGridSort'
 import { useMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { toast } from '@/composables/useNotifications'
 import { useTableSearch } from '@/composables/useTableSearch'
-import { ConnectionStatus, DatabaseType, useConnectionStore } from '@/store'
+import { ConnectionStatus, useConnectionStore } from '@/store'
+import { isCqlDatabase } from '@/types/connection'
 import { collectSortableColumns, sortRowsByState } from '@/utils/gridSort'
 import {
   formatTableValue,
@@ -132,10 +133,9 @@ const invalidated = ref(false)
 
 // --- Connection state ---
 const connectionStore = useConnectionStore()
-const isCqlPreview = computed(() => {
-  const type = connectionStore.getConnectionById(props.connectionId)?.type
-  return type === DatabaseType.CASSANDRA || type === DatabaseType.SCYLLADB
-})
+const isCqlPreview = computed(() =>
+  isCqlDatabase(connectionStore.getConnectionById(props.connectionId)?.type),
+)
 const isReconnecting = ref(false)
 const connectionError = ref<string | null>(null)
 
@@ -232,6 +232,9 @@ const columnNullable = computed(() =>
 const columnIsAutoIncrement = computed(() =>
   Object.fromEntries(columnInfoList.value.map(c => [c.name, c.is_auto_increment])),
 )
+
+const isEditColumnReadOnly = (column: string) =>
+  columnIsAutoIncrement.value[column] || (isCqlPreview.value && columnIsPK.value[column])
 
 /** PK columns (in order they appear in the result set) */
 const pkColumns = computed(() =>
@@ -698,7 +701,7 @@ function validateEditForm(): boolean {
 
   for (const col of columns) {
     const field = editForm.value[col]
-    if (!field)
+    if (!field || isEditColumnReadOnly(col))
       continue
 
     // Skip validation if set to NULL
@@ -800,8 +803,7 @@ async function confirmEdit() {
     const updates = Object.fromEntries(
       columns
         .map((col: string) => {
-          // Skip auto-increment columns - they cannot be updated
-          if (columnIsAutoIncrement.value[col]) {
+          if (isEditColumnReadOnly(col)) {
             return null
           }
           const field = editForm.value[col]
@@ -1378,7 +1380,7 @@ watch(
               </Label>
               <div class="flex-1" />
               <!-- Set to NULL toggle -->
-              <label v-if="!columnIsAutoIncrement[col]" class="text-xs text-muted-foreground flex gap-1 cursor-pointer select-none items-center">
+              <label v-if="!isEditColumnReadOnly(col)" class="text-xs text-muted-foreground flex gap-1 cursor-pointer select-none items-center">
                 <input
                   type="checkbox"
                   class="h-3 w-3 cursor-pointer"
@@ -1396,11 +1398,11 @@ watch(
               :id="`edit-field-${col}`"
               :type="getEditInputType(col)"
               :model-value="editForm[col]?.setNull ? '' : (editForm[col]?.value ?? '')"
-              :disabled="editForm[col]?.setNull || columnIsAutoIncrement[col]"
+              :disabled="editForm[col]?.setNull || isEditColumnReadOnly(col)"
               :placeholder="editForm[col]?.setNull ? 'NULL' : columnIsAutoIncrement[col] ? 'Auto-generated' : ''"
               :step="getEditInputType(col) === 'number' ? 'any' : undefined"
               class="text-xs font-mono h-7"
-              :class="{ 'border-destructive': editErrors[col], 'opacity-60': columnIsAutoIncrement[col] }"
+              :class="{ 'border-destructive': editErrors[col], 'opacity-60': isEditColumnReadOnly(col) }"
               @update:model-value="(v) => editForm[col] = { ...editForm[col], value: String(v), setNull: editForm[col]?.setNull ?? false }"
             />
             <p v-if="editErrors[col]" class="text-xs text-destructive-text">

@@ -62,6 +62,7 @@
 pub mod adapter;
 pub mod clickhouse;
 pub mod config;
+pub(crate) mod cql;
 pub mod error;
 pub mod explain;
 pub mod http_sql;
