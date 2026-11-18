@@ -630,6 +630,9 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<ObjectInfo>> {
+        if self.config.db_type.is_cql() {
+            return Ok(Vec::new());
+        }
         self.send_list_request(JdbcMethod::ListViews, database, schema, None)
             .await
     }
@@ -678,6 +681,9 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
+        if self.config.db_type.is_cql() {
+            return Ok(Vec::new());
+        }
         self.send_list_request(JdbcMethod::ListForeignKeys, database, schema, Some(table))
             .await
     }
@@ -687,6 +693,9 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
+        if self.config.db_type.is_cql() {
+            return Ok(Vec::new());
+        }
         self.send_list_request(JdbcMethod::GetForeignKeys, database, schema, None)
             .await
     }
