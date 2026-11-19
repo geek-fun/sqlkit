@@ -1,12 +1,14 @@
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use crate::ai_permissions::{
     load_permission_policy, read_permission_config, AiPolicy, AI_POLICY_LOCK,
 };
 use axum::extract::State;
-use axum::http::StatusCode;
+use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::Json;
@@ -34,6 +36,142 @@ impl McpServerHandle {
             shutdown_tx: Mutex::new(None),
             server_task: Mutex::new(None),
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Session registry — tray visibility into Data Studio MCP server traffic
+// ---------------------------------------------------------------------------
+
+/// data-studio-mcp polls every ~10s, so three missed polls drop a session.
+const SESSION_TTL: Duration = Duration::from_secs(30);
+/// Upper bound so a misbehaving client cannot grow the map without limit.
+const MAX_SESSIONS: usize = 50;
+const SESSION_HEADER: &str = "x-data-studio-session";
+const CLIENT_HEADER: &str = "x-data-studio-client";
+
+#[derive(Debug, Clone)]
+pub struct SessionEntry {
+    pub client: Option<String>,
+    pub version: Option<String>,
+    pub last_seen: Instant,
+}
+
+#[derive(Default)]
+pub struct McpSessionRegistry {
+    sessions: Mutex<HashMap<String, SessionEntry>>,
+    anonymous_last_seen: Mutex<Option<Instant>>,
+}
+
+/// Why the bridge is not running, when the reason is a gate rather than the
+/// user turning `auto_start` off (which shows as a plain "Stopped").
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BridgeStopReason {
+    SubscriptionRequired,
+}
+
+#[derive(Default)]
+pub struct BridgeStopStatus {
+    pub reason: Mutex<Option<BridgeStopReason>>,
+}
+
+impl McpSessionRegistry {
+    fn prune(sessions: &mut HashMap<String, SessionEntry>) {
+        sessions.retain(|_, entry| entry.last_seen.elapsed() < SESSION_TTL);
+    }
+
+    /// Record a request from the Data Studio MCP server. Requests without the
+    /// identity headers (older npm releases) still count, as anonymous traffic.
+    pub fn note_activity(
+        &self,
+        session_id: Option<String>,
+        client: Option<String>,
+        version: Option<String>,
+    ) {
+        let now = Instant::now();
+        match session_id {
+            Some(id) if !id.is_empty() => {
+                let mut sessions = self.sessions.lock().unwrap();
+                Self::prune(&mut sessions);
+                if sessions.len() >= MAX_SESSIONS && !sessions.contains_key(&id) {
+                    return;
+                }
+                sessions.insert(
+                    id,
+                    SessionEntry {
+                        client,
+                        version,
+                        last_seen: now,
+                    },
+                );
+            }
+            _ => {
+                *self.anonymous_last_seen.lock().unwrap() = Some(now);
+            }
+        }
+    }
+
+    /// Sessions seen within the TTL, ordered by last activity.
+    pub fn live_sessions(&self) -> Vec<SessionEntry> {
+        let mut sessions = self.sessions.lock().unwrap();
+        Self::prune(&mut sessions);
+        let mut entries: Vec<SessionEntry> = sessions.values().cloned().collect();
+        entries.sort_by_key(|entry| entry.last_seen);
+        entries
+    }
+
+    /// Seconds since the last header-less request, when within the TTL.
+    pub fn anonymous_age_secs(&self) -> Option<u64> {
+        let last = *self.anonymous_last_seen.lock().unwrap();
+        last.map(|seen| seen.elapsed().as_secs())
+            .filter(|age| *age < SESSION_TTL.as_secs())
+    }
+}
+
+/// Strip control characters and cap the length for tray rendering — the
+/// header comes from an external process.
+fn sanitize_label(raw: &str, max: usize) -> String {
+    raw.chars()
+        .filter(|c| !c.is_control())
+        .collect::<String>()
+        .trim()
+        .chars()
+        .take(max)
+        .collect()
+}
+
+/// `data-studio-mcp/0.1.12 (ZCode)` → `(version, client)`.
+fn parse_client_header(raw: &str) -> (Option<String>, Option<String>) {
+    let cleaned = sanitize_label(raw, 96);
+    let mut parts = cleaned.splitn(2, ' ');
+    let product = parts.next().unwrap_or_default();
+    let version = product
+        .split_once('/')
+        .map(|(_, v)| sanitize_label(v, 24))
+        .filter(|v| !v.is_empty());
+    let client = parts
+        .next()
+        .map(str::trim)
+        .and_then(|rest| rest.strip_prefix('('))
+        .and_then(|rest| rest.strip_suffix(')'))
+        .map(|name| sanitize_label(name, 48))
+        .filter(|name| !name.is_empty());
+    (version, client)
+}
+
+fn note_bridge_traffic(handle: &AppHandle, headers: &HeaderMap) {
+    let session_id = headers
+        .get(SESSION_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(|value| sanitize_label(value, 64))
+        .filter(|value| !value.is_empty());
+    let (client, version) = headers
+        .get(CLIENT_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .map(parse_client_header)
+        .unwrap_or((None, None));
+    if let Some(registry) = handle.try_state::<McpSessionRegistry>() {
+        registry.note_activity(session_id, client, version);
     }
 }
 
@@ -193,7 +331,8 @@ fn entitlement_denied(state: &BridgeState) -> Option<String> {
     None
 }
 
-async fn handle_tools(State(state): State<Arc<BridgeState>>) -> Response {
+async fn handle_tools(State(state): State<Arc<BridgeState>>, headers: HeaderMap) -> Response {
+    note_bridge_traffic(&state.handle, &headers);
     if let Some(reason) = entitlement_denied(&state) {
         return (
             StatusCode::FORBIDDEN,
@@ -337,8 +476,10 @@ fn allowlist_missing_connection_reason(
 
 async fn handle_invoke(
     State(state): State<Arc<BridgeState>>,
+    headers: HeaderMap,
     Json(payload): Json<InvokeRequest>,
 ) -> Json<InvokeResponse> {
+    note_bridge_traffic(&state.handle, &headers);
     if let Some(reason) = entitlement_denied(&state) {
         return Json(InvokeResponse::error(403, reason));
     }
@@ -435,7 +576,7 @@ fn get_default_port() -> u16 {
     9121
 }
 
-fn get_actual_port(app_data_dir: &Path) -> Option<u16> {
+pub(crate) fn get_actual_port(app_data_dir: &Path) -> Option<u16> {
     let path = app_data_dir.join("mcp-port");
     let port = std::fs::read_to_string(&path)
         .ok()
@@ -501,6 +642,10 @@ pub fn sync_with_entitlement(handle: &AppHandle) {
     }
     let handle = handle.clone();
     tauri::async_runtime::spawn(async move {
+        // Record why the bridge went away so the tray can say more than "Stopped".
+        if let Some(status) = handle.try_state::<BridgeStopStatus>() {
+            *status.reason.lock().unwrap() = Some(BridgeStopReason::SubscriptionRequired);
+        }
         shutdown_if_running(&handle).await;
     });
 }
@@ -640,6 +785,11 @@ pub async fn start(
             Ok(random_port)
         }
     };
+
+    // A successful start supersedes whatever gate previously blocked the bridge.
+    if let Some(status) = handle.try_state::<BridgeStopStatus>() {
+        *status.reason.lock().unwrap() = None;
+    }
 
     port
 }
@@ -1280,5 +1430,69 @@ mod tests {
             },
         );
         assert_eq!(filter_ai_connections(filtered, &policy), json!([]));
+    }
+
+    #[test]
+    fn sanitize_label_strips_control_chars_and_caps_length() {
+        assert_eq!(sanitize_label("ZCode\u{7}x", 48), "ZCodex");
+        assert_eq!(sanitize_label("abcdefghij", 4), "abcd");
+        assert_eq!(sanitize_label("  spaced  ", 48), "spaced");
+    }
+
+    #[test]
+    fn parse_client_header_extracts_version_and_client() {
+        let (version, client) = parse_client_header("data-studio-mcp/0.1.12 (ZCode)");
+        assert_eq!(version.as_deref(), Some("0.1.12"));
+        assert_eq!(client.as_deref(), Some("ZCode"));
+    }
+
+    #[test]
+    fn parse_client_header_allows_missing_client() {
+        let (version, client) = parse_client_header("data-studio-mcp/0.1.12");
+        assert_eq!(version.as_deref(), Some("0.1.12"));
+        assert_eq!(client, None);
+    }
+
+    #[test]
+    fn parse_client_header_tolerates_garbage() {
+        let (version, client) = parse_client_header("\u{1}not-a-product");
+        assert_eq!(version, None);
+        assert_eq!(client, None);
+    }
+
+    #[test]
+    fn registry_tracks_sessions_and_anonymous_traffic() {
+        let registry = McpSessionRegistry::default();
+        assert!(registry.live_sessions().is_empty());
+        assert_eq!(registry.anonymous_age_secs(), None);
+
+        registry.note_activity(
+            Some("session-a".to_string()),
+            Some("ZCode".to_string()),
+            Some("0.1.12".to_string()),
+        );
+        registry.note_activity(None, None, None);
+
+        let sessions = registry.live_sessions();
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].client.as_deref(), Some("ZCode"));
+        assert!(registry.anonymous_age_secs().is_some());
+
+        // Re-activity refreshes the entry instead of duplicating it.
+        registry.note_activity(
+            Some("session-a".to_string()),
+            Some("ZCode".to_string()),
+            Some("0.1.12".to_string()),
+        );
+        assert_eq!(registry.live_sessions().len(), 1);
+    }
+
+    #[test]
+    fn registry_caps_tracked_sessions() {
+        let registry = McpSessionRegistry::default();
+        for i in 0..(MAX_SESSIONS + 10) {
+            registry.note_activity(Some(format!("session-{i}")), None, None);
+        }
+        assert_eq!(registry.live_sessions().len(), MAX_SESSIONS);
     }
 }
