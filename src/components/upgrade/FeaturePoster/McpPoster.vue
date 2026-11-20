@@ -3,14 +3,14 @@ import { Lock, Wrench } from 'lucide-vue-next'
 import { ProgressiveBlur } from '../effects'
 
 const tools = [
-  'search',
-  'count',
-  'indexDoc',
-  'getDoc',
-  'bulk',
-  'catIndices',
-  'catHealth',
-  'clusterHealth',
+  'execute_query',
+  'explain_query',
+  'describe_table',
+  'list_tables',
+  'list_databases',
+  'list_connections',
+  'get_schema',
+  'get_slow_queries',
 ] as const
 </script>
 
@@ -23,7 +23,7 @@ const tools = [
       <span class="poster__pill">MCP</span>
       <span class="p-status">
         <span class="p-status-dot" />
-        {{ $t('pages.settings.mcp.running', { port: 7878 }) }}
+        {{ $t('pages.settings.mcp.running', { port: 9121 }) }}
       </span>
     </div>
 
@@ -33,7 +33,7 @@ const tools = [
           <div class="p-card">
             <span class="p-label">{{ $t('pages.settings.mcp.port') }}</span>
             <div class="p-port">
-              <span class="p-port-value">7878</span>
+              <span class="p-port-value">9121</span>
               <span class="p-port-btn">{{ $t('pages.settings.mcp.restart') }}</span>
             </div>
             <div class="p-autostart">
@@ -45,7 +45,7 @@ const tools = [
           <div class="p-card">
             <span class="p-label">{{ $t('plan.poster.mcp.clients') }}</span>
             <div class="p-clients">
-              <span class="p-client">Claude Desktop</span>
+              <span class="p-client">Claude Code</span>
               <span class="p-client">Cursor</span>
               <span class="p-client">Any MCP client</span>
             </div>
@@ -58,8 +58,9 @@ const tools = [
             <pre class="p-code">
 {
   "mcpServers": {
-    "dockit": {
-      "url": "http://localhost:7878/mcp"
+    "data-studio": {
+      "command": "npx",
+      "args": ["-y", "@geek-fun/data-studio-mcp"]
     }
   }
 }</pre>

@@ -91,7 +91,7 @@ const selectPreset = (value: string) => {
         {{ t('aiPermissions.retry') }}
       </Button>
     </div>
-    <fieldset v-if="!loading && loaded" :disabled="saving" class="p-0 border-0 max-w-lg min-w-0 space-y-4">
+    <fieldset v-if="!loading && loaded" :disabled="saving" class="p-0 border-0 min-w-0 space-y-4">
       <AccessLevelPicker id="ai-default-preset" :model-value="preset" :disabled="saving" @update:model-value="selectPreset" />
       <div v-if="preset === 'custom'" class="border-t border-border">
         <div v-for="action in AI_ACTIONS" :key="action" class="py-2 border-b border-border flex gap-4 items-center justify-between last:border-b-0">
