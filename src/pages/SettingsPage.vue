@@ -13,6 +13,7 @@ import { PaidGate, ProBadge } from '@/components/upgrade'
 import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import AiSettings from '@/views/setting/ai-settings.vue'
+import BridgeStatus from '@/views/setting/bridge-status.vue'
 import JreDriverSection from '@/views/setting/jre-driver-section.vue'
 import McpBridge from '@/views/setting/mcp-bridge.vue'
 import PlanSection from '@/views/setting/plan-section.vue'
@@ -314,7 +315,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
               </CardHeader>
               <CardContent class="space-y-5">
                 <!-- Font Size -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.fontSize') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -337,7 +338,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Tab Size -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.tabSize') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -360,7 +361,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Indent Width -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.indentWidth') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -383,7 +384,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Line Width -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.lineWidth') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -483,7 +484,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
               </CardHeader>
               <CardContent class="space-y-5">
                 <!-- Default Row Limit -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.query.defaultLimit') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -506,7 +507,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Query Timeout -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.query.queryTimeout') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -561,7 +562,10 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
           </TabsContent>
 
           <!-- MCP Bridge Tab -->
-          <TabsContent value="mcp" class="mt-0">
+          <TabsContent value="mcp" class="mt-0 space-y-6">
+            <!-- Bridge status stays outside the gate: users without an active
+                 subscription need the "why is it stopped" answer most. -->
+            <BridgeStatus />
             <PaidGate feature="mcp_bridge">
               <McpBridge />
             </PaidGate>

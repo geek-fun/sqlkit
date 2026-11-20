@@ -9,6 +9,7 @@ import DeviceReplaceDialog from '@/components/DeviceReplaceDialog.vue'
 import AppNotifications from '@/components/ui/notification/AppNotifications.vue'
 import UpdateNotification from '@/components/UpdateNotification.vue'
 import UpgradeDialog from '@/components/upgrade/UpgradeDialog.vue'
+import { openUpgradeDialog } from '@/components/upgrade/upgradeDialogService'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { toast } from '@/composables/useNotifications'
 import { useAccountStore } from '@/store/accountStore'
@@ -56,6 +57,9 @@ const sessionLifecycle = createSessionLifecycle({
 
 onMounted(async () => {
   checkForUpdates(false)
+
+  // Tray → "Stopped (subscription required)" opens the upgrade dialog.
+  listen('mcp-bridge://subscription', () => openUpgradeDialog('mcp_bridge')).catch(() => {})
 
   await pushUiLocale()
   await sessionLifecycle.start()
