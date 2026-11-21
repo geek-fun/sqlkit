@@ -14,10 +14,7 @@ type AccountState = {
   userId: string
   /** Console avatar URL — a signed, expiring credential, never a stable link. */
   avatar: string
-  /**
-   * Signature expiry of `avatar` (unix seconds, 0 = unknown). Drives the
-   * renewal timer in avatarRefresh; renewed like the session tokens.
-   */
+  /** Signature expiry of `avatar` (unix seconds, 0 = unknown). */
   avatarExpiresAt: number
 }
 
@@ -53,7 +50,6 @@ export const useAccountStore = defineStore('account', {
       // A web login has no device lease yet — never carry one over.
       this.refreshToken = ''
     },
-    /** Renewal write-back from avatarRefresh — the only other avatar writer. */
     setAvatar(avatar: string, avatarExpiresAt = 0) {
       this.avatar = avatar
       this.avatarExpiresAt = avatarExpiresAt
