@@ -62,8 +62,9 @@ export const createSessionLifecycle = (ports: SessionLifecycle) => {
       await ports.refresh()
     // The handoff avatar may be a stale localStorage signature (the console
     // only re-signs on its settings page) — treat it as a hint and calibrate.
+    // Display-only: never hold up the handoff on the avatar endpoint.
     if (current(revision))
-      await ports.ensureFreshAvatar()
+      void ports.ensureFreshAvatar().catch(() => {})
   }
 
   const register = async (subscription: Promise<Unlisten>) => {

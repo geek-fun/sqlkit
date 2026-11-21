@@ -10,6 +10,7 @@ import {
   createSessionLifecycle,
   ensureFreshAvatar,
   parseJwtStringClaim,
+  resolveAvatarExpiresSec,
 } from '@/common'
 import DeviceReplaceDialog from '@/components/DeviceReplaceDialog.vue'
 import AppNotifications from '@/components/ui/notification/AppNotifications.vue'
@@ -65,13 +66,14 @@ const sessionLifecycle = createSessionLifecycle({
     entitlementStore.view = null
     entitlementStore.sessionRejections = 0
     deviceStore.$reset()
+    const avatar = payload.avatar ?? ''
     accountStore.setAuth(
       payload.token,
       payload.username ?? '',
       payload.email ?? '',
       payload.userId ?? '',
-      payload.avatar ?? '',
-      payload.avatarExpiresAt ?? 0,
+      avatar,
+      resolveAvatarExpiresSec(avatar, payload.avatarExpiresAt ?? 0) ?? 0,
     )
   },
   applyRotation: payload => accountStore.applySessionRefresh(payload.previousRefreshToken, payload.accessToken, payload.refreshToken),
