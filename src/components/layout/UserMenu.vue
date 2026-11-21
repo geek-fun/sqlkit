@@ -3,7 +3,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { Loader2, LogOut, RefreshCw, Settings, UserRound } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { refreshAvatar } from '@/common'
+import { createAvatarFailureGuard, refreshAvatar } from '@/common'
 import DefaultAvatar from '@/components/DefaultAvatar.vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAccountStore } from '@/store/accountStore'
@@ -78,26 +78,24 @@ async function handleLogout() {
   await entitlementStore.clearSessionState()
 }
 
-// A dead signature renders as a blank box — fall back to the default avatar
-// and ask for a re-signed URL once per failed URL, never in a loop.
+// A dead signature renders blank — fall back and re-sign once per failed URL.
 const avatarBroken = ref(false)
-const lastFailedAvatar = ref('')
+const avatarFailure = createAvatarFailureGuard()
 
-// Render only allowlisted hosts — a handoff value is still remote input.
 const avatarRenderable = computed(() =>
-  Boolean(accountStore.avatar) && isSafeAvatarUrl(accountStore.avatar) && !avatarBroken.value,
+  Boolean(accountStore.avatar)
+  && isSafeAvatarUrl(accountStore.avatar, import.meta.env.DEV)
+  && !avatarBroken.value,
 )
 
 const onAvatarError = () => {
   avatarBroken.value = true
-  if (accountStore.avatar && accountStore.avatar !== lastFailedAvatar.value) {
-    lastFailedAvatar.value = accountStore.avatar
+  if (avatarFailure.recordFailed(accountStore.avatar))
     void refreshAvatar()
-  }
 }
 
 watch(() => accountStore.avatar, (url) => {
-  if (url !== lastFailedAvatar.value)
+  if (avatarFailure.hasRecovered(url))
     avatarBroken.value = false
 })
 </script>
