@@ -3,6 +3,7 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { Loader2, LogOut, RefreshCw, Settings, UserRound } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { refreshAvatar } from '@/common'
 import DefaultAvatar from '@/components/DefaultAvatar.vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAccountStore } from '@/store/accountStore'
@@ -76,6 +77,24 @@ async function handleLogout() {
   open.value = false
   await entitlementStore.clearSessionState()
 }
+
+// A dead signature renders as a blank box — fall back to the default avatar
+// and ask for a re-signed URL once per failed URL, never in a loop.
+const avatarBroken = ref(false)
+const lastFailedAvatar = ref('')
+
+const onAvatarError = () => {
+  avatarBroken.value = true
+  if (accountStore.avatar && accountStore.avatar !== lastFailedAvatar.value) {
+    lastFailedAvatar.value = accountStore.avatar
+    void refreshAvatar()
+  }
+}
+
+watch(() => accountStore.avatar, (url) => {
+  if (url !== lastFailedAvatar.value)
+    avatarBroken.value = false
+})
 </script>
 
 <template>
@@ -90,10 +109,11 @@ async function handleLogout() {
           class="text-lg text-primary-foreground font-bold rounded-md bg-primary flex h-8 w-8 items-center justify-center overflow-hidden"
         >
           <img
-            v-if="accountStore.avatar"
+            v-if="accountStore.avatar && !avatarBroken"
             :src="accountStore.avatar"
             alt=""
             class="h-full w-full object-cover"
+            @error="onAvatarError"
           >
           <DefaultAvatar
             v-else
