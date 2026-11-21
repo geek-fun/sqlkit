@@ -110,7 +110,10 @@ mod tests {
         );
     }
 
-    #[tokio::test]
+    // Multi-thread flavor: the default single-thread runtime lets the loop's
+    // synchronous stretches starve the in-process model server, which under
+    // llvm-cov on slow CI runners once blew the outer timeout (Elapsed flake).
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn denied_preflight_persists_result_and_stops_before_another_model_turn() {
         use async_trait::async_trait;
         use data_studio_agent::{

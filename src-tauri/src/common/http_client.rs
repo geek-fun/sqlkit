@@ -156,7 +156,6 @@ fn macos_proxy_exempts(_host: &str) -> bool {
     false
 }
 
-
 /// Detect the system proxy for `host:port` when given, or for an arbitrary
 /// probe target otherwise. Used by the UI to offer "use system proxy" on
 /// SSH tunnels and to warn when an opted-in proxy no longer applies.
@@ -182,7 +181,13 @@ mod proxy_probe_tests {
     #[test]
     #[ignore]
     fn print_system_proxy_probe_results() {
-        for host in ["proxy-check.invalid", "", "localhost", "127.0.0.1", "db.example.com"] {
+        for host in [
+            "proxy-check.invalid",
+            "",
+            "localhost",
+            "127.0.0.1",
+            "db.example.com",
+        ] {
             println!("host={host:?} -> {:?}", system_proxy_for(host, 443));
         }
     }
