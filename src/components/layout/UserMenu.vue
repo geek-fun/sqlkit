@@ -8,7 +8,7 @@ import DefaultAvatar from '@/components/DefaultAvatar.vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAccountStore } from '@/store/accountStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
-import { GEEKFUN_BASE_URL as CONSOLE_BASE_URL, openLoginUrl, openRegisterUrl } from '@/utils/authService'
+import { GEEKFUN_BASE_URL as CONSOLE_BASE_URL, isSafeAvatarUrl, openLoginUrl, openRegisterUrl } from '@/utils/authService'
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
@@ -83,6 +83,11 @@ async function handleLogout() {
 const avatarBroken = ref(false)
 const lastFailedAvatar = ref('')
 
+// Render only allowlisted hosts — a handoff value is still remote input.
+const avatarRenderable = computed(() =>
+  Boolean(accountStore.avatar) && isSafeAvatarUrl(accountStore.avatar) && !avatarBroken.value,
+)
+
 const onAvatarError = () => {
   avatarBroken.value = true
   if (accountStore.avatar && accountStore.avatar !== lastFailedAvatar.value) {
@@ -109,7 +114,7 @@ watch(() => accountStore.avatar, (url) => {
           class="text-lg text-primary-foreground font-bold rounded-md bg-primary flex h-8 w-8 items-center justify-center overflow-hidden"
         >
           <img
-            v-if="accountStore.avatar && !avatarBroken"
+            v-if="avatarRenderable"
             :src="accountStore.avatar"
             alt=""
             class="h-full w-full object-cover"
