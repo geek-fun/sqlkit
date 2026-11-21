@@ -114,7 +114,9 @@ function toolResultText(tc: AgentToolCall): string | undefined {
 
 function resultPreview(text: string): string {
   const first = text.split('\n')[0].trim()
-  return first.length > 60 ? `${first.slice(0, 60)}…` : first
+  return first.length > 60
+    ? `${first.slice(0, 60)}…`
+    : first
 }
 
 function formatDuration(ms: number): string {
@@ -177,9 +179,13 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
   const displayArg
     = Object.entries(args)
       .filter(([k]) => k !== 'connection_id')
-      .map(([, v]) => (typeof v === 'string' ? v : undefined))
+      .map(([, v]) => (typeof v === 'string'
+        ? v
+        : undefined))
       .find(v => v !== undefined) ?? ''
-  const truncated = displayArg.length > 40 ? `${displayArg.slice(0, 40)}...` : displayArg
+  const truncated = displayArg.length > 40
+    ? `${displayArg.slice(0, 40)}...`
+    : displayArg
 
   const verb = (() => {
     if (name.includes('index_document') || name.includes('create') || name.includes('write') || name.includes('insert') || name.includes('put'))
@@ -201,7 +207,9 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
     return ''
   if (!verb)
     return truncated
-  return truncated ? `${verb} ${truncated}` : verb
+  return truncated
+    ? `${verb} ${truncated}`
+    : verb
 }
 </script>
 

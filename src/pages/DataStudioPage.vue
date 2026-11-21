@@ -183,7 +183,12 @@ async function confirmAddSource() {
       connectionId: String(conn.id),
       name: conn.name,
       databaseType: conn.type as 'POSTGRESQL' | 'MYSQL' | 'SQLSERVER' | 'SQLITE',
-      permissions: { read: true, create: false, update: false, delete: false },
+      permissions: {
+        read: true,
+        create: false,
+        update: false,
+        delete: false,
+      },
     })
 
     if (!dataStudioStore.activeSession) {

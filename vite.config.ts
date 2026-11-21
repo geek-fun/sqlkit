@@ -8,7 +8,10 @@ const host = process.env.TAURI_DEV_HOST
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [vue(), UnoCSS()],
+  plugins: [
+    vue(),
+    UnoCSS(),
+  ],
 
   resolve: {
     alias: {

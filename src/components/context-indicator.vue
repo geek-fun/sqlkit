@@ -109,7 +109,9 @@ async function onCompact() {
     toast.success(t('dataStudio.contextIndicator.compactSuccess') || 'Context compacted')
   }
   catch (err) {
-    const msg = typeof err === 'string' ? err : String(err)
+    const msg = typeof err === 'string'
+      ? err
+      : String(err)
     toast.error((t('dataStudio.contextIndicator.compactFailed') || 'Compact failed: {error}').replace('{error}', msg))
   }
   finally {

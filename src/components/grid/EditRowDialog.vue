@@ -102,7 +102,18 @@ function isValidNumber(value: string): boolean {
 
 function isValidBoolean(value: string): boolean {
   const lower = value.toLowerCase()
-  return ['true', 'false', '1', '0', 't', 'f', 'y', 'n', 'yes', 'no'].includes(lower)
+  return [
+    'true',
+    'false',
+    '1',
+    '0',
+    't',
+    'f',
+    'y',
+    'n',
+    'yes',
+    'no',
+  ].includes(lower)
 }
 
 function coerceEditValue(col: string, value: string): unknown {
@@ -164,7 +175,12 @@ async function save() {
           const field = editForm.value[col]
           if (!field)
             return null
-          return [col, field.setNull ? null : coerceEditValue(col, field.value)] as [string, unknown]
+          return [
+            col,
+            field.setNull
+              ? null
+              : coerceEditValue(col, field.value),
+          ] as [string, unknown]
         })
         .filter((entry): entry is [string, unknown] => entry !== null),
     )
@@ -176,7 +192,9 @@ async function save() {
       database: props.database ?? null,
       table: props.tableName,
       schema: props.schema ?? null,
-      pkValues: props.isNewRow ? {} : pkValues,
+      pkValues: props.isNewRow
+        ? {}
+        : pkValues,
       updates,
     })
     toast.success(`${t('components.dataGrid.edit.title')} → ${t('common.status.success')}`)

@@ -45,18 +45,90 @@ type Preset = {
 }
 
 const presets = computed<Preset[]>(() => [
-  { id: 'openai', name: 'OpenAI', apiCompatibility: 'openai', baseUrl: 'https://api.openai.com/v1', kind: 'openai' },
-  { id: 'deepseek', name: 'DeepSeek', apiCompatibility: 'openai', baseUrl: 'https://api.deepseek.com/v1', kind: 'deepseek' },
-  { id: 'openrouter', name: 'OpenRouter', apiCompatibility: 'openai', baseUrl: 'https://openrouter.ai/api/v1', kind: 'openrouter' },
-  { id: 'anthropic', name: 'Anthropic', apiCompatibility: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', kind: 'anthropic' },
-  { id: 'gemini', name: 'Google Gemini', apiCompatibility: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', kind: 'gemini' },
-  { id: 'grok', name: 'Grok', apiCompatibility: 'openai', baseUrl: 'https://api.x.ai/v1', kind: 'grok' },
-  { id: 'mistral', name: 'Mistral', apiCompatibility: 'openai', baseUrl: 'https://api.mistral.ai/v1', kind: 'mistral' },
-  { id: 'azure-openai', name: 'Azure OpenAI', apiCompatibility: 'openai', baseUrl: '', kind: 'azure-openai' },
-  { id: 'ollama', name: 'Ollama', apiCompatibility: 'openai', baseUrl: 'http://127.0.0.1:11434', kind: 'ollama' },
-  { id: 'lm-studio', name: 'LM Studio', apiCompatibility: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', kind: 'lm-studio' },
-  { id: 'custom-openai', name: 'Custom OpenAI', apiCompatibility: 'openai', baseUrl: '', kind: 'custom-openai' },
-  { id: 'custom-anthropic', name: 'Custom Anthropic', apiCompatibility: 'anthropic', baseUrl: '', kind: 'custom-anthropic' },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.openai.com/v1',
+    kind: 'openai',
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.deepseek.com/v1',
+    kind: 'deepseek',
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    kind: 'openrouter',
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    apiCompatibility: 'anthropic',
+    baseUrl: 'https://api.anthropic.com/v1',
+    kind: 'anthropic',
+  },
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    kind: 'gemini',
+  },
+  {
+    id: 'grok',
+    name: 'Grok',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.x.ai/v1',
+    kind: 'grok',
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.mistral.ai/v1',
+    kind: 'mistral',
+  },
+  {
+    id: 'azure-openai',
+    name: 'Azure OpenAI',
+    apiCompatibility: 'openai',
+    baseUrl: '',
+    kind: 'azure-openai',
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    apiCompatibility: 'openai',
+    baseUrl: 'http://127.0.0.1:11434',
+    kind: 'ollama',
+  },
+  {
+    id: 'lm-studio',
+    name: 'LM Studio',
+    apiCompatibility: 'openai',
+    baseUrl: 'http://127.0.0.1:1234/v1',
+    kind: 'lm-studio',
+  },
+  {
+    id: 'custom-openai',
+    name: 'Custom OpenAI',
+    apiCompatibility: 'openai',
+    baseUrl: '',
+    kind: 'custom-openai',
+  },
+  {
+    id: 'custom-anthropic',
+    name: 'Custom Anthropic',
+    apiCompatibility: 'anthropic',
+    baseUrl: '',
+    kind: 'custom-anthropic',
+  },
 ])
 
 // ── Proxy mode options ────────────────────────────────────────────────────────
@@ -101,7 +173,9 @@ const contextWindowInput = computed({
   get: () => draft.value.contextWindowOverride?.toString() ?? '',
   set: (val: string) => {
     const num = Number.parseInt(val, 10)
-    draft.value.contextWindowOverride = Number.isNaN(num) ? undefined : num
+    draft.value.contextWindowOverride = Number.isNaN(num)
+      ? undefined
+      : num
   },
 })
 

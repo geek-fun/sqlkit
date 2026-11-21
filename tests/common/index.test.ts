@@ -9,7 +9,11 @@ describe('pureObject', () => {
   })
 
   it('should convert nested objects', () => {
-    const input = { a: { b: { c: 1 } } }
+    const input = {
+      a: {
+        b: { c: 1 },
+      },
+    }
     const result = pureObject(input)
     expect(result).toEqual(input)
     expect(result.a).not.toBe(input.a)
@@ -23,7 +27,12 @@ describe('pureObject', () => {
   })
 
   it('should handle mixed objects and arrays', () => {
-    const input = { items: [{ id: 1 }, { id: 2 }] }
+    const input = {
+      items: [
+        { id: 1 },
+        { id: 2 },
+      ],
+    }
     const result = pureObject(input)
     expect(result).toEqual(input)
     expect(result.items).not.toBe(input.items)

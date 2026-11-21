@@ -9,6 +9,6 @@ declare module '*.vue' {
 
 // Monaco Editor API without built-in language contributions
 // Types are identical to the main monaco-editor bundle.
-declare module 'monaco-editor/esm/vs/editor/editor.api' {
+declare module 'monaco-editor/editor/editor.api' {
   export * from 'monaco-editor'
 }

@@ -30,16 +30,25 @@ export function saveQueryFile(content: string, filePath?: string, fileName?: str
 }
 
 export async function saveQueryFileAs(content: string, suggestedName: string = 'query.sql'): Promise<SaveResult | null> {
-  const defaultName = suggestedName.endsWith('.sql') ? suggestedName : `${suggestedName}.sql`
+  const defaultName = suggestedName.endsWith('.sql')
+    ? suggestedName
+    : `${suggestedName}.sql`
   const selectedPath = await showSaveDialog({
-    filters: [{ name: 'SQL Files', extensions: ['sql'] }],
+    filters: [
+      {
+        name: 'SQL Files',
+        extensions: ['sql'],
+      },
+    ],
     defaultPath: defaultName,
   })
 
   if (!selectedPath)
     return null
 
-  const filePath = selectedPath.endsWith('.sql') ? selectedPath : `${selectedPath}.sql`
+  const filePath = selectedPath.endsWith('.sql')
+    ? selectedPath
+    : `${selectedPath}.sql`
   return invoke<SaveResult>('save_query_file', { content, filePath })
 }
 

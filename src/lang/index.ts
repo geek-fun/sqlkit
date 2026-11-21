@@ -14,12 +14,17 @@ const AVAILABLE_LOCALES: AppLocale[] = ['enUS', 'zhCN']
 
 function resolveLocale(): AppLocale {
   const stored = getStoredLocale()
-  if (stored === 'auto')
-    return typeof navigator !== 'undefined' && navigator.language === 'zh-CN' ? 'zhCN' : 'enUS'
+  if (stored === 'auto') {
+    return typeof navigator !== 'undefined' && navigator.language === 'zh-CN'
+      ? 'zhCN'
+      : 'enUS'
+  }
   // Validate stored locale against available locales; fall back to auto if invalid
   if (AVAILABLE_LOCALES.includes(stored as AppLocale))
     return stored
-  return typeof navigator !== 'undefined' && navigator.language === 'zh-CN' ? 'zhCN' : 'enUS'
+  return typeof navigator !== 'undefined' && navigator.language === 'zh-CN'
+    ? 'zhCN'
+    : 'enUS'
 }
 
 const lang = createI18n({

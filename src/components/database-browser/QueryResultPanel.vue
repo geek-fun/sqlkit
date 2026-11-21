@@ -109,7 +109,9 @@ const connectionTypeForAnalysis = computed(() => {
   if (!props.connectionId)
     return undefined
   const conn = connectionStore.getConnectionById(props.connectionId)
-  return conn?.type ? String(conn.type).toLowerCase() : undefined
+  return conn?.type
+    ? String(conn.type).toLowerCase()
+    : undefined
 })
 
 async function refreshEditability() {
@@ -195,7 +197,9 @@ async function reExecuteWithSortFilter() {
         schemaContext: props.schema ?? null,
         sort: activeSort.value.map(s => ({
           column: s.column,
-          direction: s.direction === 'ASC' ? 'ASC' : 'DESC',
+          direction: s.direction === 'ASC'
+            ? 'ASC'
+            : 'DESC',
         })),
         filters: activeFilters.value.map(f => ({
           column: f.column,

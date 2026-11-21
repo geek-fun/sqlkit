@@ -9,7 +9,9 @@ describe('analyzeCompletionContext', () => {
     const ctx = analyzeCompletionContext(text, text.length)
     expect(ctx.word).toBe('u')
     expect(ctx.activeTable?.table).toBe('users')
-    expect(ctx.tableRefs).toEqual([{ table: 'users' }])
+    expect(ctx.tableRefs).toEqual([
+      { table: 'users' },
+    ])
     expect(ctx.inComment).toBe(false)
   })
 

@@ -69,7 +69,10 @@ async function handleBrowse() {
     directory: false,
     save: true,
     filters: [
-      { name: 'Export File', extensions: ['csv', 'jsonl'] },
+      {
+        name: 'Export File',
+        extensions: ['csv', 'jsonl'],
+      },
     ],
   })
   if (selected) {

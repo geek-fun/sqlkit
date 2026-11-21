@@ -148,7 +148,9 @@ export const useTabStore = defineStore('tabs', {
     openErDiagramTab(connectionId: string, database: string, schema?: string): QueryTab {
       const tab: QueryTab = {
         id: generateId(),
-        name: `ER Diagram - ${database}${schema ? `.${schema}` : ''}`,
+        name: `ER Diagram - ${database}${schema
+          ? `.${schema}`
+          : ''}`,
         content: '',
         connectionId,
         database,
@@ -176,8 +178,14 @@ export const useTabStore = defineStore('tabs', {
         return existing
       }
 
-      const typeLabel = type === 'VIEW' ? 'Views' : type === 'PROCEDURE' ? 'Procedures' : 'Functions'
-      const tabName = schema ? `${typeLabel} — ${schema}` : `${typeLabel} — ${database}`
+      const typeLabel = type === 'VIEW'
+        ? 'Views'
+        : type === 'PROCEDURE'
+          ? 'Procedures'
+          : 'Functions'
+      const tabName = schema
+        ? `${typeLabel} — ${schema}`
+        : `${typeLabel} — ${database}`
       const tab: QueryTab = {
         id: generateId(),
         name: tabName,
@@ -199,7 +207,10 @@ export const useTabStore = defineStore('tabs', {
       if (index === -1)
         return
 
-      this.tabs = [...this.tabs.slice(0, index), ...this.tabs.slice(index + 1)]
+      this.tabs = [
+        ...this.tabs.slice(0, index),
+        ...this.tabs.slice(index + 1),
+      ]
 
       if (this.activeTabId === tabId) {
         this.activeTabId = this.tabs[Math.max(0, index - 1)]?.id ?? null
@@ -214,14 +225,14 @@ export const useTabStore = defineStore('tabs', {
     closeTabsForConnection(connectionId: string) {
       const remaining = this.tabs.filter(t => t.connectionId !== connectionId)
       this.tabs = remaining
-      if (this.activeTabId && !remaining.find(t => t.id === this.activeTabId)) {
+      if (this.activeTabId && !remaining.some(t => t.id === this.activeTabId)) {
         this.activeTabId = remaining[0]?.id ?? null
       }
     },
 
     closeNonOrphanTabs() {
       this.tabs = this.tabs.filter(t => t.orphanFromConnectionId)
-      if (this.activeTabId && !this.tabs.find(t => t.id === this.activeTabId)) {
+      if (this.activeTabId && !this.tabs.some(t => t.id === this.activeTabId)) {
         const orphanTab = this.tabs.find(t => t.orphanFromConnectionId)
         this.activeTabId = orphanTab?.id ?? null
       }
@@ -244,7 +255,10 @@ export const useTabStore = defineStore('tabs', {
         t => isStale(t) && !t.tableView && t.hasUnsavedChanges,
       )
 
-      const toCloseIds = new Set([...staleTableViewIds, ...staleSavedQueryIds])
+      const toCloseIds = new Set([
+        ...staleTableViewIds,
+        ...staleSavedQueryIds,
+      ])
 
       const orphanedIds = new Set(staleUnsavedQueryTabs.map(t => t.id))
 
@@ -256,7 +270,7 @@ export const useTabStore = defineStore('tabs', {
             : t,
         )
 
-      if (this.activeTabId && !this.tabs.find(t => t.id === this.activeTabId)) {
+      if (this.activeTabId && !this.tabs.some(t => t.id === this.activeTabId)) {
         const nonOrphanTab = this.tabs.find(t => !t.orphanFromConnectionId)
         const orphanTab = this.tabs.find(t => t.orphanFromConnectionId)
         this.activeTabId = nonOrphanTab?.id ?? orphanTab?.id ?? null
@@ -276,7 +290,10 @@ export const useTabStore = defineStore('tabs', {
         t => !t.tableView && t.hasUnsavedChanges && !t.orphanFromConnectionId,
       )
 
-      const toCloseIds = new Set([...tableViewTabIds, ...savedQueryTabIds])
+      const toCloseIds = new Set([
+        ...tableViewTabIds,
+        ...savedQueryTabIds,
+      ])
 
       this.tabs = this.tabs.filter(t => !toCloseIds.has(t.id))
 
@@ -292,7 +309,7 @@ export const useTabStore = defineStore('tabs', {
         }
       })
 
-      if (this.activeTabId && !this.tabs.find(t => t.id === this.activeTabId)) {
+      if (this.activeTabId && !this.tabs.some(t => t.id === this.activeTabId)) {
         const nonOrphanTab = this.tabs.find(t => !t.orphanFromConnectionId)
         const orphanTab = this.tabs.find(t => t.orphanFromConnectionId)
         this.activeTabId = nonOrphanTab?.id ?? orphanTab?.id ?? null
@@ -320,7 +337,9 @@ export const useTabStore = defineStore('tabs', {
         return
       }
 
-      const sql = sqlToExecute !== undefined ? sqlToExecute : tab.content
+      const sql = sqlToExecute !== undefined
+        ? sqlToExecute
+        : tab.content
 
       if (typeof sql !== 'string' || sql.trim() === '') {
         return
@@ -470,7 +489,7 @@ export const useTabStore = defineStore('tabs', {
     },
 
     setActiveTab(tabId: string) {
-      if (this.tabs.find(t => t.id === tabId)) {
+      if (this.tabs.some(t => t.id === tabId)) {
         this.activeTabId = tabId
       }
     },

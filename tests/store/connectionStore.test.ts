@@ -192,8 +192,22 @@ describe('connectionStore', () => {
       it('returns active connection', () => {
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'DB1', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
-          { id: 'conn-2', name: 'DB2', type: DatabaseType.MYSQL, host: 'localhost', port: 3306, ssl: false },
+          {
+            id: 'conn-1',
+            name: 'DB1',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
+          {
+            id: 'conn-2',
+            name: 'DB2',
+            type: DatabaseType.MYSQL,
+            host: 'localhost',
+            port: 3306,
+            ssl: false,
+          },
         ]
         store.activeConnectionId = 'conn-1'
 
@@ -210,9 +224,33 @@ describe('connectionStore', () => {
       it('returns only connected connections', () => {
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'DB1', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true, isConnected: true },
-          { id: 'conn-2', name: 'DB2', type: DatabaseType.MYSQL, host: 'localhost', port: 3306, ssl: false, isConnected: false },
-          { id: 'conn-3', name: 'DB3', type: DatabaseType.SQLITE, host: '', port: 0, ssl: false, isConnected: true },
+          {
+            id: 'conn-1',
+            name: 'DB1',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+            isConnected: true,
+          },
+          {
+            id: 'conn-2',
+            name: 'DB2',
+            type: DatabaseType.MYSQL,
+            host: 'localhost',
+            port: 3306,
+            ssl: false,
+            isConnected: false,
+          },
+          {
+            id: 'conn-3',
+            name: 'DB3',
+            type: DatabaseType.SQLITE,
+            host: '',
+            port: 0,
+            ssl: false,
+            isConnected: true,
+          },
         ]
 
         expect(store.connectedConnections).toHaveLength(2)
@@ -245,7 +283,15 @@ describe('connectionStore', () => {
       it('returns connection database when no current set', () => {
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'DB1', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true, database: 'defaultdb' },
+          {
+            id: 'conn-1',
+            name: 'DB1',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+            database: 'defaultdb',
+          },
         ]
 
         expect(store.getCurrentDatabase('conn-1')).toBe('defaultdb')
@@ -261,7 +307,9 @@ describe('connectionStore', () => {
   describe('actions', () => {
     describe('fetchConnections', () => {
       it('should fetch connections from API', async () => {
-        const mockBackendConnections = [createMockBackendConnection()]
+        const mockBackendConnections = [
+          createMockBackendConnection(),
+        ]
         connectionApi.list.mockResolvedValue(mockBackendConnections)
 
         const store = useConnectionStore()
@@ -285,10 +333,34 @@ describe('connectionStore', () => {
 
       it('maps backend connection types correctly', async () => {
         connectionApi.list.mockResolvedValue([
-          { id: '1', name: 'PG', db_type: 'PostgreSQL', host: 'localhost', port: 5432 },
-          { id: '2', name: 'My', db_type: 'MySQL', host: 'localhost', port: 3306 },
-          { id: '3', name: 'MS', db_type: 'SqlServer', host: 'localhost', port: 1433 },
-          { id: '4', name: 'Lite', db_type: 'SQLite', host: '', port: 0 },
+          {
+            id: '1',
+            name: 'PG',
+            db_type: 'PostgreSQL',
+            host: 'localhost',
+            port: 5432,
+          },
+          {
+            id: '2',
+            name: 'My',
+            db_type: 'MySQL',
+            host: 'localhost',
+            port: 3306,
+          },
+          {
+            id: '3',
+            name: 'MS',
+            db_type: 'SqlServer',
+            host: 'localhost',
+            port: 1433,
+          },
+          {
+            id: '4',
+            name: 'Lite',
+            db_type: 'SQLite',
+            host: '',
+            port: 0,
+          },
         ])
 
         const store = useConnectionStore()
@@ -302,7 +374,13 @@ describe('connectionStore', () => {
 
       it('defaults unknown db_type to PostgreSQL', async () => {
         connectionApi.list.mockResolvedValue([
-          { id: '1', name: 'Unknown', db_type: 'UnknownDB', host: 'localhost', port: 5432 },
+          {
+            id: '1',
+            name: 'Unknown',
+            db_type: 'UnknownDB',
+            host: 'localhost',
+            port: 5432,
+          },
         ])
 
         const store = useConnectionStore()
@@ -313,7 +391,14 @@ describe('connectionStore', () => {
 
       it('maps ssl_mode from backend to SslConfig', async () => {
         connectionApi.list.mockResolvedValue([
-          { id: '1', name: 'Test', db_type: 'PostgreSQL', host: 'localhost', port: 5432, ssl_mode: 'prefer' },
+          {
+            id: '1',
+            name: 'Test',
+            db_type: 'PostgreSQL',
+            host: 'localhost',
+            port: 5432,
+            ssl_mode: 'prefer',
+          },
         ])
 
         const store = useConnectionStore()
@@ -324,7 +409,14 @@ describe('connectionStore', () => {
 
       it('handles null ssl_mode from backend', async () => {
         connectionApi.list.mockResolvedValue([
-          { id: '1', name: 'Test', db_type: 'PostgreSQL', host: 'localhost', port: 5432, ssl_mode: null },
+          {
+            id: '1',
+            name: 'Test',
+            db_type: 'PostgreSQL',
+            host: 'localhost',
+            port: 5432,
+            ssl_mode: null,
+          },
         ])
 
         const store = useConnectionStore()
@@ -450,7 +542,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         const result = await store.connect('conn-1')
@@ -470,7 +569,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         const connectPromise = store.connect('conn-1')
@@ -492,7 +598,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         await expect(store.connect('conn-1')).rejects.toThrow('Failed to connect')
@@ -506,7 +619,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         await store.connect('conn-1')
@@ -519,7 +639,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         await store.connect('conn-1')
@@ -534,7 +661,15 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true, isConnected: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+            isConnected: true,
+          },
         ]
         store.activeConnectionId = 'conn-1'
         store.connectionStatus['conn-1'] = ConnectionStatus.CONNECTED
@@ -565,7 +700,15 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true, isConnected: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+            isConnected: true,
+          },
         ]
         store.connectionStatus['conn-1'] = ConnectionStatus.CONNECTED
 

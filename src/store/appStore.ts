@@ -285,7 +285,10 @@ export const useAppStore = defineStore('app', {
       this.languageType = languageType
     },
     setEditorConfig(config: Partial<EditorConfig>) {
-      this.editorConfig = { ...this.editorConfig, ...config }
+      this.editorConfig = {
+        ...this.editorConfig,
+        ...config,
+      }
     },
     setQueryTimeout(timeout: number) {
       this.queryConfig.queryTimeout = timeout
@@ -297,7 +300,10 @@ export const useAppStore = defineStore('app', {
       this.queryConfig.autoSave = autoSave
     },
     updateQueryConfig(config: Partial<QueryConfig>) {
-      this.queryConfig = { ...this.queryConfig, ...config }
+      this.queryConfig = {
+        ...this.queryConfig,
+        ...config,
+      }
     },
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
@@ -306,7 +312,9 @@ export const useAppStore = defineStore('app', {
       this.sidebarCollapsed = collapsed
     },
     getEditorTheme() {
-      return this.uiThemeType === ThemeType.DARK ? 'vs-dark' : 'vs-light'
+      return this.uiThemeType === ThemeType.DARK
+        ? 'vs-dark'
+        : 'vs-light'
     },
 
     // ── Provider CRUD ────────────────────────────────────────────────────
@@ -331,7 +339,12 @@ export const useAppStore = defineStore('app', {
       this.llmSettings = {
         ...this.llmSettings,
         providers: this.llmSettings.providers.map(p =>
-          p.id === providerId ? { ...p, ...updates } : p,
+          p.id === providerId
+            ? {
+                ...p,
+                ...updates,
+              }
+            : p,
         ),
       }
       await this.persistLlmSettings()
@@ -341,7 +354,9 @@ export const useAppStore = defineStore('app', {
       this.llmSettings = {
         ...this.llmSettings,
         providers: this.llmSettings.providers.map(p =>
-          p.id === providerId ? { ...p, enabled: !p.enabled } : p,
+          p.id === providerId
+            ? { ...p, enabled: !p.enabled }
+            : p,
         ),
       }
       await this.persistLlmSettings()
@@ -479,7 +494,10 @@ export const useAppStore = defineStore('app', {
         return { success: valid }
       }
       catch (err) {
-        return { success: false, error: String(err) }
+        return {
+          success: false,
+          error: String(err),
+        }
       }
     },
 

@@ -15,11 +15,11 @@
 [![CI](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml/badge.svg)](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml)
 
 <p>
-  <img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Tauri-FFC131?logo=tauri&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white"/>
+  <img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white" alt="macOS"/>
+  <img src="https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white" alt="Windows"/>
+  <img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" alt="Linux"/>
+  <img src="https://img.shields.io/badge/Tauri-FFC131?logo=tauri&logoColor=black" alt="Tauri"/>
+  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white" alt="Rust"/>
 </p>
 
 [Download](https://www.geekfun.club/download) · [Docs](docs/DISTRIBUTION.md) · [Website](https://www.geekfun.club) · [Releases](https://github.com/geek-fun/sqlkit/releases)
@@ -37,34 +37,34 @@ SqlKit is an **agentic database client** — it doesn't just execute SQL, it und
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" />
-  <img src="https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white" />
-  <img src="https://img.shields.io/badge/Oracle-F80000?logo=oracle&logoColor=white" />
-  <img src="https://img.shields.io/badge/SQL%20Server-CC2927?logo=microsoftsqlserver&logoColor=white" />
-  <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" />
-  <img src="https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black" />
-  <img src="https://img.shields.io/badge/ClickHouse-FFCC01?logo=clickhouse&logoColor=black" />
-  <img src="https://img.shields.io/badge/Firebird-E5402B?logo=firebird&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL" />
+  <img src="https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white" alt="MySQL" />
+  <img src="https://img.shields.io/badge/Oracle-F80000?logo=oracle&logoColor=white" alt="Oracle" />
+  <img src="https://img.shields.io/badge/SQL%20Server-CC2927?logo=microsoftsqlserver&logoColor=white" alt="SQL Server" />
+  <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" alt="SQLite" />
+  <img src="https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black" alt="DuckDB" />
+  <img src="https://img.shields.io/badge/ClickHouse-FFCC01?logo=clickhouse&logoColor=black" alt="ClickHouse" />
+  <img src="https://img.shields.io/badge/Firebird-E5402B?logo=firebird&logoColor=white" alt="Firebird" />
   <br/>
-  <img src="https://img.shields.io/badge/MariaDB-003545?logo=mariadb&logoColor=white" />
-  <img src="https://img.shields.io/badge/CockroachDB-6933FF?logo=cockroachlabs&logoColor=white" />
-  <img src="https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white" />
-  <img src="https://img.shields.io/badge/DB2-052FAD?logo=ibm&logoColor=white" />
-  <img src="https://img.shields.io/badge/H2-004080?logoColor=white" />
-  <img src="https://img.shields.io/badge/Trino-DD00A1?logo=trino&logoColor=white" />
-  <img src="https://img.shields.io/badge/Redshift-8C4FFF?logo=amazonredshift&logoColor=white" />
-  <img src="https://img.shields.io/badge/Teradata-F37440?logo=teradata&logoColor=white" />
+  <img src="https://img.shields.io/badge/MariaDB-003545?logo=mariadb&logoColor=white" alt="MariaDB" />
+  <img src="https://img.shields.io/badge/CockroachDB-6933FF?logo=cockroachlabs&logoColor=white" alt="CockroachDB" />
+  <img src="https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white" alt="Snowflake" />
+  <img src="https://img.shields.io/badge/DB2-052FAD?logo=ibm&logoColor=white" alt="DB2" />
+  <img src="https://img.shields.io/badge/H2-004080?logoColor=white" alt="H2" />
+  <img src="https://img.shields.io/badge/Trino-DD00A1?logo=trino&logoColor=white" alt="Trino" />
+  <img src="https://img.shields.io/badge/Redshift-8C4FFF?logo=amazonredshift&logoColor=white" alt="Redshift" />
+  <img src="https://img.shields.io/badge/Teradata-F37440?logo=teradata&logoColor=white" alt="Teradata" />
   <br/>
-  <img src="https://img.shields.io/badge/TiDB-DC150B?logo=tidb&logoColor=white" />
-  <img src="https://img.shields.io/badge/OceanBase-006AFF?logoColor=white" />
-  <img src="https://img.shields.io/badge/OpenGauss-0052CC?logoColor=white" />
-  <img src="https://img.shields.io/badge/Doris-0052CC?logoColor=white" />
-  <img src="https://img.shields.io/badge/StarRocks-5C2D91?logoColor=white" />
-  <img src="https://img.shields.io/badge/TimescaleDB-F2F2F2?logo=timescale&logoColor=black" />
-  <img src="https://img.shields.io/badge/Hive-FDEE21?logo=apachehive&logoColor=black" />
-  <img src="https://img.shields.io/badge/Databricks-FF3621?logo=databricks&logoColor=white" />
-  <img src="https://img.shields.io/badge/BigQuery-669DF6?logo=googlebigquery&logoColor=white" />
-  <img src="https://img.shields.io/badge/and%20more...-555555?logoColor=white" />
+  <img src="https://img.shields.io/badge/TiDB-DC150B?logo=tidb&logoColor=white" alt="TiDB" />
+  <img src="https://img.shields.io/badge/OceanBase-006AFF?logoColor=white" alt="OceanBase" />
+  <img src="https://img.shields.io/badge/OpenGauss-0052CC?logoColor=white" alt="OpenGauss" />
+  <img src="https://img.shields.io/badge/Doris-0052CC?logoColor=white" alt="Doris" />
+  <img src="https://img.shields.io/badge/StarRocks-5C2D91?logoColor=white" alt="StarRocks" />
+  <img src="https://img.shields.io/badge/TimescaleDB-F2F2F2?logo=timescale&logoColor=black" alt="TimescaleDB" />
+  <img src="https://img.shields.io/badge/Hive-FDEE21?logo=apachehive&logoColor=black" alt="Hive" />
+  <img src="https://img.shields.io/badge/Databricks-FF3621?logo=databricks&logoColor=white" alt="Databricks" />
+  <img src="https://img.shields.io/badge/BigQuery-669DF6?logo=googlebigquery&logoColor=white" alt="BigQuery" />
+  <img src="https://img.shields.io/badge/and%20more...-555555?logoColor=white" alt="and more..." />
 </p>
 
 ## Installation

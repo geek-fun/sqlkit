@@ -36,7 +36,9 @@ const { t } = useI18n()
 const connectionStore = useConnectionStore()
 
 const activeConnectionDbType = computed(() =>
-  props.activeConnectionId ? connectionStore.getConnectionById(props.activeConnectionId)?.type : undefined,
+  props.activeConnectionId
+    ? connectionStore.getConnectionById(props.activeConnectionId)?.type
+    : undefined,
 )
 
 function getTabDbType(tab: QueryTab) {

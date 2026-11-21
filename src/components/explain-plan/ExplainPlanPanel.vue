@@ -37,7 +37,9 @@ const formattedTotalCost = computed(() => {
   const c = totalCost.value
   if (c === undefined)
     return undefined
-  return Number.isInteger(c) ? c.toFixed(0) : c.toFixed(2)
+  return Number.isInteger(c)
+    ? c.toFixed(0)
+    : c.toFixed(2)
 })
 </script>
 

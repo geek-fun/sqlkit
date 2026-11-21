@@ -64,7 +64,9 @@ function scanStatements(content: string): StatementRange[] {
 
   for (let i = 0; i < content.length; i++) {
     const ch = content[i]
-    const next = i + 1 < content.length ? content[i + 1] : null
+    const next = i + 1 < content.length
+      ? content[i + 1]
+      : null
 
     // Track lines
     if (ch === '\n') {
@@ -328,7 +330,14 @@ function splitRangesAtBlankLines(ranges: StatementRange[], content: string): Sta
     // When the segment starts with `WITH`, suppress soft-split for the next DML
     // keyword — it's the main query of a CTE, not a new statement.
     let segmentFirstKeyword: string | null = null
-    const FIRST_DML_KEYWORDS = new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'REPLACE'])
+    const FIRST_DML_KEYWORDS = new Set([
+      'SELECT',
+      'INSERT',
+      'UPDATE',
+      'DELETE',
+      'MERGE',
+      'REPLACE',
+    ])
     // Each split: { sqlLine: the SQL keyword line, prevContentLine: last content before blank run }
     const splits: { sqlLine: number, prevContentLine: number }[] = []
 

@@ -59,7 +59,6 @@ const { llmSettings } = storeToRefs(appStore)
 
 const inputText = ref('')
 const scrollAreaRef = ref<{ viewportElement: HTMLElement | null } | null>(null)
-const contextIndicatorRef = ref<{ refresh: () => Promise<void> } | null>(null)
 
 // ── Smart scroll ──────────────────────────────────────────────────────
 
@@ -169,7 +168,9 @@ const featureRoute = computed(() =>
 )
 
 const selectedModelId = computed(() => featureRoute.value.selectedModelId ?? undefined)
-const recentModelIds = computed(() => (selectedModelId.value ? [selectedModelId.value] : []))
+const recentModelIds = computed(() => (selectedModelId.value
+  ? [selectedModelId.value]
+  : []))
 
 // ── Input ─────────────────────────────────────────────────────────────
 
@@ -362,7 +363,7 @@ onBeforeUnmount(() => {
 
           <div class="toolbar-center">
             <ContextIndicator
-              ref="contextIndicatorRef"
+
               :session-id="sessionId"
               :settings="contextSettings ?? null"
             />

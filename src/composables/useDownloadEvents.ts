@@ -101,7 +101,9 @@ export function useDownloadEvents() {
       return true
     }
     catch (error) {
-      errors[id] = error instanceof Error ? error.message : String(error)
+      errors[id] = error instanceof Error
+        ? error.message
+        : String(error)
       states[id] = 'error'
       delete progress[id]
       return false

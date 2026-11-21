@@ -78,7 +78,9 @@ function parsePostgresPlan(plan: Record<string, any>, id: string): ExplainPlanNo
       ? `${startupCost.toFixed(2)}..${totalCost.toFixed(2)}`
       : undefined
 
-  const title = relation ? `${nodeType} on ${relation}` : nodeType
+  const title = relation
+    ? `${nodeType} on ${relation}`
+    : nodeType
 
   // Collect details from extra fields
   const details: string[] = []
@@ -95,7 +97,9 @@ function parsePostgresPlan(plan: Record<string, any>, id: string): ExplainPlanNo
   for (const field of extraFields) {
     const val = plan[field]
     if (val !== undefined) {
-      details.push(`${field}: ${Array.isArray(val) ? val.join(', ') : String(val)}`)
+      details.push(`${field}: ${Array.isArray(val)
+        ? val.join(', ')
+        : String(val)}`)
     }
   }
 
@@ -152,7 +156,9 @@ function parseMySqlTable(table: Record<string, any>, id: string, extraDetails?: 
     ? Number.parseFloat(table.cost_info.query_cost)
     : undefined
 
-  const details: string[] = [...(extraDetails ?? [])]
+  const details: string[] = [
+    ...(extraDetails ?? []),
+  ]
   if (table.attached_condition) {
     details.push(table.attached_condition)
   }
@@ -160,7 +166,9 @@ function parseMySqlTable(table: Record<string, any>, id: string, extraDetails?: 
     details.push(`Columns: ${(table.used_columns as string[]).join(', ')}`)
   }
 
-  const title = relation ? `${nodeType} on ${relation}` : nodeType
+  const title = relation
+    ? `${nodeType} on ${relation}`
+    : nodeType
 
   const materialized = table.materialized_from_subquery
   if (materialized) {
@@ -204,13 +212,17 @@ function parseMySqlQueryBlock(block: Record<string, any>, baseId: string): Expla
       }
     }
     // Wrap in a synthetic join parent node for tree hierarchy
-    return [{
-      id: baseId,
-      title: 'Nested Loop Join',
-      nodeType: 'Nested Loop Join',
-      details: children.length > 1 ? [] : ['Single table'],
-      children,
-    }]
+    return [
+      {
+        id: baseId,
+        title: 'Nested Loop Join',
+        nodeType: 'Nested Loop Join',
+        details: children.length > 1
+          ? []
+          : ['Single table'],
+        children,
+      },
+    ]
   }
 
   // Ordering operation wraps a table with filesort
@@ -220,7 +232,9 @@ function parseMySqlQueryBlock(block: Record<string, any>, baseId: string): Expla
       const tableNode = parseMySqlTable(
         orderingOp.table,
         `${baseId}.${counter++}`,
-        orderingOp.using_filesort ? ['Using filesort'] : undefined,
+        orderingOp.using_filesort
+          ? ['Using filesort']
+          : undefined,
       )
       nodes.push(tableNode)
     }
@@ -317,7 +331,9 @@ export function parseSqliteText(text: string): ExplainPlanNode[] {
     const { nodeType, relation, index } = parseSqliteDetail(row.detail)
     const node: ExplainPlanNode = {
       id: row.id,
-      title: relation ? `${nodeType} on ${relation}` : nodeType,
+      title: relation
+        ? `${nodeType} on ${relation}`
+        : nodeType,
       nodeType,
       relation,
       index,
@@ -362,7 +378,9 @@ function parseSqlServerOperator(line: string): { nodeType: string, relation?: st
   // Pattern: "OperatorName(OBJECT:([schema].[table]), ...)"
   // Or "OperatorName(Inner Join, ...)"
   const parenIndex = cleaned.indexOf('(')
-  const nodeType = parenIndex > 0 ? cleaned.substring(0, parenIndex).trim() : cleaned.trim()
+  const nodeType = parenIndex > 0
+    ? cleaned.substring(0, parenIndex).trim()
+    : cleaned.trim()
 
   const detail = cleaned
 
@@ -423,7 +441,9 @@ export function parseSqlServerText(text: string): ExplainPlanNode[] {
 
     const { nodeType, relation, index, detail } = parseSqlServerOperator(line)
 
-    const title = relation ? `${nodeType} on ${relation}` : nodeType
+    const title = relation
+      ? `${nodeType} on ${relation}`
+      : nodeType
 
     nodes.push({
       id: String(idCounter++),
@@ -576,7 +596,9 @@ export function parseMySqlAnalyzeText(text: string): ExplainPlanNode[] {
   // Find the base indentation level from the first `->` line
   const baseIndent = Math.min(...lines.map((l) => {
     const idx = l.indexOf('->')
-    return idx >= 0 ? idx : Infinity
+    return idx >= 0
+      ? idx
+      : Infinity
   }))
 
   const rootNodes: ExplainPlanNode[] = []
@@ -597,10 +619,14 @@ export function parseMySqlAnalyzeText(text: string): ExplainPlanNode[] {
     const costStr = costMatch?.[1]
     const totalCost = costStr
       ? Number.parseFloat(
-          costStr.includes('..') ? costStr.split('..')[1] : costStr,
+          costStr.includes('..')
+            ? costStr.split('..')[1]
+            : costStr,
         )
       : undefined
-    const rows = costMatch?.[2] ? Number.parseFloat(costMatch[2]) : undefined
+    const rows = costMatch?.[2]
+      ? Number.parseFloat(costMatch[2])
+      : undefined
 
     // Extract details (text before the cost parentheses)
     let nodeType = content
@@ -618,9 +644,14 @@ export function parseMySqlAnalyzeText(text: string): ExplainPlanNode[] {
     if (nodeType.includes(' on ')) {
       const afterOn = nodeType.split(/ on /i).slice(1).join(' on ')
       const usingIdx = afterOn.search(/ using /i)
-      relation = usingIdx >= 0 ? afterOn.substring(0, usingIdx).trim() : afterOn
+      relation = usingIdx >= 0
+        ? afterOn.substring(0, usingIdx).trim()
+        : afterOn
       if (usingIdx >= 0) {
-        details = [...details, afterOn.substring(usingIdx).trim()]
+        details = [
+          ...details,
+          afterOn.substring(usingIdx).trim(),
+        ]
       }
     }
     const node: ExplainPlanNode = {

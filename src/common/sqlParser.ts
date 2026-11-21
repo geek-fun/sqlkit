@@ -53,8 +53,12 @@ export function extractStatementAtCursor(sql: string, cursorPosition?: CursorPos
   const lastSemicolon = beforeCursor.lastIndexOf(';')
   const nextSemicolon = afterCursor.indexOf(';')
 
-  const start = lastSemicolon === -1 ? 0 : lastSemicolon + 1
-  const end = nextSemicolon === -1 ? sql.length : offset + nextSemicolon
+  const start = lastSemicolon === -1
+    ? 0
+    : lastSemicolon + 1
+  const end = nextSemicolon === -1
+    ? sql.length
+    : offset + nextSemicolon
 
   const statement = sql.substring(start, end).trim()
   return statement || sql.trim()

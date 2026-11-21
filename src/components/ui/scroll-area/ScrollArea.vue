@@ -15,7 +15,9 @@ const props = defineProps<
 const viewportRef = ref<InstanceType<typeof ScrollAreaViewport> | null>(null)
 const viewportElement = computed<HTMLElement | null>(() => {
   const raw = viewportRef.value?.viewportElement
-  return raw ? (unref(raw) ?? null) : null
+  return raw
+    ? (unref(raw) ?? null)
+    : null
 })
 
 defineExpose({ viewportElement })

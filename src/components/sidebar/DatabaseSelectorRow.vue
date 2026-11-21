@@ -46,7 +46,9 @@ const connectionStore = useConnectionStore()
 const databaseStore = useDatabaseStore()
 
 const activeConnection = computed(() =>
-  props.connectionId ? connectionStore.getConnectionById(props.connectionId) : null,
+  props.connectionId
+    ? connectionStore.getConnectionById(props.connectionId)
+    : null,
 )
 
 const allDatabases = computed(() => {
@@ -61,7 +63,10 @@ const systemDatabases = computed(() => allDatabases.value.filter(db => db.is_sys
 const options = computed<ComboboxOption[]>(() => {
   const seen = new Set<string>()
   const allDbs = [
-    { label: t('sidebar.database.placeholder'), value: '' },
+    {
+      label: t('sidebar.database.placeholder'),
+      value: '',
+    },
     ...userDatabases.value
       .filter((db) => {
         if (seen.has(db.name))
@@ -77,7 +82,11 @@ const options = computed<ComboboxOption[]>(() => {
         seen.add(db.name)
         return true
       })
-      .map(db => ({ label: db.name, value: db.name, group: t('components.databaseBrowser.systemDatabases') })),
+      .map(db => ({
+        label: db.name,
+        value: db.name,
+        group: t('components.databaseBrowser.systemDatabases'),
+      })),
   ]
   return allDbs
 })
@@ -89,7 +98,9 @@ const capabilities = computed<DbCapabilities>(() => {
 })
 
 function handleSelect(value: string) {
-  emit('update:modelValue', value === '' ? null : value)
+  emit('update:modelValue', value === ''
+    ? null
+    : value)
 }
 
 function handleAction(kind: ActionKind) {

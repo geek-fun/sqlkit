@@ -16,7 +16,9 @@ export function rowsToCsv(rows: Record<string, unknown>[], columns: string[]): s
       const v = row[c]
       if (v === null || v === undefined)
         return ''
-      const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
+      const s = typeof v === 'object'
+        ? JSON.stringify(v)
+        : String(v)
       return escape(s)
     }).join(','),
   )
@@ -24,7 +26,9 @@ export function rowsToCsv(rows: Record<string, unknown>[], columns: string[]): s
 }
 
 export function computeTotalPages(totalCount: number, rowsPerPage: number): number {
-  return totalCount > 0 ? Math.ceil(totalCount / rowsPerPage) : 1
+  return totalCount > 0
+    ? Math.ceil(totalCount / rowsPerPage)
+    : 1
 }
 
 export function computeOffset(page: number, rowsPerPage: number): number {

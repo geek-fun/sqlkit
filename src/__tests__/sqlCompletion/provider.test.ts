@@ -10,16 +10,26 @@ import { SchemaMetadataService } from '@/composables/sqlCompletion/metadata'
 import { createProvider, emptySnapshot, SQL_DIALECT_IDS } from '@/composables/sqlCompletion/provider'
 
 const fakeStore: StoreMetadata = {
-  databases: [{ name: 'app', is_system: false }],
-  schemas: { app: ['public'] },
+  databases: [
+    { name: 'app', is_system: false },
+  ],
+  schemas: {
+    app: ['public'],
+  },
   tables: {
-    'app': [{ name: 'users', schema: 'public' }],
-    'app.public': [{ name: 'users', schema: 'public' }],
+    'app': [
+      { name: 'users', schema: 'public' },
+    ],
+    'app.public': [
+      { name: 'users', schema: 'public' },
+    ],
   },
 }
 
 function makeService() {
-  return new SchemaMetadataService({ getMetadata: () => fakeStore })
+  return new SchemaMetadataService({
+    getMetadata: () => fakeStore,
+  })
 }
 
 const deps = {
@@ -57,7 +67,9 @@ function makeFakeMonaco() {
     languages: {
       registerCompletionItemProvider: jest.fn((language: string, provider: unknown) => {
         registered.push({ language, provider })
-        return { dispose: jest.fn() }
+        return {
+          dispose: jest.fn(),
+        }
       }),
       CompletionItemKind: {
         Keyword: 0,
@@ -117,17 +129,24 @@ describe('completion provider', () => {
 
   it('(c) after alias dot → column suggestions with kind Field', () => {
     const fake = makeFakeMonaco()
-    const svc = new SchemaMetadataService({ getMetadata: () => fakeStore })
+    const svc = new SchemaMetadataService({
+      getMetadata: () => fakeStore,
+    })
     const localProvider = createProvider(fake as never, { ...deps, metadataService: svc })
     localProvider.register()
     const model = makeModel('SELECT u. FROM users u')
     localProvider.setContext(model as never, { connectionId: 'c1', database: 'app', schema: 'public' })
     const snapshot: SchemaSnapshot = {
-      databases: [{ name: 'app', isSystem: false }],
+      databases: [
+        { name: 'app', isSystem: false },
+      ],
       schemasByDb: {},
       tablesByKey: {},
       columnsByTable: {
-        'c1|app|public|users': [{ name: 'id', dataType: 'int4' }, { name: 'email', dataType: 'text' }],
+        'c1|app|public|users': [
+          { name: 'id', dataType: 'int4' },
+          { name: 'email', dataType: 'text' },
+        ],
       },
       derivedTables: {},
       hasSchemaData: true,

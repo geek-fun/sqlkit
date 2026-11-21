@@ -82,8 +82,12 @@ const navigableItems = computed(() => {
     = filteredOptions.value
       .filter((opt: ComboboxOption) => !opt.disabled)
       .map((opt: ComboboxOption) => ({ type: 'option' as const, value: opt.value }))
-  if (showCreateNew.value)
-    items.push({ type: 'create', value: searchQuery.value.trim() })
+  if (showCreateNew.value) {
+    items.push({
+      type: 'create',
+      value: searchQuery.value.trim(),
+    })
+  }
   return items
 })
 
@@ -93,7 +97,9 @@ const activeDescendantId = computed(() => {
   const item = navigableItems.value[highlightedIndex.value]
   if (!item)
     return undefined
-  return item.type === 'create' ? `${listboxId}-create` : `${listboxId}-opt-${item.value}`
+  return item.type === 'create'
+    ? `${listboxId}-create`
+    : `${listboxId}-opt-${item.value}`
 })
 
 function selectOption(value: string) {
@@ -133,12 +139,16 @@ async function handleKeydown(e: KeyboardEvent) {
 
   if (e.key === 'ArrowDown') {
     e.preventDefault()
-    highlightedIndex.value = count === 0 ? -1 : (highlightedIndex.value + 1) % count
+    highlightedIndex.value = count === 0
+      ? -1
+      : (highlightedIndex.value + 1) % count
     scrollHighlightedIntoView()
   }
   else if (e.key === 'ArrowUp') {
     e.preventDefault()
-    highlightedIndex.value = count === 0 ? -1 : (highlightedIndex.value - 1 + count) % count
+    highlightedIndex.value = count === 0
+      ? -1
+      : (highlightedIndex.value - 1 + count) % count
     scrollHighlightedIntoView()
   }
   else if (e.key === 'Enter') {

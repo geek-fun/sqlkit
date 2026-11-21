@@ -38,7 +38,10 @@ async function handleBrowse() {
   const selected = await open({
     multiple: false,
     filters: [
-      { name: 'Import File', extensions: ['csv', 'jsonl', 'sql', 'xlsx'] },
+      {
+        name: 'Import File',
+        extensions: ['csv', 'jsonl', 'sql', 'xlsx'],
+      },
     ],
   })
   if (selected) {

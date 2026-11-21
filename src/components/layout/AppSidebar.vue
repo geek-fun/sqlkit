@@ -7,11 +7,36 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 const route = useRoute()
 
 const menuItems = [
-  { id: 'connections', label: 'Connections', icon: 'dns', path: '/connections' },
-  { id: 'queries', label: 'Queries', icon: 'code', path: '/queries' },
-  { id: 'data-studio', label: 'Data Studio', icon: 'smart_toy', path: '/data-studio' },
-  { id: 'history', label: 'History', icon: 'history', path: '/history' },
-  { id: 'github', label: 'GitHub', icon: 'github', path: '' },
+  {
+    id: 'connections',
+    label: 'Connections',
+    icon: 'dns',
+    path: '/connections',
+  },
+  {
+    id: 'queries',
+    label: 'Queries',
+    icon: 'code',
+    path: '/queries',
+  },
+  {
+    id: 'data-studio',
+    label: 'Data Studio',
+    icon: 'smart_toy',
+    path: '/data-studio',
+  },
+  {
+    id: 'history',
+    label: 'History',
+    icon: 'history',
+    path: '/history',
+  },
+  {
+    id: 'github',
+    label: 'GitHub',
+    icon: 'github',
+    path: '',
+  },
 ]
 
 const isActive = (path: string) => route.path === path

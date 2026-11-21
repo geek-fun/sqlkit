@@ -46,9 +46,18 @@ const { t } = useI18n()
 const searchQuery = ref('')
 
 const typeConfig: Record<ListingType, { icon: string, label: string }> = {
-  VIEW: { icon: '👁', label: t('components.listingTab.views') },
-  PROCEDURE: { icon: '⚙', label: t('components.listingTab.procedures') },
-  FUNCTION: { icon: '⚙', label: t('components.listingTab.functions') },
+  VIEW: {
+    icon: '👁',
+    label: t('components.listingTab.views'),
+  },
+  PROCEDURE: {
+    icon: '⚙',
+    label: t('components.listingTab.procedures'),
+  },
+  FUNCTION: {
+    icon: '⚙',
+    label: t('components.listingTab.functions'),
+  },
 }
 
 const filteredObjects = computed(() => {

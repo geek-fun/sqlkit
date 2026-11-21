@@ -14,11 +14,15 @@ type SidePanel = 'none' | 'ai' | 'tasks'
 const sidePanel = ref<SidePanel>('none')
 
 function toggleAi() {
-  sidePanel.value = sidePanel.value === 'ai' ? 'none' : 'ai'
+  sidePanel.value = sidePanel.value === 'ai'
+    ? 'none'
+    : 'ai'
 }
 
 function toggleTaskManager() {
-  sidePanel.value = sidePanel.value === 'tasks' ? 'none' : 'tasks'
+  sidePanel.value = sidePanel.value === 'tasks'
+    ? 'none'
+    : 'tasks'
 }
 </script>
 

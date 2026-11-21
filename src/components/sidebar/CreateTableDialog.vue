@@ -63,7 +63,14 @@ const MYSQL_COMPAT = new Set<DatabaseType>([
   DatabaseType.CLOUDSQLMYSQL,
 ])
 
-const MYSQL_ENGINES = ['InnoDB', 'MyISAM', 'MEMORY', 'CSV', 'ARCHIVE', 'BLACKHOLE']
+const MYSQL_ENGINES = [
+  'InnoDB',
+  'MyISAM',
+  'MEMORY',
+  'CSV',
+  'ARCHIVE',
+  'BLACKHOLE',
+]
 
 const isMySQL = computed(() => props.databaseType && MYSQL_COMPAT.has(props.databaseType))
 
@@ -115,7 +122,16 @@ watch(() => props.open, (open) => {
 function addColumn() {
   columns.value = [
     ...columns.value,
-    { id: nextColId++, name: '', type: 'VARCHAR', length: '255', nullable: true, defaultValue: '', autoIncrement: false, primaryKey: false },
+    {
+      id: nextColId++,
+      name: '',
+      type: 'VARCHAR',
+      length: '255',
+      nullable: true,
+      defaultValue: '',
+      autoIncrement: false,
+      primaryKey: false,
+    },
   ]
 }
 
@@ -139,15 +155,23 @@ const ddlPreview = computed(() => {
     return ''
 
   const name = tableName.value.trim()
-  const schemaPrefix = props.schema ? `${props.schema}.` : ''
+  const schemaPrefix = props.schema
+    ? `${props.schema}.`
+    : ''
   const fullName = `${schemaPrefix}${name}`
 
   const colLines = columns.value
     .filter(c => c.name.trim())
     .map((c) => {
       let colDef = `  ${c.name.trim()} ${c.type}`
-      if (c.length && ['VARCHAR', 'CHAR', 'DECIMAL', 'NUMERIC'].includes(c.type))
+      if (c.length && [
+        'VARCHAR',
+        'CHAR',
+        'DECIMAL',
+        'NUMERIC',
+      ].includes(c.type)) {
         colDef += `(${c.length})`
+      }
       if (c.autoIncrement && ['INTEGER', 'BIGINT', 'SMALLINT'].includes(c.type))
         colDef += ' GENERATED ALWAYS AS IDENTITY'
       if (!c.nullable)

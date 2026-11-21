@@ -192,7 +192,7 @@ const someSelected = computed(() => selectionCount.value > 0 && selectionCount.v
             </tr>
           </thead>
         </table>
-        <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border flex-1 overflow-y-auto">
+        <div class="flex-1 overflow-y-auto scrollbar-thumb-border scrollbar-track-transparent scrollbar-thin">
           <table class="text-xs w-full">
             <tbody>
               <tr

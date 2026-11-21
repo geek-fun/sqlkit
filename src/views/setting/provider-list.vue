@@ -24,7 +24,9 @@ const testResult = ref<{ id: string, success: boolean } | null>(null)
 const syncingId = ref<string | null>(null)
 
 function toggleExpand(id: string) {
-  expandedProvider.value = expandedProvider.value === id ? null : id
+  expandedProvider.value = expandedProvider.value === id
+    ? null
+    : id
 }
 
 function handleToggleEnabled(id: string) {

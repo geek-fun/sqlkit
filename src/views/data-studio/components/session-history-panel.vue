@@ -35,7 +35,9 @@ function sessionLabel(session: AgentSession): string {
     return sourceLabel
   const firstUser = session.messages.find(m => m.role === 'user')
   if (firstUser?.content) {
-    return firstUser.content.length > 40 ? `${firstUser.content.slice(0, 40)}…` : firstUser.content
+    return firstUser.content.length > 40
+      ? `${firstUser.content.slice(0, 40)}…`
+      : firstUser.content
   }
   return session.title || t('dataStudio.history.newSession')
 }

@@ -21,7 +21,14 @@ async function selectFile(type: 'ca' | 'client' | 'key') {
     filters: [
       {
         name: 'Certificate',
-        extensions: ['pem', 'crt', 'cer', 'key', 'p12', 'pfx'],
+        extensions: [
+          'pem',
+          'crt',
+          'cer',
+          'key',
+          'p12',
+          'pfx',
+        ],
       },
     ],
   })

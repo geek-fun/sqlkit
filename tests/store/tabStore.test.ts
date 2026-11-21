@@ -436,7 +436,9 @@ describe('tabStore', () => {
     it('should execute query and store results', async () => {
       const mockResult = {
         columns: ['id', 'name'],
-        rows: [{ id: 1, name: 'Test' }],
+        rows: [
+          { id: 1, name: 'Test' },
+        ],
         rowCount: 1,
       }
       invoke.mockResolvedValue({
@@ -495,7 +497,10 @@ describe('tabStore', () => {
     })
 
     it('should use provided SQL instead of tab content', async () => {
-      invoke.mockResolvedValue({ status: 'success', data: { columns: [], rows: [], rowCount: 0 } })
+      invoke.mockResolvedValue({
+        status: 'success',
+        data: { columns: [], rows: [], rowCount: 0 },
+      })
 
       const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
@@ -510,7 +515,10 @@ describe('tabStore', () => {
     })
 
     it('should clear previous error before execution', async () => {
-      invoke.mockResolvedValue({ status: 'success', data: { columns: [], rows: [], rowCount: 0 } })
+      invoke.mockResolvedValue({
+        status: 'success',
+        data: { columns: [], rows: [], rowCount: 0 },
+      })
 
       const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')
@@ -524,7 +532,10 @@ describe('tabStore', () => {
     })
 
     it('passes database to execute_query', async () => {
-      invoke.mockResolvedValue({ status: 'success', data: { columns: [], rows: [], rowCount: 0 } })
+      invoke.mockResolvedValue({
+        status: 'success',
+        data: { columns: [], rows: [], rowCount: 0 },
+      })
 
       const store = useTabStore()
       ;(crypto.randomUUID as jest.Mock).mockReturnValue('tab-1')

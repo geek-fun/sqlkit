@@ -165,7 +165,9 @@ async function initAgentRuntime(): Promise<void> {
         id: tool_call_id,
         toolName: tool_name,
         args: JSON.stringify(args ?? {}),
-        status: denied ? 'denied' : needsConfirmation ? 'pending' : 'executing',
+        status: denied
+          ? 'denied'
+          : needsConfirmation ? 'pending' : 'executing',
         riskLevel,
         requiresConfirmation: needsConfirmation,
       }
@@ -285,7 +287,12 @@ async function initAgentRuntime(): Promise<void> {
   unlisteners.push(
     await agentApi.onAgentLoopStopped(({ session_id, reason, message }) => {
       const store = useDataStudioStore()
-      const normalized = (['iteration_cap', 'wall_clock_budget', 'token_budget', 'llm_error'].includes(reason)
+      const normalized = ([
+        'iteration_cap',
+        'wall_clock_budget',
+        'token_budget',
+        'llm_error',
+      ].includes(reason)
         ? reason
         : 'iteration_cap') as AgentSessionStopReason
       store.setSessionStopped(session_id, normalized, message)

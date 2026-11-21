@@ -294,7 +294,9 @@ export function formatServerVersion(version: string): string {
     return `V${versionMatch[1]}`
   }
 
-  return version.length > 20 ? `${version.slice(0, 20)}...` : version
+  return version.length > 20
+    ? `${version.slice(0, 20)}...`
+    : version
 }
 
 export function isJdbcDatabase(type: DatabaseType): boolean {
@@ -430,11 +432,15 @@ type ConnectionStoreState = {
 }
 
 function safeBool(value: unknown, fallback: boolean): boolean {
-  return typeof value === 'boolean' ? value : fallback
+  return typeof value === 'boolean'
+    ? value
+    : fallback
 }
 
 function safeStr(value: unknown, fallback: string): string {
-  return typeof value === 'string' ? value : fallback
+  return typeof value === 'string'
+    ? value
+    : fallback
 }
 
 function safePort(value: unknown): number {
@@ -442,7 +448,9 @@ function safePort(value: unknown): number {
     return value
   if (typeof value === 'string') {
     const parsed = Number.parseInt(value, 10)
-    return Number.isNaN(parsed) ? 22 : parsed
+    return Number.isNaN(parsed)
+      ? 22
+      : parsed
   }
   return 22
 }
@@ -487,7 +495,9 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     else if (authMethod.method === 'privateKey') {
       method = 'privateKey'
       privateKey = safeStr(authMethod.private_key_path, '')
-      passphrase = typeof authMethod.passphrase === 'string' ? authMethod.passphrase : undefined
+      passphrase = typeof authMethod.passphrase === 'string'
+        ? authMethod.passphrase
+        : undefined
     }
   }
 
@@ -559,16 +569,18 @@ export function buildTransportLayers(sshTunnel?: SSHTunnelConfig): import('@/dat
       break
   }
 
-  return [{
-    type: 'ssh',
-    host: sshTunnel.host,
-    port: sshTunnel.port,
-    username: sshTunnel.username,
-    auth_method: authMethod,
-    enabled: true,
-    connect_timeout_secs: 10,
-    keepalive_interval_secs: 30,
-  }]
+  return [
+    {
+      type: 'ssh',
+      host: sshTunnel.host,
+      port: sshTunnel.port,
+      username: sshTunnel.username,
+      auth_method: authMethod,
+      enabled: true,
+      connect_timeout_secs: 10,
+      keepalive_interval_secs: 30,
+    },
+  ]
 }
 
 export const useConnectionStore = defineStore('connectionStore', {
@@ -623,7 +635,10 @@ export const useConnectionStore = defineStore('connectionStore', {
         const result = await connectionApi.list()
         // The backend doesn't track runtime connection state, so we preserve
         // `isConnected` from the existing store entries.
-        const existing = new Map(this.connections.map(c => [c.id, { isConnected: c.isConnected, serverVersion: c.serverVersion }]))
+        const existing = new Map(this.connections.map(c => [
+          c.id,
+          { isConnected: c.isConnected, serverVersion: c.serverVersion },
+        ]))
         this.connections = result.map((item: Record<string, unknown>) => {
           const id = item.id as string
           const prev = existing.get(id)
@@ -646,7 +661,9 @@ export const useConnectionStore = defineStore('connectionStore', {
             sshTunnel: extractSshTunnelFromTransport(item.transport_layers),
             oracleOptions: extractOracleOptions(item.oracle_options),
             isConnected: prev?.isConnected ?? (item.is_connected as boolean | undefined),
-            lastUsed: item.last_used ? new Date(item.last_used as string) : undefined,
+            lastUsed: item.last_used
+              ? new Date(item.last_used as string)
+              : undefined,
             serverVersion: prev?.serverVersion,
           }
         })
@@ -693,7 +710,12 @@ export const useConnectionStore = defineStore('connectionStore', {
       }
       catch (error) {
         console.error('Failed to save connection:', error)
-        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' }
+        return {
+          success: false,
+          message: error instanceof Error
+            ? error.message
+            : 'Unknown error',
+        }
       }
     },
 

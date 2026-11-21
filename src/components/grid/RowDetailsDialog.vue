@@ -27,13 +27,19 @@ function formatValue(v: unknown, type?: string): string {
     return ''
   if (isJsonType(type)) {
     try {
-      return JSON.stringify(typeof v === 'string' ? JSON.parse(v) : v, null, 2)
+      return JSON.stringify(typeof v === 'string'
+        ? JSON.parse(v)
+        : v, null, 2)
     }
     catch {
-      return typeof v === 'object' ? JSON.stringify(v) : String(v)
+      return typeof v === 'object'
+        ? JSON.stringify(v)
+        : String(v)
     }
   }
-  return typeof v === 'object' ? JSON.stringify(v) : String(v)
+  return typeof v === 'object'
+    ? JSON.stringify(v)
+    : String(v)
 }
 
 const isNull = (v: unknown): boolean => v === null || v === undefined

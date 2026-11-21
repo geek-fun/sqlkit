@@ -19,7 +19,9 @@ const dl = useDownloadEvents()
 
 function getDriverIcon(dbType: string): string {
   const dbTypeEnum = dbTypeFromBackend[dbType]
-  return dbTypeEnum ? getDatabaseIcon(dbTypeEnum) : ''
+  return dbTypeEnum
+    ? getDatabaseIcon(dbTypeEnum)
+    : ''
 }
 
 // --- State ---
@@ -64,8 +66,11 @@ function formatFileSize(bytes: number): string {
 
 function updateSortedDrivers() {
   sortedDrivers.value = [...drivers.value].sort((a, b) => {
-    if (a.installed !== b.installed)
-      return a.installed ? -1 : 1
+    if (a.installed !== b.installed) {
+      return a.installed
+        ? -1
+        : 1
+    }
     return a.name.localeCompare(b.name)
   })
 }
@@ -118,7 +123,9 @@ async function handleCheckJreUpdates() {
   }
   catch (error) {
     toast.error(t('pages.settings.jre.jreCard.notifications.checkUpdatesFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
@@ -152,7 +159,9 @@ async function handleRemoveJre() {
   }
   catch (error) {
     toast.error(t('pages.settings.jre.jreCard.notifications.removeFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
@@ -198,7 +207,9 @@ async function handleRemoveBridge() {
   }
   catch (error) {
     toast.error(t('pages.settings.jre.bridgeCard.notifications.removeFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
@@ -246,7 +257,9 @@ async function handleRemoveDriver(dbType: string) {
   }
   catch (error) {
     toast.error(t('pages.settings.jre.driversCard.notifications.removeFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
@@ -270,7 +283,9 @@ async function handleCheckDriverUpdates(dbType: string) {
   }
   catch (error) {
     toast.error(t('pages.settings.jre.driversCard.notifications.checkUpdatesFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {

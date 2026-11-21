@@ -45,7 +45,12 @@ function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
     const v2 = promptFilterValue(t('components.dataGrid.filter.between'))
     if (v2 === null)
       return
-    emit('filter', { column: props.column, operator, value: v1, value2: v2 })
+    emit('filter', {
+      column: props.column,
+      operator,
+      value: v1,
+      value2: v2,
+    })
   }
   else {
     const v = promptFilterValue(t('components.dataGrid.filter.byValue'))

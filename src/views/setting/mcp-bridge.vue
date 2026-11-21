@@ -47,9 +47,18 @@ const permissionModes: { value: McpPermissionMode, labelKey: string }[] = [
 ]
 
 const actionOptions = computed(() => [
-  { value: 'read' as const, label: t('pages.settings.mcp.actionRead') },
-  { value: 'write' as const, label: t('pages.settings.mcp.actionWrite') },
-  { value: 'delete' as const, label: t('pages.settings.mcp.actionDelete') },
+  {
+    value: 'read' as const,
+    label: t('pages.settings.mcp.actionRead'),
+  },
+  {
+    value: 'write' as const,
+    label: t('pages.settings.mcp.actionWrite'),
+  },
+  {
+    value: 'delete' as const,
+    label: t('pages.settings.mcp.actionDelete'),
+  },
 ])
 
 const connections = computed(() => connectionStore.connections)
@@ -125,7 +134,12 @@ function buildPolicy(): McpPolicy {
     connection_overrides: Object.fromEntries(
       Object.entries(connectionOverrides.value).map(([k, v]) => [
         k,
-        { read_only: v.read_only, ...(v.allowed_actions ? { allowed_actions: v.allowed_actions } : {}) },
+        {
+          read_only: v.read_only,
+          ...(v.allowed_actions
+            ? { allowed_actions: v.allowed_actions }
+            : {}),
+        },
       ]),
     ),
   }
@@ -134,7 +148,9 @@ function buildPolicy(): McpPolicy {
 async function savePolicy() {
   try {
     // Policy-only save: hot-swaps into the running bridge without a restart.
-    await invoke('save_mcp_policy', { policy: buildPolicy() })
+    await invoke('save_mcp_policy', {
+      policy: buildPolicy(),
+    })
   }
   catch (e) {
     console.error(t('pages.settings.mcp.saveFailed'), e)
@@ -155,7 +171,9 @@ onMounted(async () => {
 
 function onPortChange(val: string | number) {
   const num = Number(val)
-  portValue.value = Number.isInteger(num) && num > 0 ? num : undefined
+  portValue.value = Number.isInteger(num) && num > 0
+    ? num
+    : undefined
 }
 
 async function onAutoStartChange(val: boolean) {
@@ -243,7 +261,9 @@ function connectionActions(id: string): McpAction[] {
 
 async function onActionToggle(id: string, action: McpAction) {
   const current = connectionActions(id)
-  const next = current.includes(action) ? current.filter(a => a !== action) : [...current, action]
+  const next = current.includes(action)
+    ? current.filter(a => a !== action)
+    : [...current, action]
   const nextOverrides = { ...connectionOverrides.value }
   if (next.length === 3) {
     delete nextOverrides[id]

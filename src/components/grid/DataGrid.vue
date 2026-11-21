@@ -367,8 +367,11 @@ function formatNumber(v: unknown, type?: string): string {
   if (isNullValue(v))
     return ''
   const num = Number(v)
-  if (Number.isNaN(num))
-    return typeof v === 'object' ? JSON.stringify(v) : String(v)
+  if (Number.isNaN(num)) {
+    return typeof v === 'object'
+      ? JSON.stringify(v)
+      : String(v)
+  }
   const t = (type ?? '').toUpperCase()
   if (/^(?:INT|BIGINT|SMALLINT|TINYINT|SERIAL|BIGSERIAL)/.test(t)) {
     return new Intl.NumberFormat().format(num)
@@ -380,8 +383,11 @@ function formatDateTime(v: unknown, type?: string): string {
   if (isNullValue(v))
     return ''
   const date = new Date(v as string | number)
-  if (Number.isNaN(date.getTime()))
-    return typeof v === 'object' ? JSON.stringify(v) : String(v)
+  if (Number.isNaN(date.getTime())) {
+    return typeof v === 'object'
+      ? JSON.stringify(v)
+      : String(v)
+  }
   const t = (type ?? '').toUpperCase()
   if (t === 'DATE') {
     return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(date)
@@ -392,14 +398,22 @@ function formatDateTime(v: unknown, type?: string): string {
 function jsonPreview(v: unknown): string {
   if (isNullValue(v))
     return ''
-  const s = typeof v === 'string' ? v : JSON.stringify(v)
-  return s.length > 60 ? `${s.slice(0, 60)}…` : s
+  const s = typeof v === 'string'
+    ? v
+    : JSON.stringify(v)
+  return s.length > 60
+    ? `${s.slice(0, 60)}…`
+    : s
 }
 
 function formatBlobSize(v: unknown): string {
   if (isNullValue(v))
     return ''
-  const s = typeof v === 'string' ? v.length / 2 : (typeof v === 'object' ? JSON.stringify(v) : String(v)).length
+  const s = typeof v === 'string'
+    ? v.length / 2
+    : (typeof v === 'object'
+        ? JSON.stringify(v)
+        : String(v)).length
   if (s < 1024)
     return `[BLOB ${s.toFixed(0)} B]`
   return `[BLOB ${(s / 1024).toFixed(1)} KB]`
@@ -420,7 +434,9 @@ function getCellClass(type?: string): string {
 function getCellTooltip(v: unknown): string {
   if (isNullValue(v))
     return ''
-  return typeof v === 'object' ? JSON.stringify(v) : String(v)
+  return typeof v === 'object'
+    ? JSON.stringify(v)
+    : String(v)
 }
 
 function formatCellText(v: unknown): string {
@@ -446,7 +462,11 @@ const statusText = computed(() => {
     return ''
   const start = 1
   const end = props.rows.length
-  return t('components.dataGrid.status.showing', { start, end, total: props.rowCount.toLocaleString() })
+  return t('components.dataGrid.status.showing', {
+    start,
+    end,
+    total: props.rowCount.toLocaleString(),
+  })
 })
 
 const formattedTime = computed(() => {

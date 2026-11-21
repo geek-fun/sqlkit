@@ -34,9 +34,18 @@ onMounted(async () => {
 const currentTheme = computed(() => appStore.themeType)
 
 const themeOptions = [
-  { value: ThemeType.AUTO, label: () => t('pages.settings.appearance.themes.system') },
-  { value: ThemeType.DARK, label: () => t('pages.settings.appearance.themes.dark') },
-  { value: ThemeType.LIGHT, label: () => t('pages.settings.appearance.themes.light') },
+  {
+    value: ThemeType.AUTO,
+    label: () => t('pages.settings.appearance.themes.system'),
+  },
+  {
+    value: ThemeType.DARK,
+    label: () => t('pages.settings.appearance.themes.dark'),
+  },
+  {
+    value: ThemeType.LIGHT,
+    label: () => t('pages.settings.appearance.themes.light'),
+  },
 ]
 
 const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)

@@ -41,7 +41,15 @@ const NONE: DbCapabilities = {
 
 const PG_COMPAT: DbCapabilities = { ...ALL, backup: false }
 
-const MYSQL_COMPAT: DbCapabilities = { ...ALL, schemas: false, materializedViews: false, backup: false, newSchema: false, newDatabase: true, dropDatabase: true }
+const MYSQL_COMPAT: DbCapabilities = {
+  ...ALL,
+  schemas: false,
+  materializedViews: false,
+  backup: false,
+  newSchema: false,
+  newDatabase: true,
+  dropDatabase: true,
+}
 
 const SQLITE_LIKE: DbCapabilities = { ...NONE, views: true, export: true }
 
@@ -84,7 +92,12 @@ const CAPABILITY_MAP: Partial<Record<DatabaseType, DbCapabilities>> = {
   [DatabaseType.CLOUDSQLMYSQL]: MYSQL_COMPAT,
 
   [DatabaseType.SQLITE]: SQLITE_LIKE,
-  [DatabaseType.DUCKDB]: { ...NONE, views: true, export: true, materializedViews: true },
+  [DatabaseType.DUCKDB]: {
+    ...NONE,
+    views: true,
+    export: true,
+    materializedViews: true,
+  },
   [DatabaseType.RQLITE]: SQLITE_LIKE,
   [DatabaseType.TURSO]: SQLITE_LIKE,
 
@@ -95,22 +108,62 @@ const CAPABILITY_MAP: Partial<Record<DatabaseType, DbCapabilities>> = {
   [DatabaseType.XUGUDB]: { ...ALL, materializedViews: false },
   [DatabaseType.GBASE8A]: { ...ALL, materializedViews: false },
 
-  [DatabaseType.CLICKHOUSE]: { ...ALL, procedures: false, functions: false, materializedViews: true, schemas: false, newSchema: false },
+  [DatabaseType.CLICKHOUSE]: {
+    ...ALL,
+    procedures: false,
+    functions: false,
+    materializedViews: true,
+    schemas: false,
+    newSchema: false,
+  },
   [DatabaseType.DB2]: { ...ALL, materializedViews: false },
   [DatabaseType.H2]: { ...ALL, materializedViews: false },
   [DatabaseType.SNOWFLAKE]: ALL,
-  [DatabaseType.TRINO]: { ...ALL, newDatabase: false, newSchema: false, dropDatabase: false, procedures: false },
-  [DatabaseType.PRESTO]: { ...ALL, newDatabase: false, newSchema: false, dropDatabase: false, procedures: false },
+  [DatabaseType.TRINO]: {
+    ...ALL,
+    newDatabase: false,
+    newSchema: false,
+    dropDatabase: false,
+    procedures: false,
+  },
+  [DatabaseType.PRESTO]: {
+    ...ALL,
+    newDatabase: false,
+    newSchema: false,
+    dropDatabase: false,
+    procedures: false,
+  },
   [DatabaseType.DERBY]: { ...ALL, materializedViews: false },
-  [DatabaseType.HIVE]: { ...ALL, newSchema: false, procedures: false, functions: false },
-  [DatabaseType.DATABRICKS]: { ...ALL, newDatabase: false, newSchema: false, dropDatabase: false, procedures: false },
+  [DatabaseType.HIVE]: {
+    ...ALL,
+    newSchema: false,
+    procedures: false,
+    functions: false,
+  },
+  [DatabaseType.DATABRICKS]: {
+    ...ALL,
+    newDatabase: false,
+    newSchema: false,
+    dropDatabase: false,
+    procedures: false,
+  },
   [DatabaseType.HANA]: { ...ALL, materializedViews: false },
   [DatabaseType.TERADATA]: { ...ALL, materializedViews: false },
   [DatabaseType.VERTICA]: ALL,
   [DatabaseType.EXASOL]: { ...ALL, materializedViews: false },
-  [DatabaseType.BIGQUERY]: { ...ALL, newDatabase: false, dropDatabase: false, materializedViews: true },
+  [DatabaseType.BIGQUERY]: {
+    ...ALL,
+    newDatabase: false,
+    dropDatabase: false,
+    materializedViews: true,
+  },
   [DatabaseType.INFORMIX]: { ...ALL, materializedViews: false },
-  [DatabaseType.KYLIN]: { ...ALL, newDatabase: false, newSchema: false, dropDatabase: false },
+  [DatabaseType.KYLIN]: {
+    ...ALL,
+    newDatabase: false,
+    newSchema: false,
+    dropDatabase: false,
+  },
   [DatabaseType.CASSANDRA]: { ...NONE, export: true, views: false },
   [DatabaseType.IRIS]: { ...ALL, materializedViews: false },
   [DatabaseType.ACCESS]: { ...NONE, export: true, views: true },

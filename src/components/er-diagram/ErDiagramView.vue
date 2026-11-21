@@ -90,7 +90,12 @@ const dragNodeStart = ref({ x: 0, y: 0 })
 
 // ─── Drag to pan ────────────────────────────────
 const isPanning = ref(false)
-const panStart = ref({ mouseX: 0, mouseY: 0, scrollLeft: 0, scrollTop: 0 })
+const panStart = ref({
+  mouseX: 0,
+  mouseY: 0,
+  scrollLeft: 0,
+  scrollTop: 0,
+})
 
 function onViewportMouseDown(e: MouseEvent) {
   // Only left-click triggers pan
@@ -138,7 +143,9 @@ const localSchema = ref<string>(props.schema ?? '__all__')
 const supportsSchemas = computed(() => availableSchemas.value.length > 0)
 
 const schemaParam = computed(() =>
-  localSchema.value === '__all__' ? null : localSchema.value,
+  localSchema.value === '__all__'
+    ? null
+    : localSchema.value,
 )
 
 watch(() => props.schema, (val) => {
@@ -363,7 +370,9 @@ async function fetchSchemaData() {
     computeLayout()
   }
   catch (err) {
-    error.value = `Failed to load ER diagram: ${err instanceof Error ? err.message : String(err)}`
+    error.value = `Failed to load ER diagram: ${err instanceof Error
+      ? err.message
+      : String(err)}`
     console.error('Failed to fetch ER diagram data:', err)
   }
   finally {
@@ -384,7 +393,9 @@ watch(localSchema, () => {
 // ─── Interaction Handlers ─────────────────────────────
 function selectTable(tableName: string) {
   selectedTableId.value
-    = selectedTableId.value === tableName ? null : tableName
+    = selectedTableId.value === tableName
+      ? null
+      : tableName
 }
 
 function deselectAll() {

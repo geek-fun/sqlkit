@@ -11,7 +11,9 @@ export function useTheme() {
   let handleChange: (() => void) | null = null
 
   const getSystemTheme = (): 'dark' | 'light' =>
-    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    window.matchMedia('(prefers-color-scheme: dark)').matches
+      ? 'dark'
+      : 'light'
 
   const applyTheme = (newTheme: Theme) => {
     const root = document.documentElement

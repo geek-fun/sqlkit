@@ -119,7 +119,9 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
       return
     }
 
-    const errorMessage = err instanceof Error ? err.message : String(err)
+    const errorMessage = err instanceof Error
+      ? err.message
+      : String(err)
     connectingModal.value?.showError(errorMessage)
   }
 }
@@ -193,7 +195,9 @@ async function handleDisconnect(connection: ServerConnection) {
     await connectionStore.disconnect(connection.id)
   }
   catch (error) {
-    connectError.value = error instanceof Error ? error.message : String(error)
+    connectError.value = error instanceof Error
+      ? error.message
+      : String(error)
   }
 }
 

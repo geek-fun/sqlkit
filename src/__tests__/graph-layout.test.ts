@@ -37,7 +37,9 @@ describe('computeCanvasSize', () => {
       A: { x: 110, y: 80 },
       B: { x: 410, y: 160 },
     }
-    const getHeight = (name: string) => name === 'A' ? 100 : 100
+    const getHeight = (name: string) => name === 'A'
+      ? 100
+      : 100
     const result = computeCanvasSize(positions, 220, getHeight, 80)
 
     // A right edge = 110 + 110 + 80 = 300

@@ -186,7 +186,9 @@ function buildSystemPrompt({ schema, sources, permissionsMode }: {
           permParts.push('delete')
       }
 
-      const permStr = permParts.length > 0 ? ` (permissions: ${permParts.join(', ')})` : ''
+      const permStr = permParts.length > 0
+        ? ` (permissions: ${permParts.join(', ')})`
+        : ''
       parts.push(`- ${source.connectionId}: ${dbType}${permStr}`)
     }
 
@@ -279,7 +281,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
   const error = computed(
     () =>
       localError.value
-      ?? (activeSession.value ? dataStudioStore.getSessionError(activeSession.value.id) : undefined),
+      ?? (activeSession.value
+        ? dataStudioStore.getSessionError(activeSession.value.id)
+        : undefined),
   )
   const lastSettings = ref<Record<string, unknown> | null>(null)
 
@@ -335,8 +339,18 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const connectionConfig = contextSnapshot?.connections
         ? Object.fromEntries(
             Object.entries(contextSnapshot.connections).flatMap(([alias, conn]) => {
-              const entry = { connectionId: String(conn.connectionId), dbType: conn.dbType, permissions: conn.permissions }
-              return [[String(conn.connectionId), entry], [alias, entry]]
+              const entry = {
+                connectionId: String(conn.connectionId),
+                dbType: conn.dbType,
+                permissions: conn.permissions,
+              }
+              return [
+                [
+                  String(conn.connectionId),
+                  entry,
+                ],
+                [alias, entry],
+              ]
             }),
           )
         : {}
@@ -397,7 +411,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
       }
     }
     catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      const message = err instanceof Error
+        ? err.message
+        : String(err)
       localError.value = message
       config.sessionStore.setSessionStatus(sessionId, 'error')
     }
@@ -454,7 +470,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
         await appStore.getFeatureModelConfig(config.feature)
       }
       catch (err) {
-        localError.value = err instanceof Error ? err.message : String(err)
+        localError.value = err instanceof Error
+          ? err.message
+          : String(err)
         return
       }
 
@@ -481,7 +499,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
       await runAgentLoop(sessionId, options.content, schemaContext, context ?? { connections: {} })
     }
     catch (err) {
-      localError.value = err instanceof Error ? err.message : String(err)
+      localError.value = err instanceof Error
+        ? err.message
+        : String(err)
       console.error('[useChatAgent] sendMessage error:', err)
     }
   }

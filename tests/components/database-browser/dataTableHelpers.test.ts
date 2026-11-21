@@ -94,7 +94,12 @@ describe('dataTableHelpers', () => {
     })
 
     it('handles object values by JSON-stringifying them', () => {
-      const objRows = [{ id: 1, data: { key: 'val' } }]
+      const objRows = [
+        {
+          id: 1,
+          data: { key: 'val' },
+        },
+      ]
       const csv = rowsToCsv(objRows, ['id', 'data'])
       const lines = csv.split('\n')
       expect(lines[1]).toBe('"1","{""key"":""val""}"')

@@ -15,7 +15,9 @@ export function useDataGridSort() {
         // Cycle ASC → DESC → remove
         if (existing.direction === 'ASC') {
           sortState.value = current.map(s =>
-            s.column === column ? { ...s, direction: 'DESC' as SortDirection } : s,
+            s.column === column
+              ? { ...s, direction: 'DESC' as SortDirection }
+              : s,
           )
         }
         else {
@@ -23,21 +25,28 @@ export function useDataGridSort() {
         }
       }
       else {
-        sortState.value = [...current, { column, direction: 'ASC' }]
+        sortState.value = [
+          ...current,
+          { column, direction: 'ASC' },
+        ]
       }
     }
     else {
       // Single-column sort
       if (existing) {
         if (existing.direction === 'ASC') {
-          sortState.value = [{ column, direction: 'DESC' }]
+          sortState.value = [
+            { column, direction: 'DESC' },
+          ]
         }
         else {
           sortState.value = []
         }
       }
       else {
-        sortState.value = [{ column, direction: 'ASC' }]
+        sortState.value = [
+          { column, direction: 'ASC' },
+        ]
       }
     }
   }
@@ -60,7 +69,9 @@ export function useDataGridSort() {
 
   const getSortPriority = (column: string): number | null => {
     const idx = sortState.value.findIndex(s => s.column === column)
-    return idx >= 0 ? idx + 1 : null
+    return idx >= 0
+      ? idx + 1
+      : null
   }
 
   const hasActiveSort = computed(() => sortState.value.length > 0)

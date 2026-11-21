@@ -72,7 +72,9 @@ const sourceSummary = computed(() => {
     case 'server':
       return 'All databases on this server'
     case 'database':
-      return database.value ? `All tables in ${database.value}` : 'Select a database'
+      return database.value
+        ? `All tables in ${database.value}`
+        : 'Select a database'
     case 'tables':
     default:
       return selectedTables.value.length > 0
@@ -92,13 +94,18 @@ const formatOptions: { value: ExportFormat, label: string, icon: string }[] = [
 // Browse output file or directory
 async function handleBrowse() {
   if (scope.value === 'tables') {
-    const extension = selectedFormat.value === 'excel' ? 'xlsx' : selectedFormat.value
+    const extension = selectedFormat.value === 'excel'
+      ? 'xlsx'
+      : selectedFormat.value
     const selected = await open({
       multiple: false,
       directory: false,
       save: true,
       filters: [
-        { name: 'Export File', extensions: [extension] },
+        {
+          name: 'Export File',
+          extensions: [extension],
+        },
       ],
     })
     if (selected) {
@@ -198,7 +205,9 @@ async function startExport() {
     transferStore.completeOperation(result)
   }
   catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = err instanceof Error
+      ? err.message
+      : String(err)
     const errorResult: TransferResult = {
       success: false,
       totalRows: 0,
@@ -206,7 +215,9 @@ async function startExport() {
       skippedRows: 0,
       errorCount: 1,
       durationMs: 0,
-      errors: [{ message }],
+      errors: [
+        { message },
+      ],
     }
     transferStore.completeOperation(errorResult)
   }

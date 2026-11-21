@@ -96,7 +96,9 @@ async function handleConnectionSelect(connId: string) {
     }
     catch (error) {
       toast.error(t('transfer.connection.connectFailed'), {
-        description: error instanceof Error ? error.message : String(error),
+        description: error instanceof Error
+          ? error.message
+          : String(error),
       })
       isConnecting.value = false
       return
@@ -127,7 +129,9 @@ async function fetchDatabases(connId: string) {
   }
   catch (error) {
     toast.error(t('transfer.connection.databasesFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
@@ -151,7 +155,9 @@ async function fetchSchemas(connId: string, db: string) {
   }
   catch (error) {
     toast.error(t('transfer.connection.schemasFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
