@@ -485,6 +485,9 @@ fn extract_select_items(items: &[SelectItem]) -> Vec<(String, usize)> {
             let name = match item {
                 SelectItem::UnnamedExpr(expr) => expr_to_name(expr),
                 SelectItem::ExprWithAlias { alias, .. } => alias.value.clone(),
+                SelectItem::ExprWithAliases { aliases, .. } => {
+                    aliases.first().map(|alias| alias.value.clone()).unwrap_or_default()
+                }
                 SelectItem::QualifiedWildcard(kind, _) => match kind {
                     SelectItemQualifiedWildcardKind::ObjectName(obj) => obj.to_string() + ".*",
                     SelectItemQualifiedWildcardKind::Expr(e) => format!("({}).*", expr_to_name(e)),

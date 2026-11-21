@@ -118,13 +118,7 @@ fn classify_statement(stmt: &Statement) -> SqlKind {
         | Statement::Comment { .. }
         | Statement::LockTables { .. }
         | Statement::UnlockTables { .. }
-        | Statement::SetVariable { .. }
-        | Statement::SetNames { .. }
-        | Statement::SetNamesDefault { .. }
-        | Statement::SetRole { .. }
-        | Statement::SetSessionParam(_)
-        | Statement::SetTimeZone { .. }
-        | Statement::SetTransaction { .. }
+        | Statement::Set(_)
         | Statement::Commit { .. }
         | Statement::Rollback { .. }
         | Statement::Savepoint { .. }

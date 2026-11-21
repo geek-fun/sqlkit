@@ -517,8 +517,7 @@ async fn import_target<A: crate::database::DatabaseAdapter>(
 
             let range = workbook
                 .worksheet_range(&sheet_name)
-                .ok_or_else(|| format!("Sheet '{}' not found", sheet_name))?
-                .map_err(|e| format!("Failed to read sheet '{}': {:?}", sheet_name, e))?;
+                .map_err(|_| format!("Sheet '{}' not found", sheet_name))?;
 
             let has_header = target
                 .excel_options
@@ -532,7 +531,7 @@ async fn import_target<A: crate::database::DatabaseAdapter>(
                     .next()
                     .map(|row| {
                         row.iter()
-                            .map(|c: &calamine::DataType| c.to_string())
+                            .map(|c| c.to_string())
                             .collect()
                     })
                     .unwrap_or_default()
@@ -562,7 +561,7 @@ async fn import_target<A: crate::database::DatabaseAdapter>(
                         } else {
                             Some(
                                 row.get(col_idx)
-                                    .map(|c: &calamine::DataType| c.to_string())
+                                    .map(|c| c.to_string())
                                     .unwrap_or_default(),
                             )
                         }
@@ -790,14 +789,13 @@ pub fn detect_file(file_path: &str) -> Result<FileDetectionResult, String> {
                 .map_err(|e| format!("Failed to open Excel file for detection: {}", e))?;
             let range = workbook
                 .worksheet_range("Sheet1")
-                .ok_or("Sheet 'Sheet1' not found")?
-                .map_err(|e| format!("Failed to read sheet: {:?}", e))?;
+                .map_err(|_| "Sheet 'Sheet1' not found")?;
             let cols = range
                 .rows()
                 .next()
                 .map(|row| {
                     row.iter()
-                        .map(|c: &calamine::DataType| c.to_string())
+                        .map(|c| c.to_string())
                         .collect()
                 })
                 .unwrap_or_default();
@@ -943,8 +941,7 @@ pub fn preview_import(
             let sheet_name = "Sheet1";
             let range = workbook
                 .worksheet_range(sheet_name)
-                .ok_or_else(|| format!("Sheet '{}' not found", sheet_name))?
-                .map_err(|e| format!("Failed to read sheet: {:?}", e))?;
+                .map_err(|_| format!("Sheet '{}' not found", sheet_name))?;
 
             let has_header = true;
 
@@ -954,7 +951,7 @@ pub fn preview_import(
                     .next()
                     .map(|row| {
                         row.iter()
-                            .map(|c: &calamine::DataType| c.to_string())
+                            .map(|c| c.to_string())
                             .collect()
                     })
                     .unwrap_or_default();
@@ -969,7 +966,7 @@ pub fn preview_import(
                 }
                 let row_values: Vec<String> = row
                     .iter()
-                    .map(|cell: &calamine::DataType| cell.to_string())
+                    .map(|cell| cell.to_string())
                     .collect();
                 sample_rows.push(row_values);
             }
