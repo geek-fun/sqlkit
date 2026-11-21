@@ -43,7 +43,9 @@ impl client::Handler for SshClient {
         if !self.verify_host_key {
             return Ok(true);
         }
-        let fingerprint = server_public_key.fingerprint(russh::keys::HashAlg::Sha256).to_string();
+        let fingerprint = server_public_key
+            .fingerprint(russh::keys::HashAlg::Sha256)
+            .to_string();
         match crate::ssh::known_hosts::verify_or_pin(&self.host, self.port, &fingerprint) {
             Ok(()) => Ok(true),
             Err(e) => {
