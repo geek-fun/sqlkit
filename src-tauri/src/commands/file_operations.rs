@@ -314,6 +314,215 @@ pub async fn save_query_metadata(
     write_saved_queries_metadata(app_handle, updated).await
 }
 
+/// Storage format detected from a database file header.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DatabaseFileFormat {
+    /// DuckDB native format (`DUCK` magic at byte offset 8).
+    Duckdb,
+    /// SQLite format 3 header.
+    Sqlite,
+    /// A file exists but its header matches no known database format.
+    Unknown,
+}
+
+/// Probe result for a file-based database path (SQLite / SQLCipher / DuckDB).
+///
+/// Used by the connection form to explain what will happen on connect: a
+/// missing file is created by the engine, an existing file is opened, and an
+/// existing file of a different format is a likely mistake.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DatabaseFileProbe {
+    /// Tilde-expanded path that was probed.
+    pub path: String,
+    /// Whether the path exists.
+    pub exists: bool,
+    /// Whether the path is a directory (never a valid database file).
+    pub is_directory: bool,
+    /// Size in bytes for regular files.
+    pub size_bytes: Option<u64>,
+    /// Whether the parent directory exists (engines create the file, not the parent).
+    pub parent_exists: bool,
+    /// Whether a probe file could be created and removed in the parent directory.
+    pub parent_writable: bool,
+    /// Whether connects can write: existing file writable, or parent directory writable.
+    pub writable: bool,
+    /// Detected storage format of an existing regular file.
+    pub format: Option<DatabaseFileFormat>,
+    /// DuckDB storage-format version read from the file header (bytes 12..20).
+    ///
+    /// Determines the oldest DuckDB release that can open the file, which is the
+    /// first thing to check when a file "suddenly cannot be opened".
+    pub storage_version: Option<u64>,
+    /// Whether a sibling `<file>.wal` write-ahead log is present.
+    pub has_wal: bool,
+}
+
+const DUCKDB_MAGIC_OFFSET: u64 = 8;
+const DUCKDB_STORAGE_VERSION_OFFSET: usize = 12;
+const DUCKDB_MAGIC: &[u8; 4] = b"DUCK";
+const SQLITE_MAGIC: &[u8; 16] = b"SQLite format 3\0";
+
+/// Detected storage layout of an existing database file.
+struct DatabaseFileHeader {
+    format: DatabaseFileFormat,
+    storage_version: Option<u64>,
+}
+
+/// Read the header of an existing database file: format plus, for DuckDB, the
+/// storage-format version (little-endian `u64` at byte offset 12).
+fn read_database_header(path: &Path) -> DatabaseFileHeader {
+    use std::io::Read;
+
+    let unknown = DatabaseFileHeader {
+        format: DatabaseFileFormat::Unknown,
+        storage_version: None,
+    };
+
+    let Ok(mut file) = fs::File::open(path) else {
+        return unknown;
+    };
+
+    let mut header = Vec::new();
+    if file
+        .by_ref()
+        .take((DUCKDB_STORAGE_VERSION_OFFSET + 8) as u64)
+        .read_to_end(&mut header)
+        .is_err()
+    {
+        return unknown;
+    }
+    if header.len() >= SQLITE_MAGIC.len() && &header[..SQLITE_MAGIC.len()] == SQLITE_MAGIC {
+        return DatabaseFileHeader {
+            format: DatabaseFileFormat::Sqlite,
+            storage_version: None,
+        };
+    }
+
+    let magic_end = DUCKDB_MAGIC_OFFSET as usize + DUCKDB_MAGIC.len();
+    if header.len() >= magic_end && &header[DUCKDB_MAGIC_OFFSET as usize..magic_end] == DUCKDB_MAGIC
+    {
+        let storage_version = header
+            .get(DUCKDB_STORAGE_VERSION_OFFSET..DUCKDB_STORAGE_VERSION_OFFSET + 8)
+            .map(|bytes| {
+                let mut buffer = [0u8; 8];
+                buffer.copy_from_slice(bytes);
+                u64::from_le_bytes(buffer)
+            });
+        return DatabaseFileHeader {
+            format: DatabaseFileFormat::Duckdb,
+            storage_version,
+        };
+    }
+
+    unknown
+}
+
+/// Path of the DuckDB write-ahead log that sits next to a database file.
+fn write_ahead_log_path(path: &Path) -> PathBuf {
+    let mut name = path.as_os_str().to_os_string();
+    name.push(".wal");
+    PathBuf::from(name)
+}
+
+/// Whether an existing file can be opened for writing.
+fn is_file_writable(path: &Path) -> bool {
+    fs::OpenOptions::new().write(true).open(path).is_ok()
+}
+
+/// Whether a file can be created inside `dir`, verified with a temporary probe file.
+fn is_directory_writable(dir: &Path) -> bool {
+    if !dir.is_dir() {
+        return false;
+    }
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos())
+        .unwrap_or_default();
+    let probe = dir.join(format!(
+        ".sqlkit-write-probe-{}-{}",
+        std::process::id(),
+        nanos
+    ));
+    match fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&probe)
+    {
+        Ok(_) => {
+            let _ = fs::remove_file(&probe);
+            true
+        }
+        Err(_) => false,
+    }
+}
+
+/// Inspect a file-based database path without creating or modifying it.
+#[tauri::command]
+pub fn probe_database_file(path: String) -> DatabaseFileProbe {
+    let expanded = crate::database::config::expand_tilde(&path);
+    let target = Path::new(&expanded);
+    let metadata = fs::metadata(target).ok();
+
+    let exists = metadata.is_some();
+    let is_directory = metadata.as_ref().map(|m| m.is_dir()).unwrap_or(false);
+    let size_bytes = metadata.as_ref().filter(|m| m.is_file()).map(|m| m.len());
+
+    let parent = match target.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+        _ => PathBuf::from("."),
+    };
+    let parent_exists = parent.is_dir();
+    let parent_writable = parent_exists && is_directory_writable(&parent);
+
+    let writable = if exists {
+        !is_directory && is_file_writable(target)
+    } else {
+        parent_writable
+    };
+    let header = if exists && !is_directory {
+        Some(read_database_header(target))
+    } else {
+        None
+    };
+    let format = header.as_ref().map(|h| h.format);
+    let storage_version = header.as_ref().and_then(|h| h.storage_version);
+    let has_wal = write_ahead_log_path(target).is_file();
+
+    DatabaseFileProbe {
+        path: expanded,
+        exists,
+        is_directory,
+        size_bytes,
+        parent_exists,
+        parent_writable,
+        writable,
+        format,
+        storage_version,
+        has_wal,
+    }
+}
+
+/// Create the parent directory of a database file, then re-probe the path.
+///
+/// Engines create a missing database file on connect, but not the directories
+/// leading to it, so the form offers this as an explicit repair action.
+#[tauri::command]
+pub fn create_database_directory(path: String) -> Result<DatabaseFileProbe, String> {
+    let expanded = crate::database::config::expand_tilde(&path);
+    let target = Path::new(&expanded);
+    let parent = match target.parent() {
+        Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
+        _ => return Err("The path has no parent directory".to_string()),
+    };
+
+    fs::create_dir_all(&parent)
+        .map_err(|e| format!("Failed to create {}: {}", parent.display(), e))?;
+
+    Ok(probe_database_file(expanded))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420,5 +629,122 @@ mod tests {
 
         let content = std::fs::read_to_string(&metadata_path).unwrap();
         let _: SavedQueriesMetadata = serde_json::from_str(&content).unwrap();
+    }
+
+    #[test]
+    fn probe_missing_file_reports_creatable_in_existing_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("new.duckdb");
+
+        let probe = probe_database_file(target.to_string_lossy().to_string());
+
+        assert!(!probe.exists);
+        assert!(!probe.is_directory);
+        assert!(probe.size_bytes.is_none());
+        assert!(probe.parent_exists);
+        assert!(probe.parent_writable);
+        assert!(probe.writable);
+        assert!(probe.format.is_none());
+    }
+
+    #[test]
+    fn probe_missing_file_reports_missing_parent() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("nested").join("new.duckdb");
+
+        let probe = probe_database_file(target.to_string_lossy().to_string());
+
+        assert!(!probe.exists);
+        assert!(!probe.parent_exists);
+        assert!(!probe.parent_writable);
+        assert!(!probe.writable);
+    }
+
+    #[test]
+    fn probe_detects_duckdb_header_and_storage_version() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("analytics.duckdb");
+        let mut bytes = vec![0u8; 8];
+        bytes.extend_from_slice(DUCKDB_MAGIC);
+        // Storage version 64, the value duckdb_jdbc 1.5.6 writes for a plain file.
+        bytes.extend_from_slice(&64u64.to_le_bytes());
+        std::fs::write(&target, &bytes).unwrap();
+
+        let probe = probe_database_file(target.to_string_lossy().to_string());
+
+        assert!(probe.exists);
+        assert_eq!(probe.format, Some(DatabaseFileFormat::Duckdb));
+        assert_eq!(probe.storage_version, Some(64));
+        assert!(!probe.has_wal);
+        assert_eq!(probe.size_bytes, Some(bytes.len() as u64));
+        assert!(probe.writable);
+        assert!(probe.parent_exists);
+    }
+
+    #[test]
+    fn probe_reports_a_sibling_write_ahead_log() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("analytics.duckdb");
+        let mut bytes = vec![0u8; 8];
+        bytes.extend_from_slice(DUCKDB_MAGIC);
+        bytes.extend_from_slice(&64u64.to_le_bytes());
+        std::fs::write(&target, &bytes).unwrap();
+        std::fs::write(write_ahead_log_path(&target), b"wal").unwrap();
+
+        let probe = probe_database_file(target.to_string_lossy().to_string());
+
+        assert!(probe.has_wal);
+    }
+
+    #[test]
+    fn probe_reads_no_storage_version_from_sqlite_files() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("legacy.db");
+        let mut bytes = SQLITE_MAGIC.to_vec();
+        bytes.extend_from_slice(&[0u8; 64]);
+        std::fs::write(&target, &bytes).unwrap();
+
+        let probe = probe_database_file(target.to_string_lossy().to_string());
+
+        assert_eq!(probe.format, Some(DatabaseFileFormat::Sqlite));
+        assert_eq!(probe.storage_version, None);
+    }
+
+    #[test]
+    fn probe_detects_sqlite_header() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("legacy.db");
+        let mut bytes = SQLITE_MAGIC.to_vec();
+        bytes.extend_from_slice(&[0u8; 64]);
+        std::fs::write(&target, &bytes).unwrap();
+
+        let probe = probe_database_file(target.to_string_lossy().to_string());
+
+        assert_eq!(probe.format, Some(DatabaseFileFormat::Sqlite));
+    }
+
+    #[test]
+    fn probe_flags_unknown_format() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("notes.txt");
+        std::fs::write(&target, b"definitely not a database").unwrap();
+
+        let probe = probe_database_file(target.to_string_lossy().to_string());
+
+        assert_eq!(probe.format, Some(DatabaseFileFormat::Unknown));
+    }
+
+    #[test]
+    fn probe_rejects_directories() {
+        let dir = tempfile::tempdir().unwrap();
+        let target = dir.path().join("folder");
+        std::fs::create_dir(&target).unwrap();
+
+        let probe = probe_database_file(target.to_string_lossy().to_string());
+
+        assert!(probe.exists);
+        assert!(probe.is_directory);
+        assert!(!probe.writable);
+        assert!(probe.format.is_none());
     }
 }

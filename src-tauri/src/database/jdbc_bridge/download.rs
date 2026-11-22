@@ -6,11 +6,14 @@
 //! JDBC driver JARs can be downloaded directly from Maven Central
 //! (fallback if the Java bridge resolution is unavailable).
 
+use super::registry::DatabaseDriverConfig;
 use crate::database::error::{DbError, DbResult};
 use crate::download::DownloadKind;
 use futures::StreamExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
+use std::time::Duration;
 
 const APP_VERSION: &str = env!("APP_VERSION");
 
@@ -30,6 +33,9 @@ fn bridge_dir() -> PathBuf {
 
 /// Get the path to the current version's bridge JAR (`~/.sqlkit/jdbc-bridge/jdbc-bridge-{ver}.jar`).
 pub fn bridge_jar_path() -> PathBuf {
+    if let Some(path) = std::env::var_os("SQLKIT_JDBC_BRIDGE_JAR") {
+        return PathBuf::from(path);
+    }
     bridge_dir().join(format!(
         "{}{}{}",
         BRIDGE_JAR_PREFIX, APP_VERSION, BRIDGE_JAR_SUFFIX
@@ -39,6 +45,93 @@ pub fn bridge_jar_path() -> PathBuf {
 /// Check if the current version's bridge JAR is installed.
 pub fn is_bridge_installed() -> bool {
     bridge_jar_path().exists()
+}
+
+/// Upper bound for Maven metadata requests. Without one, a stalled endpoint
+/// keeps `test_connection` spinning with no way out.
+const METADATA_TIMEOUT: Duration = Duration::from_secs(20);
+
+/// Shared HTTP client with a bounded connection setup.
+///
+/// `reqwest::get` builds a client without any timeout, so a network that accepts
+/// the TCP connection but never answers used to hang bridge setup forever.
+fn http_client() -> &'static reqwest::Client {
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| {
+        reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(15))
+            .build()
+            .unwrap_or_default()
+    })
+}
+
+/// Directory holding the cached driver JARs of one Maven artifact.
+pub fn driver_cache_dir(artifact: &str) -> PathBuf {
+    bridge_dir().join("drivers").join(artifact)
+}
+
+/// A driver JAR smaller than this is a metadata/stub shell, not a usable
+/// driver. Maven "latest" can resolve to a version whose published JAR is a
+/// class-less shell (observed: `ojdbc11-23.26.3.0.0.jar`, ~6 KB) — accepting
+/// such stubs poisons the cache and breaks class loading with bare
+/// `Driver class not found` errors.
+const MIN_DRIVER_JAR_BYTES: u64 = 64 * 1024;
+
+fn is_plausible_driver_jar(path: &Path) -> bool {
+    path.is_file()
+        && std::fs::metadata(path)
+            .map(|m| m.len() >= MIN_DRIVER_JAR_BYTES)
+            .unwrap_or(false)
+}
+
+/// Newest `.jar` inside `dir`, ignoring anything that is not a regular file
+/// or fails the shell-JAR plausibility check.
+fn newest_jar_in(dir: &Path) -> Option<PathBuf> {
+    std::fs::read_dir(dir)
+        .ok()?
+        .flatten()
+        .filter(|entry| entry.path().is_file())
+        .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "jar"))
+        .filter(|entry| is_plausible_driver_jar(&entry.path()))
+        .filter_map(|entry| {
+            let modified = entry.metadata().ok()?.modified().ok()?;
+            Some((modified, entry.path()))
+        })
+        .max_by_key(|(modified, _)| *modified)
+        .map(|(_, path)| path)
+}
+
+/// Newest cached driver JAR for a Maven artifact, if one was downloaded before.
+pub fn newest_cached_driver_jar(artifact: &str) -> Option<PathBuf> {
+    newest_jar_in(&driver_cache_dir(artifact))
+}
+
+/// Delete a pinned cache JAR that fails the plausibility gate. The Java
+/// resolver skips downloading when the destination file already exists, so a
+/// truncated/shell JAR landing at the pinned filename would wedge the driver
+/// forever — evict it and let the next resolve re-download.
+pub fn evict_implausible_pinned_jar(config: &DatabaseDriverConfig) {
+    if let Some(cap) = &config.version_cap {
+        let pinned = driver_cache_dir(&config.maven_artifact)
+            .join(format!("{}-{}.jar", config.maven_artifact, cap));
+        if pinned.is_file() && !is_plausible_driver_jar(&pinned) {
+            let _ = std::fs::remove_file(&pinned);
+        }
+    }
+}
+
+/// Cached JAR to use for a driver config without touching the network.
+///
+/// A registry `version_cap` pins the exact file to use; uncapped artifacts
+/// (DuckDB, for example) take the newest JAR already in the cache, which is what
+/// the explicit "update driver" action would replace.
+pub fn cached_driver_jar(config: &DatabaseDriverConfig) -> Option<PathBuf> {
+    if let Some(cap) = &config.version_cap {
+        let pinned = driver_cache_dir(&config.maven_artifact)
+            .join(format!("{}-{}.jar", config.maven_artifact, cap));
+        return is_plausible_driver_jar(&pinned).then_some(pinned);
+    }
+    newest_cached_driver_jar(&config.maven_artifact)
 }
 
 /// Download a file from URL to a temporary path, then atomically rename to final.
@@ -51,7 +144,9 @@ pub async fn download_to_path(
     expected_size_hint: u64,
 ) -> DbResult<()> {
     let tmp_path = dest.with_extension("tmp");
-    let response = reqwest::get(url)
+    let response = http_client()
+        .get(url)
+        .send()
         .await
         .map_err(|e| DbError::Connection(format!("Failed to download from {}: {}", url, e)))?;
     if !response.status().is_success() {
@@ -216,15 +311,27 @@ pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
         DbError::Connection(format!("No driver registry entry for '{}'", db_type))
     })?;
 
-    let dest_dir = super::jre::home_dir()
-        .join(".sqlkit")
-        .join("jdbc-bridge")
-        .join("drivers")
-        .join(&config.maven_artifact);
+    let dest_dir = driver_cache_dir(&config.maven_artifact);
 
-    // Drivers with a direct download URL (non-Maven, e.g. GBase 8a)
+    // Anything already cached is good enough for the pre-flight check — resolving
+    // LATEST over the network is what made every DuckDB "Test connection" pay a
+    // Maven round trip even though the JAR was on disk. Use the explicit driver
+    // update action to move to a newer version.
+    if cached_driver_jar(config).is_some() {
+        return Ok(());
+    }
+
+    // Drivers with a direct download URL (non-Maven, e.g. GBase 8a or the
+    // Cassandra wrapper bundle). Name the cached file the way the Java
+    // resolver does (`{artifact}-{version}.jar`, version = cap ?? "1.0.0") so
+    // the pre-flight download satisfies both the pinned-cache lookup and the
+    // bridge's own ResolveDriver short-circuit instead of re-downloading.
     if let Some(download_url) = &config.download_url {
-        let jar_name = config.maven_artifact.clone() + ".jar";
+        let version = config
+            .version_cap
+            .clone()
+            .unwrap_or_else(|| "1.0.0".to_string());
+        let jar_name = format!("{}-{}.jar", config.maven_artifact, version);
         let dest = dest_dir.join(&jar_name);
         if dest.exists() {
             return Ok(());
@@ -248,7 +355,10 @@ pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
             "https://repo1.maven.org/maven2/{}/{}/maven-metadata.xml",
             group_path, config.maven_artifact
         );
-        let resp = reqwest::get(&metadata_url)
+        let resp = http_client()
+            .get(&metadata_url)
+            .timeout(METADATA_TIMEOUT)
+            .send()
             .await
             .map_err(|e| DbError::Connection(format!("Failed to fetch Maven metadata: {}", e)))?;
         if !resp.status().is_success() {
@@ -334,4 +444,70 @@ async fn cleanup_old_bridge_versions() -> DbResult<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod driver_cache_tests {
+    #[test]
+    fn newest_jar_in_skips_shell_jars() {
+        let tmp = std::env::temp_dir().join(format!(
+            "sqlkit-jar-test-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        ));
+        std::fs::create_dir_all(&tmp).unwrap();
+        // shell JAR (older mtime, tiny size)
+        std::fs::write(tmp.join("a-1.0.0.jar"), vec![0u8; 6836]).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        // plausible JAR (newer mtime, real size)
+        let good = tmp.join("a-1.0.1.jar");
+        std::fs::write(&good, vec![0u8; 70_000]).unwrap();
+
+        assert_eq!(newest_jar_in(&tmp).unwrap(), good);
+        std::fs::remove_dir_all(&tmp).unwrap();
+    }
+
+    use super::*;
+
+    fn write_jar(dir: &Path, name: &str, modified: std::time::SystemTime) {
+        std::fs::create_dir_all(dir).unwrap();
+        let path = dir.join(name);
+        // Plausible driver size (≥ MIN_DRIVER_JAR_BYTES) so the test JARs
+        // pass the shell-JAR filter like real downloads do.
+        std::fs::write(&path, vec![0u8; 70_000]).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(modified)
+            .unwrap();
+    }
+
+    #[test]
+    fn newest_jar_in_picks_the_latest_jar_only() {
+        let dir = tempfile::tempdir().unwrap();
+        let now = std::time::SystemTime::now();
+        write_jar(
+            dir.path(),
+            "duckdb_jdbc-1.4.0.0.jar",
+            now - Duration::from_secs(600),
+        );
+        write_jar(dir.path(), "duckdb_jdbc-1.5.6.0.jar", now);
+        write_jar(dir.path(), "unrelated.zip", now + Duration::from_secs(600));
+
+        let newest = newest_jar_in(dir.path()).expect("cached jar");
+        assert_eq!(
+            newest.file_name().unwrap().to_string_lossy(),
+            "duckdb_jdbc-1.5.6.0.jar"
+        );
+    }
+
+    #[test]
+    fn newest_jar_in_returns_none_for_empty_or_missing_dirs() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(newest_jar_in(dir.path()).is_none());
+        assert!(newest_jar_in(&dir.path().join("missing")).is_none());
+    }
 }

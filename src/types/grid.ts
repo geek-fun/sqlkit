@@ -43,14 +43,6 @@ export type CopyFormat = 'csv' | 'json' | 'insert'
 
 export type ColumnTypeMap = Record<string, string>
 
-// ── Grid Component Events ──
-
-export type DataGridEmits = {
-  (e: 'sortChange', state: SortColumn[]): void
-  (e: 'filterChange', state: ColumnFilter[]): void
-  (e: 'refresh'): void
-}
-
 // ── Filter Bar ──
 
 export type FilterBarEmits = {

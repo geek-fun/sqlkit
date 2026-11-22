@@ -13,6 +13,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg?logo=apache)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/geek-fun/sqlkit?logo=github)](https://github.com/geek-fun/sqlkit/stargazers)
 [![CI](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml/badge.svg)](https://github.com/geek-fun/sqlkit/actions/workflows/node.yml)
+[![MCP Toplist](https://mcptoplist.com/badge/io.github.geek-fun%2Fdata-studio.svg)](https://mcptoplist.com/server/io.github.geek-fun%2Fdata-studio)
 
 <p>
   <img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white" alt="macOS"/>
@@ -64,6 +65,52 @@ SqlKit 是一个 **Agentic 数据库客户端** —— 它不仅执行 SQL，还
   <img src="https://img.shields.io/badge/Hive-FDEE21?logo=apachehive&logoColor=black" alt="Hive" />
   <img src="https://img.shields.io/badge/Databricks-FF3621?logo=databricks&logoColor=white" alt="Databricks" />
   <img src="https://img.shields.io/badge/BigQuery-669DF6?logo=googlebigquery&logoColor=white" alt="BigQuery" />
+  <br/>
+  <img src="https://img.shields.io/badge/SQLCipher-003B57?logoColor=white" alt="SQLCipher" />
+  <img src="https://img.shields.io/badge/YugabyteDB-FF6E42?logoColor=white" alt="YugabyteDB" />
+  <img src="https://img.shields.io/badge/QuestDB-FF4B64?logoColor=white" alt="QuestDB" />
+  <img src="https://img.shields.io/badge/Greenplum-43B02A?logoColor=white" alt="Greenplum" />
+  <img src="https://img.shields.io/badge/EnterpriseDB-003B71?logoColor=white" alt="EnterpriseDB" />
+  <img src="https://img.shields.io/badge/CrateDB-009DC7?logoColor=white" alt="CrateDB" />
+  <img src="https://img.shields.io/badge/Materialize-7B61FF?logoColor=white" alt="Materialize" />
+  <img src="https://img.shields.io/badge/AlloyDB-4285F4?logo=googlecloud&logoColor=white" alt="AlloyDB" />
+  <br/>
+  <img src="https://img.shields.io/badge/SelectDB-22C1C3?logoColor=white" alt="SelectDB" />
+  <img src="https://img.shields.io/badge/Databend-5B47F5?logoColor=white" alt="Databend" />
+  <img src="https://img.shields.io/badge/SingleStore-AA00FF?logo=singlestore&logoColor=white" alt="SingleStore" />
+  <img src="https://img.shields.io/badge/Manticore%20Search-E94B35?logoColor=white" alt="Manticore Search" />
+  <img src="https://img.shields.io/badge/TDSQL-0052D9?logoColor=white" alt="TDSQL" />
+  <img src="https://img.shields.io/badge/PolarDB-FF6A00?logoColor=white" alt="PolarDB" />
+  <img src="https://img.shields.io/badge/GoldenDB-C69214?logoColor=white" alt="GoldenDB" />
+  <img src="https://img.shields.io/badge/TDengine-2F6FFF?logoColor=white" alt="TDengine" />
+  <br/>
+  <img src="https://img.shields.io/badge/Dameng-3857FF?logoColor=white" alt="Dameng" />
+  <img src="https://img.shields.io/badge/GaussDB-E60012?logoColor=white" alt="GaussDB" />
+  <img src="https://img.shields.io/badge/KingbaseES-003B8E?logoColor=white" alt="KingbaseES" />
+  <img src="https://img.shields.io/badge/HighGo-005BAC?logoColor=white" alt="HighGo" />
+  <img src="https://img.shields.io/badge/UXDB-0052CC?logoColor=white" alt="UXDB" />
+  <img src="https://img.shields.io/badge/Vastbase-0052CC?logoColor=white" alt="Vastbase" />
+  <img src="https://img.shields.io/badge/YashanDB-0052CC?logoColor=white" alt="YashanDB" />
+  <img src="https://img.shields.io/badge/XuguDB-0052CC?logoColor=white" alt="XuguDB" />
+  <br/>
+  <img src="https://img.shields.io/badge/GBase%208a-0052CC?logoColor=white" alt="GBase 8a" />
+  <img src="https://img.shields.io/badge/GBase%208c-0052CC?logoColor=white" alt="GBase 8c" />
+  <img src="https://img.shields.io/badge/SAP%20HANA-0FAAFF?logo=sap&logoColor=white" alt="SAP HANA" />
+  <img src="https://img.shields.io/badge/Vertica-005A9C?logoColor=white" alt="Vertica" />
+  <img src="https://img.shields.io/badge/Exasol-005F71?logoColor=white" alt="Exasol" />
+  <img src="https://img.shields.io/badge/Informix-052FAD?logoColor=white" alt="Informix" />
+  <img src="https://img.shields.io/badge/InterSystems%20IRIS-00A5A8?logoColor=white" alt="InterSystems IRIS" />
+  <img src="https://img.shields.io/badge/Access-A4373A?logoColor=white" alt="Access" />
+  <br/>
+  <img src="https://img.shields.io/badge/Apache%20Derby-D22128?logoColor=white" alt="Apache Derby" />
+  <img src="https://img.shields.io/badge/Apache%20Kylin-F09D13?logoColor=white" alt="Apache Kylin" />
+  <img src="https://img.shields.io/badge/Cassandra-1287B1?logo=apachecassandra&logoColor=white" alt="Cassandra" />
+  <img src="https://img.shields.io/badge/Presto-5890FF?logo=presto&logoColor=white" alt="Presto" />
+  <img src="https://img.shields.io/badge/rqlite-007D9C?logoColor=white" alt="rqlite" />
+  <img src="https://img.shields.io/badge/Turso-4FF8D2?logo=turso&logoColor=black" alt="Turso" />
+  <img src="https://img.shields.io/badge/Cloud%20SQL%20for%20PostgreSQL-4285F4?logo=googlecloud&logoColor=white" alt="Cloud SQL for PostgreSQL" />
+  <img src="https://img.shields.io/badge/Cloud%20SQL%20for%20MySQL-4285F4?logo=googlecloud&logoColor=white" alt="Cloud SQL for MySQL" />
+  <img src="https://img.shields.io/badge/Fujitsu%20Enterprise%20Postgres-E60012?logoColor=white" alt="Fujitsu Enterprise Postgres" />
   <img src="https://img.shields.io/badge/and%20more...-555555?logoColor=white" alt="and more..." />
 </p>
 
@@ -202,7 +249,12 @@ npm run tauri dev
 
 <details>
 <summary><strong>SqlKit 是免费的吗？</strong></summary>
-是的。SqlKit 采用 Apache 2.0 许可证开源，所有功能免费使用。
+
+是的 —— **社区版**永久免费、基于 Apache 2.0 开源协议。连接、SQL 编辑、Schema 浏览、数据编辑、查询历史与结果集导出等核心功能全部免费，没有人为限制。
+
+进阶能力 —— AI 智能体（自带 LLM）、MCP 服务器、ER 图、批量导入导出与跨引擎数据传输 —— 属于付费的 **GEEKFUN Data Studio 旗舰版**订阅（$9.9/月 或 $99/年，7 天免费试用）。订阅期间发布的所有版本永久可用，取消订阅后依然归你。
+
+[了解定价详情 →](https://www.geekfun.club/zh/pricing)
 </details>
 
 <details>
@@ -233,19 +285,15 @@ PostgreSQL、MySQL、Oracle、SQL Server、SQLite、DuckDB、ClickHouse、Firebi
 ## 社区
 
 <p align="center">
-  <img src="https://www.geekfun.club/wechat-group.jpg" width="140" alt="微信群">
-  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
   <img src="docs/images/wechat_official.png" width="300" alt="微信公众号">
 </p>
 
 <p align="center">
-  <a href="https://discord.gg/5NSUyPK2E"><img src="https://img.shields.io/badge/Discord-加入-5865F2?logo=discord&logoColor=white" alt="Discord" /></a>
+  <a href="https://x.com/geekfun_club"><img src="https://img.shields.io/badge/X-关注-000000?logo=x&logoColor=white" alt="X-关注" /></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://x.com/geekfun_club"><img src="https://img.shields.io/badge/X-关注-000000?logo=x&logoColor=white" alt="X / Twitter" /></a>
+  <a href="https://www.youtube.com/@geekfun-club"><img src="https://img.shields.io/badge/YouTube-订阅-FF0000?logo=youtube&logoColor=white" alt="YouTube-订阅" /></a>
   &nbsp;&nbsp;&nbsp;
-  <a href="https://www.youtube.com/@geekfun-club"><img src="https://img.shields.io/badge/YouTube-订阅-FF0000?logo=youtube&logoColor=white" alt="YouTube" /></a>
-  &nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/geek-fun"><img src="https://img.shields.io/badge/GitHub-关注-181717?logo=github&logoColor=white" alt="GitHub" /></a>
+  <a href="https://github.com/geek-fun"><img src="https://img.shields.io/badge/GitHub-关注-181717?logo=github&logoColor=white" alt="GitHub-关注" /></a>
 </p>
 
 ## 赞助
@@ -253,18 +301,8 @@ PostgreSQL、MySQL、Oracle、SQL Server、SQLite、DuckDB、ClickHouse、Firebi
 <p align="center">
   <img src="docs/images/wechat_ponsor.jpg" width="140" alt="微信赞赏码">
   &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-  <a href="https://github.com/sponsors/geek-fun"><img src="https://img.shields.io/badge/GitHub_Sponsors-%E2%9D%A4_支持-EA4AAA?logo=githubsponsors&logoColor=white" alt="GitHub Sponsors" /></a>
+  <a href="https://github.com/sponsors/geek-fun"><img src="https://img.shields.io/badge/GitHub_Sponsors-%E2%9D%A4_支持-EA4AAA?logo=githubsponsors&logoColor=white" alt="GitHub_Sponsors-%E2%9D%A4_支持" /></a>
 </p>
-
-## Star 历史
-
-<a href="https://www.star-history.com/?repos=geek-fun%2Fsqlkit&type=date">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=geek-fun/sqlkit&type=date&theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=geek-fun/sqlkit&type=date" />
-    <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=geek-fun/sqlkit&type=date" />
-  </picture>
-</a>
 
 ## 许可证
 

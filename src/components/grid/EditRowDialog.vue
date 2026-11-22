@@ -234,8 +234,8 @@ function handleClose(open: boolean) {
           <div class="flex gap-2 items-center">
             <Label class="text-xs font-medium whitespace-nowrap">
               {{ col }}
-              <span v-if="primaryKeys.includes(col)" class="text-[10px] text-amber-500 ml-1">(PK)</span>
-              <span v-if="columnTypes[col]" class="text-[10px] text-muted-foreground font-mono ml-1">{{ columnTypes[col] }}</span>
+              <span v-if="primaryKeys.includes(col)" class="text-caption text-amber-500 ml-1">(PK)</span>
+              <span v-if="columnTypes[col]" class="text-caption text-muted-foreground font-mono ml-1">{{ columnTypes[col] }}</span>
             </Label>
             <div class="flex-1" />
             <!-- NULL toggle for non-PK columns -->
@@ -261,12 +261,12 @@ function handleClose(open: boolean) {
             :class="{ 'border-destructive': editErrors[col], 'opacity-60 bg-muted': primaryKeys.includes(col) }"
             @update:model-value="(v: string | number) => editForm[col] = { ...editForm[col], value: String(v), setNull: editForm[col]?.setNull ?? false }"
           />
-          <p v-if="editErrors[col]" class="text-xs text-destructive">
+          <p v-if="editErrors[col]" class="text-xs text-destructive-text">
             {{ editErrors[col] }}
           </p>
         </div>
 
-        <div v-if="saveError" class="text-sm text-destructive p-3 border border-destructive/30 rounded-md bg-destructive/10">
+        <div v-if="saveError" class="text-sm text-destructive-text p-3 border border-destructive/30 rounded-md bg-destructive/10">
           {{ saveError }}
         </div>
       </div>

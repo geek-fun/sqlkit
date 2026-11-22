@@ -23,11 +23,15 @@ export default antfu({
     '**/dist/**',
     '**/node_modules/**',
     '**/.tauri/**',
+    '.impeccable/hook.cache.json',
     'AGENTS.md',
     'docs/**',
     'src-tauri/gen/**',
   ],
   rules: {
+    // AGENTS.md prefers const-arrow declarations; the antfu preset's
+    // top-level-function rule enforces the opposite
+    'antfu/top-level-function': 'off',
     'no-console': 'warn',
     'unused-imports/no-unused-vars': 'warn',
     'style/eol-last': ['error', 'always'],

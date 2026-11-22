@@ -38,7 +38,11 @@ export type {
   SessionSource,
   SourcePermissionsMode,
 } from './dataStudioStore'
+export { useDeviceStore } from './deviceStore'
+export type { ActivatedResult, DeviceDto, DeviceLimitInfo } from './deviceStore'
+export { useEntitlementStore } from './entitlementStore'
+export type { PlanState } from './entitlementStore'
 export { useHistoryStore } from './historyStore'
 export type { HistoryEntry, HistoryEntryStatus } from './historyStore'
 export { useTabStore } from './tabStore'
-export type { ErDiagramMeta, QueryResult, QueryTab } from './tabStore'
+export type { ErDiagramMeta, QueryResult, QueryTab, TableViewMeta, TableViewSubPage } from './tabStore'

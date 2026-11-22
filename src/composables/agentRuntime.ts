@@ -148,7 +148,8 @@ async function initAgentRuntime(): Promise<void> {
   )
 
   unlisteners.push(
-    await agentApi.onAgentLoopToolCall(({ session_id, tool_call_id, tool_name, arguments: args }) => {
+    await agentApi.onAgentLoopToolCall(({ session_id, tool_call_id, tool_name, arguments: args, risk_level, confirmation_required }) => {
+      clearToolTimeout(tool_call_id)
       const store = useDataStudioStore()
       store.removePreparingPlaceholder()
       store.setSessionActiveTool(session_id, tool_name)
@@ -157,8 +158,8 @@ async function initAgentRuntime(): Promise<void> {
         return
 
       const runtime = getSessionRuntime(session_id)
-      const riskLevel = (runtime.metadata?.[tool_name]?.riskLevel as AgentToolCall['riskLevel']) ?? 'elevated'
-      const needsConfirmation = shouldRequireConfirmation(session, tool_name, riskLevel)
+      const riskLevel = risk_level ?? (runtime.metadata?.[tool_name]?.riskLevel as AgentToolCall['riskLevel']) ?? 'elevated'
+      const needsConfirmation = confirmation_required ?? shouldRequireConfirmation(session, tool_name, riskLevel)
       const denied = isDeniedByRule(session_id, tool_name)
 
       const toolCall: AgentToolCall = {
@@ -172,16 +173,17 @@ async function initAgentRuntime(): Promise<void> {
         requiresConfirmation: needsConfirmation,
       }
 
+      const existingAssistant = session.messages.find(message => message.toolCalls?.some(call => call.id === tool_call_id))
       const streamingAssistant = [...session.messages]
         .reverse()
         .find(message => message.role === 'assistant' && message.status === 'streaming')
       const lastAssistant
-        = streamingAssistant
+        = existingAssistant ?? streamingAssistant
           ?? [...session.messages].reverse().find(message => message.role === 'assistant')
 
       if (lastAssistant) {
         store.setMessageToolCalls(lastAssistant.id, [
-          ...(lastAssistant.toolCalls ?? []),
+          ...(lastAssistant.toolCalls ?? []).filter(call => call.id !== tool_call_id),
           toolCall,
         ], session_id)
       }
@@ -215,7 +217,7 @@ async function initAgentRuntime(): Promise<void> {
   )
 
   unlisteners.push(
-    await agentApi.onAgentLoopToolResult(({ session_id, tool_call_id, envelope, error }) => {
+    await agentApi.onAgentLoopToolResult(({ session_id, tool_call_id, envelope, error, denied, denial, tool_name, arguments: args }) => {
       clearToolTimeout(tool_call_id)
       const store = useDataStudioStore()
       store.setSessionActiveTool(session_id, null)
@@ -231,15 +233,44 @@ async function initAgentRuntime(): Promise<void> {
             && message.toolCalls?.some(toolCall => toolCall.id === tool_call_id),
         )
 
+      if (!assistantMsg && denied && tool_name) {
+        const target = [...session.messages].reverse().find(message => message.role === 'assistant')
+        if (target) {
+          const rejected: AgentToolCall = {
+            id: tool_call_id,
+            toolName: tool_name,
+            args: JSON.stringify(args ?? {}),
+            status: 'denied',
+            riskLevel: 'safe',
+            requiresConfirmation: false,
+            result: envelope.summary,
+            denial,
+          }
+          store.setMessageToolCalls(target.id, [
+            ...(target.toolCalls ?? []),
+            rejected,
+          ], session_id)
+        }
+      }
+
       if (assistantMsg) {
         store.updateToolCallStatus(
           assistantMsg.id,
           tool_call_id,
-          error ? 'error' : 'done',
+          denied
+            ? 'denied'
+            : error ? 'error' : 'done',
           envelope.summary,
           envelope.metadata?.duration_ms,
           session_id,
         )
+
+        if (denial) {
+          const updated = getSessionById(store.sessions, session_id)?.messages.find(message => message.id === assistantMsg.id)
+          store.setMessageToolCalls(assistantMsg.id, (updated?.toolCalls ?? []).map(call => call.id === tool_call_id
+            ? { ...call, denial }
+            : call), session_id)
+        }
 
         if (envelope.full_result) {
           store.toolResultFullBodies = {
@@ -248,6 +279,30 @@ async function initAgentRuntime(): Promise<void> {
           }
         }
       }
+    }),
+  )
+
+  unlisteners.push(
+    await agentApi.onAgentLoopBlocked(({ session_id }) => {
+      const store = useDataStudioStore()
+      const session = getSessionById(store.sessions, session_id)
+      session?.messages.forEach((message) => {
+        const unresolved = message.toolCalls?.some(call => ['pending', 'confirmed', 'executing'].includes(call.status))
+        if (unresolved) {
+          store.setMessageToolCalls(message.id, (message.toolCalls ?? []).map((call) => {
+            if (!['pending', 'confirmed', 'executing'].includes(call.status))
+              return call
+            clearToolTimeout(call.id)
+            return { ...call, status: 'interrupted', requiresConfirmation: false }
+          }), session_id)
+        }
+        if (message.status === 'streaming')
+          store.setMessageStatus(message.id, 'done', session_id)
+      })
+      store.setSessionStatus(session_id, 'blocked')
+      store.clearSessionProgress(session_id)
+      store.setSessionActiveTool(session_id, null)
+      store.removeOrphanedStreamingMessages(session_id)
     }),
   )
 

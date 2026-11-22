@@ -1,22 +1,6 @@
 use data_studio_agent::capabilities::registry;
 use data_studio_agent::capabilities::types::Capability;
 use serde_json::{json, Value};
-use tauri::AppHandle;
-use tauri::Manager;
-
-#[tauri::command]
-pub async fn invoke_capability(
-    name: String,
-    args: Value,
-    connection_id: Option<String>,
-    app: AppHandle,
-) -> Result<String, String> {
-    let config = match connection_id {
-        Some(ref id) => Some(resolve_connection_config(&app, id).await?),
-        None => None,
-    };
-    registry::invoke_capability_inner(&name, args, config).await
-}
 
 #[tauri::command]
 pub async fn get_available_tools(source_kinds: Option<Vec<String>>) -> Result<String, String> {
@@ -54,11 +38,4 @@ fn to_metadata(cap: &Capability) -> Value {
         "riskLevel": cap.risk_level,
         "requiredPermission": cap.required_permission
     })
-}
-
-async fn resolve_connection_config(app: &AppHandle, connection_id: &str) -> Result<Value, String> {
-    let state: tauri::State<'_, crate::state::AppState> = app.state();
-    state.ensure_connection(connection_id).await?;
-
-    Ok(json!({ "connectionId": connection_id }))
 }

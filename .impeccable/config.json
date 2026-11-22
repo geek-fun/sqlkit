@@ -1,0 +1,26 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/agent-message-bubble.vue"
+        ],
+        "createdAt": "2026-10-27T07:14:06.715Z",
+        "reason": "Agent review: this neutral border marks semantic Markdown blockquotes, not decorative card accents."
+      },
+      {
+        "rule": "bounce-easing",
+        "value": "typing-bounce",
+        "files": [
+          "src/components/agent-message-bubble.vue"
+        ],
+        "createdAt": "2026-10-27T07:14:06.764Z",
+        "reason": "Agent review: the existing typing dots pulse from scale 0 to 1 with ease-in-out; there is no bounce, overshoot, or elastic easing."
+      }
+    ]
+  }
+}

@@ -46,7 +46,7 @@ const isMatch = () => typedName.value.trim() === (props.databaseName || '')
       </DialogHeader>
 
       <div class="space-y-2">
-        <p class="text-xs text-destructive font-medium">
+        <p class="text-xs text-destructive-text font-medium">
           {{ t('sidebar.databases.actions.dropDatabase.typeToConfirm') }}
         </p>
         <Input

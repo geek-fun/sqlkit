@@ -101,6 +101,44 @@ async fn test_connection_in_memory() {
 }
 
 #[tokio::test]
+async fn test_empty_and_comment_only_sql() {
+    // rusqlite 0.43 rejects empty / comment-only SQL (Error::Empty); the
+    // adapter must report zero affected rows instead of surfacing the error.
+    let config = get_test_config_memory();
+    let mut adapter = SQLiteAdapter::new(config);
+
+    adapter.connect().await.expect("Failed to connect");
+
+    adapter
+        .execute_query("CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)")
+        .await
+        .expect("Failed to create table");
+
+    for sql in ["-- only a comment", "/* block comment */", "", "   \n\t  "] {
+        let result = adapter
+            .execute_query(sql)
+            .await
+            .unwrap_or_else(|e| panic!("comment-only / empty SQL must not fail: {sql:?} -> {e}"));
+        assert_eq!(result.rows_affected, Some(0), "sql: {sql:?}");
+    }
+
+    // Statement + trailing comment: the statement runs, the comment is ignored.
+    let insert = adapter
+        .execute_query("INSERT INTO t (id, v) VALUES (1, 'a'); -- trailing comment")
+        .await
+        .expect("trailing comment must not fail");
+    assert_eq!(insert.rows_affected, Some(1));
+
+    let select = adapter
+        .execute_query("SELECT id, v FROM t WHERE v = 'a'")
+        .await
+        .expect("Failed to select");
+    assert_eq!(select.rows.len(), 1);
+
+    adapter.disconnect().await.expect("Failed to disconnect");
+}
+
+#[tokio::test]
 async fn test_create_and_query_table() {
     let db_name = "test_create_query";
     cleanup_db_file(db_name);

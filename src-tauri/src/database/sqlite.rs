@@ -8,6 +8,7 @@ use crate::database::{
     config::ConnectionConfig,
     error::{DbError, DbResult},
     pool::ConnectionPool,
+    sql_classification::statement_returns_rows,
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
         QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
@@ -15,6 +16,7 @@ use crate::database::{
 };
 use async_trait::async_trait;
 use rusqlite::{types::ValueRef, Connection, OpenFlags, Row};
+use sqlparser::dialect::GenericDialect;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -377,10 +379,11 @@ impl SQLiteAdapter {
             .map_err(|e| DbError::QueryExecution(format!("Failed to lock connection: {}", e)))?;
 
         // Check if this is a SELECT query
-        let trimmed = query.trim().to_uppercase();
-        let is_select = trimmed.starts_with("SELECT")
-            || trimmed.starts_with("PRAGMA")
-            || trimmed.starts_with("EXPLAIN");
+        let is_select = statement_returns_rows(
+            query,
+            &["SELECT", "PRAGMA", "EXPLAIN", "WITH"],
+            &GenericDialect {},
+        );
 
         if is_select {
             let mut stmt = conn_guard
@@ -418,9 +421,27 @@ impl SQLiteAdapter {
                 rows_affected: None,
                 execution_time_ms: None,
                 truncated: false,
+                result_sets: Vec::new(),
             })
         } else {
             // For non-SELECT queries (INSERT, UPDATE, DELETE, etc.)
+            // rusqlite 0.43 rejects empty / comment-only SQL with Error::Empty;
+            // the editor legitimately produces those (comment-only runs, trailing
+            // comments after statement splitting) — report zero affected rows.
+            if crate::database::sql_classification::first_executable_keyword(query).is_none() {
+                drop(conn_guard);
+                pool.return_conn(conn)?;
+                return Ok(QueryResult {
+                    columns: Vec::new(),
+                    column_types: Vec::new(),
+                    rows: Vec::new(),
+                    rows_affected: Some(0),
+                    execution_time_ms: None,
+                    truncated: false,
+                    result_sets: Vec::new(),
+                });
+            }
+
             let rows_affected = conn_guard
                 .execute(query, [])
                 .map_err(|e| DbError::QueryExecution(format!("Failed to execute query: {}", e)))?;
@@ -435,6 +456,7 @@ impl SQLiteAdapter {
                 rows_affected: Some(rows_affected as u64),
                 execution_time_ms: None,
                 truncated: false,
+                result_sets: Vec::new(),
             })
         }
     }

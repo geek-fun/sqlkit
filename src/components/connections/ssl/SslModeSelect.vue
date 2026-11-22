@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import type { SslMode } from '@/types/connection'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Label } from '@/components/ui/label'
 import { SSL_MODE_LABELS, SSL_MODES } from '@/types/connection'
 
-defineProps<{
+const props = defineProps<{
+  hidePrefer?: boolean
   error?: string
 }>()
 
 const modelValue = defineModel<SslMode>({ required: true })
+
+const modes = computed(() => props.hidePrefer
+  ? SSL_MODES.filter(mode => mode !== 'prefer')
+  : SSL_MODES)
 
 const { t } = useI18n()
 
@@ -36,16 +42,19 @@ function selectMode(mode: SslMode) {
 <template>
   <div class="space-y-1">
     <div class="flex flex-wrap gap-3 items-center">
-      <Label class="text-sm min-w-fit whitespace-nowrap">{{ t('ssl.mode.label') }}</Label>
+      <Label class="text-sm flex gap-1.5 min-w-fit whitespace-nowrap items-center">
+        <span class="i-carbon-certificate text-muted-foreground shrink-0 h-4 w-4" />
+        {{ t('ssl.mode.label') }}
+      </Label>
       <div class="p-0.5 border border-border rounded-md bg-muted/40 inline-flex gap-px">
         <button
-          v-for="mode in SSL_MODES"
+          v-for="mode in modes"
           :key="mode"
           type="button"
           :title="getDescription(mode)"
           class="text-xs leading-none px-2.5 py-1.5 rounded-sm cursor-pointer transition-colors" :class="[
             modelValue === mode
-              ? 'bg-background text-primary shadow-sm font-medium'
+              ? 'bg-background text-primary-text shadow-sm font-medium'
               : 'text-muted-foreground hover:text-foreground',
           ]"
           @click="selectMode(mode)"
@@ -54,8 +63,8 @@ function selectMode(mode: SslMode) {
         </button>
       </div>
     </div>
-    <p v-if="error" class="text-sm text-destructive">
-      {{ error }}
+    <p v-if="error" class="text-sm text-destructive-text">
+      {{ t(error) }}
     </p>
   </div>
 </template>

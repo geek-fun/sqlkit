@@ -529,11 +529,7 @@ async fn import_target<A: crate::database::DatabaseAdapter>(
             let header_row: Vec<String> = if has_header {
                 rows_iter
                     .next()
-                    .map(|row| {
-                        row.iter()
-                            .map(|c| c.to_string())
-                            .collect()
-                    })
+                    .map(|row| row.iter().map(|c| c.to_string()).collect())
                     .unwrap_or_default()
             } else {
                 target
@@ -559,11 +555,7 @@ async fn import_target<A: crate::database::DatabaseAdapter>(
                         {
                             None
                         } else {
-                            Some(
-                                row.get(col_idx)
-                                    .map(|c| c.to_string())
-                                    .unwrap_or_default(),
-                            )
+                            Some(row.get(col_idx).map(|c| c.to_string()).unwrap_or_default())
                         }
                     })
                     .collect();
@@ -793,11 +785,7 @@ pub fn detect_file(file_path: &str) -> Result<FileDetectionResult, String> {
             let cols = range
                 .rows()
                 .next()
-                .map(|row| {
-                    row.iter()
-                        .map(|c| c.to_string())
-                        .collect()
-                })
+                .map(|row| row.iter().map(|c| c.to_string()).collect())
                 .unwrap_or_default();
             (cols, None, Some(true))
         }
@@ -949,11 +937,7 @@ pub fn preview_import(
                 columns = range
                     .rows()
                     .next()
-                    .map(|row| {
-                        row.iter()
-                            .map(|c| c.to_string())
-                            .collect()
-                    })
+                    .map(|row| row.iter().map(|c| c.to_string()).collect())
                     .unwrap_or_default();
             }
 
@@ -964,10 +948,7 @@ pub fn preview_import(
                 if sample_rows.len() >= preview_rows as usize {
                     break;
                 }
-                let row_values: Vec<String> = row
-                    .iter()
-                    .map(|cell| cell.to_string())
-                    .collect();
+                let row_values: Vec<String> = row.iter().map(|cell| cell.to_string()).collect();
                 sample_rows.push(row_values);
             }
         }

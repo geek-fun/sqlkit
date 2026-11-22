@@ -20,6 +20,10 @@ use deadpool_postgres::{
 };
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, ServerName};
 use rustls::ClientConfig;
+use sqlparser::{
+    dialect::PostgreSqlDialect,
+    tokenizer::{Token, Tokenizer},
+};
 use std::collections::HashMap;
 use std::fs;
 use std::sync::Arc;
@@ -51,6 +55,20 @@ impl<'a> FromSql<'a> for RawString {
 
 /// Convert PostgreSQL error to DbError with detailed information
 fn postgres_error_to_db_error(error: tokio_postgres::Error) -> DbError {
+    use std::error::Error;
+
+    if error.is_closed()
+        || error
+            .source()
+            .and_then(|source| source.downcast_ref::<std::io::Error>())
+            .is_some()
+        || error.as_db_error().is_some_and(|error| {
+            error.code().code().starts_with("08")
+                || matches!(error.code().code(), "57P01" | "57P02" | "57P03")
+        })
+    {
+        return DbError::Connection(error.to_string());
+    }
     // For database errors, we want to preserve structured information
     // by creating a formatted string that our api_response parser can understand
     if let Some(db_error) = error.as_db_error() {
@@ -173,6 +191,32 @@ pub struct PostgresPool {
     pool: Pool,
 }
 
+/// Only return a query connection to the pool after execution completes successfully.
+struct QueryClient(Option<deadpool_postgres::Object>);
+
+impl std::ops::Deref for QueryClient {
+    type Target = deadpool_postgres::Object;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref().unwrap()
+    }
+}
+
+impl QueryClient {
+    fn release(mut self) {
+        drop(self.0.take());
+    }
+}
+
+impl Drop for QueryClient {
+    fn drop(&mut self) {
+        if let Some(client) = self.0.take() {
+            // Detach before closing, including when an outer timeout drops this future.
+            drop(deadpool_postgres::Object::take(client));
+        }
+    }
+}
+
 #[async_trait]
 impl ConnectionPool for PostgresPool {
     type Connection = Client;
@@ -243,20 +287,93 @@ impl PostgresAdapter {
         Self { config, pool: None }
     }
 
+    /// Create a temporary adapter connected to `db` for cross-database reads.
+    ///
+    /// PostgreSQL connections are per-database, so metadata for a database other
+    /// than the one this adapter was opened with requires a separate connection.
+    async fn temp_adapter_for_db(&self, db: &str) -> DbResult<Self> {
+        let mut temp_config = self.config.clone();
+        temp_config.database = Some(db.to_string());
+        let mut temp_adapter = PostgresAdapter::new(temp_config);
+        temp_adapter.connect().await?;
+        Ok(temp_adapter)
+    }
+
+    fn quote_ident(identifier: &str) -> DbResult<String> {
+        if identifier.is_empty() || identifier.len() > 128 {
+            return Err(DbError::InvalidQuery(format!(
+                "Invalid identifier: '{}'",
+                identifier
+            )));
+        }
+        for part in identifier.split('.') {
+            let trimmed = part.trim_matches('"');
+            let valid = !trimmed.is_empty()
+                && trimmed
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && !trimmed.chars().next().unwrap().is_ascii_digit();
+            if !valid {
+                return Err(DbError::InvalidQuery(format!(
+                    "Invalid identifier: '{}'",
+                    identifier
+                )));
+            }
+        }
+        Ok(identifier
+            .split('.')
+            .map(|part| format!("\"{}\"", part.trim_matches('"')))
+            .collect::<Vec<_>>()
+            .join("."))
+    }
+
+    fn validate_privilege(privilege: &str) -> DbResult<String> {
+        const PRIVILEGES: &[&str] = &[
+            "SELECT",
+            "INSERT",
+            "UPDATE",
+            "DELETE",
+            "TRUNCATE",
+            "REFERENCES",
+            "TRIGGER",
+            "ALL",
+            "ALL PRIVILEGES",
+        ];
+        let mut validated = Vec::new();
+        for part in privilege.split(',') {
+            let trimmed = part.trim().to_uppercase();
+            if trimmed.is_empty() || !PRIVILEGES.contains(&trimmed.as_str()) {
+                return Err(DbError::InvalidQuery(format!(
+                    "Unsupported privilege: '{}'. Supported: {}",
+                    part.trim(),
+                    PRIVILEGES.join(", ")
+                )));
+            }
+            validated.push(trimmed);
+        }
+        Ok(validated.join(", "))
+    }
+
     /// Build the PostgreSQL connection string.
-    fn build_connection_string(&self) -> String {
+    ///
+    /// Values are libpq-quoted: keyword strings parse space-separated
+    /// `key=value` pairs, so raw interpolation of user-entered values (a
+    /// database named "x host=attacker", a password with spaces…) would
+    /// rewrite neighboring params and e.g. re-point the cross-database temp
+    /// connection, leaking credentials to a spoofed host.
+    fn build_connection_string(&self) -> DbResult<String> {
         let mut parts = Vec::new();
 
-        parts.push(format!("host={}", self.config.host));
+        parts.push(format!("host={}", libpq_quote(&self.config.host)));
         parts.push(format!("port={}", self.config.port));
-        parts.push(format!("user={}", self.config.username));
+        parts.push(format!("user={}", libpq_quote(&self.config.username)));
 
         if let Some(ref password) = self.config.password {
-            parts.push(format!("password={}", password));
+            parts.push(format!("password={}", libpq_quote(password)));
         }
 
         if let Some(ref database) = self.config.database {
-            parts.push(format!("dbname={}", database));
+            parts.push(format!("dbname={}", libpq_quote(database)));
         } else if matches!(self.config.db_type, DatabaseType::PostgreSQL) {
             // Real PostgreSQL servers always have a 'postgres' maintenance DB;
             // use it as the default when the user leaves the field empty.
@@ -267,7 +384,7 @@ impl PostgresAdapter {
             // is to fall back to the username-matching database, but
             // deadpool-postgres does not implement this fallback — it requires
             // an explicit dbname. Use the username as the fallback here.
-            parts.push(format!("dbname={}", self.config.username));
+            parts.push(format!("dbname={}", libpq_quote(&self.config.username)));
         }
 
         // Add SSL mode
@@ -288,10 +405,24 @@ impl PostgresAdapter {
 
         // Add additional options
         for (key, value) in &self.config.options {
-            parts.push(format!("{}={}", key, value));
+            if key == "statement_timeout" {
+                continue;
+            }
+            // The keyword side cannot be quoted: reject keys with
+            // syntax-meaningful characters instead of interpolating them.
+            if !key
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || matches!(c, '_' | '-' | '.'))
+            {
+                return Err(DbError::InvalidQuery(format!(
+                    "Unsupported connection option key: {}",
+                    key
+                )));
+            }
+            parts.push(format!("{}={}", key, libpq_quote(value)));
         }
 
-        parts.join(" ")
+        Ok(parts.join(" "))
     }
 
     fn build_rustls_config(
@@ -504,15 +635,21 @@ impl PostgresAdapter {
                 None
             };
 
+        let builder = ClientConfig::builder_with_provider(Arc::new(
+            rustls::crypto::aws_lc_rs::default_provider(),
+        ))
+        .with_safe_default_protocol_versions()
+        .map_err(|e| DbError::Configuration(format!("Failed to configure TLS: {}", e)))?;
+
         if skip_verification {
             let config = if let Some((certs, key)) = client_auth {
-                ClientConfig::builder()
+                builder
                     .dangerous()
                     .with_custom_certificate_verifier(Arc::new(NoVerification))
                     .with_client_auth_cert(certs, key)
                     .map_err(|e| DbError::Connection(format!("Failed to set client auth: {}", e)))?
             } else {
-                ClientConfig::builder()
+                builder
                     .dangerous()
                     .with_custom_certificate_verifier(Arc::new(NoVerification))
                     .with_no_client_auth()
@@ -552,7 +689,7 @@ impl PostgresAdapter {
 
         if !verify_hostname {
             let config = if let Some((certs, key)) = client_auth {
-                ClientConfig::builder()
+                builder
                     .dangerous()
                     .with_custom_certificate_verifier(Arc::new(ChainOnlyVerifier {
                         root_store: Arc::new(root_store),
@@ -560,7 +697,7 @@ impl PostgresAdapter {
                     .with_client_auth_cert(certs, key)
                     .map_err(|e| DbError::Connection(format!("Failed to set client auth: {}", e)))?
             } else {
-                ClientConfig::builder()
+                builder
                     .dangerous()
                     .with_custom_certificate_verifier(Arc::new(ChainOnlyVerifier {
                         root_store: Arc::new(root_store),
@@ -571,12 +708,12 @@ impl PostgresAdapter {
         }
 
         let config = if let Some((certs, key)) = client_auth {
-            ClientConfig::builder()
+            builder
                 .with_root_certificates(root_store)
                 .with_client_auth_cert(certs, key)
                 .map_err(|e| DbError::Connection(format!("Failed to set client auth: {}", e)))?
         } else {
-            ClientConfig::builder()
+            builder
                 .with_root_certificates(root_store)
                 .with_no_client_auth()
         };
@@ -882,16 +1019,121 @@ impl PostgresAdapter {
     }
 }
 
+fn split_postgres_statements(sql: &str) -> Vec<&str> {
+    let Ok(tokens) = Tokenizer::new(&PostgreSqlDialect {}, sql).tokenize_with_location() else {
+        return vec![sql];
+    };
+    let lines: Vec<&str> = sql.split_inclusive('\n').collect();
+    let mut start = 0;
+    let mut statements = Vec::new();
+    let mut has_sql = false;
+    for token in tokens {
+        if token.token == Token::SemiColon {
+            let line = token.span.start.line as usize - 1;
+            let offset = lines.iter().take(line).map(|s| s.len()).sum::<usize>()
+                + lines[line]
+                    .char_indices()
+                    .nth(token.span.start.column as usize - 1)
+                    .map(|(i, _)| i)
+                    .unwrap_or(lines[line].len());
+            if has_sql {
+                statements.push(&sql[start..offset]);
+            }
+            start = offset + 1;
+            has_sql = false;
+        } else if !matches!(token.token, Token::Whitespace(_)) {
+            has_sql = true;
+        }
+    }
+    if has_sql {
+        statements.push(&sql[start..]);
+    }
+    statements
+}
+
+fn needs_text_format(ty: &Type) -> bool {
+    match ty.kind() {
+        Kind::Enum(_) => false,
+        Kind::Array(inner) => !matches!(
+            *inner,
+            Type::TEXT
+                | Type::VARCHAR
+                | Type::BPCHAR
+                | Type::NAME
+                | Type::INT4
+                | Type::INT8
+                | Type::FLOAT8
+                | Type::BOOL
+        ),
+        _ => !matches!(
+            *ty,
+            Type::BOOL
+                | Type::INT2
+                | Type::INT4
+                | Type::INT8
+                | Type::FLOAT4
+                | Type::FLOAT8
+                | Type::VARCHAR
+                | Type::TEXT
+                | Type::BPCHAR
+                | Type::NAME
+                | Type::BYTEA
+                | Type::UUID
+                | Type::JSON
+                | Type::JSONB
+                | Type::TIMESTAMP
+                | Type::TIMESTAMPTZ
+                | Type::DATE
+                | Type::TIME
+        ),
+    }
+}
+
+fn text_query_value(value: Option<&str>, ty: &Type) -> QueryValue {
+    let Some(value) = value else {
+        return QueryValue::Null;
+    };
+    match *ty {
+        Type::BOOL => QueryValue::Bool(value == "t"),
+        Type::INT2 | Type::INT4 | Type::INT8 => value
+            .parse()
+            .map(QueryValue::Int)
+            .unwrap_or_else(|_| QueryValue::String(value.into())),
+        Type::FLOAT4 | Type::FLOAT8 => value
+            .parse()
+            .map(QueryValue::Float)
+            .unwrap_or_else(|_| QueryValue::String(value.into())),
+        Type::BYTEA => value
+            .strip_prefix("\\x")
+            .and_then(|v| hex::decode(v).ok())
+            .map(QueryValue::Bytes)
+            .unwrap_or_else(|| QueryValue::String(value.into())),
+        Type::TIMESTAMP | Type::TIMESTAMPTZ | Type::DATE | Type::TIME => {
+            QueryValue::DateTime(value.into())
+        }
+        _ => QueryValue::String(value.into()),
+    }
+}
+
+/// Quote a value per libpq keyword-string rules (single-quoted, doubled
+/// quotes, escaped backslashes). See `build_connection_string`.
+fn libpq_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\\', "\\\\").replace('\'', "''"))
+}
+
 #[async_trait]
 impl DatabaseAdapter for PostgresAdapter {
     type Pool = PostgresPool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        let connection_string = self.build_connection_string();
+        let connection_string = self.build_connection_string()?;
 
         // Create deadpool configuration
         let mut pg_config = DeadpoolConfig::new();
         pg_config.url = Some(connection_string);
+        pg_config.manager = Some(deadpool_postgres::ManagerConfig {
+            recycling_method: deadpool_postgres::RecyclingMethod::Verified,
+        });
         pg_config.pool = Some(DeadpoolPoolConfig::new(
             self.config.pool_config.max_connections as usize,
         ));
@@ -984,6 +1226,7 @@ impl DatabaseAdapter for PostgresAdapter {
             .get()
             .await
             .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+        let client = QueryClient(Some(client));
 
         let start = Instant::now();
 
@@ -995,87 +1238,82 @@ impl DatabaseAdapter for PostgresAdapter {
             .and_then(|v| v.parse::<u64>().ok())
             .map(Duration::from_millis);
 
-        // Determine if this is a query that returns rows or a statement
-        let query_trimmed = query.trim().to_uppercase();
-        let is_select = query_trimmed.starts_with("SELECT")
-            || query_trimmed.starts_with("WITH")
-            || query_trimmed.starts_with("SHOW")
-            || query_trimmed.starts_with("EXPLAIN");
-
-        let execution_time;
-
-        if is_select {
-            // Prepare first so column metadata is available even when the
-            // result set is empty — an empty SELECT must still render its
-            // columns (empty table) rather than looking like a DML statement.
-            let statement = if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, client.prepare(query))
+        let execute = async {
+            let statements = split_postgres_statements(query);
+            let is_script = statements.len() > 1;
+            let mut result_sets = Vec::new();
+            let mut affected = 0;
+            for sql in statements {
+                let statement = client
+                    .prepare(sql)
                     .await
-                    .map_err(|_| {
-                        DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
-                    })?
-                    .map_err(postgres_error_to_db_error)?
-            } else {
-                client
-                    .prepare(query)
-                    .await
-                    .map_err(postgres_error_to_db_error)?
-            };
-
-            let result = if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, client.query(&statement, &[]))
-                    .await
-                    .map_err(|_| {
-                        DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
-                    })?
-                    .map_err(postgres_error_to_db_error)?
-            } else {
-                client
-                    .query(&statement, &[])
-                    .await
-                    .map_err(postgres_error_to_db_error)?
-            };
-
-            execution_time = start.elapsed().as_millis() as u64;
-
-            let columns: Vec<String> = statement
-                .columns()
-                .iter()
-                .map(|col| col.name().to_string())
-                .collect();
-            let column_types: Vec<String> = statement
-                .columns()
-                .iter()
-                .map(|col| col.type_().name().to_string())
-                .collect();
-
-            let mut query_result = QueryResult::with_columns(columns, column_types);
-            for row in &result {
-                let query_row = Self::row_to_query_row(row)?;
-                query_result.add_row(query_row);
+                    .map_err(postgres_error_to_db_error)?;
+                if statement.columns().is_empty() {
+                    affected += client
+                        .execute(&statement, &[])
+                        .await
+                        .map_err(postgres_error_to_db_error)?;
+                    continue;
+                }
+                let columns = statement.columns();
+                let mut current = QueryResult::with_columns(
+                    columns.iter().map(|c| c.name().to_string()).collect(),
+                    columns
+                        .iter()
+                        .map(|c| c.type_().name().to_string())
+                        .collect(),
+                );
+                // Exotic PostgreSQL types use binary wire formats that are not
+                // UTF-8. Ask the server for text rather than displaying raw bytes.
+                if columns.iter().any(|c| needs_text_format(c.type_())) {
+                    for message in client
+                        .simple_query(sql)
+                        .await
+                        .map_err(postgres_error_to_db_error)?
+                    {
+                        if let tokio_postgres::SimpleQueryMessage::Row(row) = message {
+                            let values = columns
+                                .iter()
+                                .enumerate()
+                                .map(|(i, c)| {
+                                    (
+                                        c.name().to_string(),
+                                        text_query_value(row.get(i), c.type_()),
+                                    )
+                                })
+                                .collect();
+                            current.add_row(values);
+                        }
+                    }
+                } else {
+                    for row in client
+                        .query(&statement, &[])
+                        .await
+                        .map_err(postgres_error_to_db_error)?
+                    {
+                        current.add_row(Self::row_to_query_row(&row)?);
+                    }
+                }
+                result_sets.push(current);
             }
-
-            Ok(query_result.with_execution_time(execution_time))
+            let mut result = result_sets
+                .last()
+                .cloned()
+                .unwrap_or_else(|| QueryResult::affected(affected));
+            if is_script {
+                result.result_sets = result_sets;
+            }
+            Ok::<_, DbError>(result)
+        };
+        let result = if let Some(duration) = timeout {
+            tokio::time::timeout(duration, execute)
+                .await
+                .map_err(|_| DbError::Timeout(format!("Query timed out after {:?}", duration)))??
         } else {
-            // For INSERT, UPDATE, DELETE, etc.
-            let affected = if let Some(timeout_duration) = timeout {
-                tokio::time::timeout(timeout_duration, client.execute(query, &[]))
-                    .await
-                    .map_err(|_| {
-                        DbError::Timeout(format!("Query timed out after {:?}", timeout_duration))
-                    })?
-                    .map_err(postgres_error_to_db_error)?
-            } else {
-                client
-                    .execute(query, &[])
-                    .await
-                    .map_err(postgres_error_to_db_error)?
-            };
-
-            execution_time = start.elapsed().as_millis() as u64;
-
-            Ok(QueryResult::affected(affected).with_execution_time(execution_time))
-        }
+            execute.await?
+        };
+        client.release();
+        Ok(result.with_execution_time(start.elapsed().as_millis() as u64))
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
@@ -1126,15 +1364,9 @@ impl DatabaseAdapter for PostgresAdapter {
 
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
         // If a different database is requested, create a temporary connection to it.
-        // PostgreSQL connections are per-database, so we cannot query another database's
-        // schemas through the current connection.
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_schemas(None).await;
+                return self.temp_adapter_for_db(db).await?.list_schemas(None).await;
             }
         }
 
@@ -1174,15 +1406,13 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
         // If a different database is requested, create a temporary connection to it.
-        // PostgreSQL connections are per-database, so we cannot query another database's
-        // tables through the current connection.
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_tables(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_tables(None, schema)
+                    .await;
             }
         }
 
@@ -1249,10 +1479,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list columns from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_columns(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1276,7 +1511,8 @@ impl DatabaseAdapter for PostgresAdapter {
                     SELECT 1 FROM pg_catalog.pg_type t
                     JOIN pg_catalog.pg_namespace n ON t.typnamespace = n.oid
                     WHERE t.typname = c.udt_name AND n.nspname = c.udt_schema AND t.typtype = 'e'
-                ) THEN true ELSE false END as is_enum
+                ) THEN true ELSE false END as is_enum,
+                c.is_identity, c.is_generated, c.generation_expression
             FROM information_schema.columns c
             LEFT JOIN (
                 SELECT ku.table_schema, ku.table_name, ku.column_name
@@ -1323,10 +1559,11 @@ impl DatabaseAdapter for PostgresAdapter {
                 let is_primary_key: bool = row.get(9);
                 let is_enum: bool = row.get(10);
 
-                let is_auto_increment = default_value
-                    .as_ref()
-                    .map(|d| d.contains("nextval"))
-                    .unwrap_or(false);
+                let is_auto_increment = row.get::<_, String>(11) == "YES"
+                    || default_value
+                        .as_ref()
+                        .map(|d| d.contains("nextval"))
+                        .unwrap_or(false);
 
                 let actual_type = if data_type == "USER-DEFINED" {
                     udt_name
@@ -1335,6 +1572,12 @@ impl DatabaseAdapter for PostgresAdapter {
                 };
 
                 let mut metadata = HashMap::new();
+                if row.get::<_, String>(12) == "ALWAYS" {
+                    metadata.insert("is_generated".to_string(), "true".to_string());
+                    if let Some(expression) = row.get::<_, Option<String>>(13) {
+                        metadata.insert("generation_expression".to_string(), expression);
+                    }
+                }
                 if is_enum {
                     metadata.insert("is_enum".to_string(), "true".to_string());
                 }
@@ -1364,10 +1607,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<TableInfo> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot get table info from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .get_table_info(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1439,7 +1687,10 @@ impl DatabaseAdapter for PostgresAdapter {
             if !stats_rows.is_empty() {
                 let row_count: i64 = stats_rows[0].get(0);
                 let size_bytes: i64 = stats_rows[0].get(1);
-                (Some(row_count as u64), Some(size_bytes as u64))
+                (
+                    Some(row_count.max(0) as u64),
+                    Some(size_bytes.max(0) as u64),
+                )
             } else {
                 (None, None)
             }
@@ -1460,9 +1711,20 @@ impl DatabaseAdapter for PostgresAdapter {
 
     async fn get_foreign_keys(
         &self,
-        _database: Option<&str>,
-        _schema: Option<&str>,
+        database: Option<&str>,
+        schema: Option<&str>,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .get_foreign_keys(None, schema)
+                    .await;
+            }
+        }
+
         let pool = self
             .pool
             .as_ref()
@@ -1474,7 +1736,7 @@ impl DatabaseAdapter for PostgresAdapter {
             .await
             .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
 
-        let schema_filter = _schema.unwrap_or("public");
+        let schema_filter = schema.unwrap_or("public");
 
         let query = r#"
             SELECT
@@ -1490,12 +1752,15 @@ impl DatabaseAdapter for PostgresAdapter {
             JOIN information_schema.key_column_usage kcu
                 ON tc.constraint_name = kcu.constraint_name
                 AND tc.table_schema = kcu.table_schema
-            JOIN information_schema.constraint_column_usage ccu
-                ON tc.constraint_name = ccu.constraint_name
-                AND tc.table_schema = ccu.table_schema
+                AND tc.table_name = kcu.table_name
             JOIN information_schema.referential_constraints rc
                 ON tc.constraint_name = rc.constraint_name
                 AND tc.table_schema = rc.constraint_schema
+            JOIN information_schema.key_column_usage ccu
+                ON ccu.constraint_catalog = rc.unique_constraint_catalog
+                AND ccu.constraint_schema = rc.unique_constraint_schema
+                AND ccu.constraint_name = rc.unique_constraint_name
+                AND ccu.ordinal_position = kcu.position_in_unique_constraint
             WHERE tc.constraint_type = 'FOREIGN KEY'
             AND tc.table_schema = $1
             ORDER BY tc.constraint_name, kcu.ordinal_position
@@ -1548,11 +1813,11 @@ impl DatabaseAdapter for PostgresAdapter {
     ) -> DbResult<Vec<ObjectInfo>> {
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_views(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_views(None, schema)
+                    .await;
             }
         }
 
@@ -1656,11 +1921,11 @@ impl DatabaseAdapter for PostgresAdapter {
     ) -> DbResult<Vec<ObjectInfo>> {
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_procedures(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_procedures(None, schema)
+                    .await;
             }
         }
 
@@ -1723,11 +1988,11 @@ impl DatabaseAdapter for PostgresAdapter {
     ) -> DbResult<Vec<ObjectInfo>> {
         if let Some(db) = database {
             if Some(db) != self.config.database.as_deref() {
-                let mut temp_config = self.config.clone();
-                temp_config.database = Some(db.to_string());
-                let mut temp_adapter = PostgresAdapter::new(temp_config);
-                temp_adapter.connect().await?;
-                return temp_adapter.list_functions(None, schema).await;
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_functions(None, schema)
+                    .await;
             }
         }
 
@@ -1795,10 +2060,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<TriggerInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list triggers from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_triggers(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1856,23 +2126,30 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<IndexInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list indexes from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_indexes(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
 
         let query = r#"
-            SELECT
-                indexname,
-                indexdef,
-                tablename
-            FROM pg_indexes
-            WHERE schemaname = $1
-            AND tablename = $2
-            ORDER BY indexname
+            SELECT ci.relname, am.amname, i.indisunique, i.indisprimary,
+                ARRAY(SELECT pg_get_indexdef(i.indexrelid, n, true)
+                      FROM generate_series(1, i.indnatts) AS n ORDER BY n)
+            FROM pg_index i
+            JOIN pg_class ct ON ct.oid = i.indrelid
+            JOIN pg_namespace ns ON ns.oid = ct.relnamespace
+            JOIN pg_class ci ON ci.oid = i.indexrelid
+            JOIN pg_am am ON am.oid = ci.relam
+            WHERE ns.nspname = $1 AND ct.relname = $2
+            ORDER BY ci.relname
         "#;
 
         let pool = self
@@ -1893,53 +2170,218 @@ impl DatabaseAdapter for PostgresAdapter {
 
         let indexes = rows
             .iter()
-            .map(|row| {
-                let name: String = row.get(0);
-                let indexdef: String = row.get(2);
-
-                // Extract index type from definition
-                let index_type =
-                    if indexdef.contains("USING BTREE") || indexdef.contains("USING btree") {
-                        "BTREE"
-                    } else if indexdef.contains("USING HASH") || indexdef.contains("USING hash") {
-                        "HASH"
-                    } else if indexdef.contains("USING GIN") || indexdef.contains("USING gin") {
-                        "GIN"
-                    } else if indexdef.contains("USING GIST") || indexdef.contains("USING gist") {
-                        "GIST"
-                    } else {
-                        "BTREE"
-                    };
-
-                let is_unique = indexdef.to_uppercase().contains("UNIQUE");
-                let is_primary = indexdef.to_uppercase().contains("PRIMARY KEY");
-
-                // Extract columns from definition
-                let columns = if let Some(idx) = indexdef.find('(') {
-                    let rest = &indexdef[idx + 1..];
-                    if let Some(end) = rest.rfind(')') {
-                        rest[..end]
-                            .split(',')
-                            .map(|c| c.trim().trim_matches('"').to_string())
-                            .collect()
-                    } else {
-                        vec![]
-                    }
-                } else {
-                    vec![]
-                };
-
-                IndexInfo {
-                    name,
-                    columns,
-                    index_type: index_type.to_string(),
-                    is_unique,
-                    is_primary,
-                }
+            .map(|row| IndexInfo {
+                name: row.get(0),
+                index_type: row.get::<_, String>(1).to_uppercase(),
+                is_unique: row.get(2),
+                is_primary: row.get(3),
+                columns: row.get(4),
             })
             .collect();
 
         Ok(indexes)
+    }
+
+    async fn list_sessions(&self, _database: Option<&str>) -> DbResult<Vec<serde_json::Value>> {
+        // pg_stat_activity is cluster-wide, so the requested database is irrelevant.
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let query = r#"
+            SELECT
+                pid,
+                usename,
+                datname,
+                state,
+                query_start,
+                EXTRACT(EPOCH FROM (NOW() - query_start))::float8 AS duration_seconds,
+                query
+            FROM pg_stat_activity
+            WHERE state IS NOT NULL
+              AND pid <> pg_backend_pid()
+        "#;
+
+        let rows = client
+            .query(query, &[])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let sessions = rows
+            .iter()
+            .map(|row| {
+                let pid: i32 = row.get(0);
+                let usename: Option<String> = row.get(1);
+                let datname: Option<String> = row.get(2);
+                let state: Option<String> = row.get(3);
+                let query_start: Option<DateTime<FixedOffset>> = row.get(4);
+                let duration_seconds: Option<f64> = row.get(5);
+                let query: Option<String> = row.get(6);
+                serde_json::json!({
+                    "pid": pid,
+                    "usename": usename,
+                    "datname": datname,
+                    "state": state,
+                    "query_start": query_start.map(|d| d.to_string()),
+                    "duration_seconds": duration_seconds,
+                    "query": query,
+                })
+            })
+            .collect();
+
+        Ok(sessions)
+    }
+
+    async fn kill_session(&self, session_id: &str) -> DbResult<()> {
+        let pid: i32 = session_id.parse().map_err(|_| {
+            DbError::InvalidQuery(format!(
+                "Invalid session id '{}': PostgreSQL session ids are numeric PIDs",
+                session_id
+            ))
+        })?;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let rows = client
+            .query("SELECT pg_terminate_backend($1::int)", &[&pid])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let terminated: bool = rows.first().map(|row| row.get(0)).unwrap_or(false);
+        if !terminated {
+            return Err(DbError::QueryExecution(format!(
+                "Failed to terminate session {} (no such backend or insufficient privilege)",
+                session_id
+            )));
+        }
+
+        Ok(())
+    }
+
+    async fn get_slow_queries(
+        &self,
+        _database: Option<&str>,
+        limit: Option<u32>,
+    ) -> DbResult<Vec<serde_json::Value>> {
+        // pg_stat_activity is cluster-wide, so the requested database is irrelevant.
+        let limit = limit.unwrap_or(20) as i64;
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        let query = r#"
+            SELECT
+                pid,
+                usename,
+                datname,
+                EXTRACT(EPOCH FROM (NOW() - query_start))::float8 AS duration_seconds,
+                query
+            FROM pg_stat_activity
+            WHERE state = 'active'
+              AND NOW() - query_start > interval '1 second'
+            ORDER BY duration_seconds DESC
+            LIMIT $1
+        "#;
+
+        let rows = client
+            .query(query, &[&limit])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        let slow = rows
+            .iter()
+            .map(|row| {
+                let pid: i32 = row.get(0);
+                let usename: String = row.get(1);
+                let datname: Option<String> = row.get(2);
+                let duration_seconds: f64 = row.get(3);
+                let query: String = row.get(4);
+                serde_json::json!({
+                    "pid": pid,
+                    "usename": usename,
+                    "datname": datname,
+                    "duration_seconds": duration_seconds,
+                    "query": query,
+                })
+            })
+            .collect();
+
+        Ok(slow)
+    }
+
+    async fn grant_privilege(&self, privilege: &str, object: &str, grantee: &str) -> DbResult<()> {
+        let privs = Self::validate_privilege(privilege)?;
+        let obj = Self::quote_ident(object)?;
+        let grantee = Self::quote_ident(grantee)?;
+        let sql = format!("GRANT {} ON {} TO {}", privs, obj, grantee);
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        client
+            .execute(&sql, &[])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
+    }
+
+    async fn revoke_privilege(&self, privilege: &str, object: &str, grantee: &str) -> DbResult<()> {
+        let privs = Self::validate_privilege(privilege)?;
+        let obj = Self::quote_ident(object)?;
+        let grantee = Self::quote_ident(grantee)?;
+        let sql = format!("REVOKE {} ON {} FROM {}", privs, obj, grantee);
+
+        let pool = self
+            .pool
+            .as_ref()
+            .ok_or_else(|| DbError::Connection("Not connected".to_string()))?;
+
+        let client = pool
+            .pool
+            .get()
+            .await
+            .map_err(|e| DbError::Connection(format!("Failed to get connection: {}", e)))?;
+
+        client
+            .execute(&sql, &[])
+            .await
+            .map_err(|e| DbError::QueryExecution(e.to_string()))?;
+
+        Ok(())
     }
 
     async fn list_foreign_keys(
@@ -1948,11 +2390,15 @@ impl DatabaseAdapter for PostgresAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot list foreign keys from a different database without reconnecting"
-                    .to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .list_foreign_keys(None, schema, table)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -1970,12 +2416,15 @@ impl DatabaseAdapter for PostgresAdapter {
             JOIN information_schema.key_column_usage kcu
                 ON tc.constraint_name = kcu.constraint_name
                 AND tc.table_schema = kcu.table_schema
-            JOIN information_schema.constraint_column_usage ccu
-                ON tc.constraint_name = ccu.constraint_name
-                AND tc.table_schema = ccu.table_schema
+                AND tc.table_name = kcu.table_name
             JOIN information_schema.referential_constraints rc
                 ON tc.constraint_name = rc.constraint_name
                 AND tc.table_schema = rc.constraint_schema
+            JOIN information_schema.key_column_usage ccu
+                ON ccu.constraint_catalog = rc.unique_constraint_catalog
+                AND ccu.constraint_schema = rc.unique_constraint_schema
+                AND ccu.constraint_name = rc.unique_constraint_name
+                AND ccu.ordinal_position = kcu.position_in_unique_constraint
             WHERE tc.constraint_type = 'FOREIGN KEY'
             AND tc.table_schema = $1
             AND tc.table_name = $2
@@ -2039,10 +2488,15 @@ impl DatabaseAdapter for PostgresAdapter {
         object_name: &str,
         object_type: &str,
     ) -> DbResult<String> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot get DDL from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .get_object_ddl(None, schema, object_name, object_type)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2132,10 +2586,15 @@ impl DatabaseAdapter for PostgresAdapter {
         object_name: &str,
         object_type: &str,
     ) -> DbResult<()> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot drop object from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .drop_object(None, schema, object_name, object_type)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2194,10 +2653,15 @@ impl DatabaseAdapter for PostgresAdapter {
         object_type: &str,
         new_name: &str,
     ) -> DbResult<()> {
-        if database.is_some() && database != self.config.database.as_deref() {
-            return Err(DbError::UnsupportedOperation(
-                "Cannot rename object from a different database without reconnecting".to_string(),
-            ));
+        // If a different database is requested, create a temporary connection to it.
+        if let Some(db) = database {
+            if Some(db) != self.config.database.as_deref() {
+                return self
+                    .temp_adapter_for_db(db)
+                    .await?
+                    .rename_object(None, schema, object_name, object_type, new_name)
+                    .await;
+            }
         }
 
         let schema_filter = schema.unwrap_or("public");
@@ -2259,6 +2723,68 @@ mod tests {
     use crate::database::DatabaseType;
 
     #[test]
+    fn tls_configuration_selects_an_explicit_crypto_provider() {
+        let adapter = PostgresAdapter::new(ConnectionConfig::new(
+            DatabaseType::PostgreSQL,
+            "localhost",
+            5432,
+            "postgres",
+        ));
+        assert!(adapter.build_rustls_config(true, true).is_ok());
+        assert!(adapter.build_rustls_config(false, false).is_ok());
+        assert!(adapter.build_rustls_config(false, true).is_ok());
+    }
+
+    #[test]
+    fn execution_timeout_is_not_forwarded_as_a_connection_keyword() {
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+            .with_option("statement_timeout", "1000")
+            .with_option("application_name", "sqlkit");
+        let connection_string = PostgresAdapter::new(config)
+            .build_connection_string()
+            .unwrap();
+        assert!(!connection_string.contains("statement_timeout"));
+        assert!(connection_string.contains("application_name='sqlkit'"));
+    }
+
+    #[test]
+    fn split_preserves_quoted_blocks_comments_and_unicode() {
+        let sql =
+            "-- 杭州;\r\nDO $body$ BEGIN PERFORM 'it''s;ok'; END; $body$; SELECT '你好;'; -- tail";
+        assert_eq!(
+            split_postgres_statements(sql),
+            [
+                "-- 杭州;\r\nDO $body$ BEGIN PERFORM 'it''s;ok'; END; $body$",
+                " SELECT '你好;'"
+            ]
+        );
+        assert!(split_postgres_statements("; /* comments only; */ -- done").is_empty());
+    }
+
+    #[test]
+    fn text_protocol_preserves_types_and_nulls() {
+        assert_eq!(text_query_value(None, &Type::INET), QueryValue::Null);
+        assert_eq!(
+            text_query_value(Some("t"), &Type::BOOL),
+            QueryValue::Bool(true)
+        );
+        assert_eq!(
+            text_query_value(Some("42"), &Type::INT8),
+            QueryValue::Int(42)
+        );
+        assert_eq!(
+            text_query_value(Some("\\x00ff"), &Type::BYTEA),
+            QueryValue::Bytes(vec![0, 255])
+        );
+        assert_eq!(
+            text_query_value(Some("(300,CNY)"), &Type::TEXT),
+            QueryValue::String("(300,CNY)".into())
+        );
+        assert!(needs_text_format(&Type::INET));
+        assert!(needs_text_format(&Type::TSTZ_RANGE));
+    }
+
+    #[test]
     fn test_postgres_adapter_creation() {
         let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
             .with_database("testdb")
@@ -2278,15 +2804,15 @@ mod tests {
             .with_option("application_name", "sqlkit");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("host='localhost'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=postgres"));
-        assert!(conn_str.contains("password=password"));
-        assert!(conn_str.contains("dbname=testdb"));
+        assert!(conn_str.contains("user='postgres'"));
+        assert!(conn_str.contains("password='password'"));
+        assert!(conn_str.contains("dbname='testdb'"));
         assert!(conn_str.contains("sslmode=require"));
-        assert!(conn_str.contains("application_name=sqlkit"));
+        assert!(conn_str.contains("application_name='sqlkit'"));
     }
 
     #[test]
@@ -2305,7 +2831,7 @@ mod tests {
                     .with_ssl_mode(ssl_mode);
 
             let adapter = PostgresAdapter::new(config);
-            let conn_str = adapter.build_connection_string();
+            let conn_str = adapter.build_connection_string().unwrap();
 
             assert!(
                 conn_str.contains(expected),
@@ -2326,16 +2852,16 @@ mod tests {
                 .with_option("connect_timeout", "10");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=db.example.com"));
+        assert!(conn_str.contains("host='db.example.com'"));
         assert!(conn_str.contains("port=5433"));
-        assert!(conn_str.contains("user=admin"));
-        assert!(conn_str.contains("password=secure_pass"));
-        assert!(conn_str.contains("dbname=production"));
+        assert!(conn_str.contains("user='admin'"));
+        assert!(conn_str.contains("password='secure_pass'"));
+        assert!(conn_str.contains("dbname='production'"));
         assert!(conn_str.contains("sslmode=verify-full"));
-        assert!(conn_str.contains("application_name=sqlkit"));
-        assert!(conn_str.contains("connect_timeout=10"));
+        assert!(conn_str.contains("application_name='sqlkit'"));
+        assert!(conn_str.contains("connect_timeout='10'"));
     }
 
     #[test]
@@ -2344,13 +2870,55 @@ mod tests {
             .with_password("password");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("host='localhost'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=postgres"));
-        assert!(conn_str.contains("password=password"));
+        assert!(conn_str.contains("user='postgres'"));
+        assert!(conn_str.contains("password='password'"));
+        // the maintenance-db fallback is a literal keyword value
         assert!(conn_str.contains("dbname=postgres"));
+    }
+
+    #[test]
+    fn test_connection_string_quotes_hostile_values() {
+        // A libpq keyword string parses space-separated `key=value` pairs, so
+        // raw values could rewrite neighboring params (e.g. point the
+        // cross-database temp connection at a spoofed host). Everything the
+        // user types must land inside one quoted value instead.
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+            .with_database("x host=attacker.example")
+            .with_password("p w'ord \\");
+
+        let adapter = PostgresAdapter::new(config);
+        let conn_str = adapter.build_connection_string().unwrap();
+
+        // The hostile text survives as ONE quoted value; the only host
+        // keyword is the one the config legitimately declares.
+        assert!(
+            conn_str.contains("dbname='x host=attacker.example'"),
+            "hostile dbname must stay inside one quoted value: {}",
+            conn_str
+        );
+        assert!(
+            conn_str.starts_with("host='localhost'"),
+            "exactly one host param, the config one: {}",
+            conn_str
+        );
+        assert!(
+            conn_str.contains(r"password='p w''ord \\'"),
+            "password must be libpq-quoted: {}",
+            conn_str
+        );
+    }
+
+    #[test]
+    fn test_connection_string_rejects_hostile_option_key() {
+        let config = ConnectionConfig::new(DatabaseType::PostgreSQL, "localhost", 5432, "postgres")
+            .with_option("x host=evil", "1");
+
+        let adapter = PostgresAdapter::new(config);
+        assert!(adapter.build_connection_string().is_err());
     }
 
     #[test]
@@ -2359,13 +2927,13 @@ mod tests {
             .with_password("kingbase@123");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=10.84.1.213"));
+        assert!(conn_str.contains("host='10.84.1.213'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=SYSTEM"));
+        assert!(conn_str.contains("user='SYSTEM'"));
         assert!(
-            conn_str.contains("dbname=SYSTEM"),
+            conn_str.contains("dbname='SYSTEM'"),
             "PG-wire-compat engines must fall back to username as dbname (libpq convention)"
         );
         assert!(
@@ -2380,12 +2948,12 @@ mod tests {
             .with_database("testdb");
 
         let adapter = PostgresAdapter::new(config);
-        let conn_str = adapter.build_connection_string();
+        let conn_str = adapter.build_connection_string().unwrap();
 
-        assert!(conn_str.contains("host=localhost"));
+        assert!(conn_str.contains("host='localhost'"));
         assert!(conn_str.contains("port=5432"));
-        assert!(conn_str.contains("user=postgres"));
-        assert!(conn_str.contains("dbname=testdb"));
+        assert!(conn_str.contains("user='postgres'"));
+        assert!(conn_str.contains("dbname='testdb'"));
         assert!(!conn_str.contains("password="));
     }
 

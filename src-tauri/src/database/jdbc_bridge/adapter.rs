@@ -2,10 +2,11 @@
 
 use crate::database::{
     adapter::DatabaseAdapter,
-    config::ConnectionConfig,
+    config::{ConnectionConfig, DatabaseType},
     error::{DbError, DbResult},
     types::{
-        ColumnInfo, ConnectionStatus, DatabaseSchema, QueryResult, QueryRow, QueryValue, TableInfo,
+        ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
+        QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
     },
 };
 use async_trait::async_trait;
@@ -37,29 +38,85 @@ impl JdbcBridgeAdapter {
         }
     }
 
+    fn fold_catalog_into_schema<'a>(
+        &self,
+        database: Option<&'a str>,
+        schema: Option<&'a str>,
+    ) -> (Option<&'a str>, Option<&'a str>) {
+        if self.config.db_type.is_cql() {
+            (None, schema.or(database))
+        } else {
+            (database, schema)
+        }
+    }
+
+    /// Run a CQL query and return its rows, bypassing `DatabaseMetaData` for
+    /// introspection (see `list_tables` / `list_columns`).
+    async fn cql_rows(&self, sql: &str) -> DbResult<Vec<QueryRow>> {
+        let launcher = self.launcher()?;
+        let data = Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                JdbcMethod::ExecuteQuery,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "sql": sql,
+                }),
+            ),
+        )
+        .await?;
+        Ok(Self::parse_query_result(data)?.rows)
+    }
+
     /// Ensure all prerequisites are met: JRE, bridge JAR, and JDBC driver.
     /// Uses the fallback chain to try multiple driver versions automatically.
     async fn init_bridge(&mut self) -> DbResult<Arc<Mutex<JdbcBridgeLauncher>>> {
         let db_type = self.config.db_type;
         let ssl_mode_str = match self.config.ssl_mode {
+            crate::database::config::SslMode::Prefer if db_type.is_cql() => "disable",
             crate::database::config::SslMode::Disable => "disable",
             crate::database::config::SslMode::Prefer => "prefer",
             crate::database::config::SslMode::Require => "require",
             crate::database::config::SslMode::VerifyCA => "verify-ca",
             crate::database::config::SslMode::VerifyFull => "verify-full",
         };
+        // Embedded / file-based types have no SSL settings in the UI, so the
+        // stored mode is just the Prefer default — sending it would make the
+        // bridge inject `ssl=true` into drivers that reject unknown options
+        // (e.g. DuckDB, issue #158). None omits the field entirely.
+        let ssl_mode = if db_type.ssl_supported() {
+            Some(ssl_mode_str)
+        } else {
+            None
+        };
 
         // Use fallback chain for JDBC-dependent databases (Oracle, DB2, H2, etc.)
         // For non-registry types, fall back to the old single-driver approach
+        let database = if db_type.is_cql() {
+            let keyspace = self.config.cql_keyspace();
+            if !keyspace.starts_with(|c: char| c.is_ascii_alphabetic())
+                || !keyspace
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || c == b'_')
+            {
+                return Err(DbError::Connection(format!(
+                    "Invalid CQL keyspace: {keyspace}"
+                )));
+            }
+            Some(keyspace)
+        } else {
+            self.config.database.as_deref()
+        };
         let (_version, conn_id, launcher) = super::fallback::run_fallback_chain(
             db_type,
             &self.config.host,
             self.config.port,
-            self.config.database.as_deref(),
+            database,
+            db_type.is_cql().then(|| self.config.cql_datacenter()),
             &self.config.username,
             &self.config.password,
             self.config.oracle_options.as_ref(),
-            Some(ssl_mode_str),
+            ssl_mode,
             self.config.ssl_ca_cert.as_deref(),
             self.config.ssl_client_cert.as_deref(),
             self.config.ssl_client_key.as_deref(),
@@ -96,7 +153,7 @@ impl JdbcBridgeAdapter {
 
     fn parse_query_result(data: serde_json::Value) -> DbResult<QueryResult> {
         let qr: QueryResultData = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse query result: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse query result: {}", e)))?;
 
         let rows: Vec<QueryRow> = qr
             .rows
@@ -115,8 +172,8 @@ impl JdbcBridgeAdapter {
                                 QueryValue::String(n.to_string())
                             }
                         }
-                        serde_json::Value::Bool(b) => QueryValue::String(b.to_string()),
-                        _ => QueryValue::String(String::new()),
+                        serde_json::Value::Bool(b) => QueryValue::Bool(b),
+                        _ => QueryValue::String(val.to_string()),
                     };
                     map.insert(col_name, qv);
                 }
@@ -131,13 +188,42 @@ impl JdbcBridgeAdapter {
             rows_affected: qr.rows_affected,
             execution_time_ms: None,
             truncated: false,
+            result_sets: Vec::new(),
         })
     }
 
     fn parse_connection_status(data: serde_json::Value) -> DbResult<ConnectionStatus> {
         let cs: ConnectionStatusData = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse status: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse status: {}", e)))?;
         Ok(cs.into())
+    }
+
+    /// Send a metadata list request whose result parses directly into `T`
+    /// (the Java side emits the exact struct field names).
+    async fn send_list_request<T: serde::de::DeserializeOwned>(
+        &self,
+        method: JdbcMethod,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: Option<&str>,
+    ) -> DbResult<T> {
+        let (database, schema) = self.fold_catalog_into_schema(database, schema);
+        let launcher = self.launcher()?;
+        let data = Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                method,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                    "table": table,
+                }),
+            ),
+        )
+        .await?;
+        serde_json::from_value(data)
+            .map_err(|e| DbError::Serialization(format!("Failed to parse result: {}", e)))
     }
 }
 
@@ -151,9 +237,18 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn disconnect(&mut self) -> DbResult<()> {
-        if let Some(launcher) = &self.launcher {
-            let mut guard = launcher.lock().await;
-            guard.shutdown();
+        // Release only this connection's pool. The bridge process is shared with
+        // other connections, and `disconnect` is what closes the HikariCP pool —
+        // which in turn releases DuckDB's exclusive file lock.
+        if let (Some(launcher), Some(conn_id)) = (self.launcher.clone(), self.conn_id.clone()) {
+            let request = JdbcRequest::new(
+                JdbcMethod::Disconnect,
+                serde_json::json!({ "conn_id": conn_id }),
+            );
+            let _ = tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                Self::send_request(&launcher, request).await
+            })
+            .await;
         }
         self.launcher = None;
         self.conn_id = None;
@@ -163,7 +258,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     async fn test_connection(&self) -> DbResult<ConnectionStatus> {
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::TestConnection,
                 serde_json::json!({
@@ -172,12 +267,37 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
             ),
         )
         .await?;
-        Self::parse_connection_status(data)
+        let mut status = Self::parse_connection_status(data)?;
+        if self.config.db_type.is_cql() {
+            if self.config.db_type == DatabaseType::Cassandra
+                && status
+                    .server_version
+                    .as_deref()
+                    .and_then(|version| version.split('.').next())
+                    .and_then(|major| major.parse::<u32>().ok())
+                    .is_some_and(|major| major < 3)
+            {
+                return Err(DbError::UnsupportedOperation(
+                    "Cassandra 3.0 or later is required for keyspace and table browsing.".into(),
+                ));
+            }
+            // JDBC getCatalog() exposes the cluster name for the CQL wrapper.
+            status.current_database = Some(self.config.cql_keyspace().to_string());
+        }
+        Ok(status)
     }
 
     async fn execute_query(&self, query: &str) -> DbResult<QueryResult> {
         let launcher = self.launcher()?;
-        let statements = split_sql_statements(query);
+        let statements = if self.config.db_type.is_cql() {
+            crate::database::cql::split_statements(query)
+                .map_err(|error| DbError::InvalidQuery(error.into()))?
+                .into_iter()
+                .map(str::to_owned)
+                .collect()
+        } else {
+            split_sql_statements_for_dialect(query, self.config.db_type == DatabaseType::Oracle)
+        };
         if statements.is_empty() {
             return Ok(QueryResult {
                 columns: Vec::new(),
@@ -186,6 +306,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                 rows_affected: Some(0),
                 execution_time_ms: None,
                 truncated: false,
+                result_sets: Vec::new(),
             });
         }
         // Execute each statement individually. Many JDBC drivers (notably
@@ -208,10 +329,11 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
             rows_affected: Some(0),
             execution_time_ms: None,
             truncated: false,
+            result_sets: Vec::new(),
         };
         for stmt in &statements {
             let data = Self::send_request(
-                &launcher,
+                launcher,
                 JdbcRequest::new(
                     JdbcMethod::ExecuteQuery,
                     serde_json::json!({
@@ -239,9 +361,25 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
+        if self.config.db_type.is_cql() {
+            // The wrapper's catalog listing reports the cluster name, not
+            // keyspaces — read them from system_schema instead.
+            return Ok(self
+                .cql_rows("SELECT keyspace_name FROM system_schema.keyspaces")
+                .await?
+                .iter()
+                .filter_map(|row| row.get("keyspace_name").and_then(|v| v.as_string()))
+                .map(|name| DatabaseSchema {
+                    is_system: name.starts_with("system"),
+                    name,
+                    description: None,
+                    metadata: HashMap::new(),
+                })
+                .collect());
+        }
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::ListDatabases,
                 serde_json::json!({
@@ -251,7 +389,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         )
         .await?;
         let names: Vec<String> = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse database list: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse database list: {}", e)))?;
         Ok(names
             .into_iter()
             .map(|name| DatabaseSchema {
@@ -264,20 +402,27 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
+        let (database, schema) = if self.config.db_type.is_cql() {
+            // The wrapper reports keyspaces as schemas — carry the database there.
+            (None, database)
+        } else {
+            (database, None)
+        };
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::ListSchemas,
                 serde_json::json!({
                     "conn_id": self.conn_id,
                     "database": database,
+                    "schema": schema,
                 }),
             ),
         )
         .await?;
         serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse schema list: {}", e)))
+            .map_err(|e| DbError::Serialization(format!("Failed to parse schema list: {}", e)))
     }
 
     async fn list_tables(
@@ -285,9 +430,45 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
+        if self.config.db_type.is_cql() {
+            // The wrapper's DatabaseMetaData only reports objects of the
+            // keyspace bound at connect time and ignores the catalog/schema
+            // arguments — so browsing a keyspace picked later in the UI would
+            // come back empty. Read system_schema directly instead, which also
+            // keeps working when the session keyspace is `system`.
+            let keyspace = schema.or(database);
+            let sql = match keyspace {
+                Some(ks) => format!(
+                    "SELECT table_name FROM system_schema.tables WHERE keyspace_name = '{}'",
+                    ks.replace('\'', "''")
+                ),
+                None => "SELECT keyspace_name, table_name FROM system_schema.tables".to_string(),
+            };
+            let rows = self.cql_rows(&sql).await?;
+            return Ok(rows
+                .iter()
+                .filter_map(|row| {
+                    let table = row.get("table_name")?.as_string()?;
+                    let ks = row
+                        .get("keyspace_name")
+                        .and_then(|v| v.as_string())
+                        .or_else(|| keyspace.map(|k| k.to_string()));
+                    Some(TableInfo {
+                        schema: ks,
+                        name: table,
+                        table_type: "TABLE".to_string(),
+                        row_count: None,
+                        size_bytes: None,
+                        description: None,
+                        metadata: HashMap::new(),
+                    })
+                })
+                .collect());
+        }
+        let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::ListTables,
                 serde_json::json!({
@@ -299,7 +480,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         )
         .await?;
         let tables: Vec<serde_json::Value> = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse table list: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse table list: {}", e)))?;
         Ok(tables
             .into_iter()
             .filter_map(|t| {
@@ -326,9 +507,62 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
+        if self.config.db_type.is_cql() {
+            // Same session-keyspace limitation as list_tables: read the column
+            // definitions (and primary-key flags) from system_schema.
+            let keyspace = schema
+                .or(database)
+                .unwrap_or_else(|| self.config.cql_keyspace());
+            let sql = format!(
+                "SELECT column_name, kind, position, type FROM system_schema.columns \
+                 WHERE keyspace_name = '{}' AND table_name = '{}'",
+                keyspace.replace('\'', "''"),
+                table.replace('\'', "''")
+            );
+            let mut cols: Vec<(String, bool, String)> = self
+                .cql_rows(&sql)
+                .await?
+                .iter()
+                .filter_map(|row| {
+                    let name = row.get("column_name").and_then(|v| v.as_string())?;
+                    let kind = row
+                        .get("kind")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
+                    let ty = row
+                        .get("type")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
+                    Some((
+                        name,
+                        kind.contains("partition_key") || kind.contains("clustering"),
+                        ty,
+                    ))
+                })
+                .collect();
+            // Primary-key columns first, then the rest, mirroring CQL's layout.
+            cols.sort_by_key(|(_, is_pk, _)| !*is_pk);
+            return Ok(cols
+                .into_iter()
+                .map(|(name, is_primary_key, data_type)| ColumnInfo {
+                    name,
+                    data_type,
+                    nullable: !is_primary_key,
+                    default_value: None,
+                    is_primary_key,
+                    is_auto_increment: false,
+                    max_length: None,
+                    precision: None,
+                    scale: None,
+                    description: None,
+                    metadata: HashMap::new(),
+                })
+                .collect());
+        }
+        let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
-            &launcher,
+            launcher,
             JdbcRequest::new(
                 JdbcMethod::ListColumns,
                 serde_json::json!({
@@ -341,7 +575,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         )
         .await?;
         let cols: Vec<serde_json::Value> = serde_json::from_value(data)
-            .map_err(|e| DbError::Connection(format!("Failed to parse column list: {}", e)))?;
+            .map_err(|e| DbError::Serialization(format!("Failed to parse column list: {}", e)))?;
         Ok(cols
             .into_iter()
             .filter_map(|c| {
@@ -392,6 +626,167 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
             .ok_or_else(|| DbError::Connection(format!("Table '{}' not found", table)))
     }
 
+    async fn list_views(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        if self.config.db_type.is_cql() {
+            return Ok(Vec::new());
+        }
+        self.send_list_request(JdbcMethod::ListViews, database, schema, None)
+            .await
+    }
+
+    async fn list_procedures(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        self.send_list_request(JdbcMethod::ListProcedures, database, schema, None)
+            .await
+    }
+
+    async fn list_functions(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ObjectInfo>> {
+        self.send_list_request(JdbcMethod::ListFunctions, database, schema, None)
+            .await
+    }
+
+    async fn list_triggers(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<TriggerInfo>> {
+        self.send_list_request(JdbcMethod::ListTriggers, database, schema, Some(table))
+            .await
+    }
+
+    async fn list_indexes(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<IndexInfo>> {
+        self.send_list_request(JdbcMethod::ListIndexes, database, schema, Some(table))
+            .await
+    }
+
+    async fn list_foreign_keys(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        table: &str,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        if self.config.db_type.is_cql() {
+            return Ok(Vec::new());
+        }
+        self.send_list_request(JdbcMethod::ListForeignKeys, database, schema, Some(table))
+            .await
+    }
+
+    async fn get_foreign_keys(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+    ) -> DbResult<Vec<ForeignKeyInfo>> {
+        if self.config.db_type.is_cql() {
+            return Ok(Vec::new());
+        }
+        self.send_list_request(JdbcMethod::GetForeignKeys, database, schema, None)
+            .await
+    }
+
+    async fn get_object_ddl(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<String> {
+        let launcher = self.launcher()?;
+        let data = Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                JdbcMethod::GetObjectDdl,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                    "object_name": object_name,
+                    "object_type": object_type,
+                }),
+            ),
+        )
+        .await?;
+
+        let ddl: Option<String> =
+            serde_json::from_value(data.get("ddl").cloned().unwrap_or(serde_json::Value::Null))
+                .map_err(|e| DbError::Serialization(format!("Failed to parse DDL: {}", e)))?;
+        ddl.ok_or_else(|| {
+            DbError::UnsupportedOperation(format!(
+                "DDL not available for {} '{}' on this engine",
+                object_type, object_name
+            ))
+        })
+    }
+
+    async fn drop_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+    ) -> DbResult<()> {
+        let launcher = self.launcher()?;
+        Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                JdbcMethod::DropObject,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                    "object_name": object_name,
+                    "object_type": object_type,
+                }),
+            ),
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn rename_object(
+        &self,
+        database: Option<&str>,
+        schema: Option<&str>,
+        object_name: &str,
+        object_type: &str,
+        new_name: &str,
+    ) -> DbResult<()> {
+        let launcher = self.launcher()?;
+        Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                JdbcMethod::RenameObject,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "database": database,
+                    "schema": schema,
+                    "object_name": object_name,
+                    "object_type": object_type,
+                    "new_name": new_name,
+                }),
+            ),
+        )
+        .await?;
+        Ok(())
+    }
+
     fn get_pool(&self) -> Option<Arc<Self::Pool>> {
         None
     }
@@ -410,7 +805,32 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
 /// - `/* ... */` block comments
 /// - Trailing semicolons and whitespace
 /// - Empty statements are skipped
+#[cfg(test)]
 fn split_sql_statements(sql: &str) -> Vec<String> {
+    split_sql_statements_for_dialect(sql, false)
+}
+
+fn is_oracle_block(sql: &str) -> bool {
+    let words: Vec<String> = sql
+        .split_whitespace()
+        .take(6)
+        .map(str::to_ascii_uppercase)
+        .collect();
+    if matches!(words.first().map(String::as_str), Some("BEGIN" | "DECLARE")) {
+        return true;
+    }
+    if words.first().map(String::as_str) != Some("CREATE") {
+        return false;
+    }
+    words.iter().skip(1).any(|word| {
+        matches!(
+            word.as_str(),
+            "FUNCTION" | "PROCEDURE" | "PACKAGE" | "TRIGGER" | "TYPE"
+        )
+    })
+}
+
+fn split_sql_statements_for_dialect(sql: &str, oracle: bool) -> Vec<String> {
     let mut statements: Vec<String> = Vec::new();
     let mut current = String::new();
     let chars: Vec<char> = sql.chars().collect();
@@ -419,8 +839,51 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
     while i < chars.len() {
         let c = chars[i];
 
+        if oracle
+            && c == '/'
+            && (current.trim().is_empty() || is_oracle_block(current.trim()))
+            && current
+                .rsplit_once('\n')
+                .map(|(_, tail)| tail.trim().is_empty())
+                .unwrap_or(current.trim().is_empty())
+            && chars[i + 1..]
+                .iter()
+                .take_while(|c| **c != '\n')
+                .all(|c| c.is_whitespace())
+        {
+            let trimmed = current.trim().to_string();
+            if !trimmed.is_empty() {
+                statements.push(trimmed);
+            }
+            current.clear();
+        }
+        // Oracle alternative quoted literals may contain both quotes and semicolons.
+        else if oracle
+            && matches!(c, 'q' | 'Q')
+            && chars.get(i + 1) == Some(&'\'')
+            && i + 2 < chars.len()
+        {
+            let close = match chars[i + 2] {
+                '[' => ']',
+                '(' => ')',
+                '{' => '}',
+                '<' => '>',
+                c => c,
+            };
+            current.extend(&chars[i..i + 3]);
+            i += 3;
+            while i < chars.len() {
+                current.push(chars[i]);
+                if chars[i] == close && chars.get(i + 1) == Some(&'\'') {
+                    current.push('\'');
+                    i += 1;
+                    break;
+                }
+                i += 1;
+            }
+        }
         // Single-quoted string literal
-        if c == '\'' {
+        else if c == '\'' {
             current.push(c);
             i += 1;
             while i < chars.len() {
@@ -461,6 +924,8 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
             while i < chars.len() && chars[i] != '\n' {
                 i += 1;
             }
+            current.push(' ');
+            continue;
         }
         // Block comment
         else if c == '/' && i + 1 < chars.len() && chars[i + 1] == '*' {
@@ -472,9 +937,11 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
                 }
                 i += 1;
             }
+            current.push(' ');
+            continue;
         }
         // Statement separator
-        else if c == ';' {
+        else if c == ';' && !(oracle && is_oracle_block(current.trim())) {
             let trimmed = current.trim().to_string();
             if !trimmed.is_empty() {
                 statements.push(trimmed);
@@ -499,6 +966,94 @@ fn split_sql_statements(sql: &str) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    #[ignore = "Requires a disposable Cassandra server and the current JDBC bridge JAR"]
+    async fn cql_bridge_opens_exact_keyspace_and_executes_an_intact_batch() {
+        let port = std::env::var("SQLKIT_CQL_TEST_PORT")
+            .expect("set SQLKIT_CQL_TEST_PORT to the disposable server's local port")
+            .parse()
+            .expect("valid Cassandra port");
+        let config = ConnectionConfig::new(DatabaseType::Cassandra, "127.0.0.1", port, "")
+            .with_ssl_mode(crate::database::SslMode::Disable);
+        let mut admin = JdbcBridgeAdapter::new(config.clone());
+        admin.connect().await.unwrap();
+        let keyspace = format!("CqlTest{}", uuid::Uuid::new_v4().simple());
+        let quoted = format!("\"{keyspace}\"");
+        admin
+            .execute_query(&format!(
+                "CREATE KEYSPACE {quoted} WITH replication = \
+                 {{'class': 'SimpleStrategy', 'replication_factor': 1}}"
+            ))
+            .await
+            .unwrap();
+        let mut scoped = JdbcBridgeAdapter::new(config.with_database(&quoted));
+        let rows = async {
+            scoped.connect().await?;
+            scoped
+                .execute_query(
+                    "CREATE TABLE events (id int PRIMARY KEY); \
+                     BEGIN UNLOGGED BATCH \
+                     INSERT INTO events (id) VALUES (1); \
+                     INSERT INTO events (id) VALUES (2); \
+                     APPLY BATCH; SELECT * FROM events",
+                )
+                .await
+        }
+        .await;
+        scoped.disconnect().await.unwrap();
+        admin
+            .execute_query(&format!("DROP KEYSPACE {quoted}"))
+            .await
+            .unwrap();
+        admin.disconnect().await.unwrap();
+        assert_eq!(rows.unwrap().rows.len(), 2);
+    }
+
+    #[test]
+    fn comments_preserve_token_boundaries() {
+        assert_eq!(
+            split_sql_statements("SELECT/*gap*/1; SELECT--gap\n2;"),
+            ["SELECT 1", "SELECT \n2"]
+        );
+        assert_eq!(split_sql_statements("SELECT 1/*gap*/+2"), ["SELECT 1 +2"]);
+    }
+
+    #[test]
+    fn oracle_blocks_keep_internal_semicolons_and_strip_slash() {
+        let sql = "CREATE OR REPLACE PROCEDURE p AS\nBEGIN\n NULL;\nEND;\n/\nSELECT 1 FROM dual;";
+        let statements = split_sql_statements_for_dialect(sql, true);
+        assert_eq!(statements.len(), 2);
+        assert!(statements[0].ends_with("END;"));
+        assert_eq!(statements[1], "SELECT 1 FROM dual");
+        assert_eq!(
+            split_sql_statements_for_dialect("BEGIN NULL; END;", true),
+            ["BEGIN NULL; END;"]
+        );
+    }
+
+    #[test]
+    fn oracle_alternative_quotes_and_types_are_preserved() {
+        let statements = split_sql_statements_for_dialect("SELECT q'[it's;a;value]' FROM dual; CREATE TYPE price AS OBJECT(n NUMBER);\n/\nSELECT 2 FROM dual;", true);
+        assert_eq!(statements.len(), 3);
+        assert!(statements[0].contains("it's;a;value"));
+        assert!(statements[1].ends_with("NUMBER);"));
+    }
+
+    #[test]
+    fn bridge_values_preserve_booleans_and_structured_data() {
+        let result = JdbcBridgeAdapter::parse_query_result(serde_json::json!({
+            "columns": ["flag", "data", "missing"],
+            "rows": [[true, {"city": "杭州"}, null]],
+        }))
+        .unwrap();
+        assert_eq!(result.rows[0]["flag"], QueryValue::Bool(true));
+        assert_eq!(
+            result.rows[0]["data"],
+            QueryValue::String("{\"city\":\"杭州\"}".into())
+        );
+        assert_eq!(result.rows[0]["missing"], QueryValue::Null);
+    }
 
     #[test]
     fn test_split_single_statement() {
@@ -565,5 +1120,35 @@ mod tests {
         assert_eq!(stmts.len(), 2);
         assert_eq!(stmts[0], "SELECT * FROM t WHERE x = 1");
         assert_eq!(stmts[1], "SELECT 2");
+    }
+}
+
+impl Drop for JdbcBridgeAdapter {
+    /// Best-effort pool release for adapters dropped without `disconnect()`.
+    ///
+    /// The bridge process outlives single connections now, so a leaked pool would
+    /// keep the database open (and a DuckDB file locked) for the rest of the
+    /// session. The "Test connection" path is the main caller of this.
+    fn drop(&mut self) {
+        let (Some(launcher), Some(conn_id)) = (self.launcher.take(), self.conn_id.take()) else {
+            return;
+        };
+
+        let request = JdbcRequest::new(
+            JdbcMethod::Disconnect,
+            serde_json::json!({ "conn_id": conn_id }),
+        );
+
+        if let Ok(mut guard) = launcher.try_lock() {
+            let _ = guard.send_request(&request);
+            return;
+        }
+
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                let mut guard = launcher.lock().await;
+                let _ = guard.send_request(&request);
+            });
+        }
     }
 }

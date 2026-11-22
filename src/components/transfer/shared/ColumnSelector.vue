@@ -120,18 +120,18 @@ const isColumnSelected = (colName: string) => selectedColumns.value.includes(col
 <template>
   <div class="space-y-3">
     <div class="flex items-center justify-between">
-      <Label class="text-[11px] text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.common.columns') }}</Label>
+      <Label class="text-caption text-muted-foreground tracking-wide font-medium uppercase">{{ t('transfer.common.columns') }}</Label>
       <div class="flex gap-1.5">
-        <Button variant="ghost" size="sm" class="text-[11px] text-muted-foreground px-2 h-6 hover:text-foreground" @click="selectAll">
+        <Button variant="ghost" size="sm" class="text-caption text-muted-foreground px-2 h-6 hover:text-foreground" @click="selectAll">
           {{ t('transfer.migration.selectAll') }}
         </Button>
-        <Button variant="ghost" size="sm" class="text-[11px] text-muted-foreground px-2 h-6 hover:text-foreground" @click="deselectAll">
+        <Button variant="ghost" size="sm" class="text-caption text-muted-foreground px-2 h-6 hover:text-foreground" @click="deselectAll">
           {{ t('transfer.common.deselectAll') }}
         </Button>
       </div>
     </div>
 
-    <div v-if="loading" class="text-[11px] text-muted-foreground p-6 border rounded-md border-dashed bg-muted/20 flex items-center justify-center">
+    <div v-if="loading" class="text-caption text-muted-foreground p-6 border rounded-md border-dashed bg-muted/20 flex items-center justify-center">
       <span class="i-carbon-circle-dash mr-1.5 animate-spin" /> Loading columns...
     </div>
 
@@ -150,13 +150,13 @@ const isColumnSelected = (colName: string) => selectedColumns.value.includes(col
           class="h-3.5 w-3.5"
           @update:checked="toggleColumn(col.name)"
         />
-        <span class="text-[11px] leading-none font-mono truncate peer-disabled:opacity-70 peer-disabled:cursor-not-allowed" :title="col.name">
+        <span class="text-caption leading-none font-mono truncate peer-disabled:opacity-70 peer-disabled:cursor-not-allowed" :title="col.name">
           {{ col.name }}
         </span>
       </label>
     </div>
 
-    <div class="text-[10px] text-muted-foreground font-mono">
+    <div class="text-caption text-muted-foreground font-mono">
       {{ selectedColumns.length }} of {{ availableColumns.length }} columns selected
     </div>
   </div>

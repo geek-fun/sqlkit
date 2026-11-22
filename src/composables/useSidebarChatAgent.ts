@@ -69,12 +69,6 @@ export function useSidebarChatAgent() {
         [activeTab.name || 'active']: {
           connectionId: activeTab.connectionId,
           dbType: 'SQL',
-          permissions: {
-            read: true,
-            create: false,
-            update: false,
-            delete: false,
-          },
         },
       }
     }
@@ -119,7 +113,7 @@ export function useSidebarChatAgent() {
       updateToolCallStatus: (messageId: string, toolCallId: string, status: AgentToolCallStatus, result?: string, durationMs?: number, sessionId?: string) =>
         dataStudioStore.updateToolCallStatus(messageId, toolCallId, status, result, durationMs, sessionId),
       setSessionStatus: (sessionId: string, status: ChatSessionStatus) =>
-        dataStudioStore.setSessionStatus(sessionId, status as 'idle' | 'running' | 'waiting_confirmation' | 'error' | 'stopped'),
+        dataStudioStore.setSessionStatus(sessionId, status),
       setSessionStopped: (sessionId, reason, message) =>
         dataStudioStore.setSessionStopped(sessionId, reason as never, message),
       clearSessionStop: (sessionId: string) => dataStudioStore.clearSessionStop(sessionId),

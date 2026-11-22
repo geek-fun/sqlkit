@@ -119,7 +119,12 @@ pub async fn test_connection(
         ConnectionStrategy::JdbcBridge => {
             let mut adapter = JdbcBridgeAdapter::new(conn_config);
             adapter.connect().await.map_err(|e| e.to_string())?;
-            adapter.test_connection().await.map_err(|e| e.to_string())
+            let status = adapter.test_connection().await.map_err(|e| e.to_string());
+            // Close the pool explicitly: the bridge process is shared, so a pooled
+            // connection left behind would hold the database (and a DuckDB file
+            // lock) open until the app exits.
+            let _ = adapter.disconnect().await;
+            status
         }
         ConnectionStrategy::Http => match dt {
             DatabaseType::RQLite => {
@@ -208,6 +213,7 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
         "informix" => Ok(DatabaseType::Informix),
         "kylin" => Ok(DatabaseType::Kylin),
         "cassandra" => Ok(DatabaseType::Cassandra),
+        "scylladb" => Ok(DatabaseType::ScyllaDB),
         "iris" | "intersystems_iris" => Ok(DatabaseType::Iris),
         "access" | "ms_access" | "microsoft_access" => Ok(DatabaseType::Access),
         _ => Err(format!("Unsupported database type: {}", db_type)),
@@ -229,7 +235,7 @@ fn is_file_based_db(db_type: &crate::database::DatabaseType) -> bool {
 /// If transport layers are configured, starts the tunnel and returns `127.0.0.1:local_port`.
 /// Otherwise returns the original `(host, port)` for direct connection.
 pub async fn connection_host_port(
-    connection_id: &str,
+    _connection_id: &str,
     config: &ConnectionConfig,
     tunnels: &TunnelManager,
 ) -> Result<(String, u16), String> {
@@ -251,9 +257,48 @@ pub async fn connection_host_port(
         return Ok((config.host.clone(), config.port));
     }
 
-    match start_transport_layers(connection_id, &layers, &config.host, config.port, tunnels).await?
+    // Gate before any transport is established — an unentitled user must
+    // not spin up tunnels at all.
+    crate::entitlement::ensure_local_ultimate_global("SSH tunnel")?;
+
+    // Deterministic tunnel key — same SSH layers + same target reuse one
+    // tunnel across connections instead of stacking duplicates per bastion.
+    let connection_key = tunnel_key(&layers, &config.host, config.port);
+
+    match start_transport_layers(
+        &connection_key,
+        &layers,
+        &config.host,
+        config.port,
+        tunnels,
+        true,
+    )
+    .await?
     {
         Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),
         None => Ok((config.host.clone(), config.port)),
     }
+}
+
+/// Deterministic key from the enabled SSH hops + remote target — identical
+/// to dockit's tunnel_key strategy. The key never contains secrets (only
+/// the auth method name), so it is safe to log.
+fn tunnel_key(
+    layers: &[crate::ssh::config::TransportLayerConfig],
+    host: &str,
+    port: u16,
+) -> String {
+    let mut hops = Vec::new();
+    for layer in layers {
+        // TransportLayerConfig currently has a single variant — a plain let
+        // keeps this correct when more transport kinds are added.
+        // TransportLayerConfig is single-variant today; the let keeps this
+        // compiling unchanged when more transport kinds arrive.
+        let crate::ssh::config::TransportLayerConfig::Ssh(config) = layer;
+        hops.push(format!(
+            "{}:{}:{}:{}",
+            config.host, config.port, config.username, config.auth_method
+        ));
+    }
+    format!("ssh:{}:{}:{}", hops.join("->"), host, port)
 }

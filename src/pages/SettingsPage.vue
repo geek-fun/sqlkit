@@ -1,57 +1,97 @@
 <script setup lang="ts">
-import { invoke } from '@tauri-apps/api/core'
-import { computed, onMounted, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
-import { Button } from '@/components/ui/button'
+import { SettingsAbout } from '@/components/settings/about'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 // Separator is rendered inline as a styled div
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useAppUpdater } from '@/composables/useAppUpdater'
-import { ThemeType, useAppStore } from '@/store/appStore'
+import { PaidGate, ProBadge } from '@/components/upgrade'
+import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 import AiSettings from '@/views/setting/ai-settings.vue'
 import JreDriverSection from '@/views/setting/jre-driver-section.vue'
 import McpBridge from '@/views/setting/mcp-bridge.vue'
+import PlanSection from '@/views/setting/plan-section.vue'
 
 const appStore = useAppStore()
 const { t, locale: _locale } = useI18n()
-const { checkForUpdates, downloadAndInstall, isChecking, isDownloading, isInstalling, updateAvailable, updateInfo, downloadProgress } = useAppUpdater()
+const entitlementStore = useEntitlementStore()
 
-const version = ref('')
-
-onMounted(async () => {
-  try {
-    version.value = await invoke<string>('get_app_version')
-  }
-  catch {
-    version.value = import.meta.env.VITE_APP_VERSION ?? '0.0.0'
-  }
-})
-
+const preferencesSaved = ref(false)
+watch(() => [
+  appStore.themeType,
+  appStore.languageType,
+  appStore.editorConfig,
+  appStore.queryConfig,
+], () => {
+  preferencesSaved.value = true
+}, { deep: true })
 // --- Theme ---
 const currentTheme = computed(() => appStore.themeType)
 
 const themeOptions = [
   {
     value: ThemeType.AUTO,
-    label: () => t('pages.settings.appearance.themes.system'),
+    label: () => t('pages.settings.general.themes.system'),
   },
   {
     value: ThemeType.DARK,
-    label: () => t('pages.settings.appearance.themes.dark'),
+    label: () => t('pages.settings.general.themes.dark'),
   },
   {
     value: ThemeType.LIGHT,
-    label: () => t('pages.settings.appearance.themes.light'),
+    label: () => t('pages.settings.general.themes.light'),
   },
 ]
 
 const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)
 
 // --- Language ---
-// Note: Language change functionality removed - using i18n locale directly
+const currentLanguage = computed(() => appStore.languageType)
+
+const languageOptions = [
+  {
+    value: LanguageType.AUTO,
+    label: () => t('pages.settings.general.languages.auto'),
+  },
+  {
+    value: LanguageType.EN_US,
+    label: () => t('pages.settings.general.languages.enUS'),
+  },
+  {
+    value: LanguageType.ZH_CN,
+    label: () => t('pages.settings.general.languages.zhCN'),
+  },
+  {
+    value: LanguageType.ZH_TW,
+    label: () => t('pages.settings.general.languages.zhTW'),
+  },
+  {
+    value: LanguageType.PT_BR,
+    label: () => t('pages.settings.general.languages.ptBR'),
+  },
+  {
+    value: LanguageType.JA_JP,
+    label: () => t('pages.settings.general.languages.jaJP'),
+  },
+  {
+    value: LanguageType.KO_KR,
+    label: () => t('pages.settings.general.languages.koKR'),
+  },
+  {
+    value: LanguageType.ES_ES,
+    label: () => t('pages.settings.general.languages.esES'),
+  },
+]
+
+const handleLanguageChange = (value: string) => {
+  if (Object.values(LanguageType).includes(value as LanguageType))
+    appStore.setLanguageType(value as LanguageType)
+}
 
 const fontSizeInput = ref(String(appStore.editorConfig.fontSize))
 const fontSizeError = ref('')
@@ -153,18 +193,6 @@ function handleQueryTimeoutChange(val: string | number) {
 
 const autoSave = computed(() => appStore.queryConfig.autoSave)
 const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave)
-
-async function handleCheckUpdates() {
-  if (updateAvailable.value) {
-    await downloadAndInstall()
-    return
-  }
-  await checkForUpdates(true)
-  // If an update was found, automatically start downloading
-  if (updateAvailable.value && updateInfo.value) {
-    await downloadAndInstall()
-  }
-}
 </script>
 
 <template>
@@ -178,18 +206,19 @@ async function handleCheckUpdates() {
           </h1>
           <span class="text-muted-foreground">|</span>
           <span class="text-sm text-muted-foreground">{{ t('pages.settings.subtitle') }}</span>
+          <span v-if="preferencesSaved" class="text-xs text-muted-foreground ml-auto flex gap-1.5 items-center" role="status"><span class="i-lucide-circle-check text-success h-3.5 w-3.5" aria-hidden="true" />{{ t('pages.settings.feedback.saved') }}</span>
         </div>
       </div>
 
       <!-- Tabbed settings content -->
       <Tabs
-        default-value="appearance"
+        default-value="general"
         class="px-6 py-4 flex-1 overflow-y-auto"
       >
         <div class="mx-auto max-w-4xl">
-          <TabsList class="mb-6">
-            <TabsTrigger value="appearance">
-              {{ t('pages.settings.appearance.title') }}
+          <TabsList class="mb-6 flex-wrap h-auto max-w-full justify-start">
+            <TabsTrigger value="general">
+              {{ t('pages.settings.general.title') }}
             </TabsTrigger>
             <TabsTrigger value="editor">
               {{ t('pages.settings.editor.title') }}
@@ -197,31 +226,30 @@ async function handleCheckUpdates() {
             <TabsTrigger value="query">
               {{ t('pages.settings.query.title') }}
             </TabsTrigger>
-            <TabsTrigger value="ai">
+            <TabsTrigger value="ai" class="gap-1.5">
               {{ t('pages.settings.ai.tabLabel') }}
+              <ProBadge v-if="!entitlementStore.isLocalUltimate" size="dot" />
             </TabsTrigger>
-            <TabsTrigger value="mcp">
+            <TabsTrigger value="mcp" class="gap-1.5">
               {{ t('pages.settings.mcp.title') }}
+              <ProBadge v-if="!entitlementStore.isLocalUltimate" size="dot" />
             </TabsTrigger>
             <TabsTrigger value="jre">
               {{ t('pages.settings.jre.title') }}
             </TabsTrigger>
-            <TabsTrigger value="about">
-              {{ t('pages.settings.about.title') }}
-            </TabsTrigger>
           </TabsList>
 
-          <!-- Appearance Tab -->
-          <TabsContent value="appearance" class="mt-0">
+          <!-- General Tab -->
+          <TabsContent value="general" class="mt-0 space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>{{ t('pages.settings.appearance.title') }}</CardTitle>
-                <CardDescription>{{ t('pages.settings.appearance.description') }}</CardDescription>
+                <CardTitle>{{ t('pages.settings.general.title') }}</CardTitle>
+                <CardDescription>{{ t('pages.settings.general.description') }}</CardDescription>
               </CardHeader>
               <CardContent class="space-y-6">
                 <!-- Theme selector -->
                 <div class="space-y-3">
-                  <Label>{{ t('pages.settings.appearance.theme') }}</Label>
+                  <Label>{{ t('pages.settings.general.theme') }}</Label>
                   <div class="gap-4 grid grid-cols-3">
                     <button
                       v-for="opt in themeOptions"
@@ -232,63 +260,24 @@ async function handleCheckUpdates() {
                         : 'border-border hover:border-muted-foreground'"
                       @click="handleThemeChange(opt.value)"
                     >
-                      <!-- Theme preview -->
-                      <div class="mb-2 rounded flex h-24 overflow-hidden" :class="opt.value === ThemeType.LIGHT ? 'bg-white' : 'bg-zinc-900'">
-                        <!-- Auto: split preview -->
-                        <template v-if="opt.value === ThemeType.AUTO">
-                          <div class="flex h-full w-1/2">
-                            <div class="p-1 bg-zinc-800 flex flex-col gap-1 h-full w-6">
-                              <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                              <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                              <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                            </div>
-                            <div class="p-1 bg-zinc-900 flex-1 space-y-1">
-                              <div class="rounded bg-zinc-700 h-1.5" />
-                              <div class="rounded bg-zinc-700 h-1.5 w-3/4" />
-                              <div class="rounded bg-zinc-700 h-1.5 w-1/2" />
-                            </div>
+                      <div class="mb-2 rounded flex h-24 overflow-hidden">
+                        <div
+                          v-for="mode in opt.value === ThemeType.AUTO ? [ThemeType.DARK, ThemeType.LIGHT] : [opt.value]"
+                          :key="mode"
+                          class="theme-preview bg-background flex flex-1 h-full overflow-hidden"
+                          :class="mode === ThemeType.LIGHT ? 'light' : 'dark'"
+                          aria-hidden="true"
+                        >
+                          <div class="p-1 bg-chrome flex flex-col gap-1 w-6">
+                            <div v-for="item in 3" :key="item" class="rounded-sm bg-muted-foreground/40 h-3 w-3" />
                           </div>
-                          <div class="flex h-full w-1/2">
-                            <div class="p-1 bg-gray-200 flex flex-col gap-1 h-full w-6">
-                              <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                              <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                              <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                            </div>
-                            <div class="p-1 bg-white flex-1 space-y-1">
-                              <div class="rounded bg-gray-200 h-1.5" />
-                              <div class="rounded bg-gray-200 h-1.5 w-3/4" />
-                              <div class="rounded bg-gray-200 h-1.5 w-1/2" />
-                            </div>
+                          <div class="p-2 flex-1 space-y-1.5">
+                            <div class="rounded bg-muted-foreground/30 h-2" />
+                            <div class="rounded bg-muted-foreground/30 h-2 w-3/4" />
+                            <div class="rounded bg-muted-foreground/30 h-2 w-1/2" />
+                            <div class="rounded bg-muted h-2 w-5/6" />
                           </div>
-                        </template>
-                        <!-- Dark preview -->
-                        <template v-else-if="opt.value === ThemeType.DARK">
-                          <div class="p-1 bg-zinc-800 flex flex-col gap-1 h-full w-6">
-                            <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                            <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                            <div class="rounded-sm bg-zinc-600 h-3 w-3" />
-                          </div>
-                          <div class="p-2 bg-zinc-900 flex-1 space-y-1.5">
-                            <div class="rounded bg-zinc-700 h-2" />
-                            <div class="rounded bg-zinc-700 h-2 w-3/4" />
-                            <div class="rounded bg-zinc-700 h-2 w-1/2" />
-                            <div class="rounded bg-zinc-800 h-2 w-5/6" />
-                          </div>
-                        </template>
-                        <!-- Light preview -->
-                        <template v-else>
-                          <div class="p-1 bg-gray-200 flex flex-col gap-1 h-full w-6">
-                            <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                            <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                            <div class="rounded-sm bg-gray-400 h-3 w-3" />
-                          </div>
-                          <div class="p-2 bg-white flex-1 space-y-1.5">
-                            <div class="rounded bg-gray-200 h-2" />
-                            <div class="rounded bg-gray-200 h-2 w-3/4" />
-                            <div class="rounded bg-gray-200 h-2 w-1/2" />
-                            <div class="rounded bg-gray-100 h-2 w-5/6" />
-                          </div>
-                        </template>
+                        </div>
                       </div>
                       <!-- Selected checkmark -->
                       <div
@@ -302,49 +291,56 @@ async function handleCheckUpdates() {
                       </p>
                     </button>
                   </div>
+                </div>
 
-                  <!-- Check for Updates -->
-                  <div class="flex items-center justify-between">
-                    <div class="space-y-1">
-                      <Label>{{ t('pages.settings.updates.checkForUpdates') }}</Label>
-                      <p class="text-xs text-muted-foreground">
-                        {{ t('pages.settings.updates.checkForUpdatesHelp') }}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      :disabled="isChecking || isInstalling"
-                      @click="handleCheckUpdates"
+                <!-- Language selector -->
+                <div class="space-y-3">
+                  <Label>{{ t('pages.settings.general.language') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.general.languageHelp') }}
+                  </p>
+                  <RadioGroup
+                    :model-value="currentLanguage"
+                    class="gap-3 grid grid-cols-2 sm:grid-cols-4"
+                    :aria-label="t('pages.settings.general.languageSelect')"
+                    @update:model-value="handleLanguageChange($event as string)"
+                  >
+                    <label
+                      v-for="langOpt in languageOptions"
+                      :key="langOpt.value"
+                      class="px-3 py-2.5 border rounded-lg flex gap-2.5 min-w-0 cursor-pointer transition-all items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1"
+                      :class="currentLanguage === langOpt.value
+                        ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                        : 'border-input hover:border-primary/50 hover:bg-accent/50'"
                     >
-                      <!-- Spinning circle while checking or installing -->
-                      <span
-                        v-if="isChecking || isInstalling"
-                        class="i-carbon-circle-dash mr-2 shrink-0 h-4 w-4 animate-spin"
+                      <RadioGroupItem
+                        :id="`lang-${langOpt.value}`"
+                        :value="langOpt.value"
+                        :aria-labelledby="`lang-${langOpt.value}-label`"
+                        class="shrink-0"
                       />
-                      <!-- Circular progress ring while downloading -->
-                      <svg
-                        v-else-if="isDownloading && downloadProgress !== null"
-                        class="mr-2 shrink-0 h-4 w-4 -rotate-90"
-                        viewBox="0 0 16 16"
-                      >
-                        <circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="2" opacity="0.15" />
-                        <circle
-                          cx="8" cy="8" r="6"
-                          fill="none"
-                          stroke="currentColor"
-                          stroke-width="2"
-                          stroke-dasharray="37.6991"
-                          :stroke-dashoffset="37.6991 * (1 - downloadProgress / 100)"
-                          stroke-linecap="round"
-                        />
-                      </svg>
-                      {{ isChecking ? t('pages.settings.updates.checking') : isDownloading && downloadProgress !== null ? `${t('pages.settings.updates.downloading')} ${downloadProgress}%` : isInstalling ? t('pages.settings.updates.installing') : updateAvailable ? t('pages.settings.updates.updateAvailable') : t('pages.settings.updates.check') }}
-                    </Button>
-                  </div>
+                      <span
+                        :id="`lang-${langOpt.value}-label`"
+                        class="text-sm font-medium min-w-0 cursor-pointer truncate"
+                        :title="langOpt.label()"
+                      >{{ langOpt.label() }}</span>
+                    </label>
+                  </RadioGroup>
                 </div>
               </CardContent>
             </Card>
+            <section aria-labelledby="settings-account-plan-title" class="space-y-3">
+              <div class="space-y-1">
+                <h2 id="settings-account-plan-title" class="text-base font-semibold">
+                  {{ t('plan.section.title') }}
+                </h2>
+                <p class="text-sm text-muted-foreground">
+                  {{ t('plan.section.desc') }}
+                </p>
+              </div>
+              <PlanSection />
+            </section>
+            <SettingsAbout />
           </TabsContent>
 
           <!-- Editor Tab -->
@@ -372,7 +368,7 @@ async function handleCheckUpdates() {
                       class="w-28"
                       @update:model-value="handleFontSizeChange($event)"
                     />
-                    <p v-if="fontSizeError" class="text-xs text-destructive">
+                    <p v-if="fontSizeError" class="text-xs text-destructive-text">
                       {{ fontSizeError }}
                     </p>
                   </div>
@@ -395,7 +391,7 @@ async function handleCheckUpdates() {
                       class="w-28"
                       @update:model-value="handleTabSizeChange($event)"
                     />
-                    <p v-if="tabSizeError" class="text-xs text-destructive">
+                    <p v-if="tabSizeError" class="text-xs text-destructive-text">
                       {{ tabSizeError }}
                     </p>
                   </div>
@@ -418,7 +414,7 @@ async function handleCheckUpdates() {
                       class="w-28"
                       @update:model-value="handleIndentWidthChange($event)"
                     />
-                    <p v-if="indentWidthError" class="text-xs text-destructive">
+                    <p v-if="indentWidthError" class="text-xs text-destructive-text">
                       {{ indentWidthError }}
                     </p>
                   </div>
@@ -441,7 +437,7 @@ async function handleCheckUpdates() {
                       class="w-28"
                       @update:model-value="handleLineWidthChange($event)"
                     />
-                    <p v-if="lineWidthError" class="text-xs text-destructive">
+                    <p v-if="lineWidthError" class="text-xs text-destructive-text">
                       {{ lineWidthError }}
                     </p>
                   </div>
@@ -541,7 +537,7 @@ async function handleCheckUpdates() {
                       class="w-32"
                       @update:model-value="handleDefaultLimitChange($event)"
                     />
-                    <p v-if="defaultLimitError" class="text-xs text-destructive">
+                    <p v-if="defaultLimitError" class="text-xs text-destructive-text">
                       {{ defaultLimitError }}
                     </p>
                   </div>
@@ -564,7 +560,7 @@ async function handleCheckUpdates() {
                       class="w-32"
                       @update:model-value="handleQueryTimeoutChange($event)"
                     />
-                    <p v-if="queryTimeoutError" class="text-xs text-destructive">
+                    <p v-if="queryTimeoutError" class="text-xs text-destructive-text">
                       {{ queryTimeoutError }}
                     </p>
                   </div>
@@ -597,88 +593,21 @@ async function handleCheckUpdates() {
 
           <!-- AI Tab -->
           <TabsContent value="ai" class="mt-0">
-            <AiSettings />
+            <PaidGate feature="ai">
+              <AiSettings />
+            </PaidGate>
           </TabsContent>
 
           <!-- MCP Bridge Tab -->
           <TabsContent value="mcp" class="mt-0">
-            <McpBridge />
+            <PaidGate feature="mcp_bridge">
+              <McpBridge />
+            </PaidGate>
           </TabsContent>
 
           <!-- JRE & Drivers Tab -->
           <TabsContent value="jre" class="mt-0">
             <JreDriverSection />
-          </TabsContent>
-
-          <!-- About Tab -->
-          <TabsContent value="about" class="mt-0">
-            <Card>
-              <CardHeader>
-                <CardTitle>{{ t('pages.settings.about.title') }}</CardTitle>
-                <CardDescription>{{ t('pages.settings.about.description') }}</CardDescription>
-              </CardHeader>
-              <CardContent class="space-y-5">
-                <!-- Version -->
-                <div class="flex items-center justify-between">
-                  <Label>{{ t('pages.settings.about.version') }}</Label>
-                  <span class="text-sm text-muted-foreground font-mono">{{ version }}</span>
-                </div>
-
-                <!-- License -->
-                <div class="flex items-center justify-between">
-                  <Label>{{ t('pages.settings.about.license') }}</Label>
-                  <span class="text-sm text-muted-foreground">{{ t('pages.settings.about.licenseName') }}</span>
-                </div>
-
-                <div class="border-t border-border/40" />
-
-                <!-- Repository -->
-                <a
-                  href="https://github.com/geek-fun/sqlkit"
-                  target="_blank"
-                  class="p-2 rounded-md flex transition-colors items-center justify-between -mx-2 hover:bg-muted/50"
-                >
-                  <Label>{{ t('pages.settings.about.repository') }}</Label>
-                  <div class="flex gap-2 items-center">
-                    <span class="text-sm text-muted-foreground">geek-fun/sqlkit</span>
-                    <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
-                  </div>
-                </a>
-
-                <!-- Website -->
-                <a
-                  href="https://www.geekfun.club"
-                  target="_blank"
-                  class="p-2 rounded-md flex transition-colors items-center justify-between -mx-2 hover:bg-muted/50"
-                >
-                  <Label>{{ t('pages.settings.about.website') }}</Label>
-                  <div class="flex gap-2 items-center">
-                    <span class="text-sm text-muted-foreground">geekfun.club</span>
-                    <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
-                  </div>
-                </a>
-
-                <!-- Discord -->
-                <a
-                  href="https://discord.gg/5NSUyPK2E"
-                  target="_blank"
-                  class="p-2 rounded-md flex transition-colors items-center justify-between -mx-2 hover:bg-muted/50"
-                >
-                  <Label>{{ t('pages.settings.about.community') }}</Label>
-                  <div class="flex gap-2 items-center">
-                    <span class="text-sm text-muted-foreground">Discord</span>
-                    <span class="i-carbon-launch text-muted-foreground h-4 w-4" />
-                  </div>
-                </a>
-
-                <div class="border-t border-border/40" />
-
-                <!-- Copyright -->
-                <p class="text-xs text-muted-foreground pt-2 text-center">
-                  {{ t('pages.settings.about.copyright', { year: new Date().getFullYear() }) }}
-                </p>
-              </CardContent>
-            </Card>
           </TabsContent>
         </div>
       </Tabs>

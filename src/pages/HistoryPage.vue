@@ -337,7 +337,7 @@ function handleToggleFavorite(id: string) {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                class="text-destructive h-7 w-7 hover:text-destructive"
+                                class="text-destructive-text h-7 w-7 hover:text-destructive-text"
                                 @click="handleDelete(entry.id)"
                               >
                                 <svg

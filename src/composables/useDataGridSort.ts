@@ -1,6 +1,6 @@
 import type { Ref } from 'vue'
 import type { SortDirection, SortState } from '@/types/grid'
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 
 export function useDataGridSort() {
   const sortState: Ref<SortState> = ref([])
@@ -51,15 +51,28 @@ export function useDataGridSort() {
     }
   }
 
-  const clearSort = () => {
-    sortState.value = []
+  /** Set an explicit direction for a column, keeping other sort rules intact. */
+  const setSort = (column: string, direction: SortDirection) => {
+    const existing = sortState.value.find(s => s.column === column)
+    sortState.value = existing
+      ? sortState.value.map(s => (s.column === column
+          ? { ...s, direction }
+          : s))
+      : [
+          ...sortState.value,
+          { column, direction },
+        ]
   }
 
-  const buildOrderByClause = (validColumns: string[]): string | null => {
-    const valid = sortState.value.filter(s => validColumns.includes(s.column))
-    if (valid.length === 0)
-      return null
-    return valid.map(s => `${s.column} ${s.direction}`).join(', ')
+  /** Drop sort rules for columns that no longer exist or are no longer sortable. */
+  const pruneSort = (validColumns: readonly string[]) => {
+    const pruned = sortState.value.filter(s => validColumns.includes(s.column))
+    if (pruned.length !== sortState.value.length)
+      sortState.value = pruned
+  }
+
+  const clearSort = () => {
+    sortState.value = []
   }
 
   const getSortDirection = (column: string): SortDirection | null => {
@@ -74,15 +87,13 @@ export function useDataGridSort() {
       : null
   }
 
-  const hasActiveSort = computed(() => sortState.value.length > 0)
-
   return {
     sortState,
     toggleSort,
+    setSort,
+    pruneSort,
     clearSort,
-    buildOrderByClause,
     getSortDirection,
     getSortPriority,
-    hasActiveSort,
   }
 }

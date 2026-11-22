@@ -7,6 +7,137 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Device activation and session refresh report the app's UI language, so re-logging in after changing it keeps the console device list accurate (#209)
+
+## [1.0.2] - 2026-11-13
+
+### Added
+
+- UberLLM provider preset in AI settings (OpenAI compatible, base URL `https://api.uberllm.dev/v1`) (#205)
+- CloudGPU provider preset in AI settings (OpenAI compatible, base URL `https://cloudgpu.app/v1`)
+- Runcrate provider preset in AI settings (OpenAI compatible, base URL `https://api.runcrate.ai/v1`)
+
+### Changed
+
+- Unified the app's type scale and tightened workspace density: sidebar trees and query tabs read at the 13px body tier, with a more compact navigation rail, object tree, and toolbars.
+
+### Fixed
+
+- AI chat no longer sends the message when Enter confirms an IME candidate during Chinese/Japanese input.
+
+## [1.0.1] - 2026-10-28
+
+### Added
+
+- AI permissions use one policy across Data Studio and MCP clients: a per-connection access level overrides the system default, and individual actions can be tuned in Custom. Editing permissions requires Ultimate.
+- Blocked agent actions can be recovered in place — the denial names the connection, required action, and source, with Review permissions and Retry request that starts a fresh turn without replaying earlier work.
+- Layered agent prompts: a global system prompt in AI settings plus an optional prompt per connection give the agent business context wherever it runs (#187).
+- Query results and table views are paginated — choose rows per page, jump to the first or last page, or show all returned rows. Sorting applies to the visible page.
+- Table and result footers show the active database, affected rows, execution time, and per-tab counts for columns, indexes, foreign keys, and triggers.
+- Table context menus lead with View Data and open View Structure directly on the schema sub-page; each tab remembers the sub-page you last viewed.
+- Database menus gain Create Script, which opens a new query tab for that database.
+- Cheaper Inference provider preset in AI settings (OpenAI compatible, base URL `https://api.cheaperinference.com/v1`)
+
+### Changed
+
+- The workspace uses a graphite dark theme with consistent semantic colors, while keeping existing data, status, and database-type recognition cues.
+- Settings consolidates account, plan, theme, and update controls into a General tab, and pagination uses the same controls in table views and result grids.
+- SSH tunnel details are read-only until you explicitly edit them, so saved hop chains no longer show open editable fields in the connection form.
+- Monaco scrollbars match the app's thin scrollbars.
+
+### Fixed
+
+- Sessions now survive app restarts: you stay signed in with entitlements restored, and overlapping session refreshes no longer invalidate each other.
+- Idle connections recover before a database action runs — metadata browsing, queries, edits, DDL, transfers, and AI/MCP tools replace a dead session instead of failing.
+- PostgreSQL scripts that return multiple result sets keep all of them and let you switch between result sets.
+- Permission changes apply immediately to agent dispatches, and earlier denials remain labeled as previous attempts instead of implying current access.
+- About shows the running app version and is consolidated into Settings.
+- The source permission modal follows the permission editor's radio cards and switch rows, with an explicit detach confirmation (#199).
+
+### Security
+
+- Upgraded DOMPurify to pick up upstream security fixes, including the copy bundled with Monaco.
+- Removed an unused command that allowed generic capability invocation from the WebView, and limited permission cleanup to connections that no longer exist.
+
+## [1.0.0] - 2026-10-18
+
+### Added
+
+- **DuckDB failure diagnosis and file-format reporting** — DuckDB connection failures are translated into an explanation with the fix attached: file lock held by another process or connection, instance-configuration conflict, and storage-format incompatibility each get their own message, and the two lock cases offer **retry as read-only** inline in the connection form (the connecting modal shows the same explanation on connect). `probe_database_file` additionally reports the DuckDB storage-format version (header bytes 12..20, mapped to the oldest release that can open the file) and whether a sibling `.wal` write-ahead log is present, both shown under the file path.
+
+- **Create DuckDB / SQLite databases from the connection form** — the file-based path field is editable again and gains `New…` / `Open…` actions backed by the native save dialog (extension appended automatically), an inline explanation of what will happen on connect (the engine creates a missing file, the file exists, is empty, is read-only, is a folder, is a different engine's file, or the parent folder is missing with a one-click "Create folder"), and a per-engine recent-files list with reveal/remove actions. DuckDB also gets the SQLite-style **File / In-Memory** tabs; in-memory connections are stored as named instances (`memory:<label>`) because unnamed DuckDB in-memory databases are private to a single connection and would otherwise give every pooled connection its own empty database. A new **read-only** access mode (`access_mode=READ_ONLY`) is meant to let DuckDB share a file with other processes (`~` is expanded for file-based paths, and opening the same DuckDB file a second time with a conflicting access mode is blocked with "switch to that connection" / "open read-only" choices — read-only needs a bridge build with the HikariCP flag alignment below, and the form explains that until it ships). New Tauri commands: `probe_database_file` (existence, size, writability, header sniffing) and `create_database_directory`. `scripts/verify-duckdb-jdbc-urls.sh` records the DuckDB JDBC semantics these decisions rely on.
+
+- **Entitlements & version-lock subscription model (geekfun#56)** — client-side implementation of the Ultimate entitlement contract: the two server-computed fields `ultimateExpiresAt` + `versionLockHorizon` are consumed via a new Rust entitlement module (persisted cache, offline tolerance, failure degradation, 5-minute refresh throttle, `app.releaseDate <= versionLockHorizon` unlock check). Rust command gates return `ENTITLEMENT_REQUIRED` for AI (agent loop/step, compaction, LLM validation), the whole Transfer module (import/export/migration/structure execution), SSH tunnel establishment, and the MCP bridge (config/policy save + auto-start). The frontend adds an entitlement store, Geekfun login entry, paid-feature gates with upgrade guidance on Data Studio, Transfer, AI assistant sidebar, ER diagram actions, AI/MCP settings, SSH tunnel option in the connection form, plus an Account & Plan settings tab showing the version-lock state with Geekfun login and logout (logout clears the local entitlement cache so entitlements never outlive the account session).
+- Requesty provider preset in AI settings (OpenAI compatible, base URL `https://router.requesty.ai/v1`)
+- Opper provider preset in AI settings (OpenAI compatible, base URL `https://api.opper.ai/v3/compat`)
+- API Route provider preset in AI settings (OpenAI compatible, base URL `https://global.api-route.com/v1`)
+
+- **SSH tunnels for any connection** — connect through a bastion, with multi-hop chains, reusable SSH profiles, an optional proxy hop, password or key auth (ED25519/RSA, optional passphrase), and trust-on-first-use host-key pinning plus an unpin command for when a server key changes.
+
+- **Cross-database browsing without reconnecting** — table, column, index, foreign-key, view, routine and trigger panels can inspect any database on the server; PostgreSQL and SQL Server route through a short-lived connection instead of asking you to reconnect.
+
+- **Instant result-grid sorting** — sorting runs in the frontend over the rows already returned, so clicking a header no longer re-runs the query; primitive columns sort consistently even when one column mixes numbers, dates, booleans and text.
+
+- **Settings report what is happening** — JRE/driver installs, provider sync, update checks and other settings actions show pending, success and failure inline with progress and retry, replacing silent no-ops.
+
+### Changed
+
+- **JDBC connections are much faster (DuckDB "Test connection" above all)** — measured per connect before: an Adoptium JRE update check (1.4-2.5 s, on *every* connect), two Maven Central metadata round trips (0.6-0.8 s each), a fresh bridge JVM (DuckDB maps a ~107 MB native library, ~1.4 s) and a new driver class loader per connection. Now: the JRE check is memoised for 6 hours, a cached driver JAR skips the Maven resolution on the Rust side (the Java side follows in the next bridge build), bridge downloads use a shared HTTP client with a bounded connect timeout instead of `reqwest::get` (which had none), the bridge process is shared across connections (`shared_launcher`), and a connection releases only its own pool through the `disconnect` RPC instead of killing the process. Verified with `src-tauri/tests/duckdb_bridge_integration.rs`: a warm connect went from ~4.3 s to **5.5 ms** with a bridge build that also caches the driver class loader; with the currently released bridge the same test measures ~1.4 s per warm connect.
+
+
+- **Result grids use the available width** — data columns stretch to fill spare space and the Actions column stays pinned to the right edge.
+
+### Fixed
+
+- Editing an AI provider now selects its exact provider preset before falling back to API compatibility.
+
+- **DuckDB read-only mode is rejected by the released JDBC bridge** — DuckDB refuses `Connection.setReadOnly()`, and HikariCP calls it whenever its own read-only flag disagrees with the opened connection (it defaults to false), so a read-only URL failed with `Can't change read-only status on connection level`. The bridge now derives HikariCP's flag from the URL (`ConnectionManager.isReadOnlyUrl`); until a bridge build with that change ships, the connection form explains the limitation and offers **retry as read-write**. Verified against a patched bridge in `src-tauri/tests/duckdb_bridge_integration.rs`.
+
+- **Untranslated keys could render in the UI** — the new-connection menu displayed `pages.connections.newMenu.*` because those strings were added under the wrong node of the locale files; `src/__tests__/i18nKeys.test.ts` now scans every literal `t('…')` in `src/` and fails when a key does not resolve in `enUS` or `zhCN`, so this class of regression is caught by `npm test` instead of by a screenshot. The same scan surfaced two latent gaps, both fixed: `common.cancel` (used by the device-replace dialog, now the existing `common.buttons.cancel`) and the missing `zhCN` value for `components.serverForm.placeholders.encryptionKey`.
+
+- **DuckDB database files whose path contains `;` were mis-parsed** — the DuckDB JDBC driver splits its URL on `;`, so `jdbc:duckdb:/path/semi;colon.duckdb` failed with `Invalid URL entry` (verified against `duckdb_jdbc` 1.5.6); such paths are now rejected with an explanation in the connection form and in the backend instead of surfacing a confusing driver error, and read-only mode is never silently dropped for them.
+
+- **DuckDB connections fail with "The following options were not recognized: ssl" (issue #158)** — embedded/file-based engines (DuckDB, SQLite, SQLCipher, Access) have no SSL settings in the UI, so their stored ssl mode is just the `Prefer` default; the JDBC bridge now receives no ssl mode for such types instead of injecting `ssl=true`, which DuckDB's driver rejects as an unknown option; the bridge's property mapper also stops blindly setting `ssl=true` for drivers without explicit SSL support (H2 and Firebird previously fell into that fallback).
+
+- **Deep-link sign-in on cold start** — a `sqlkit://auth` link that launches the app no longer drops the token: the payload is parked in a pending-auth slot during startup and the frontend pulls it via `consume_pending_auth` once mounted; running-instance links double-write the same slot, closing the startup window too.
+
+- **Complex queries across all four databases** — PostgreSQL multi-statement batches keep their result sets and exotic types (arrays, JSON, ranges, geometry); MySQL and SQL Server keep sessions across requests and preserve later or empty result sets, row counts and errors; Oracle keeps PL/SQL definitions and slash delimiters and returns complete DDL. MySQL functional-index crashes and numeric/binary conversion, SQL Server duplicate columns and missing precision, and Oracle JSON, timestamp and object-type conversion are fixed.
+
+- **Statements that start with a comment or end in RETURNING** — these were classified as non-row statements, so the UI showed "N row(s) affected" and an empty grid; they now return rows.
+
+- **Numeric column headers line up with their values** — headers take the same alignment as their cells, the sort indicator stays after the column name, and sort-priority numbers appear only for multi-column sorts.
+
+- **The DDL panel's close button no longer overlaps Copy** — the header reserves the space the dialog close button occupies.
+
+- **AI providers update instead of duplicating** — adding an existing provider updates it in place, and a failed model sync reports the error instead of silently leaving the default model list.
+
+- **DuckDB native-load warnings** — the bridge JVM starts with native access enabled, so JDK 24+ no longer prints restricted-method warnings into connection error messages.
+
+- **Themed default avatar** — accounts without a picture get a deterministic gradient initial derived from the account name instead of the flat ink block.
+
+## [0.8.7] - 2026-08-17
+
+### Added
+
+- DBA capabilities for session, slow-query, and privilege management (#138)
+
+### Fixed
+
+- Use Pinia appStore as the single theme source for the editor (#137)
+
+## [0.8.6] - 2026-08-11
+
+### Added
+
+- Guide agents to sqlkit tools for database access (#134)
+- Advertise a discovery tool per connection in `list_connections` (#135)
+
+### Changed
+
+- Bump data-studio-agent to v0.1.6
+
 ## [0.8.5] - 2026-08-08
 
 ### Added
@@ -127,7 +258,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refactor ER diagram to single TB layout with Record position tracking
 - Replace ER diagram SVG rendering with pure HTML for better performance
-- Adopt DBX-style compact toolbar layout
+- Adopt compact toolbar layout
 - Refactor sidebar: move ER diagram button to database actions dropdown
 
 ## [0.7.4] - 2026-07-01

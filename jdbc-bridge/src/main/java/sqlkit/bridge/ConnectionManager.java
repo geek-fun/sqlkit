@@ -14,6 +14,18 @@ public class ConnectionManager {
 
     private final Map<String, HikariDataSource> pools = new HashMap<>();
     private final Map<String, DriverClassLoader> loaders = new HashMap<>();
+    private final Map<String, SslPropertyMapper.CqlTlsSettings> cqlTls = new HashMap<>();
+
+    /**
+     * Driver classes loaded once per JAR set.
+     *
+     * A fresh class loader per connection re-runs the driver's static
+     * initialisation, which for DuckDB maps a ~107 MB native library (measured
+     * ~1.4 s). Caching the loader keeps that cost to the first connection of the
+     * bridge process; entries are released together with the process.
+     */
+    private final Map<String, DriverClassLoader> sharedLoaders = new HashMap<>();
+    private final Map<String, Driver> sharedDrivers = new HashMap<>();
 
     /**
      * Create a new JDBC connection pool.
@@ -33,7 +45,7 @@ public class ConnectionManager {
                         boolean credentialsInUrl,
                         String sslMode, String sslCaCert,
                         String sslClientCert, String sslClientKey,
-                        boolean trustServerCertificate) throws ClassifiedException, Exception {
+                        boolean trustServerCertificate, String cqlKeyspace) throws ClassifiedException, Exception {
         if (pools.containsKey(connId)) {
             throw new Exception("Connection already exists: " + connId);
         }
@@ -49,28 +61,36 @@ public class ConnectionManager {
         }
         final String jdbcUrl = url;
 
-        DriverClassLoader loader = new DriverClassLoader(driverJars);
-        Class<?> driverCls = Class.forName(driverClass, true, loader);
-        if (!java.sql.Driver.class.isAssignableFrom(driverCls)) {
-            throw new ClassifiedException("Class " + driverClass + " does not implement java.sql.Driver", null, ErrorClassifier.ErrorType.UNKNOWN);
-        }
-        final java.sql.Driver driver = (java.sql.Driver) driverCls.getDeclaredConstructor().newInstance();
-        loaders.put(connId, loader);
+        final java.sql.Driver driver = sharedDriver(driverClass, driverJars);
+        DriverClassLoader loader = loaderFor(driverJars);
+        final SslPropertyMapper.CqlTlsSettings tls = SslPropertyMapper.requiresCqlTls(driverClass, sslMode)
+                ? SslPropertyMapper.cqlTlsSettings(jdbcUrl, username, password, sslMode,
+                    sslCaCert, sslClientCert, sslClientKey)
+                : null;
 
         HikariConfig config = new HikariConfig();
+        // Keep HikariCP's read-only flag aligned with the connection the driver
+        // already opened: HikariCP calls `connection.setReadOnly(config.isReadOnly())`
+        // whenever the two disagree, and DuckDB rejects changing the mode at
+        // connection level ("Can't change read-only status on connection level").
+        config.setReadOnly(isReadOnlyUrl(jdbcUrl));
         config.setDataSource(new javax.sql.DataSource() {
             public java.sql.Connection getConnection() throws java.sql.SQLException {
-                java.util.Properties info = new java.util.Properties();
-                if (username != null) info.setProperty("user", username);
-                if (password != null) info.setProperty("password", password);
-                SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
-                return driver.connect(jdbcUrl, info);
+                return getConnection(username, password);
             }
             public java.sql.Connection getConnection(String u, String p) throws java.sql.SQLException {
                 java.util.Properties info = new java.util.Properties();
                 if (u != null) info.setProperty("user", u);
                 if (p != null) info.setProperty("password", p);
-                SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
+                if (cqlKeyspace != null) {
+                    // URL paths are validated as unquoted names by the wrapper.
+                    info.setProperty("databaseName", "\"" + cqlKeyspace.replace("\"", "\"\"") + "\"");
+                }
+                if (tls != null) {
+                    info.putAll(tls.properties);
+                } else {
+                    SslPropertyMapper.applySslProperties(driverClass, jdbcUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, info);
+                }
                 return driver.connect(jdbcUrl, info);
             }
             public java.io.PrintWriter getLogWriter() { return null; }
@@ -92,18 +112,73 @@ public class ConnectionManager {
         config.setIdleTimeout(600000);
         config.setMaxLifetime(1800000);
 
-        HikariDataSource ds = new HikariDataSource(config);
-
-        // Verify connection works
-        try (Connection c = ds.getConnection()) {
-            // ok
+        HikariDataSource ds = null;
+        try {
+            ds = new HikariDataSource(config);
+            try (Connection c = ds.getConnection()) {
+                // Verify the pool can open a connection.
+            }
         } catch (Exception e) {
-            ds.close();
+            if (ds != null) {
+                ds.close();
+            }
+            if (tls != null) {
+                tls.close();
+            }
             ErrorClassifier.ErrorType errorType = ErrorClassifier.classify(e);
             throw new ClassifiedException("Failed to verify connection: " + e.getMessage(), e, errorType);
         }
 
         pools.put(connId, ds);
+        loaders.put(connId, loader);
+        if (tls != null) {
+            cqlTls.put(connId, tls);
+        }
+    }
+
+    /** Reuse one {@link DriverClassLoader} per set of driver JARs. */
+    private DriverClassLoader loaderFor(List<String> driverJars) throws Exception {
+        String key = String.join("|", driverJars);
+        DriverClassLoader loader = sharedLoaders.get(key);
+        if (loader == null) {
+            loader = new DriverClassLoader(driverJars);
+            sharedLoaders.put(key, loader);
+        }
+        return loader;
+    }
+
+    /** Reuse the instantiated JDBC driver for a driver class + JAR set. */
+    private Driver sharedDriver(String driverClass, List<String> driverJars) throws Exception {
+        String key = driverClass + "|" + String.join("|", driverJars);
+        Driver driver = sharedDrivers.get(key);
+        if (driver != null) {
+            return driver;
+        }
+
+        DriverClassLoader loader = loaderFor(driverJars);
+        Class<?> driverCls = Class.forName(driverClass, true, loader);
+        if (!java.sql.Driver.class.isAssignableFrom(driverCls)) {
+            throw new ClassifiedException("Class " + driverClass + " does not implement java.sql.Driver", null, ErrorClassifier.ErrorType.UNKNOWN);
+        }
+        driver = (java.sql.Driver) driverCls.getDeclaredConstructor().newInstance();
+        sharedDrivers.put(key, driver);
+        return driver;
+    }
+
+    /**
+     * Whether a JDBC URL asks for a read-only database.
+     *
+     * DuckDB expresses this in the URL (`access_mode=READ_ONLY` from SQLKit, or
+     * the driver property `duckdb.read_only`), and the driver refuses to change
+     * the mode through {@link java.sql.Connection#setReadOnly(boolean)}.
+     */
+    static boolean isReadOnlyUrl(String jdbcUrl) {
+        if (jdbcUrl == null) {
+            return false;
+        }
+        String normalized = jdbcUrl.toLowerCase(Locale.ROOT);
+        return normalized.contains("access_mode=read_only")
+                || normalized.contains("duckdb.read_only=true");
     }
 
     /**
@@ -114,9 +189,12 @@ public class ConnectionManager {
         if (ds != null) {
             ds.close();
         }
-        DriverClassLoader loader = loaders.remove(connId);
-        if (loader != null) {
-            try { loader.close(); } catch (Exception ignored) { }
+        // The loader is shared with other connections (see sharedLoaders), so it is
+        // only closed when the whole bridge shuts down.
+        loaders.remove(connId);
+        SslPropertyMapper.CqlTlsSettings tls = cqlTls.remove(connId);
+        if (tls != null) {
+            tls.close();
         }
     }
 
@@ -160,9 +238,16 @@ public class ConnectionManager {
             ds.close();
         }
         pools.clear();
+        cqlTls.values().forEach(SslPropertyMapper.CqlTlsSettings::close);
+        cqlTls.clear();
         for (DriverClassLoader loader : loaders.values()) {
             try { loader.close(); } catch (Exception ignored) { }
         }
         loaders.clear();
+        for (DriverClassLoader loader : sharedLoaders.values()) {
+            try { loader.close(); } catch (Exception ignored) { }
+        }
+        sharedLoaders.clear();
+        sharedDrivers.clear();
     }
 }

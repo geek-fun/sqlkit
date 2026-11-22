@@ -20,7 +20,7 @@ export type ChatMessage = {
   preparingInProgress?: boolean
 }
 
-export type ChatSessionStatus = 'idle' | 'running' | 'waiting_confirmation' | 'error' | 'stopped'
+export type ChatSessionStatus = 'idle' | 'running' | 'waiting_confirmation' | 'blocked' | 'error' | 'stopped'
 
 export type ChatSessionStopReason
   = 'iteration_cap'
@@ -41,6 +41,7 @@ export type ChatSession = {
 }
 
 export type ChatPermissions = {
+  manage?: boolean
   read: boolean
   create: boolean
   update: boolean
@@ -48,9 +49,10 @@ export type ChatPermissions = {
 }
 
 export type ConnectionEntry = {
+  sourceId?: string
   connectionId: string
   dbType: string
-  permissions: ChatPermissions
+  permissions?: ChatPermissions
 }
 
 export type ChatContextConfig = {

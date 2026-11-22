@@ -14,8 +14,9 @@ export default defineConfig({
     presetIcons({
       scale: 1.2,
       collections: {
-        carbon: () => import('@iconify-json/carbon/icons.json').then(i => i.default as Record<string, unknown>),
-        lucide: () => import('@iconify-json/lucide/icons.json').then(i => i.default as Record<string, unknown>),
+        'carbon': () => import('@iconify-json/carbon/icons.json').then(i => i.default as Record<string, unknown>),
+        'lucide': () => import('@iconify-json/lucide/icons.json').then(i => i.default as Record<string, unknown>),
+        'simple-icons': () => import('@iconify-json/simple-icons/icons.json').then(i => i.default as Record<string, unknown>),
       },
     }),
     presetAnimations(),
@@ -33,9 +34,12 @@ export default defineConfig({
       input: 'hsl(var(--input))',
       ring: 'hsl(var(--ring))',
       background: 'hsl(var(--background))',
+      chrome: 'hsl(var(--chrome))',
+      selection: 'hsl(var(--selection))',
       foreground: 'hsl(var(--foreground))',
       primary: {
         DEFAULT: 'hsl(var(--primary))',
+        text: 'hsl(var(--primary-text))',
         foreground: 'hsl(var(--primary-foreground))',
       },
       secondary: {
@@ -44,6 +48,9 @@ export default defineConfig({
       },
       destructive: {
         DEFAULT: 'hsl(var(--destructive))',
+        text: 'hsl(var(--destructive-text))',
+        muted: 'hsl(var(--destructive-muted))',
+        border: 'hsl(var(--destructive-border))',
         foreground: 'hsl(var(--destructive-foreground))',
       },
       success: {
@@ -51,6 +58,12 @@ export default defineConfig({
         foreground: 'hsl(var(--success-foreground))',
         muted: 'hsl(var(--success-muted))',
         border: 'hsl(var(--success-border))',
+      },
+      warning: {
+        DEFAULT: 'hsl(var(--warning))',
+        foreground: 'hsl(var(--warning-foreground))',
+        muted: 'hsl(var(--warning-muted))',
+        border: 'hsl(var(--warning-border))',
       },
       muted: {
         DEFAULT: 'hsl(var(--muted))',
@@ -73,6 +86,12 @@ export default defineConfig({
       lg: 'var(--radius)',
       md: 'calc(var(--radius) - 2px)',
       sm: 'calc(var(--radius) - 4px)',
+    },
+    text: {
+      // Semantic type scale (DESIGN.md Typography). preset-wind4 stores font
+      // sizes under theme.text; 12/14/16/20px already exist as xs/sm/base/xl.
+      caption: { fontSize: '11px', lineHeight: '16px' },
+      body: { fontSize: '13px', lineHeight: '20px' },
     },
     animation: {
       keyframes: {
@@ -107,13 +126,13 @@ export default defineConfig({
     'text-accent-foreground',
     'hover:bg-accent',
     'hover:text-accent-foreground',
-    'text-primary',
+    'text-primary-text',
     'bg-popover',
     'text-popover-foreground',
     'bg-destructive/10',
-    'text-destructive',
+    'text-destructive-text',
     'hover:bg-destructive/10',
-    'hover:text-destructive-foreground',
+    'hover:text-destructive-text',
     'bg-success',
     'text-success',
     'border-success-border',

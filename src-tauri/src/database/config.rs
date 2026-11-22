@@ -137,6 +137,8 @@ pub enum DatabaseType {
     Kylin,
     /// Apache Cassandra — JDBC bridge.
     Cassandra,
+    /// ScyllaDB — CQL-compatible wide-column store, JDBC bridge.
+    ScyllaDB,
     /// InterSystems IRIS — JDBC bridge.
     Iris,
     /// Microsoft Access — JDBC bridge.
@@ -157,6 +159,66 @@ pub enum DatabaseType {
     RQLite,
     /// Turso (libsql) — HTTP SQL API.
     Turso,
+}
+
+impl DatabaseType {
+    pub(crate) fn is_cql(self) -> bool {
+        matches!(self, Self::Cassandra | Self::ScyllaDB)
+    }
+
+    /// Whether a backend slug (`db_type` string as used by the SQL services
+    /// and MCP tools) identifies a CQL engine. Case-insensitive on purpose:
+    /// the slug arrives from several layers with mixed casing.
+    pub(crate) fn slug_is_cql(slug: &str) -> bool {
+        matches!(slug.to_lowercase().as_str(), "cassandra" | "scylladb")
+    }
+
+    /// The backend slug for this type — the same `db_type` string the SQL
+    /// services key their dialect lookups on (matches the serde lowercase
+    /// representation the frontend persists).
+    pub(crate) fn slug(self) -> String {
+        serde_json::to_value(self)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_else(|| "generic".to_string())
+    }
+
+    /// Whether this connection type has an SSL/TLS concept at all.
+    ///
+    /// Embedded / file-based engines mirror the frontend
+    /// `SSL_UNSUPPORTED_DATABASES`: their settings form never shows SSL, so
+    /// no ssl mode is ever persisted and the stored value is just the
+    /// `Prefer` default. The bridge must not receive one either — injecting
+    /// SSL properties into such drivers breaks the connection (DuckDB
+    /// rejects unknown options, issue #158).
+    pub fn ssl_supported(self) -> bool {
+        !matches!(
+            self,
+            DatabaseType::SQLite
+                | DatabaseType::SQLCipher
+                | DatabaseType::DuckDb
+                | DatabaseType::Access
+        )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn embedded_types_have_no_ssl_concept() {
+        assert!(!DatabaseType::SQLite.ssl_supported());
+        assert!(!DatabaseType::SQLCipher.ssl_supported());
+        assert!(!DatabaseType::DuckDb.ssl_supported());
+        assert!(!DatabaseType::Access.ssl_supported());
+        // network types keep their ssl mode
+        assert!(DatabaseType::PostgreSQL.ssl_supported());
+        assert!(DatabaseType::MySQL.ssl_supported());
+        assert!(DatabaseType::Oracle.ssl_supported());
+        assert!(DatabaseType::H2.ssl_supported());
+        assert!(DatabaseType::Firebird.ssl_supported());
+    }
 }
 
 /// SSL/TLS mode for connections.
@@ -305,8 +367,43 @@ impl ConnectionConfig {
 
     /// Set the database name.
     pub fn with_database(mut self, database: impl Into<String>) -> Self {
-        self.database = Some(database.into());
+        let database = database.into();
+        if self.db_type.is_cql() {
+            // Older connection records store the datacenter in the database value.
+            let (keyspace, params) = database.split_once('?').unwrap_or((&database, ""));
+            if let Some((_, dc)) = url::form_urlencoded::parse(params.as_bytes())
+                .find(|(name, _)| name.eq_ignore_ascii_case("localdatacenter"))
+            {
+                self.options
+                    .insert("localdatacenter".into(), dc.into_owned());
+            }
+            let keyspace = keyspace.trim();
+            self.database = Some(
+                keyspace
+                    .strip_prefix('"')
+                    .and_then(|name| name.strip_suffix('"'))
+                    .unwrap_or(keyspace)
+                    .to_string(),
+            );
+        } else {
+            self.database = Some(database);
+        }
         self
+    }
+
+    pub(crate) fn cql_keyspace(&self) -> &str {
+        self.database
+            .as_deref()
+            .filter(|name| !name.is_empty())
+            .unwrap_or("system")
+    }
+
+    pub(crate) fn cql_datacenter(&self) -> &str {
+        self.options
+            .get("localdatacenter")
+            .map(|dc| dc.trim())
+            .filter(|dc| !dc.is_empty())
+            .unwrap_or("datacenter1")
     }
 
     /// Set the password.
@@ -375,6 +472,50 @@ impl ConnectionConfig {
     }
 }
 
+/// Expand a leading `~` to the current user's home directory.
+///
+/// File-based engines pass the path straight to the driver, which does not
+/// expand shell short-hands, so `~/data/app.duckdb` would otherwise create a
+/// literal `~` directory next to the process working directory.
+pub fn expand_tilde(path: &str) -> String {
+    let trimmed = path.trim();
+    let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"));
+    match home {
+        Ok(home) if trimmed == "~" => home,
+        Ok(home) if trimmed.starts_with("~/") || trimmed.starts_with("~\\") => {
+            format!("{}{}", home, &trimmed[1..])
+        }
+        _ => trimmed.to_string(),
+    }
+}
+
+/// Build the `{database}` component of the DuckDB JDBC URL template
+/// (`jdbc:duckdb:{database}`).
+///
+/// DuckDB accepts JDBC URL options after the database part, so read-only mode is
+/// expressed as `access_mode=READ_ONLY`. Paths are tilde-expanded because the
+/// driver treats the value literally.
+///
+/// The driver splits the URL on `;` before opening the database (verified
+/// against `duckdb_jdbc` 1.5.6: `semi;colon.duckdb` fails with
+/// `Invalid URL entry`), so such paths are rejected instead of being silently
+/// turned into options — or, worse, into a read-write connection when the user
+/// asked for read-only.
+pub fn duckdb_database_value(host: &str, read_only: bool) -> Result<String, String> {
+    let path = expand_tilde(host);
+    if path.contains(';') {
+        return Err(
+            "DuckDB's JDBC driver splits the connection URL on ';', so a database path \
+             containing ';' cannot be opened. Rename the file and try again."
+                .to_string(),
+        );
+    }
+    if !read_only {
+        return Ok(path);
+    }
+    Ok(format!("{};access_mode=READ_ONLY", path))
+}
+
 /// Serialization helpers for Duration.
 mod duration_serde {
     use serde::{Deserialize, Deserializer, Serializer};
@@ -393,5 +534,70 @@ mod duration_serde {
     {
         let secs = u64::deserialize(deserializer)?;
         Ok(Duration::from_secs(secs))
+    }
+}
+
+#[cfg(test)]
+mod file_path_tests {
+    use super::*;
+
+    #[test]
+    fn expand_tilde_leaves_plain_paths_untouched() {
+        assert_eq!(expand_tilde("/tmp/app.duckdb"), "/tmp/app.duckdb");
+        assert_eq!(expand_tilde(":memory:"), ":memory:");
+        assert_eq!(expand_tilde("  /tmp/app.duckdb  "), "/tmp/app.duckdb");
+    }
+
+    #[test]
+    fn expand_tilde_replaces_leading_home() {
+        let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"));
+        let Ok(home) = home else {
+            return;
+        };
+        assert_eq!(
+            expand_tilde("~/data/app.duckdb"),
+            format!("{}/data/app.duckdb", home)
+        );
+        assert_eq!(expand_tilde("~"), home);
+    }
+
+    #[test]
+    fn duckdb_database_value_appends_read_only_option() {
+        assert_eq!(
+            duckdb_database_value("/tmp/app.duckdb", false),
+            Ok("/tmp/app.duckdb".to_string())
+        );
+        assert_eq!(
+            duckdb_database_value("/tmp/app.duckdb", true),
+            Ok("/tmp/app.duckdb;access_mode=READ_ONLY".to_string())
+        );
+    }
+
+    #[test]
+    fn duckdb_database_value_keeps_named_memory_instances() {
+        assert_eq!(
+            duckdb_database_value("memory:sqlkit_ab12cd34", false),
+            Ok("memory:sqlkit_ab12cd34".to_string())
+        );
+        assert_eq!(
+            duckdb_database_value("memory:sqlkit_ab12cd34", true),
+            Ok("memory:sqlkit_ab12cd34;access_mode=READ_ONLY".to_string())
+        );
+    }
+
+    #[test]
+    fn duckdb_database_value_rejects_pre_joined_options() {
+        // Callers pass a bare path; a value that already carries URL options is
+        // rejected so options can never be applied twice by accident.
+        let once = duckdb_database_value("/tmp/app.duckdb", true).expect("value");
+        assert!(duckdb_database_value(&once, true).is_err());
+    }
+
+    #[test]
+    fn duckdb_database_value_rejects_paths_with_semicolons() {
+        // Verified against duckdb_jdbc 1.5.6: `jdbc:duckdb:/tmp/semi;colon.duckdb`
+        // fails with `Invalid URL entry: colon.duckdb`.
+        assert!(duckdb_database_value("/tmp/semi;colon.duckdb", false).is_err());
+        assert!(duckdb_database_value("/tmp/semi;colon.duckdb", true).is_err());
     }
 }

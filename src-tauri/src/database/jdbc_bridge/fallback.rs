@@ -105,6 +105,7 @@ pub async fn try_driver(
     host: &str,
     port: u16,
     database: Option<&str>,
+    cql_datacenter: Option<&str>,
     username: &str,
     password: &Option<String>,
     use_cap: bool,
@@ -115,22 +116,65 @@ pub async fn try_driver(
     ssl_client_key: Option<&str>,
     trust_server_certificate: bool,
 ) -> DriverAttempt {
-    let url = build_oracle_url(config, host, port, database, oracle_options);
+    let url = if let Some(dc) = cql_datacenter {
+        // The wrapper decodes the URI query and then decodes each parameter.
+        let encoded = url::form_urlencoded::byte_serialize(dc.as_bytes()).collect::<String>();
+        let encoded = url::form_urlencoded::byte_serialize(encoded.as_bytes()).collect::<String>();
+        let query = format!("?localdatacenter={encoded}");
+        super::registry::build_jdbc_url(config, host, port, Some(&query))
+    } else {
+        build_oracle_url(config, host, port, database, oracle_options)
+    };
 
-    // Start bridge (no driver JARs yet — ResolveDriver will download on the Java side)
+    // Reuse the app-wide bridge process: a fresh JVM would re-map DuckDB's
+    // ~107 MB native library (~1.4 s) on every single connection attempt.
     let bridge_jar = download::bridge_jar_path();
-    let mut launcher = JdbcBridgeLauncher::new(bridge_jar);
     let jvm_args = build_jvm_args(oracle_options);
-    match launcher.start(&jvm_args) {
-        Ok(_) => {}
+    let launcher = match super::launcher::shared_launcher(&bridge_jar, &jvm_args) {
+        Ok(launcher) => launcher,
         Err(e) => return DriverAttempt::Fatal(e),
-    }
-    let launcher = Arc::new(Mutex::new(launcher));
+    };
 
-    // Step 1: ResolveDriver — let the Java bridge download / resolve the driver JAR
+    // Step 1: ResolveDriver — let the Java bridge download / resolve the driver JAR.
+    // A cached JAR short-circuits the RPC (and with it a Maven metadata request on
+    // the Java side). Artifacts with a version cap keep the original
+    // latest-then-cap fallback behaviour.
+    // Self-heal a poisoned pinned cache before resolving (see evict_…).
+    download::evict_implausible_pinned_jar(config);
+
+    // Unconditional cache short-circuit: capped configs resolve to their
+    // pinned (known-good) version, uncapped ones to the newest plausible JAR.
+    // The old "never short-circuit for capped" rule existed to keep the
+    // latest-then-cap Java flow alive, but Maven LATEST can hand back a
+    // class-less shell JAR (seen with ojdbc11 23.26.3.0.0), which fails class
+    // loading before the cap ever gets a turn.
+    let cached_jar = download::cached_driver_jar(config);
+
+    if let Some(cached) = cached_jar {
+        return connect_with_jar(
+            &launcher,
+            config,
+            cached.to_string_lossy().to_string(),
+            url,
+            username,
+            password,
+            database,
+            oracle_options,
+            ssl_mode,
+            ssl_ca_cert,
+            ssl_client_cert,
+            ssl_client_key,
+            trust_server_certificate,
+        )
+        .await;
+    }
+
     // On the first attempt, try without version_cap (LATEST).
     // If the config has no cap, or we're explicitly using it, send the cap.
-    let effective_cap = if use_cap {
+    // Direct-download drivers are version-pinned by definition: always send
+    // the cap so the Java resolver names the cached JAR deterministically
+    // (a null cap would name it "-1.0.0.jar" and duplicate the download).
+    let effective_cap = if use_cap || config.download_url.is_some() {
         config.version_cap.as_deref()
     } else {
         None
@@ -189,6 +233,41 @@ pub async fn try_driver(
         }
     };
 
+    connect_with_jar(
+        &launcher,
+        config,
+        jar_path,
+        url,
+        username,
+        password,
+        database,
+        oracle_options,
+        ssl_mode,
+        ssl_ca_cert,
+        ssl_client_cert,
+        ssl_client_key,
+        trust_server_certificate,
+    )
+    .await
+}
+
+/// Send the `Connect` RPC for an already resolved driver JAR.
+#[allow(clippy::too_many_arguments)]
+async fn connect_with_jar(
+    launcher: &Arc<Mutex<JdbcBridgeLauncher>>,
+    config: &DatabaseDriverConfig,
+    jar_path: String,
+    url: String,
+    username: &str,
+    password: &Option<String>,
+    database: Option<&str>,
+    oracle_options: Option<&OracleConnectionOptions>,
+    ssl_mode: Option<&str>,
+    ssl_ca_cert: Option<&str>,
+    ssl_client_cert: Option<&str>,
+    ssl_client_key: Option<&str>,
+    trust_server_certificate: bool,
+) -> DriverAttempt {
     // Step 2: Send connect request with the resolved JAR on the classpath
     let params = match serde_json::to_value(ConnectParams {
         url,
@@ -216,7 +295,14 @@ pub async fn try_driver(
         }
     };
 
-    let req = JdbcRequest::new(JdbcMethod::Connect, params);
+    // The bridge must honor the separately supplied keyspace and TLS mode.
+    let cql = db_type_from_config(config).is_cql();
+    let method = if cql {
+        JdbcMethod::ConnectCql
+    } else {
+        JdbcMethod::Connect
+    };
+    let req = JdbcRequest::new(method, params);
 
     // 30s timeout per attempt
     let conn_result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
@@ -228,6 +314,11 @@ pub async fn try_driver(
     match conn_result {
         Ok(Ok(resp)) => {
             if let Some(ref err) = resp.error {
+                if cql && err.starts_with("Unknown method") {
+                    return DriverAttempt::Fatal(DbError::Connection(
+                        "The installed JDBC bridge does not support the Cassandra and ScyllaDB connection protocol. Update the bridge in Settings → JRE & Drivers.".into(),
+                    ));
+                }
                 let category = classify_connection_error(
                     db_type_from_config(config),
                     err,
@@ -238,7 +329,7 @@ pub async fn try_driver(
                         DriverAttempt::VersionMismatch(err.clone())
                     }
                     _ => {
-                        let stderr = stderr_from_launcher(&launcher);
+                        let stderr = stderr_from_launcher(launcher);
                         let detail = if stderr.is_empty() {
                             err.clone()
                         } else {
@@ -252,11 +343,11 @@ pub async fn try_driver(
                     .result
                     .and_then(|v| v.as_str().map(|s| s.to_string()))
                     .unwrap_or_else(|| format!("conn_{}", uuid::Uuid::new_v4()));
-                DriverAttempt::Connected(conn_id, launcher)
+                DriverAttempt::Connected(conn_id, launcher.clone())
             }
         }
         Ok(Err(e)) => {
-            let stderr = stderr_from_launcher(&launcher);
+            let stderr = stderr_from_launcher(launcher);
             let msg = if stderr.is_empty() {
                 e.to_string()
             } else {
@@ -289,6 +380,7 @@ pub async fn run_fallback_chain(
     host: &str,
     port: u16,
     database: Option<&str>,
+    cql_datacenter: Option<&str>,
     username: &str,
     password: &Option<String>,
     oracle_options: Option<&OracleConnectionOptions>,
@@ -335,7 +427,9 @@ pub async fn run_fallback_chain(
             }
         }
     } else {
-        if let Some(redirect_url) = super::jre::check_adoptium_update().await {
+        // Memoised: this used to be a blocking HTTP round trip (1.4-2.5 s) before
+        // every single connect, including local DuckDB/SQLite-style files.
+        if let Some(redirect_url) = super::jre::check_adoptium_update_cached().await {
             if let Some(latest) = super::jre::parse_adoptium_build_version(&redirect_url) {
                 if let Some(current) = super::jre::read_jre_version() {
                     if super::jre::compare_versions(&latest, &current) > 0 {
@@ -349,67 +443,76 @@ pub async fn run_fallback_chain(
         download::download_bridge_plugin().await?;
     }
 
-    // Two-phase driver resolution:
-    // 1. Try LATEST (no version_cap)
-    match try_driver(
-        config,
-        host,
-        port,
-        database,
-        username,
-        password,
-        false,
-        oracle_options,
-        ssl_mode,
-        ssl_ca_cert,
-        ssl_client_cert,
-        ssl_client_key,
-        trust_server_certificate,
-    )
-    .await
-    {
-        DriverAttempt::Connected(conn_id, launcher) => {
-            return Ok(("resolved".to_string(), conn_id, launcher));
-        }
-        DriverAttempt::VersionMismatch(_) => {
-            // 2. If LATEST fails with version_incompatible and a cap exists, retry with cap
-            if config.version_cap.is_some() {
-                match try_driver(
-                    config,
-                    host,
-                    port,
-                    database,
-                    username,
-                    password,
-                    true,
-                    oracle_options,
-                    ssl_mode,
-                    ssl_ca_cert,
-                    ssl_client_cert,
-                    ssl_client_key,
-                    trust_server_certificate,
-                )
-                .await
-                {
-                    DriverAttempt::Connected(conn_id, launcher) => {
-                        return Ok(("capped".to_string(), conn_id, launcher));
-                    }
-                    DriverAttempt::VersionMismatch(msg) => Err(DbError::Connection(format!(
-                        "Could not find a compatible JDBC driver for this database version. \
-                         Error: {}",
-                        msg,
-                    ))),
-                    DriverAttempt::Fatal(e) => Err(e),
-                }
-            } else {
-                Err(DbError::Connection(
+    // Two-phase driver resolution: LATEST first, capped retry on version
+    // mismatch. Drivers with a pinned `version_cap` skip the LATEST phase
+    // entirely — its "newest" artifact can resolve to a class-less shell JAR
+    // (observed with ojdbc11 23.26.3.0.0), which then fails class loading
+    // instead of ever falling back to the cap.
+    if config.version_cap.is_none() {
+        match try_driver(
+            config,
+            host,
+            port,
+            database,
+            cql_datacenter,
+            username,
+            password,
+            false,
+            oracle_options,
+            ssl_mode,
+            ssl_ca_cert,
+            ssl_client_cert,
+            ssl_client_key,
+            trust_server_certificate,
+        )
+        .await
+        {
+            DriverAttempt::Connected(conn_id, launcher) => {
+                return Ok(("resolved".to_string(), conn_id, launcher));
+            }
+            DriverAttempt::VersionMismatch(_) => {
+                // version_cap.is_none() here by construction — no retry tier.
+                return Err(DbError::Connection(
                     "Could not find a compatible JDBC driver for this database version. \
                      Try updating the driver in Settings → JRE & Drivers."
                         .to_string(),
-                ))
+                ));
             }
+            DriverAttempt::Fatal(e) => return Err(e),
         }
-        DriverAttempt::Fatal(e) => Err(e),
+    }
+    {
+        // Pinned driver: go straight to the cap
+        match try_driver(
+            config,
+            host,
+            port,
+            database,
+            cql_datacenter,
+            username,
+            password,
+            true,
+            oracle_options,
+            ssl_mode,
+            ssl_ca_cert,
+            ssl_client_cert,
+            ssl_client_key,
+            trust_server_certificate,
+        )
+        .await
+        {
+            DriverAttempt::Connected(conn_id, launcher) => {
+                return Ok(("capped".to_string(), conn_id, launcher));
+            }
+            DriverAttempt::VersionMismatch(msg) => {
+                return Err(DbError::Connection(format!(
+                    "Could not find a compatible JDBC driver for this database version. \
+                     Error: {}",
+                    msg,
+                )))
+            }
+            DriverAttempt::Fatal(e) => return Err(e),
+        }
     }
 }
 
@@ -433,6 +536,7 @@ fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
         "IBM Informix" => DatabaseType::Informix,
         "Apache Kylin" => DatabaseType::Kylin,
         "Apache Cassandra" => DatabaseType::Cassandra,
+        "ScyllaDB" => DatabaseType::ScyllaDB,
         "InterSystems IRIS" => DatabaseType::Iris,
         "Microsoft Access" => DatabaseType::Access,
         _ => DatabaseType::PostgreSQL, // fallback, shouldn't happen

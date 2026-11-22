@@ -71,7 +71,7 @@ function riskColor(risk: string): string {
       <Button
         size="sm"
         variant="ghost"
-        class="text-muted-foreground hover:text-destructive"
+        class="text-muted-foreground hover:text-destructive-text"
         @click="emit('confirm', { toolCallId: props.toolCall.id, action: 'deny_always' })"
       >
         {{ t('dataStudio.agent.denyAlways') }}

@@ -216,15 +216,16 @@ async function refreshDatabase(dbName: string) {
 }
 
 // Context menu action handler
-type ContextAction = 'selectTopN' | 'viewStructure' | 'createScript' | 'exportData' | 'showErDiagram' | 'dropTable' | 'truncateTable'
+type ContextAction = 'viewData' | 'viewStructure' | 'selectTopN' | 'createScript' | 'exportData' | 'showErDiagram' | 'dropTable' | 'truncateTable'
 
 function handleContextAction(action: ContextAction) {
   if (!contextMenuTable.value)
     return
   const { table, database, schema } = contextMenuTable.value
   const handlers: Record<ContextAction, () => void> = {
-    selectTopN: () => emit('selectTopN', table, database, schema, 100),
+    viewData: () => emit('selectTable', table, database, schema),
     viewStructure: () => emit('viewStructure', table, database, schema),
+    selectTopN: () => emit('selectTopN', table, database, schema, 100),
     createScript: () => emit('createScript', table, database, schema),
     exportData: () => emit('exportData', table, database, schema),
     showErDiagram: () => emit('showErDiagram', database, schema),
@@ -406,7 +407,7 @@ defineExpose({ refresh })
     <!-- Search -->
     <div v-if="props.selectedDatabase" class="px-2 py-1.5 border-b relative">
       <span class="i-lucide-search text-muted-foreground h-3.5 w-3.5 left-4 top-1/2 absolute -translate-y-1/2" />
-      <Input v-model="searchQuery" :placeholder="t('sidebar.search')" class="text-xs pl-7 h-7" />
+      <Input v-model="searchQuery" :placeholder="t('sidebar.search')" class="text-body pl-7 h-7" />
     </div>
 
     <!-- Mode A: Database selected — show schema hierarchy -->
@@ -416,7 +417,7 @@ defineExpose({ refresh })
         <div v-for="schema in availableSchemas" :key="schema">
           <!-- Schema node (expandable, left-aligned, no border) -->
           <button
-            class="text-sm px-2 py-1 flex gap-1.5 w-full cursor-pointer items-center hover:bg-accent/40"
+            class="text-body px-2 py-1 flex gap-1.5 w-full cursor-pointer items-center hover:bg-accent/40"
             @click="toggleSchema(schema)"
           >
             <span class="i-lucide-chevron-right shrink-0 h-3 w-3" :class="{ 'rotate-90': expandedSchemas.has(schema) }" />
@@ -434,7 +435,7 @@ defineExpose({ refresh })
             <!-- TABLES group (open by default) -->
             <TreeGroup
               :label="t('sidebar.groups.tables')"
-              icon="i-lucide-table"
+              icon="i-lucide-table-properties"
               icon-color="text-green-600"
               :count="getTablesForSchema(schema).length"
               :default-open="true"
@@ -442,8 +443,8 @@ defineExpose({ refresh })
               <div
                 v-for="table in getTablesForSchema(schema)"
                 :key="table.name"
-                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                 @click="handleTableClick(table, schema)"
                 @dblclick="handleDoubleClick(table, schema)"
                 @contextmenu="handleContextMenu($event, table, schema)"
@@ -468,15 +469,15 @@ defineExpose({ refresh })
               <div
                 v-for="view in getObjectsForSchema(schema)?.views ?? []"
                 :key="view.name"
-                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                 @click="selectedTreeItem = { type: 'view', name: view.name, schema }"
                 @dblclick="handleViewClick(view, schema)"
               >
                 <span
                   class="shrink-0 h-3.5 w-3.5"
                   :class="view.object_type?.toUpperCase().includes('MATERIALIZED')
-                    ? 'i-lucide-eye text-indigo-500'
+                    ? 'i-lucide-layers text-indigo-500'
                     : 'i-lucide-eye text-purple-500'"
                 />
                 <span class="text-left truncate">{{ view.name }}</span>
@@ -498,8 +499,8 @@ defineExpose({ refresh })
               <div
                 v-for="proc in getObjectsForSchema(schema)?.procedures ?? []"
                 :key="proc.name"
-                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                 @click="selectedTreeItem = { type: 'procedure', name: proc.name, schema }"
                 @dblclick="handleProcedureClick(proc, schema)"
               >
@@ -523,8 +524,8 @@ defineExpose({ refresh })
               <div
                 v-for="fn in getObjectsForSchema(schema)?.functions ?? []"
                 :key="fn.name"
-                class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                 @click="selectedTreeItem = { type: 'function', name: fn.name, schema }"
                 @dblclick="handleFunctionClick(fn, schema)"
               >
@@ -543,7 +544,7 @@ defineExpose({ refresh })
       <template v-else>
         <TreeGroup
           :label="t('sidebar.groups.tables')"
-          icon="i-lucide-table"
+          icon="i-lucide-table-properties"
           icon-color="text-green-600"
           :count="flatTables.length"
           :default-open="true"
@@ -551,8 +552,8 @@ defineExpose({ refresh })
           <div
             v-for="table in flatTables"
             :key="table.name"
-            class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-            :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === undefined ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+            class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+            :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === undefined ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
             @click="handleTableClick(table, undefined)"
             @dblclick="handleDoubleClick(table, undefined)"
             @contextmenu="handleContextMenu($event, table, undefined)"
@@ -571,7 +572,7 @@ defineExpose({ refresh })
     <div v-else-if="isActiveConnectionConnected && !props.selectedDatabase" class="flex-1 overflow-x-hidden overflow-y-scroll">
       <div v-for="db in allDatabases" :key="db.name">
         <button
-          class="text-sm px-2 py-1 flex gap-1.5 w-full cursor-pointer items-center hover:bg-accent/40"
+          class="text-body px-2 py-1 flex gap-1.5 w-full cursor-pointer items-center hover:bg-accent/40"
           @click="toggleDatabaseNode(db.name)"
           @contextmenu="handleDatabaseContextMenu($event, db.name)"
         >
@@ -588,12 +589,12 @@ defineExpose({ refresh })
                 <span class="i-lucide-folder-open text-sky-400 shrink-0 h-3.5 w-3.5" />
                 <span class="text-left">{{ schema }}</span>
               </div>
-              <TreeGroup :label="t('sidebar.groups.tables')" icon="i-lucide-table" icon-color="text-green-600" :count="getTablesForDbSchema(db.name, schema).length" :default-open="true">
+              <TreeGroup :label="t('sidebar.groups.tables')" icon="i-lucide-table-properties" icon-color="text-green-600" :count="getTablesForDbSchema(db.name, schema).length" :default-open="true">
                 <div
                   v-for="table in getTablesForDbSchema(db.name, schema)"
                   :key="table.name"
-                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'table', name: table.name, schema }"
                   @dblclick="selectedTreeItem = { type: 'table', name: table.name, schema }; emit('selectTable', table, db.name, schema)"
                   @contextmenu="(e) => { e.preventDefault(); contextMenuTable = { table, database: db.name, schema, x: e.clientX, y: e.clientY } }"
@@ -606,12 +607,12 @@ defineExpose({ refresh })
                 <div
                   v-for="view in getObjectsForDbSchema(db.name, schema)?.views ?? []"
                   :key="view.name"
-                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'view', name: view.name, schema }"
                   @dblclick="emit('openDdlTab', view.name, 'VIEW', db.name, schema)"
                 >
-                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-lucide-eye text-indigo-500' : 'i-lucide-eye text-purple-500'" />
+                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-lucide-layers text-indigo-500' : 'i-lucide-eye text-purple-500'" />
                   <span class="text-left truncate">{{ view.name }}</span>
                 </div>
               </TreeGroup>
@@ -619,8 +620,8 @@ defineExpose({ refresh })
                 <div
                   v-for="proc in getObjectsForDbSchema(db.name, schema)?.procedures ?? []"
                   :key="proc.name"
-                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'procedure', name: proc.name, schema }"
                   @dblclick="emit('openDdlTab', proc.name, 'PROCEDURE', db.name, schema)"
                 >
@@ -632,8 +633,8 @@ defineExpose({ refresh })
                 <div
                   v-for="fn in getObjectsForDbSchema(db.name, schema)?.functions ?? []"
                   :key="fn.name"
-                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name && selectedTreeItem?.schema === schema ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'function', name: fn.name, schema }"
                   @dblclick="emit('openDdlTab', fn.name, 'FUNCTION', db.name, schema)"
                 >
@@ -646,12 +647,12 @@ defineExpose({ refresh })
           <!-- Non-schema-aware: flat groups directly under database -->
           <template v-else>
             <div class="ml-4">
-              <TreeGroup :label="t('sidebar.groups.tables')" icon="i-lucide-table" icon-color="text-green-600" :count="getTablesForDbSchema(db.name).length" :default-open="true">
+              <TreeGroup :label="t('sidebar.groups.tables')" icon="i-lucide-table-properties" icon-color="text-green-600" :count="getTablesForDbSchema(db.name).length" :default-open="true">
                 <div
                   v-for="table in getTablesForDbSchema(db.name)"
                   :key="table.name"
-                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === undefined ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  :class="selectedTreeItem?.type === 'table' && selectedTreeItem?.name === table.name && selectedTreeItem?.schema === undefined ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'table', name: table.name, schema: undefined }"
                   @dblclick="selectedTreeItem = { type: 'table', name: table.name, schema: undefined }; emit('selectTable', table, db.name)"
                   @contextmenu="(e) => { e.preventDefault(); contextMenuTable = { table, database: db.name, x: e.clientX, y: e.clientY } }"
@@ -664,12 +665,12 @@ defineExpose({ refresh })
                 <div
                   v-for="view in getObjectsForDbSchema(db.name, db.name)?.views ?? []"
                   :key="view.name"
-                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  :class="selectedTreeItem?.type === 'view' && selectedTreeItem?.name === view.name ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'view', name: view.name }"
                   @dblclick="emit('openDdlTab', view.name, 'VIEW', db.name)"
                 >
-                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-lucide-eye text-indigo-500' : 'i-lucide-eye text-purple-500'" />
+                  <span class="shrink-0 h-3.5 w-3.5" :class="view.object_type?.toUpperCase().includes('MATERIALIZED') ? 'i-lucide-layers text-indigo-500' : 'i-lucide-eye text-purple-500'" />
                   <span class="text-left truncate">{{ view.name }}</span>
                 </div>
               </TreeGroup>
@@ -677,8 +678,8 @@ defineExpose({ refresh })
                 <div
                   v-for="proc in getObjectsForDbSchema(db.name, db.name)?.procedures ?? []"
                   :key="proc.name"
-                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  :class="selectedTreeItem?.type === 'procedure' && selectedTreeItem?.name === proc.name ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'procedure', name: proc.name }"
                   @dblclick="emit('openDdlTab', proc.name, 'PROCEDURE', db.name)"
                 >
@@ -690,8 +691,8 @@ defineExpose({ refresh })
                 <div
                   v-for="fn in getObjectsForDbSchema(db.name, db.name)?.functions ?? []"
                   :key="fn.name"
-                  class="text-sm ml-4 px-2 py-0.5 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
-                  :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name ? 'bg-primary/15 text-primary font-medium hover:bg-primary/20' : ''"
+                  class="text-body ml-4 px-2 py-1 flex gap-1.5 cursor-pointer items-center hover:bg-accent/40"
+                  :class="selectedTreeItem?.type === 'function' && selectedTreeItem?.name === fn.name ? 'bg-primary/15 text-primary-text font-medium hover:bg-primary/20' : ''"
                   @click="selectedTreeItem = { type: 'function', name: fn.name }"
                   @dblclick="emit('openDdlTab', fn.name, 'FUNCTION', db.name)"
                 >
@@ -766,10 +767,10 @@ defineExpose({ refresh })
       <div class="p-1">
         <div
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
-          @click="handleContextAction('selectTopN')"
+          @click="handleContextAction('viewData')"
         >
-          <span class="i-carbon-arrow-down mr-2 h-3.5 w-3.5" />
-          {{ t('components.databaseBrowser.contextMenu.selectTopN') }}
+          <span class="i-carbon-data-table mr-2 h-3.5 w-3.5" />
+          {{ t('components.databaseBrowser.contextMenu.viewData') }}
         </div>
         <div
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
@@ -777,6 +778,13 @@ defineExpose({ refresh })
         >
           <span class="i-carbon-table mr-2 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.contextMenu.viewStructure') }}
+        </div>
+        <div
+          class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
+          @click="handleContextAction('selectTopN')"
+        >
+          <span class="i-carbon-arrow-down mr-2 h-3.5 w-3.5" />
+          {{ t('components.databaseBrowser.contextMenu.selectTopN') }}
         </div>
         <div
           class="text-sm px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-accent-foreground hover:bg-accent"
@@ -802,14 +810,14 @@ defineExpose({ refresh })
         </div>
         <div class="my-1 bg-border h-px" />
         <div
-          class="text-sm text-destructive px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-foreground hover:bg-destructive/10"
+          class="text-sm text-destructive-text px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-text hover:bg-destructive/10"
           @click="handleContextAction('dropTable')"
         >
           <span class="i-carbon-trash-can mr-2 shrink-0 h-3.5 w-3.5" />
           {{ t('components.databaseBrowser.contextMenu.dropTable') }}
         </div>
         <div
-          class="text-sm text-destructive px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-foreground hover:bg-destructive/10"
+          class="text-sm text-destructive-text px-2 py-1.5 rounded-sm flex cursor-pointer items-center hover:text-destructive-text hover:bg-destructive/10"
           @click="handleContextAction('truncateTable')"
         >
           <span class="i-carbon-clean mr-2 shrink-0 h-3.5 w-3.5" />

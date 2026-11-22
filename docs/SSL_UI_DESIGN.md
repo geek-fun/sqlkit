@@ -33,6 +33,10 @@ Database-specific SSL configuration with dropdown selector + conditional fields.
 
 ---
 
+## Apache Cassandra and ScyllaDB
+
+CQL connections offer Disable, Require, Verify CA, and Verify Full. Saved Prefer settings use Require. Require, Verify CA, and Verify Full use TLS for both engines. Require uses the JVM trust store with no hostname check. Verify CA uses the configured CA, and Verify Full also checks the hostname. The certificate and private key fields configure client authentication when both are supplied.
+
 ## PostgreSQL
 
 ### UI Layout

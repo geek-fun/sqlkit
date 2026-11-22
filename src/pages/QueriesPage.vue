@@ -6,6 +6,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
+import { isSshTunnelStrippedError, shouldStripSshTunnel } from '@/common'
 import { DataTableView, DbTypeIcon, QueryResultPanel, QueryTabs } from '@/components/database-browser'
 import ListingTab from '@/components/database-browser/ListingTab.vue'
 import ErDiagramView from '@/components/er-diagram/ErDiagramView.vue'
@@ -16,6 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from '@/components/ui/button'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { openUpgradeDialog } from '@/components/upgrade'
 import { resolveMonacoDialect } from '@/composables/sqlCompletion/dialects'
 import { getMetadataService } from '@/composables/sqlCompletion/metadata'
 import { toast } from '@/composables/useNotifications'
@@ -24,7 +26,9 @@ import { useSqlFormatter } from '@/composables/useSqlFormatter'
 import { browseApi, loadQueryFile, saveQueryFile, saveQueryFileAs, saveQueryMetadata } from '@/datasources'
 import { ConnectionStatus, useAppStore, useConnectionStore, useDatabaseStore, useTabStore } from '@/store'
 import { DatabaseType } from '@/store/connectionStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 import { isApiSuccess } from '@/types/api'
+import { isCqlDatabase } from '@/types/connection'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -33,6 +37,7 @@ const appStore = useAppStore()
 const connectionStore = useConnectionStore()
 const databaseStore = useDatabaseStore()
 const tabStore = useTabStore()
+const entitlementStore = useEntitlementStore()
 const { modifierKey } = usePlatform()
 
 const showResultPanel = ref(false)
@@ -49,7 +54,7 @@ const { formatSql, resolveDialect } = useSqlFormatter()
 
 // ── Destructive action dialog state ──
 const destructiveDialogOpen = ref(false)
-const destructiveAction = ref<{ type: 'drop' | 'truncate', table: TableInfo, database: string, schema?: string } | null>(null)
+const destructiveAction = ref<{ type: 'drop' | 'truncate', table: TableInfo, connectionId: string, database: string, schema?: string } | null>(null)
 const isDestructiveActionExecuting = ref(false)
 const showOrphanTabDialog = ref(false)
 const orphanTabToHandle = ref<string | null>(null)
@@ -75,6 +80,19 @@ const activeConnection = computed(() => {
 })
 
 const activeTab = computed(() => tabStore.activeTab)
+const isCqlEditor = computed(() => {
+  const connId = activeTab.value?.connectionId
+  return isCqlDatabase(connId
+    ? connectionStore.getConnectionById(connId)?.type
+    : activeConnection.value?.type)
+})
+
+// Single source of truth for the database shown next to a result: the tab's
+// execution database, falling back to the sidebar selection while the tab is
+// still being created/synced.
+const activeDatabase = computed<string | undefined>(() =>
+  activeTab.value?.database || selectedDatabase.value || undefined,
+)
 
 const editorContent = computed({
   get: () => activeTab.value?.content || '',
@@ -131,6 +149,11 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
     return
   }
 
+  const connection = connectionStore.getConnectionById(newConnId)
+  if (shouldStripSshTunnel(connection?.sshTunnel?.enabled, entitlementStore.isLocalUltimate)) {
+    toast.warning(t('components.connectingModal.sshTunnelSkipped'))
+  }
+
   try {
     await connectionStore.connect(newConnId)
     connectionStore.setActiveConnection(newConnId)
@@ -139,6 +162,9 @@ watch(selectedConnectionId, async (newConnId, oldConnId) => {
   }
   catch (error) {
     console.error('Failed to connect:', error)
+    if (isSshTunnelStrippedError(error)) {
+      toast.warning(t('components.connectingModal.sshTunnelStripped'))
+    }
   }
 })
 
@@ -579,24 +605,11 @@ function handleSelectTopN(table: TableInfo, database: string, schema?: string, n
 }
 
 function handleViewStructure(table: TableInfo, database: string, schema?: string) {
-  const query = `-- Table structure for ${table.name}
--- Database: ${database}${schema
-  ? `\n-- Schema: ${schema}`
-  : ''}
-
--- View columns
-SELECT column_name, data_type, is_nullable, column_default
-FROM information_schema.columns
-WHERE table_name = '${table.name}'${schema
-  ? ` AND table_schema = '${schema}'`
-  : ''};`
-
   const connId = getActiveConnectionId()
-  if (connId) {
-    const tab = tabStore.createTab(connId, database, schema)
-    tabStore.updateTabContent(tab.id, query)
-    tabStore.updateTabName(tab.id, `STRUCTURE_${table.name}`)
-  }
+  if (!connId)
+    return
+  ensureDatabaseContext(connId, database)
+  tabStore.openTableViewTab(connId, database, table.name, schema, 'schema')
 }
 
 function handleExportData(_table: TableInfo, _database: string, _schema?: string) {
@@ -604,6 +617,10 @@ function handleExportData(_table: TableInfo, _database: string, _schema?: string
 }
 
 function handleShowErDiagram(database: string, schema?: string) {
+  if (!entitlementStore.isLocalUltimate) {
+    openUpgradeDialog('er_diagram')
+    return
+  }
   const connId = getActiveConnectionId()
   if (connId)
     tabStore.openErDiagramTab(connId, database, schema)
@@ -618,9 +635,13 @@ function handleOpenTableFromErDiagram(tableName: string) {
 }
 
 function handleDropTable(table: TableInfo, database: string, schema?: string) {
+  const connectionId = getActiveConnectionId()
+  if (!connectionId)
+    return
   destructiveAction.value = {
     type: 'drop',
     table,
+    connectionId,
     database,
     schema,
   }
@@ -628,9 +649,13 @@ function handleDropTable(table: TableInfo, database: string, schema?: string) {
 }
 
 function handleTruncateTable(table: TableInfo, database: string, schema?: string) {
+  const connectionId = getActiveConnectionId()
+  if (!connectionId)
+    return
   destructiveAction.value = {
     type: 'truncate',
     table,
+    connectionId,
     database,
     schema,
   }
@@ -643,30 +668,39 @@ async function handleDestructiveConfirm() {
     return
 
   isDestructiveActionExecuting.value = true
-  const connId = getActiveConnectionId()
-  if (!connId) {
+  const connId = action.connectionId
+  if (!isConnectionActive(connId)) {
     toast.error(t('pages.queries.notifications.noActiveConnection'))
     isDestructiveActionExecuting.value = false
     return
   }
 
-  const schemaPrefix = action.schema
-    ? `"${action.schema}".`
-    : ''
-  const qualifiedName = `${schemaPrefix}"${action.table.name}"`
+  const cql = isCqlDatabase(connectionStore.getConnectionById(connId)?.type)
+  const schema = action.schema || (cql ? action.database : undefined)
+  if (cql && !schema) {
+    toast.error(t('pages.queries.selectDatabase'))
+    isDestructiveActionExecuting.value = false
+    return
+  }
+  const qualifiedName = [schema, action.table.name]
+    .filter((name): name is string => !!name)
+    .map(name => quoteIdentifier(name, undefined))
+    .join('.')
   const sql = action.type === 'drop'
     ? `DROP TABLE IF EXISTS ${qualifiedName};`
     : `TRUNCATE TABLE ${qualifiedName};`
 
   try {
-    await invoke('execute_query', {
+    const response = await invoke<ApiResponse<unknown>>('execute_query', {
       connectionId: connId,
       sql,
     })
+    if (!isApiSuccess(response))
+      throw new Error(response.error.message)
     const actionLabel = action.type === 'drop'
       ? 'dropped'
       : 'truncated'
-    toast.success(t('pages.queries.notifications.tableActionSuccess', { action: actionLabel }))
+    toast.success(t('pages.queries.notifications.tableActionSuccess', { action: actionLabel, table: action.table.name }))
     destructiveDialogOpen.value = false
     destructiveAction.value = null
     schemaTreeRef.value?.refresh()
@@ -684,17 +718,24 @@ async function handleDestructiveConfirm() {
   }
 }
 
-function handleSelectTable(table: TableInfo, database: string, schema?: string) {
-  const connId = getActiveConnectionId()
-  if (!connId)
+// Execute USE database to set the backend connection's database context.
+// The Rust get_table_data MySQL branch ignores query.database, requiring
+// the connection to already have a database selected.
+function ensureDatabaseContext(connId: string, database: string) {
+  const type = connectionStore.getConnectionById(connId)?.type
+  if (isCqlDatabase(type))
     return
-  // Execute USE database to set the backend connection's database context.
-  // The Rust get_table_data MySQL branch ignores query.database, requiring
-  // the connection to already have a database selected.
   const escapedDb = database.replace(/`/g, '``')
   invoke('execute_query', { connectionId: connId, sql: `USE \`${escapedDb}\`` }).catch(() => {
     // Best-effort: some databases don't support USE (e.g. SQLite)
   })
+}
+
+function handleSelectTable(table: TableInfo, database: string, schema?: string) {
+  const connId = getActiveConnectionId()
+  if (!connId)
+    return
+  ensureDatabaseContext(connId, database)
   tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
@@ -896,6 +937,10 @@ function handleDatabaseRefresh() {
 
 function handleDatabaseAction(kind: string) {
   switch (kind) {
+    case 'createScript':
+      if (selectedDatabase.value)
+        handleOpenQueryTab(selectedDatabase.value)
+      break
     case 'newDatabase':
       createDatabaseDialogOpen.value = true
       break
@@ -918,6 +963,10 @@ function handleDatabaseAction(kind: string) {
       router.push('/transfer')
       break
     case 'showErDiagram': {
+      if (!entitlementStore.isLocalUltimate) {
+        openUpgradeDialog('er_diagram')
+        break
+      }
       const connId = getActiveConnectionId()
       const db = selectedDatabase.value
       // Database-level ER diagram: omit schema to show all tables across all schemas
@@ -1245,7 +1294,7 @@ function closeResultPanel() {
       <div class="flex flex-1 overflow-hidden">
         <!-- Sidebar -->
         <div
-          class="border-r bg-background flex flex-col"
+          class="border-r bg-chrome flex flex-col"
           :style="{ width: `${sidebarWidth}px` }"
         >
           <!-- Connection selector with status indicator -->
@@ -1323,6 +1372,7 @@ function closeResultPanel() {
             :database="activeTab.tableView.database"
             :schema="activeTab.tableView.schema"
             :table-name="activeTab.tableView.tableName"
+            :initial-sub-page="activeTab.tableView.subPage ?? 'data'"
             class="flex-1"
           />
 
@@ -1370,8 +1420,8 @@ function closeResultPanel() {
 
           <!-- Query editor area (shown for normal query tabs) -->
           <template v-else>
-            <!-- Toolbar (DBX-style: compact h-9, colored icons, no constant bg) -->
-            <div class="text-xs text-muted-foreground px-2 border-b border-border bg-background/80 flex shrink-0 gap-0.5 h-9 items-center">
+            <!-- Query actions -->
+            <div class="text-xs text-muted-foreground px-2 border-b border-border bg-chrome flex shrink-0 gap-0.5 h-9 items-center">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger as-child>
@@ -1380,6 +1430,7 @@ function closeResultPanel() {
                       size="icon"
                       class="text-emerald-600 h-7 w-7 dark:text-emerald-400 hover:bg-emerald-500/10 disabled:opacity-40 dark:hover:bg-emerald-500/20"
                       :disabled="!activeTab"
+                      :aria-label="t('pages.queries.editor.execute')"
                       @click="executeQuery"
                     >
                       <span class="i-lucide-play shrink-0 h-3.5 w-3.5" />
@@ -1400,6 +1451,7 @@ function closeResultPanel() {
                       class="text-violet-600 h-7 w-7 dark:text-violet-400 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:bg-violet-500/20"
                       :class="{ '!text-emerald-600 !bg-emerald-500/10 !dark:bg-emerald-500/20': explainAnalyzeMode }"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
+                      :aria-label="t('pages.queries.editor.explain')"
                       @click="handleExplainQuery(explainAnalyzeMode)"
                     >
                       <span class="i-lucide-line-chart shrink-0 h-3.5 w-3.5" />
@@ -1419,6 +1471,8 @@ function closeResultPanel() {
                       class="text-muted-foreground h-7 w-7 hover:text-violet-600 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:text-violet-400 dark:hover:bg-violet-500/20"
                       :class="explainAnalyzeMode ? '!text-violet-600 !bg-violet-100 dark:!text-violet-300 dark:!bg-violet-900/30' : ''"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
+                      :aria-pressed="explainAnalyzeMode"
+                      :aria-label="t('pages.queries.explain.analyzeToggle', { mode: explainAnalyzeMode ? 'ON' : 'OFF' })"
                       @click="toggleExplainMode"
                     >
                       <span class="i-lucide-activity shrink-0 h-3.5 w-3.5" />
@@ -1440,6 +1494,7 @@ function closeResultPanel() {
                       size="icon"
                       class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 disabled:opacity-40 dark:hover:bg-amber-500/20"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId"
+                      :aria-label="t('pages.queries.editor.format')"
                       @click="handleToolbarFormat"
                     >
                       <span class="i-lucide-align-left shrink-0 h-3.5 w-3.5" />
@@ -1462,6 +1517,7 @@ function closeResultPanel() {
                       size="icon"
                       class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 disabled:opacity-40 dark:hover:bg-sky-500/20"
                       :disabled="!activeTab || !activeTab.content.trim()"
+                      :aria-label="t('pages.queries.shortcuts.saveAs')"
                       @click="handleDownloadQuery"
                     >
                       <span class="i-lucide-download shrink-0 h-3.5 w-3.5" />
@@ -1476,7 +1532,7 @@ function closeResultPanel() {
               <!-- Status info -->
               <div v-if="activeTab" class="text-xs text-muted-foreground flex gap-2 items-center">
                 <span v-if="activeConnection" class="font-medium">{{ activeConnection.name }}</span>
-                <span v-if="activeConnection?.database">/ {{ activeConnection.database }}</span>
+                <span v-if="activeDatabase">/ {{ activeDatabase }}</span>
               </div>
             </div>
 
@@ -1487,6 +1543,7 @@ function closeResultPanel() {
                 v-model="editorContent"
                 height="100%"
                 :dialect="activeMonacoDialect"
+                :cql="isCqlEditor"
                 :completion-context="completionContext"
                 :is-executing="activeTab.isExecuting"
                 :font-size="appStore.editorConfig.fontSize"
@@ -1507,7 +1564,7 @@ function closeResultPanel() {
                       <DbTypeIcon
                         v-if="activeConnection.type"
                         :type="activeConnection.type"
-                        :size="24"
+                        :size="20"
                       />
                       <span class="text-lg font-semibold">{{ activeConnection.name }}</span>
                     </div>
@@ -1523,7 +1580,7 @@ function closeResultPanel() {
                   </div>
 
                   <!-- Welcome message -->
-                  <span class="i-carbon-document text-muted-foreground/50 mx-auto mb-4 h-12 w-12 block" />
+                  <span class="i-carbon-document text-muted-foreground mx-auto mb-4 h-12 w-12 block" />
                   <p class="text-muted-foreground mb-4">
                     {{ getConnectionId() ? t('pages.queries.landing.ready') : t('pages.queries.noTab') }}
                   </p>
@@ -1554,8 +1611,8 @@ function closeResultPanel() {
               :is-executing="activeTab?.isExecuting"
               :execution-time="activeTab?.executionTime"
               :sql="activeTab?.lastExecutedSql ?? activeTab?.content"
-              :connection-id="getConnectionId() ?? undefined"
-              :database="activeTab?.database"
+              :connection-id="activeTab?.connectionId || undefined"
+              :database="activeDatabase"
               :explain-plan="activeTab?.explainPlan ?? null"
               :is-explaining="activeTab?.isExplaining ?? false"
               :explain-error="activeTab?.explainError ?? null"
@@ -1563,26 +1620,6 @@ function closeResultPanel() {
               @refresh="handleNewTab"
             />
           </template>
-        </div>
-      </div>
-
-      <!-- Status bar -->
-      <div class="text-xs text-muted-foreground px-3 py-1 border-t bg-muted/30 flex items-center justify-between">
-        <div class="flex gap-4 items-center">
-          <span v-if="activeConnection?.database">
-            {{ t('pages.queries.status.database') }}: {{ activeConnection.database }}
-          </span>
-        </div>
-        <div class="flex gap-4 items-center">
-          <span v-if="activeTab?.results">
-            {{ t('pages.queries.status.rows') }}: {{ activeTab.results.rows.length }}
-          </span>
-          <span v-if="activeTab?.executionTime">
-            {{ t('pages.queries.status.time') }}: {{ activeTab.executionTime }}ms
-          </span>
-          <span v-if="activeTab?.isExecuting" class="text-primary">
-            {{ t('pages.queries.status.executing') }}
-          </span>
         </div>
       </div>
     </div>

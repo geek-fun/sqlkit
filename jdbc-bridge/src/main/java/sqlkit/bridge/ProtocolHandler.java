@@ -45,7 +45,9 @@ public class ProtocolHandler {
                     break;
 
                 case "connect":
-                    handleConnect(params, response);
+                case "connect_cql_tls":
+                case "connect_cql":
+                    handleConnect(params, response, "connect_cql".equals(method));
                     break;
 
                 case "disconnect":
@@ -72,6 +74,46 @@ public class ProtocolHandler {
                     handleListColumns(params, response);
                     break;
 
+                case "list_views":
+                    handleListViews(params, response);
+                    break;
+
+                case "list_procedures":
+                    handleListProcedures(params, response);
+                    break;
+
+                case "list_functions":
+                    handleListFunctions(params, response);
+                    break;
+
+                case "list_triggers":
+                    handleListTriggers(params, response);
+                    break;
+
+                case "list_indexes":
+                    handleListIndexes(params, response);
+                    break;
+
+                case "list_foreign_keys":
+                    handleListForeignKeys(params, response, true);
+                    break;
+
+                case "get_foreign_keys":
+                    handleListForeignKeys(params, response, false);
+                    break;
+
+                case "get_object_ddl":
+                    handleGetObjectDdl(params, response);
+                    break;
+
+                case "drop_object":
+                    handleDropObject(params, response);
+                    break;
+
+                case "rename_object":
+                    handleRenameObject(params, response);
+                    break;
+
                 case "resolve_driver":
                     handleResolveDriver(params, response);
                     break;
@@ -96,6 +138,7 @@ public class ProtocolHandler {
             ObjectNode errorResp = MAPPER.createObjectNode();
             errorResp.put("id", id);
             errorResp.put("error", buildErrorMessage(e));
+            errorResp.put("error_type", ErrorClassifier.classifyRuntime(e).name().toLowerCase());
             return errorResp;
         }
     }
@@ -114,7 +157,7 @@ public class ProtocolHandler {
         return sb.toString();
     }
 
-    private void handleConnect(JsonNode params, ObjectNode response) throws Exception {
+    private void handleConnect(JsonNode params, ObjectNode response, boolean cql) throws Exception {
         String connId = requiredString(params, "conn_id",
                 UUID.randomUUID().toString());
         String url = requiredString(params, "url", null);
@@ -140,7 +183,8 @@ public class ProtocolHandler {
         String sslClientKey = params.has("ssl_client_key") && !params.get("ssl_client_key").isNull() ? params.get("ssl_client_key").asText() : null;
         boolean trustServerCertificate = params.has("trust_server_certificate") && params.get("trust_server_certificate").asBoolean(false);
 
-        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax, credentialsInUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate);
+        String cqlKeyspace = cql ? requiredString(params, "database", null) : null;
+        connectionManager.connect(connId, url, username, password, driverClass, driverJars, poolMin, poolMax, credentialsInUrl, sslMode, sslCaCert, sslClientCert, sslClientKey, trustServerCertificate, cqlKeyspace);
         response.put("result", connId);
     }
 
@@ -206,6 +250,111 @@ public class ProtocolHandler {
             ArrayNode arr = MAPPER.valueToTree(columns);
             response.set("result", arr);
         }
+    }
+
+    private void handleListViews(JsonNode params, ObjectNode response) throws Exception {
+        String connId = requiredString(params, "conn_id", null);
+        String[] scope = optionalCatalogScope(params);
+        try (Connection conn = connectionManager.getConnection(connId)) {
+            List<Map<String, Object>> views = MetadataProvider.listViews(conn, scope[0], scope[1]);
+            response.set("result", MAPPER.valueToTree(views));
+        }
+    }
+
+    private void handleListProcedures(JsonNode params, ObjectNode response) throws Exception {
+        String connId = requiredString(params, "conn_id", null);
+        String[] scope = optionalCatalogScope(params);
+        try (Connection conn = connectionManager.getConnection(connId)) {
+            List<Map<String, Object>> procedures = MetadataProvider.listProcedures(conn, scope[0], scope[1]);
+            response.set("result", MAPPER.valueToTree(procedures));
+        }
+    }
+
+    private void handleListFunctions(JsonNode params, ObjectNode response) throws Exception {
+        String connId = requiredString(params, "conn_id", null);
+        String[] scope = optionalCatalogScope(params);
+        try (Connection conn = connectionManager.getConnection(connId)) {
+            List<Map<String, Object>> functions = MetadataProvider.listFunctions(conn, scope[0], scope[1]);
+            response.set("result", MAPPER.valueToTree(functions));
+        }
+    }
+
+    private void handleListTriggers(JsonNode params, ObjectNode response) throws Exception {
+        String connId = requiredString(params, "conn_id", null);
+        String[] scope = optionalCatalogScope(params);
+        String table = optionalString(params, "table");
+        try (Connection conn = connectionManager.getConnection(connId)) {
+            List<Map<String, Object>> triggers = MetadataProvider.listTriggers(conn, scope[0], scope[1], table);
+            response.set("result", MAPPER.valueToTree(triggers));
+        }
+    }
+
+    private void handleListIndexes(JsonNode params, ObjectNode response) throws Exception {
+        String connId = requiredString(params, "conn_id", null);
+        String[] scope = optionalCatalogScope(params);
+        String table = requiredString(params, "table", null);
+        try (Connection conn = connectionManager.getConnection(connId)) {
+            List<Map<String, Object>> indexes = MetadataProvider.listIndexes(conn, scope[0], scope[1], table);
+            response.set("result", MAPPER.valueToTree(indexes));
+        }
+    }
+
+    private void handleListForeignKeys(JsonNode params, ObjectNode response, boolean requireTable) throws Exception {
+        String connId = requiredString(params, "conn_id", null);
+        String[] scope = optionalCatalogScope(params);
+        String table = optionalString(params, "table");
+        if (requireTable && table == null) {
+            throw new Exception("Missing required parameter: table");
+        }
+        try (Connection conn = connectionManager.getConnection(connId)) {
+            List<Map<String, Object>> foreignKeys = table != null
+                    ? MetadataProvider.listForeignKeys(conn, scope[0], scope[1], table)
+                    : MetadataProvider.listAllForeignKeys(conn, scope[0], scope[1]);
+            response.set("result", MAPPER.valueToTree(foreignKeys));
+        }
+    }
+
+    private void handleGetObjectDdl(JsonNode params, ObjectNode response) throws Exception {
+        String connId = requiredString(params, "conn_id", null);
+        String[] scope = optionalCatalogScope(params);
+        String objectName = requiredString(params, "object_name", null);
+        String objectType = requiredString(params, "object_type", null);
+        try (Connection conn = connectionManager.getConnection(connId)) {
+            Map<String, Object> ddl = MetadataProvider.getObjectDdl(conn, scope[0], scope[1], objectName, objectType);
+            response.set("result", MAPPER.valueToTree(ddl));
+        }
+    }
+
+    private void handleDropObject(JsonNode params, ObjectNode response) throws Exception {
+        String connId = requiredString(params, "conn_id", null);
+        String[] scope = optionalCatalogScope(params);
+        String objectName = requiredString(params, "object_name", null);
+        String objectType = requiredString(params, "object_type", null);
+        try (Connection conn = connectionManager.getConnection(connId)) {
+            MetadataProvider.dropObject(conn, scope[0], scope[1], objectName, objectType);
+            response.put("result", "ok");
+        }
+    }
+
+    private void handleRenameObject(JsonNode params, ObjectNode response) throws Exception {
+        String connId = requiredString(params, "conn_id", null);
+        String[] scope = optionalCatalogScope(params);
+        String objectName = requiredString(params, "object_name", null);
+        String objectType = requiredString(params, "object_type", null);
+        String newName = requiredString(params, "new_name", null);
+        try (Connection conn = connectionManager.getConnection(connId)) {
+            MetadataProvider.renameObject(conn, scope[0], scope[1], objectName, objectType, newName);
+            response.put("result", "ok");
+        }
+    }
+
+    /** Read optional `database`/`schema` params as {catalog, schema}. */
+    private String[] optionalCatalogScope(JsonNode params) {
+        return new String[]{optionalString(params, "database"), optionalString(params, "schema")};
+    }
+
+    private String optionalString(JsonNode params, String key) {
+        return params.has(key) && !params.get(key).isNull() ? params.get(key).asText() : null;
     }
 
     private void handleTestConnection(JsonNode params, ObjectNode response) throws Exception {

@@ -45,9 +45,9 @@ pub struct SqlEditability {
 
 fn dialect_for(db_type: &str) -> Box<dyn sqlparser::dialect::Dialect> {
     match db_type.to_ascii_lowercase().as_str() {
-        "postgres" | "postgresql" | "duckdb" | "cockroachdb" | "gbase8c" | "kingbasees" | "yashandb"
-        | "xugudb" | "timescaledb" | "redshift" | "yugabytedb" | "opengauss" | "highgo" | "uxdb"
-        | "gaussdb" => Box::new(PostgreSqlDialect {}),
+        "postgres" | "postgresql" | "duckdb" | "cockroachdb" | "gbase8c" | "kingbasees"
+        | "yashandb" | "xugudb" | "timescaledb" | "redshift" | "yugabytedb" | "opengauss"
+        | "highgo" | "uxdb" | "gaussdb" => Box::new(PostgreSqlDialect {}),
         "mysql" | "clickhouse" | "oceanbase" | "mariadb" | "gbase8a" => Box::new(MySqlDialect {}),
         "sqlserver" | "mssql" => Box::new(MsSqlDialect {}),
         _ => Box::new(GenericDialect {}),
@@ -202,16 +202,26 @@ fn expr_has_aggregate(expr: &Expr) -> bool {
                 || function.filter.as_deref().is_some_and(expr_has_aggregate)
         }
         Expr::BinaryOp { left, right, .. } => expr_has_aggregate(left) || expr_has_aggregate(right),
-        Expr::Nested(inner) | Expr::IsNull(inner) | Expr::IsNotNull(inner) => expr_has_aggregate(inner),
+        Expr::Nested(inner) | Expr::IsNull(inner) | Expr::IsNotNull(inner) => {
+            expr_has_aggregate(inner)
+        }
         Expr::UnaryOp { expr: inner, .. } => expr_has_aggregate(inner),
-        Expr::Case { operand, conditions, else_result, .. } => {
+        Expr::Case {
+            operand,
+            conditions,
+            else_result,
+            ..
+        } => {
             operand.as_deref().is_some_and(expr_has_aggregate)
-                || conditions
-                    .iter()
-                    .any(|cond| expr_has_aggregate(&cond.condition) || expr_has_aggregate(&cond.result))
+                || conditions.iter().any(|cond| {
+                    expr_has_aggregate(&cond.condition) || expr_has_aggregate(&cond.result)
+                })
                 || else_result.as_deref().is_some_and(expr_has_aggregate)
         }
-        Expr::Subquery(query) | Expr::Exists { subquery: query, .. } => {
+        Expr::Subquery(query)
+        | Expr::Exists {
+            subquery: query, ..
+        } => {
             let mut found = false;
             if let SetExpr::Select(select) = query.body.as_ref() {
                 found = select.projection.iter().any(projection_has_aggregate);
@@ -224,20 +234,17 @@ fn expr_has_aggregate(expr: &Expr) -> bool {
 
 fn expr_function_has_aggregate_arg(args: &sqlparser::ast::FunctionArguments) -> bool {
     match args {
-        sqlparser::ast::FunctionArguments::List(list) => list
-            .args
-            .iter()
-            .any(|arg| match arg {
-                sqlparser::ast::FunctionArg::Unnamed(sqlparser::ast::FunctionArgExpr::Expr(e)) => {
-                    expr_has_aggregate(e)
-                }
-                sqlparser::ast::FunctionArg::Named { arg, .. }
-                | sqlparser::ast::FunctionArg::ExprNamed { arg, .. } => match arg {
-                    sqlparser::ast::FunctionArgExpr::Expr(e) => expr_has_aggregate(e),
-                    _ => false,
-                },
+        sqlparser::ast::FunctionArguments::List(list) => list.args.iter().any(|arg| match arg {
+            sqlparser::ast::FunctionArg::Unnamed(sqlparser::ast::FunctionArgExpr::Expr(e)) => {
+                expr_has_aggregate(e)
+            }
+            sqlparser::ast::FunctionArg::Named { arg, .. }
+            | sqlparser::ast::FunctionArg::ExprNamed { arg, .. } => match arg {
+                sqlparser::ast::FunctionArgExpr::Expr(e) => expr_has_aggregate(e),
                 _ => false,
-            }),
+            },
+            _ => false,
+        }),
         sqlparser::ast::FunctionArguments::Subquery(query) => {
             let mut found = false;
             if let SetExpr::Select(select) = query.body.as_ref() {
@@ -252,9 +259,24 @@ fn expr_function_has_aggregate_arg(args: &sqlparser::ast::FunctionArguments) -> 
 fn is_aggregate_function(name: &str) -> bool {
     matches!(
         name.to_ascii_uppercase().as_str(),
-        "COUNT" | "SUM" | "AVG" | "MIN" | "MAX" | "STDDEV" | "STDDEV_POP" | "STDDEV_SAMP" | "VARIANCE"
-            | "VAR_POP" | "VAR_SAMP" | "ARRAY_AGG" | "STRING_AGG" | "JSON_AGG" | "JSONB_AGG"
-            | "BOOL_AND" | "BOOL_OR" | "EVERY"
+        "COUNT"
+            | "SUM"
+            | "AVG"
+            | "MIN"
+            | "MAX"
+            | "STDDEV"
+            | "STDDEV_POP"
+            | "STDDEV_SAMP"
+            | "VARIANCE"
+            | "VAR_POP"
+            | "VAR_SAMP"
+            | "ARRAY_AGG"
+            | "STRING_AGG"
+            | "JSON_AGG"
+            | "JSONB_AGG"
+            | "BOOL_AND"
+            | "BOOL_OR"
+            | "EVERY"
     )
 }
 
@@ -264,7 +286,10 @@ fn is_aggregate_function(name: &str) -> bool {
 /// plain single-table SELECT; otherwise a machine-readable non-editable reason
 /// the frontend can surface to the user.
 #[tauri::command]
-pub fn analyze_sql_editability_command(sql: String, database_type: Option<String>) -> SqlEditability {
+pub fn analyze_sql_editability_command(
+    sql: String,
+    database_type: Option<String>,
+) -> SqlEditability {
     analyze_sql_editability(&sql, database_type.as_deref().unwrap_or("generic"))
 }
 
@@ -298,7 +323,9 @@ mod tests {
 
     #[test]
     fn select_with_where_order_limit_is_editable() {
-        assert!(editable("SELECT id, name FROM customers WHERE id > 10 ORDER BY name LIMIT 100"));
+        assert!(editable(
+            "SELECT id, name FROM customers WHERE id > 10 ORDER BY name LIMIT 100"
+        ));
     }
 
     #[test]
@@ -311,32 +338,50 @@ mod tests {
     #[test]
     fn join_is_not_editable() {
         assert!(!editable("SELECT a.*, b.* FROM a JOIN b ON a.id = b.id"));
-        assert_eq!(reason("SELECT a.*, b.* FROM a JOIN b ON a.id = b.id"), Some(NonEditableReason::MultipleSources));
+        assert_eq!(
+            reason("SELECT a.*, b.* FROM a JOIN b ON a.id = b.id"),
+            Some(NonEditableReason::MultipleSources)
+        );
     }
 
     #[test]
     fn comma_separated_sources_is_not_editable() {
-        assert_eq!(reason("SELECT * FROM a, b"), Some(NonEditableReason::MultipleSources));
+        assert_eq!(
+            reason("SELECT * FROM a, b"),
+            Some(NonEditableReason::MultipleSources)
+        );
     }
 
     #[test]
     fn count_aggregation_is_not_editable() {
-        assert_eq!(reason("SELECT COUNT(*) FROM apps"), Some(NonEditableReason::Aggregation));
+        assert_eq!(
+            reason("SELECT COUNT(*) FROM apps"),
+            Some(NonEditableReason::Aggregation)
+        );
     }
 
     #[test]
     fn group_by_is_not_editable() {
-        assert_eq!(reason("SELECT name, COUNT(*) FROM customers GROUP BY name"), Some(NonEditableReason::Aggregation));
+        assert_eq!(
+            reason("SELECT name, COUNT(*) FROM customers GROUP BY name"),
+            Some(NonEditableReason::Aggregation)
+        );
     }
 
     #[test]
     fn distinct_is_not_editable() {
-        assert_eq!(reason("SELECT DISTINCT name FROM customers"), Some(NonEditableReason::Aggregation));
+        assert_eq!(
+            reason("SELECT DISTINCT name FROM customers"),
+            Some(NonEditableReason::Aggregation)
+        );
     }
 
     #[test]
     fn union_is_not_editable() {
-        assert_eq!(reason("SELECT * FROM a UNION SELECT * FROM b"), Some(NonEditableReason::SetOperation));
+        assert_eq!(
+            reason("SELECT * FROM a UNION SELECT * FROM b"),
+            Some(NonEditableReason::SetOperation)
+        );
     }
 
     #[test]
@@ -357,9 +402,18 @@ mod tests {
 
     #[test]
     fn non_select_statement_is_not_editable() {
-        assert_eq!(reason("UPDATE apps SET name = 'x'"), Some(NonEditableReason::NotSelect));
-        assert_eq!(reason("DELETE FROM apps"), Some(NonEditableReason::NotSelect));
-        assert_eq!(reason("INSERT INTO apps (name) VALUES ('x')"), Some(NonEditableReason::NotSelect));
+        assert_eq!(
+            reason("UPDATE apps SET name = 'x'"),
+            Some(NonEditableReason::NotSelect)
+        );
+        assert_eq!(
+            reason("DELETE FROM apps"),
+            Some(NonEditableReason::NotSelect)
+        );
+        assert_eq!(
+            reason("INSERT INTO apps (name) VALUES ('x')"),
+            Some(NonEditableReason::NotSelect)
+        );
     }
 
     #[test]

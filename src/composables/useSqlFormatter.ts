@@ -84,6 +84,7 @@ const dialectMap: Record<string, string> = {
   [DatabaseType.INFORMIX]: 'sql',
   [DatabaseType.KYLIN]: 'sql',
   [DatabaseType.CASSANDRA]: 'sql',
+  [DatabaseType.SCYLLADB]: 'sql',
   [DatabaseType.IRIS]: 'sql',
   [DatabaseType.ACCESS]: 'sql',
 }

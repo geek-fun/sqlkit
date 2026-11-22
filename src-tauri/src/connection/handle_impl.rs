@@ -5,7 +5,7 @@
 
 use crate::database::{
     adapter::DatabaseAdapter,
-    error::DbResult,
+    error::{DbError, DbResult},
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
         QueryResult, TableInfo, TriggerInfo,
@@ -15,6 +15,40 @@ use crate::state::ActiveConnection;
 
 use super::handle::ConnectionHandle;
 use async_trait::async_trait;
+
+async fn check_adapter<A: DatabaseAdapter>(
+    adapter: &tokio::sync::Mutex<A>,
+) -> DbResult<ConnectionStatus> {
+    let adapter = adapter.lock().await;
+    let timeout = adapter.get_config().connect_timeout_secs;
+    tokio::time::timeout(
+        std::time::Duration::from_secs(timeout),
+        adapter.test_connection(),
+    )
+    .await
+    .map_err(|_| {
+        DbError::Timeout(format!(
+            "Connection check timed out after {} seconds",
+            timeout
+        ))
+    })?
+}
+
+impl ActiveConnection {
+    pub(crate) async fn check_connection(&self) -> DbResult<ConnectionStatus> {
+        match self {
+            Self::Postgres(a) => check_adapter(a).await,
+            Self::MySQL(a) => check_adapter(a).await,
+            Self::SQLServer(a) => check_adapter(a).await,
+            Self::SQLite(a) => check_adapter(a).await,
+            Self::ClickHouse(a) => check_adapter(a).await,
+            Self::JdbcBridge(a) => check_adapter(a).await,
+            Self::HttpSql(a) => check_adapter(a).await,
+            Self::Rqlite(a) => check_adapter(a).await,
+            Self::Turso(a) => check_adapter(a).await,
+        }
+    }
+}
 
 macro_rules! delegate {
     ($self:expr, $method:ident $(, $arg:expr)*) => {

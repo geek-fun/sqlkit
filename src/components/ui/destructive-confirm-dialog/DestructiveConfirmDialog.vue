@@ -72,7 +72,7 @@ const confirmButtonClass = props.confirmVariant === 'warning'
             </AlertDialogDescription>
             <p
               v-if="props.detail"
-              class="text-xs text-muted-foreground/80 pt-1"
+              class="text-xs text-muted-foreground pt-1"
             >
               {{ props.detail }}
             </p>

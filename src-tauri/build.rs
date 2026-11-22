@@ -22,4 +22,6 @@ fn main() {
         .expect("version field not found in package.json");
     println!("cargo:rustc-env=APP_VERSION={}", version);
     println!("cargo:rerun-if-changed=../package.json");
+    println!("cargo:rerun-if-changed=icons/tray-template.png");
+    println!("cargo:rerun-if-changed=icons/tray.png");
 }

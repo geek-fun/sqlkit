@@ -19,10 +19,17 @@ pub mod menu;
 // Agent / AI modules
 pub mod agent;
 pub mod agent_adapters;
+pub(crate) mod ai_permissions;
 pub mod capabilities;
 pub mod common;
 pub mod db;
+#[cfg(desktop)]
+mod desktop;
+pub mod device_activation;
+pub mod device_identity;
+pub mod entitlement;
 pub mod mcp_bridge;
+pub mod session;
 
 use std::sync::Arc;
 use std::sync::OnceLock;
@@ -37,7 +44,6 @@ pub static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 pub static GUARDIAN: OnceLock<Arc<crate::connection::guardian::ConnectionGuardian>> =
     OnceLock::new();
 
-use agent::executor::SqlKitToolExecutor;
 use agent::query_history::{add_query_history_entry, load_query_history};
 use agent::session_store::{
     clear_agent_session_messages, clear_session_confirmation_rules, create_agent_session,
@@ -51,7 +57,7 @@ use agent_adapters::{
     get_all_tools, get_tool_full_result, list_llm_models, run_agent_loop, run_agent_step,
     validate_llm_config,
 };
-use capabilities::commands::{get_available_tools, invoke_capability};
+use capabilities::commands::get_available_tools;
 use data_studio_agent as lib;
 use data_studio_agent::storage;
 
@@ -60,6 +66,10 @@ struct AuthPayload {
     token: String,
     username: String,
     email: String,
+    // optional: the console handoff passes them when the account has an
+    // avatar / stable id; older console builds may omit both
+    user_id: Option<String>,
+    avatar: Option<String>,
 }
 
 fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
@@ -75,7 +85,44 @@ fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
         token,
         username,
         email,
+        user_id: params.get("userId").map(|v| v.to_string()),
+        avatar: params.get("avatar").map(|v| v.to_string()),
     })
+}
+
+/// Deep links that arrive before the frontend has mounted cannot be delivered
+/// via events (Tauri events are not queued) — they are parked here and the
+/// frontend pulls them via `consume_pending_auth` once its listeners are up.
+#[derive(Default)]
+struct PendingAuthState(std::sync::Mutex<Option<AuthPayload>>);
+
+impl PendingAuthState {
+    fn store(&self, payload: AuthPayload) {
+        *self.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(payload);
+    }
+
+    /// Take-and-clear so a delivered token can never be replayed.
+    fn consume(&self) -> Option<AuthPayload> {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).take()
+    }
+}
+
+#[tauri::command]
+fn consume_pending_auth(state: tauri::State<'_, PendingAuthState>) -> Option<AuthPayload> {
+    state.consume()
+}
+
+/// Debug-only: reads a `sqlkit://auth` link from `SQLKIT_DEV_AUTH_URL` so the
+/// deep-link login can be tested with `npm run tauri dev`, which cannot
+/// receive URL schemes on macOS (schemes are registered per app bundle).
+#[cfg(debug_assertions)]
+fn dev_injected_auth() -> Option<AuthPayload> {
+    let raw = std::env::var("SQLKIT_DEV_AUTH_URL").ok()?;
+    let payload = parse_auth_from_url(&raw);
+    if payload.is_none() {
+        eprintln!("[sqlkit] SQLKIT_DEV_AUTH_URL is set but is not a valid sqlkit://auth link");
+    }
+    payload
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -85,7 +132,13 @@ pub fn run() {
 
     let store = commands::store::Store::new();
 
-    tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        desktop::show_main_window(app);
+    }));
+
+    builder
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
@@ -102,6 +155,9 @@ pub fn run() {
             // Store AppHandle globally for capability handlers and agent
             let _ = APP_HANDLE.set(handle.clone());
 
+            // Pin the SSH known-hosts store to the app data directory
+            ssh::init_store_dir(&app.path().app_data_dir()?);
+
             // Start connection guardian for health monitoring + auto-reconnect
             let guardian = Arc::new(ConnectionGuardian::new());
             let _ = GUARDIAN.set(guardian.clone());
@@ -111,12 +167,15 @@ pub fn run() {
                 store.set_app_handle(handle.clone()).await;
             });
             menu::create_menu(app)?;
+            #[cfg(desktop)]
+            desktop::setup(app);
 
             // Initialize the capability registry
             data_studio_agent::capabilities::registry::init_registry(&[
                 crate::capabilities::sqlkit::register_all,
                 crate::capabilities::sql::register_sql_tools,
                 crate::capabilities::sql_write::register_write_tools,
+                crate::capabilities::dba::register_dba_tools,
             ]);
 
             // Initialize agent SQLite database
@@ -140,8 +199,6 @@ pub fn run() {
             let cancel_map: lib::traits::CancelMap = Arc::new(Mutex::new(HashMap::new()));
             app.manage(confirm_map);
             app.manage(cancel_map);
-            let executor: Arc<dyn lib::ToolExecutor> = Arc::new(SqlKitToolExecutor);
-            app.manage(executor);
             app.manage(crate::mcp_bridge::McpServerHandle::new());
 
             {
@@ -150,54 +207,56 @@ pub fn run() {
                     .app_data_dir()
                     .map_err(|e| format!("{}", e))?
                     .to_path_buf();
-                let config = crate::mcp_bridge::McpConfig::load(&app_data_dir);
-                if config.auto_start {
-                    let (shutdown_tx, shutdown_rx) = tokio::sync::oneshot::channel();
-                    let server_handle: tauri::State<'_, crate::mcp_bridge::McpServerHandle> =
-                        app.state();
-                    {
-                        let mut tx = server_handle.shutdown_tx.lock().unwrap();
-                        *tx = Some(shutdown_tx);
-                    }
-                    let bridge_handle = app.handle().clone();
-                    let data_dir = app_data_dir.clone();
-                    let preferred = config.port.unwrap_or(9121);
-                    tauri::async_runtime::spawn(async move {
-                        if let Err(e) = crate::mcp_bridge::start(
-                            bridge_handle,
-                            data_dir,
-                            preferred,
-                            shutdown_rx,
-                        )
-                        .await
-                        {
-                            log::error!("MCP bridge failed to start: {}", e);
-                        }
-                    });
-                }
+                let entitlement_state = crate::entitlement::EntitlementState::load(Some(
+                    app_data_dir.join("entitlement-cache.json"),
+                ));
+                app.manage(entitlement_state);
+                app.manage(crate::device_activation::DeviceIdentityState::load(
+                    app_data_dir.clone(),
+                ));
+                app.manage(crate::session::SessionState::default());
+                // The MCP bridge starts from the entitlement path, never at setup (cache-only).
             }
 
             use tauri::{Emitter, Listener};
 
-            // Handle deep links received while the app is already running
+            app.manage(PendingAuthState::default());
+
+            // macOS cannot route custom URL schemes to a `tauri dev` binary
+            // (schemes are registered per app bundle), so local testing injects
+            // the auth deep link through the environment instead:
+            //   SQLKIT_DEV_AUTH_URL='sqlkit://auth?token=…' npm run tauri dev
+            #[cfg(debug_assertions)]
+            if let Some(payload) = dev_injected_auth() {
+                eprintln!("[sqlkit] auth injected via SQLKIT_DEV_AUTH_URL");
+                app.state::<PendingAuthState>().store(payload);
+            }
+
+            // Handle deep links received while the app is already running.
+            // Double-write: the event reaches a loaded frontend, the pending
+            // slot covers the window before its listeners exist.
             let app_handle = app.handle().clone();
             app.listen("deep-link://new-url", move |event: tauri::Event| {
                 if let Ok(urls) = serde_json::from_str::<Vec<String>>(event.payload()) {
                     for url in &urls {
                         if let Some(payload) = parse_auth_from_url(url) {
-                            let _ = app_handle.emit("sqlkit://auth", payload.clone());
+                            app_handle
+                                .state::<PendingAuthState>()
+                                .store(payload.clone());
+                            let _ = app_handle.emit("sqlkit://auth", payload);
                         }
                     }
                 }
             });
 
-            // Handle deep links passed at launch (cold start)
+            // Cold start: the URL arrived via argv before any frontend
+            // listener could exist — park it for the pull above.
+            let pending = app.state::<PendingAuthState>();
             use tauri_plugin_deep_link::DeepLinkExt;
             if let Ok(Some(urls)) = app.deep_link().get_current() {
-                let app_handle = app.handle().clone();
                 for url in &urls {
                     if let Some(payload) = parse_auth_from_url(url.as_str()) {
-                        let _ = app_handle.emit("sqlkit://auth", payload);
+                        pending.store(payload);
                     }
                 }
             }
@@ -217,8 +276,18 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            crate::ai_permissions::get_ai_permissions,
+            ai_permissions::invocation::get_ai_context,
+            crate::ai_permissions::save_ai_permissions,
+            // SSH profile management + host-key store
+            crate::ssh::commands::list_ssh_profiles,
+            crate::ssh::commands::save_ssh_profile,
+            crate::ssh::commands::delete_ssh_profile,
+            crate::ssh::commands::test_ssh_connection,
+            crate::ssh::commands::list_ssh_config_hosts,
+            crate::ssh::commands::unpin_ssh_host,
+            crate::common::http_client::detect_system_proxy,
             // Agent commands
-            invoke_capability,
             get_available_tools,
             run_agent_step,
             validate_llm_config,
@@ -318,6 +387,8 @@ pub fn run() {
             commands::read_saved_queries_metadata,
             commands::write_saved_queries_metadata,
             commands::save_query_metadata,
+            commands::probe_database_file,
+            commands::create_database_directory,
             commands::preview_export_data,
             commands::execute_export_data,
             commands::detect_file_format,
@@ -328,13 +399,31 @@ pub fn run() {
             commands::auto_map_migration_columns,
             commands::generate_ddl_for_objects,
             commands::execute_sql_content,
-            commands::get_app_version,
+            crate::consume_pending_auth,
+            crate::entitlement::refresh_entitlement,
+            crate::entitlement::get_entitlement,
+            crate::entitlement::seed_entitlement,
+            crate::entitlement::clear_entitlement,
+            crate::session::rotate_session_now,
+            crate::session::revoke_session,
+            crate::device_activation::activate_device,
+            crate::device_activation::set_ui_locale,
             crate::mcp_bridge::get_mcp_status,
             crate::mcp_bridge::save_mcp_config,
             crate::mcp_bridge::save_mcp_policy,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|_app, _event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows: false,
+                ..
+            } = _event
+            {
+                desktop::show_main_window(_app);
+            }
+        });
 }
 
 fn recover_stuck_sessions_inner(conn: &rusqlite::Connection) -> Result<(), String> {

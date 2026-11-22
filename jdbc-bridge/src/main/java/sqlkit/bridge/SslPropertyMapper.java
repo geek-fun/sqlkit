@@ -1,6 +1,12 @@
 package sqlkit.bridge;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import java.io.*;
+import java.net.URI;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyStore;
@@ -10,9 +16,12 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Properties;
 
 public class SslPropertyMapper {
+    private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final String KEYSTORE_PASSWORD = "changeit";
 
     public static void applySslProperties(String driverClass, String jdbcUrl,
@@ -116,8 +125,102 @@ public class SslPropertyMapper {
                 if (sslMode.equals("verify-full")) props.setProperty("ssl_hostname_verify", "true");
                 break;
             default:
-                props.setProperty("ssl", "true");
+                // Unknown driver — inject nothing. Blindly setting `ssl=true`
+                // breaks drivers that reject unknown options (DuckDB,
+                // issue #158). Drivers with real SSL support get an explicit
+                // case above (opt-in, like Snowflake/Hive/Vertica).
                 break;
+        }
+    }
+
+    static boolean requiresCqlTls(String driverClass, String mode) {
+        return "com.ing.data.cassandra.jdbc.CassandraDriver".equals(driverClass)
+                && ("require".equals(mode) || "verify-ca".equals(mode) || "verify-full".equals(mode));
+    }
+
+    /** Connection-local TLS settings for the Cassandra wrapper. */
+    static final class CqlTlsSettings implements AutoCloseable {
+        final Properties properties = new Properties();
+        private final List<Path> files = new ArrayList<>();
+
+        void addStore(ObjectNode ssl, String kind, String store) throws IOException {
+            if (store == null) {
+                throw new IOException("Could not load CQL TLS " + kind);
+            }
+            files.add(Path.of(store));
+            ssl.put(kind + "-path", store);
+            ssl.put(kind + "-password", KEYSTORE_PASSWORD);
+        }
+
+        @Override
+        public void close() {
+            for (Path file : files) {
+                try {
+                    Files.deleteIfExists(file);
+                } catch (IOException e) {
+                    file.toFile().deleteOnExit();
+                }
+            }
+        }
+    }
+
+    static CqlTlsSettings cqlTlsSettings(String url, String user, String password, String mode,
+            String ca, String cert, String key) throws IOException {
+        CqlTlsSettings tls = new CqlTlsSettings();
+        boolean verifyHostname = "verify-full".equals(mode);
+        if (ca == null && cert == null && key == null) {
+            tls.properties.setProperty("enableSsl", "true");
+            tls.properties.setProperty("hostnameVerification", Boolean.toString(verifyHostname));
+            return tls;
+        }
+        try {
+            if ((cert == null) != (key == null)) {
+                throw new IOException("CQL TLS client authentication requires both a certificate and a private key");
+            }
+            // A driver config file replaces the wrapper's programmatic settings.
+            // Include the original datacenter and credentials alongside the TLS stores.
+            String dc = null;
+            String query = URI.create(url.substring("jdbc:".length())).getQuery();
+            if (query != null) {
+                for (String param : query.split("&")) {
+                    if (param.startsWith("localdatacenter=")) {
+                        dc = URLDecoder.decode(param.substring("localdatacenter=".length()), StandardCharsets.UTF_8);
+                        break;
+                    }
+                }
+            }
+            if (dc == null || dc.isBlank()) {
+                throw new IOException("CQL TLS requires a local datacenter");
+            }
+
+            ObjectNode root = MAPPER.createObjectNode();
+            ObjectNode driver = root.putObject("datastax-java-driver");
+            driver.putObject("basic").putObject("load-balancing-policy").put("local-datacenter", dc);
+            ObjectNode advanced = driver.putObject("advanced");
+            if (user != null && !user.isEmpty() && password != null) {
+                ObjectNode auth = advanced.putObject("auth-provider");
+                auth.put("class", "PlainTextAuthProvider");
+                auth.put("username", user);
+                auth.put("password", password);
+            }
+            ObjectNode ssl = advanced.putObject("ssl-engine-factory");
+            ssl.put("class", "DefaultSslEngineFactory");
+            ssl.put("hostname-validation", verifyHostname);
+            if (ca != null) {
+                tls.addStore(ssl, "truststore", convertPemCaCertToPkcs12(ca));
+            }
+            if (cert != null) {
+                tls.addStore(ssl, "keystore", convertPemClientCertToPkcs12(cert, key));
+            }
+            Path configuration = Files.createTempFile("sqlkit-cql-tls-", ".conf");
+            tls.files.add(configuration);
+            configuration.toFile().deleteOnExit();
+            Files.writeString(configuration, root.toString());
+            tls.properties.setProperty("configFile", configuration.toString());
+            return tls;
+        } catch (IOException | RuntimeException e) {
+            tls.close();
+            throw e;
         }
     }
 

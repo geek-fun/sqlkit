@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import type { SessionProgress } from '@/store/dataStudioStore'
+import type { AgentToolCall, SessionProgress } from '@/store/dataStudioStore'
 import type { ChatMessage } from '@/types/chat'
 import { storeToRefs } from 'pinia'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AgentMessageBubble from '@/components/agent-message-bubble.vue'
+import { ToolPermissionReview } from '@/components/ai-permissions'
 import ContextIndicator from '@/components/context-indicator.vue'
 import ModelPicker from '@/components/model-picker.vue'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -59,6 +60,22 @@ const { llmSettings } = storeToRefs(appStore)
 
 const inputText = ref('')
 const scrollAreaRef = ref<{ viewportElement: HTMLElement | null } | null>(null)
+const reviewingTool = ref<AgentToolCall | null>(null)
+const recoveryBusy = computed(() => props.isLoading || (props.progress?.phase === 'preparing' && !props.error))
+const retryToolCall = (tool: AgentToolCall) => {
+  if (recoveryBusy.value)
+    return
+  emit('send', t('dataStudio.agent.message.retryPrompt', { tool: tool.toolName, args: tool.args }))
+  forceScrollToBottom()
+}
+const currentTurnStart = computed(() => props.messages.reduce((index, message, current) => message.role === 'user'
+  ? current
+  : index, -1))
+const awaitingDecision = computed(() => {
+  if (props.isLoading)
+    return false
+  return props.messages.slice(currentTurnStart.value + 1).some(message => message.toolCalls?.some(call => call.status === 'denied' && call.denial?.kind !== 'user'))
+})
 
 // ── Smart scroll ──────────────────────────────────────────────────────
 
@@ -183,6 +200,15 @@ function sendMessage() {
   forceScrollToBottom()
 }
 
+function onEnterKeydown(e: KeyboardEvent) {
+  // Ignore Enter used to confirm an IME candidate (e.g. Chinese/Japanese
+  // input methods) — keyCode 229 covers older Safari/WebKit during composition.
+  if (e.isComposing || e.keyCode === 229)
+    return
+  e.preventDefault()
+  sendMessage()
+}
+
 function handleContinue() {
   if (props.isLoading)
     return
@@ -242,7 +268,7 @@ onBeforeUnmount(() => {
       <ScrollArea ref="scrollAreaRef" class="h-full">
         <!-- Empty state -->
         <div v-if="messages.length === 0 && !isLoading" class="px-4 text-center flex flex-col h-full items-center justify-center">
-          <div class="i-carbon-ibm-watsonx-assistant text-muted-foreground/20 mb-4 h-16 w-16" />
+          <div class="i-carbon-ibm-watsonx-assistant text-muted-foreground mb-4 h-16 w-16" />
           <p class="text-sm text-muted-foreground max-w-xs">
             <slot name="empty">
               {{ emptyHint || t('dataStudio.agent.emptyState') }}
@@ -252,10 +278,14 @@ onBeforeUnmount(() => {
 
         <!-- Message bubbles -->
         <AgentMessageBubble
-          v-for="msg in messages"
+          v-for="(msg, index) in messages"
           :key="msg.id"
           :message="msg"
           :iteration-index="iterationIndexMap[msg.id]"
+          :can-retry="!recoveryBusy"
+          :historical="index < currentTurnStart"
+          @review-permissions="reviewingTool = $event"
+          @retry-tool-call="retryToolCall"
         />
 
         <!-- Tool confirmation cards -->
@@ -269,11 +299,11 @@ onBeforeUnmount(() => {
         </div>
 
         <!-- Error banner -->
-        <div v-if="error" class="text-sm text-destructive mx-4 mb-2 p-3 border border-destructive/20 rounded-lg bg-destructive/10 flex gap-2 items-start">
+        <div v-if="error" class="text-sm text-destructive-text mx-4 mb-2 p-3 border border-destructive/20 rounded-lg bg-destructive/10 flex gap-2 items-start">
           <span class="i-carbon-warning mt-0.5 shrink-0 h-4 w-4" />
           <span class="flex-1 min-w-0">{{ error }}</span>
           <button
-            class="text-destructive/60 p-0.5 rounded shrink-0 transition-colors hover:text-destructive"
+            class="text-destructive-text p-0.5 rounded shrink-0 transition-colors hover:text-destructive-text"
             @click="emit('dismissError')"
           >
             <span class="i-carbon-close h-3.5 w-3.5" />
@@ -288,7 +318,7 @@ onBeforeUnmount(() => {
         <span class="i-carbon-pause-filled shrink-0 h-4 w-4" style="color: hsl(38 92% 50%);" />
         <div class="flex flex-col gap-0.5">
           <span class="text-xs font-medium">{{ stopMessage }}</span>
-          <span class="text-[11px] text-muted-foreground">{{ t('dataStudio.agent.continueHint') }}</span>
+          <span class="text-caption text-muted-foreground">{{ t('dataStudio.agent.continueHint') }}</span>
         </div>
       </div>
       <div class="flex shrink-0 gap-1.5">
@@ -313,6 +343,10 @@ onBeforeUnmount(() => {
 
     <!-- Input area -->
     <div class="chat-input-area">
+      <p v-if="awaitingDecision" role="status" class="text-xs text-warning mb-2 px-1 flex gap-2 items-center">
+        <span aria-hidden="true" class="i-carbon-pause shrink-0 h-4 w-4" />
+        {{ t('dataStudio.agent.message.awaitingPermissionDecision') }}
+      </p>
       <div v-if="stopReason && stopMessage" class="loop-stopped-banner" role="status">
         <div class="loop-stopped-banner__body">
           <span class="loop-stopped-banner__icon i-carbon-pause-filled" />
@@ -353,7 +387,7 @@ onBeforeUnmount(() => {
           spellcheck="false"
           data-form-type="other"
           :disabled="isLoading"
-          @keydown.enter.exact.prevent="sendMessage"
+          @keydown.enter.exact="onEnterKeydown"
         />
 
         <div class="chat-toolbar">
@@ -363,7 +397,6 @@ onBeforeUnmount(() => {
 
           <div class="toolbar-center">
             <ContextIndicator
-
               :session-id="sessionId"
               :settings="contextSettings ?? null"
             />
@@ -390,6 +423,15 @@ onBeforeUnmount(() => {
         </div>
       </div>
     </div>
+    <ToolPermissionReview
+      v-if="reviewingTool && sessionId"
+      :key="reviewingTool.id"
+      :open="true"
+      :denial="reviewingTool.denial ?? { kind: 'permission', source: 'unknown', message: reviewingTool.result ?? '' }"
+      :tool-name="reviewingTool.toolName"
+      :session-id="sessionId"
+      @update:open="!$event && (reviewingTool = null)"
+    />
   </div>
 </template>
 
@@ -415,7 +457,7 @@ onBeforeUnmount(() => {
   outline: none;
   background: transparent;
   color: hsl(var(--foreground));
-  font-size: 13px;
+  font-size: var(--font-size-body);
   resize: none;
   line-height: 1.5;
 }
@@ -510,13 +552,13 @@ onBeforeUnmount(() => {
 }
 
 .loop-stopped-banner__message {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   font-weight: 500;
   line-height: 1.4;
 }
 
 .loop-stopped-banner__hint {
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   color: hsl(var(--muted-foreground));
   line-height: 1.4;
 }
@@ -530,7 +572,7 @@ onBeforeUnmount(() => {
 
 .loop-stopped-banner__action {
   padding: 4px 10px;
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   font-weight: 600;
   border-radius: 6px;
   cursor: pointer;

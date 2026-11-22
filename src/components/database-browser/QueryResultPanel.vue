@@ -3,18 +3,27 @@ import type { ColumnInfo } from '@/composables/sqlCompletion/metadata'
 import type { QueryResult } from '@/store/tabStore'
 import type { ApiError, ApiResponse } from '@/types/api'
 import type { ExplainResult } from '@/types/explainPlan'
-import type { ColumnFilter, SortColumn } from '@/types/grid'
+import type { ColumnFilter } from '@/types/grid'
 import { invoke } from '@tauri-apps/api/core'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ExplainPlanPanel } from '@/components/explain-plan'
-import DataGrid from '@/components/grid/DataGrid.vue'
+import { DataGrid } from '@/components/grid'
 import { Button } from '@/components/ui/button'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDataGridCopy } from '@/composables/useDataGridCopy'
 import { useConnectionStore } from '@/store'
 import { formatApiError, isApiError } from '@/types/api'
+import { isCqlDatabase } from '@/types/connection'
 
 type Props = {
   results?: QueryResult | null
@@ -55,6 +64,15 @@ const emit = defineEmits<{
 }>()
 
 const activeOutputView = ref<'results' | 'explain'>('results')
+const selectedResult = ref('0')
+const resultSets = computed(() => props.results?.resultSets ?? [])
+const isScriptResult = computed(() => resultSets.value.length > 0)
+const selectedResults = computed(() => resultSets.value[Number(selectedResult.value)] ?? props.results)
+
+const handleResultSelectorOpen = (open: boolean) => {
+  if (open)
+    activeOutputView.value = 'results'
+}
 
 watch(() => props.explainPlan, (plan) => {
   if (plan)
@@ -68,6 +86,43 @@ watch(() => props.results, (res) => {
 
 const { t } = useI18n()
 const copyUtil = useDataGridCopy()
+const exportIconColors = {
+  csv: 'text-sky-600 dark:text-sky-400',
+  json: 'text-amber-600 dark:text-amber-400',
+  insert: 'text-emerald-600 dark:text-emerald-400',
+} as const
+const exportActions = [
+  {
+    label: 'copyAllCsv',
+    icon: 'i-lucide-file-spreadsheet',
+    format: 'csv',
+    download: false,
+  },
+  {
+    label: 'copyAllJson',
+    icon: 'i-lucide-file-json',
+    format: 'json',
+    download: false,
+  },
+  {
+    label: 'copyAllInsert',
+    icon: 'i-lucide-database',
+    format: 'insert',
+    download: false,
+  },
+  {
+    label: 'exportCsv',
+    icon: 'i-lucide-file-down',
+    format: 'csv',
+    download: true,
+  },
+  {
+    label: 'exportJson',
+    icon: 'i-lucide-file-down',
+    format: 'json',
+    download: true,
+  },
+] as const
 
 const panelHeight = ref(300)
 const isResizing = ref(false)
@@ -82,16 +137,23 @@ const formattedTime = computed(() => {
     : `${(props.executionTime / 1000).toFixed(2)}s`
 })
 
-// ── Sort/Filter Re-execution (backend-driven) ──
+// ── Filter Re-execution (backend-driven) ──
+// Sorting is handled client-side by DataGrid over the returned rows; only
+// filters still need a round-trip because they change the result set itself.
 const gridLoading = ref(false)
 const gridError = ref<string | null>(null)
 const gridResults = ref<QueryResult | null>(null)
 const gridExecutionTimeMs = ref<number | undefined>(undefined)
-const activeSort = ref<SortColumn[]>([])
 const activeFilters = ref<ColumnFilter[]>([])
 
 // ── Result editability (single-table SELECTs only) ──
 const connectionStore = useConnectionStore()
+const canFilter = computed(() => {
+  const type = props.connectionId
+    ? connectionStore.getConnectionById(props.connectionId)?.type
+    : undefined
+  return !isScriptResult.value && !isCqlDatabase(type)
+})
 
 type SqlEditability = {
   editable: boolean
@@ -120,7 +182,7 @@ async function refreshEditability() {
   editableSchema.value = undefined
   editablePrimaryKeys.value = []
 
-  if (!props.sql || !props.connectionId) {
+  if (isScriptResult.value || !props.sql || !props.connectionId) {
     return
   }
 
@@ -155,7 +217,12 @@ async function refreshEditability() {
 }
 
 watch(
-  () => [props.sql, props.connectionId, props.database],
+  () => [
+    props.sql,
+    props.connectionId,
+    props.database,
+    isScriptResult.value,
+  ],
   () => {
     void refreshEditability()
   },
@@ -164,24 +231,22 @@ watch(
 
 // Sync from props when results change
 watch(() => props.results, (r) => {
-  if (r) {
-    gridResults.value = r
-    gridError.value = null
-  }
+  selectedResult.value = '0'
+  gridResults.value = r ?? null
+  gridError.value = null
+  gridExecutionTimeMs.value = undefined
+  activeFilters.value = []
 }, { immediate: true })
 
-async function handleSortChange(sort: SortColumn[]) {
-  activeSort.value = sort
-  await reExecuteWithSortFilter()
-}
-
 async function handleFilterChange(filters: ColumnFilter[]) {
+  if (!canFilter.value)
+    return
   activeFilters.value = filters
-  await reExecuteWithSortFilter()
+  await reExecuteFiltered()
 }
 
-async function reExecuteWithSortFilter() {
-  if (!props.connectionId || !props.sql)
+async function reExecuteFiltered() {
+  if (isScriptResult.value || !props.connectionId || !props.sql)
     return
 
   gridLoading.value = true
@@ -195,12 +260,7 @@ async function reExecuteWithSortFilter() {
       options: {
         originalSql: props.sql,
         schemaContext: props.schema ?? null,
-        sort: activeSort.value.map(s => ({
-          column: s.column,
-          direction: s.direction === 'ASC'
-            ? 'ASC'
-            : 'DESC',
-        })),
+        sort: [],
         filters: activeFilters.value.map(f => ({
           column: f.column,
           operator: f.operator.toUpperCase(),
@@ -233,7 +293,6 @@ async function reExecuteWithSortFilter() {
 }
 
 function handleRefresh() {
-  activeSort.value = []
   activeFilters.value = []
   gridResults.value = props.results ?? null
   gridError.value = null
@@ -272,7 +331,9 @@ function close() {
 }
 
 // Determine what to show
-const displayResults = computed(() => gridResults.value ?? props.results)
+const displayResults = computed(() => isScriptResult.value
+  ? selectedResults.value
+  : gridResults.value ?? props.results)
 const displayColumnTypes = computed(() => {
   const result = displayResults.value
   if (!result || !result.columnTypes || result.columnTypes.length === 0)
@@ -290,6 +351,15 @@ const displayErrorMessage = computed(() => {
 })
 const displayExecuting = computed(() => props.isExecuting || gridLoading.value)
 const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.executionTime)
+const handleExport = (action: typeof exportActions[number]) => {
+  const result = displayResults.value
+  if (!result?.rows.length)
+    return
+  if (action.download)
+    void copyUtil.exportToFile(result.rows, result.columns, action.format)
+  else
+    void copyUtil.copyRowsAs(result.rows, result.columns, action.format)
+}
 </script>
 
 <template>
@@ -304,13 +374,36 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
       @mousedown="startResize"
     />
 
-    <!-- Tab bar (Results | Explain) -->
-    <div class="text-xs px-3 border-b bg-muted/20 flex shrink-0 gap-1 h-9 items-center">
+    <div class="result-toolbar text-xs px-3 border-b bg-muted/20 flex shrink-0 gap-1 h-9 min-w-0 items-center">
+      <Select
+        v-if="resultSets.length > 1"
+        v-model="selectedResult"
+        :disabled="displayExecuting"
+        @update:open="handleResultSelectorOpen"
+        @update:model-value="activeOutputView = 'results'"
+      >
+        <SelectTrigger
+          class="result-set-selector text-xs px-2 shrink-0 h-7 w-40"
+          :class="activeOutputView === 'results' ? 'bg-accent text-accent-foreground' : ''"
+          :aria-label="t('components.queryResult.selectResult')"
+        >
+          <SelectValue>
+            {{ t('components.queryResult.resultSet', { index: Number(selectedResult) + 1, count: resultSets.length }) }}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem v-for="(_, index) in resultSets" :key="index" :value="String(index)">
+            {{ t('components.queryResult.resultSet', { index: index + 1, count: resultSets.length }) }}
+          </SelectItem>
+        </SelectContent>
+      </Select>
       <Button
+        v-else
         size="sm"
         variant="ghost"
-        class="text-xs px-2 h-6"
+        class="text-xs px-2 shrink-0 h-6"
         :class="activeOutputView === 'results' ? 'bg-accent text-accent-foreground' : ''"
+        :aria-pressed="activeOutputView === 'results'"
         :disabled="!displayResults && !displayExecuting"
         @click="activeOutputView = 'results'"
       >
@@ -319,83 +412,80 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
       <Button
         size="sm"
         variant="ghost"
-        class="text-xs px-2 h-6"
+        class="text-xs px-2 shrink-0 h-6"
         :class="activeOutputView === 'explain' ? 'bg-accent text-accent-foreground' : ''"
+        :aria-pressed="activeOutputView === 'explain'"
         :disabled="!explainPlan && !isExplaining && !explainError"
         @click="activeOutputView = 'explain'"
       >
         {{ t('pages.queries.explain.tabLabels.explain') }}
       </Button>
 
-      <!-- Export actions -->
-      <span class="text-muted-foreground/30 mx-1">|</span>
-      <template v-if="displayResults && displayResults.rows.length > 0 && activeOutputView === 'results'">
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'csv')">
-                <span class="i-lucide-file-spreadsheet shrink-0 h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('components.dataGrid.export.copyAllCsv') }}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'json')">
-                <span class="i-lucide-file-json shrink-0 h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('components.dataGrid.export.copyAllJson') }}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-emerald-600 h-7 w-7 dark:text-emerald-400 hover:bg-emerald-500/10 dark:hover:bg-emerald-500/20" @click="copyUtil.copyRowsAs(displayResults.rows, displayResults.columns, 'insert')">
-                <span class="i-lucide-database shrink-0 h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('components.dataGrid.export.copyAllInsert') }}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <div class="mx-0.5 bg-border h-4 w-px" />
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-sky-600 h-7 w-7 dark:text-sky-400 hover:bg-sky-500/10 dark:hover:bg-sky-500/20" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'csv')">
-                <span class="i-lucide-file-down shrink-0 h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('components.dataGrid.export.exportCsv') }}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Button variant="ghost" size="icon" class="text-amber-600 h-7 w-7 dark:text-amber-400 hover:bg-amber-500/10 dark:hover:bg-amber-500/20" @click="copyUtil.exportToFile(displayResults.rows, displayResults.columns, 'json')">
-                <span class="i-lucide-file-down shrink-0 h-3.5 w-3.5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ t('components.dataGrid.export.exportJson') }}</TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
+      <template v-if="activeOutputView === 'results'">
+        <div class="mx-1 bg-border shrink-0 h-4 w-px" aria-hidden="true" />
+        <div class="result-export-actions flex shrink-0 gap-0.5 items-center">
+          <TooltipProvider>
+            <Tooltip v-for="action in exportActions" :key="action.label">
+              <TooltipTrigger as-child>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  class="text-muted-foreground h-7 w-7 hover:text-foreground"
+                  :aria-label="t(`components.dataGrid.export.${action.label}`)"
+                  :disabled="!displayResults?.rows.length"
+                  @click="handleExport(action)"
+                >
+                  <span :class="[action.icon, exportIconColors[action.format]]" class="shrink-0 h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>{{ t(`components.dataGrid.export.${action.label}`) }}</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger as-child>
+            <Button
+              variant="ghost"
+              size="icon"
+              class="result-export-menu text-muted-foreground shrink-0 h-7 w-7 hover:text-foreground"
+              :aria-label="t('components.queryResult.exportActions')"
+              :title="t('components.queryResult.exportActions')"
+              :disabled="!displayResults?.rows.length"
+            >
+              <span class="i-lucide-ellipsis h-3.5 w-3.5" aria-hidden="true" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <template v-for="(action, index) in exportActions" :key="action.label">
+              <DropdownMenuSeparator v-if="index === 3" />
+              <DropdownMenuItem @select="handleExport(action)">
+                <span :class="[action.icon, exportIconColors[action.format]]" class="h-3.5 w-3.5" aria-hidden="true" />
+                {{ t(`components.dataGrid.export.${action.label}`) }}
+              </DropdownMenuItem>
+            </template>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </template>
       <div class="flex-1" />
-      <div v-if="displayResults && activeOutputView === 'results'" class="text-xs text-muted-foreground flex gap-2 items-center">
-        <span v-if="displayResults.columns.length > 0">{{ t('components.queryResult.rows', { count: displayResults.rows.length }) }}</span>
-        <span v-else-if="displayResults.rowsAffected !== undefined">{{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}</span>
-        <span v-if="formattedTime">• {{ t('components.queryResult.time', { time: formattedTime }) }}</span>
-      </div>
+      <TooltipProvider v-if="isScriptResult && activeOutputView === 'results'">
+        <Tooltip>
+          <TooltipTrigger as-child>
+            <Button variant="ghost" size="icon" class="text-muted-foreground shrink-0 h-6 w-6" :aria-label="t('components.queryResult.scriptReadOnly')">
+              <span class="i-lucide-lock-keyhole h-3 w-3" aria-hidden="true" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{{ t('components.queryResult.scriptReadOnly') }}</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
       <Button
         variant="ghost"
         size="icon"
-        class="text-muted-foreground h-7 w-7 hover:text-foreground"
+        class="text-muted-foreground shrink-0 h-7 w-7 hover:text-foreground"
+        :aria-label="t('components.queryResult.close')"
         :title="t('components.queryResult.close')"
         @click="close"
       >
-        <span class="i-lucide-x shrink-0 h-3.5 w-3.5" />
+        <span class="i-lucide-x shrink-0 h-3.5 w-3.5" aria-hidden="true" />
       </Button>
     </div>
 
@@ -417,12 +507,12 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <div v-else-if="displayError && !displayResults" class="p-4">
           <div class="p-4 border border-destructive/30 rounded-md bg-destructive/5">
             <div class="flex gap-3 items-start">
-              <span class="i-carbon-warning-alt text-destructive mt-0.5 flex-shrink-0 h-5 w-5" />
+              <span class="i-carbon-warning-alt text-destructive-text mt-0.5 flex-shrink-0 h-5 w-5" />
               <div>
                 <p
                   v-for="(line, index) in (typeof displayError === 'string' ? displayError : formatApiError(displayError, t)).split('\n\n')"
                   :key="index"
-                  class="text-sm text-destructive"
+                  class="text-sm text-destructive-text"
                 >
                   {{ line }}
                 </p>
@@ -434,22 +524,24 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         <!-- DataGrid (SELECT results with columns) -->
         <DataGrid
           v-else-if="displayResults && displayResults.columns.length > 0"
+          :key="isScriptResult ? selectedResult : 'query'"
           :columns="displayResults.columns"
           :column-types="displayColumnTypes"
           :rows="displayResults.rows"
           :row-count="displayResults.rows.length"
+          :truncated="displayResults.truncated"
           :execution-time-ms="displayExecutionTime"
           :connection-id="connectionId"
           :database="database"
           :schema="editableSchema ?? schema"
-          :table-name="editableTableName"
+          :table-name="isScriptResult ? undefined : editableTableName"
           :primary-keys="editablePrimaryKeys"
-          :editability-reason="editability.reason ?? undefined"
+          :editability-reason="isScriptResult ? t('components.queryResult.scriptReadOnly') : editability.reason ?? undefined"
+          :filterable="canFilter"
           :loading="displayExecuting"
           :hide-toolbar="true"
           :hide-batch-actions="true"
           :error="displayErrorMessage"
-          @sort-change="handleSortChange"
           @filter-change="handleFilterChange"
           @refresh="handleRefresh"
         />
@@ -460,12 +552,6 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
             <span class="i-carbon-checkmark mx-auto mb-2 opacity-50 h-8 w-8 block" />
             <p class="text-sm font-medium">
               {{ t('components.queryResult.success') }}
-            </p>
-            <p v-if="displayResults.rowsAffected !== undefined" class="text-xs mt-1">
-              {{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}
-            </p>
-            <p v-else class="text-xs mt-1">
-              {{ t('components.queryResult.commandCompleted') }}
             </p>
           </div>
         </div>
@@ -489,10 +575,50 @@ const displayExecutionTime = computed(() => gridExecutionTimeMs.value ?? props.e
         :error="explainError"
       />
     </div>
+
+    <!-- Status footer for statements without a result grid -->
+    <div
+      v-if="activeOutputView === 'results' && displayResults && displayResults.columns.length === 0"
+      class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex shrink-0 gap-3 items-center overflow-hidden"
+    >
+      <span v-if="database" class="tabular-nums">{{ t('pages.queries.status.database') }}: {{ database }}</span>
+      <span v-if="displayResults.rowsAffected !== undefined" class="tabular-nums">
+        {{ t('components.queryResult.rowsAffected', { count: displayResults.rowsAffected }) }}
+      </span>
+      <span v-else class="tabular-nums">{{ t('components.queryResult.commandCompleted') }}</span>
+      <span v-if="formattedTime" class="text-muted-foreground tabular-nums">
+        {{ t('components.queryResult.time', { time: formattedTime }) }}
+      </span>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.query-result-panel {
+  container-type: inline-size;
+  container-name: query-result;
+}
+
+.result-export-menu {
+  display: none;
+}
+
+@container query-result (max-width: 720px) {
+  .result-export-actions {
+    display: none;
+  }
+
+  .result-export-menu {
+    display: inline-flex;
+  }
+}
+
+@container query-result (max-width: 400px) {
+  .result-set-selector {
+    width: 8rem;
+  }
+}
+
 .resize-handle {
   position: relative;
 }

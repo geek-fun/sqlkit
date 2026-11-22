@@ -16,7 +16,7 @@
     },
     "resolveJsonModule": true,
     /* TS 6 no longer auto-includes all @types packages */
-    "types": ["jest"],
+    "types": ["jest", "node"],
     "allowImportingTsExtensions": true,
 
     /* Linting */

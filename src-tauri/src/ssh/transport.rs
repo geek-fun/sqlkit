@@ -1,92 +1,124 @@
+//! Transport layer orchestration — starts/stops SSH tunnels for connections.
+//! Resolves ~/.ssh/config aliases on SSH layers before starting tunnels.
+
 use crate::ssh::config::TransportLayerConfig;
+use crate::ssh::ssh_config::resolve_ssh_tunnel_config;
 use crate::ssh::TunnelManager;
 
+/// Start transport layers for a connection.
+/// Returns `Ok(Some(local_port))` if tunnel was started, `Ok(None)` if no layers.
+///
+/// `force_port_forward` forces the last hop into PortForward mode — used for
+/// plain-HTTP targets (DynamoDB Local). See `force_port_forward_for`.
 pub async fn start_transport_layers(
-    connection_id: &str,
+    connection_key: &str,
     layers: &[TransportLayerConfig],
     remote_host: &str,
     remote_port: u16,
     tunnels: &TunnelManager,
+    force_port_forward: bool,
 ) -> Result<Option<u16>, String> {
-    if layers.is_empty() {
-        return Ok(None);
-    }
-
     let enabled: Vec<&TransportLayerConfig> = layers.iter().filter(|l| l.enabled()).collect();
 
     if enabled.is_empty() {
         return Ok(None);
     }
 
-    if enabled.len() > 1 {
-        return Err(format!(
-            "Multi-hop transport chains are not yet supported (got {} layers). \
-             Only single-hop SSH tunnels are currently available in this version.",
-            enabled.len()
-        ));
-    }
+    // Resolve ~/.ssh/config aliases on each SSH layer
+    let resolved: Vec<TransportLayerConfig> = enabled
+        .iter()
+        .map(|layer| match layer {
+            TransportLayerConfig::Ssh(config) => {
+                TransportLayerConfig::Ssh(resolve_ssh_tunnel_config(config))
+            }
+        })
+        .collect();
 
-    match enabled[0] {
-        TransportLayerConfig::Ssh(ssh_config) => {
+    // Build the chain of hops: each hop connects to (next_hop_host, next_hop_port)
+    // or (remote_host, remote_port) for the last hop.
+    match resolved.len() {
+        1 => {
+            let TransportLayerConfig::Ssh(config) = &resolved[0];
             let local_port = tunnels
-                .start_tunnel(connection_id, ssh_config, remote_host, remote_port)
+                .start_tunnel(
+                    connection_key,
+                    config,
+                    remote_host,
+                    remote_port,
+                    force_port_forward,
+                )
+                .await?;
+            Ok(Some(local_port))
+        }
+        _n => {
+            // Multi-hop: build Vec of SshTunnelConfigs for start_chain
+            let hops: Vec<_> = resolved
+                .iter()
+                .map(|layer| match layer {
+                    TransportLayerConfig::Ssh(c) => c.clone(),
+                })
+                .collect();
+            let local_port = tunnels
+                .start_chain(
+                    connection_key,
+                    &hops,
+                    remote_host,
+                    remote_port,
+                    force_port_forward,
+                )
                 .await?;
             Ok(Some(local_port))
         }
     }
 }
 
-pub async fn stop_transport_layers(connection_id: &str, tunnels: &TunnelManager) {
-    tunnels.stop_tunnel(connection_id).await;
+/// Stop transport layers for a connection.
+pub async fn stop_transport_layers(connection_key: &str, tunnels: &TunnelManager) {
+    tunnels.stop_tunnel(connection_key).await;
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ssh::config::{SshAuthMethod, SshTunnelConfig, TransportLayerConfig};
+    use crate::ssh::config::SshTunnelConfig;
 
-    fn ssh_config() -> SshTunnelConfig {
+    fn test_config() -> SshTunnelConfig {
         SshTunnelConfig {
             enabled: true,
-            host: "test.example.com".to_string(),
+            host: "test.example.com".into(),
             port: 22,
-            username: "testuser".to_string(),
-            auth_method: SshAuthMethod::Agent,
+            username: "testuser".into(),
+            auth_method: "agent".into(),
+            password: String::new(),
+            key_path: String::new(),
+            key_passphrase: String::new(),
+            use_ssh_agent: false,
+            ssh_agent_sock_path: String::new(),
             connect_timeout_secs: 5,
             keepalive_interval_secs: 30,
             verify_host_key: false,
+            expose_lan: false,
+            use_system_proxy: false,
         }
     }
 
     #[tokio::test]
     async fn test_empty_layers_returns_none() {
         let tunnels = TunnelManager::new();
-        let result = start_transport_layers("test", &[], "db.example.com", 5432, &tunnels).await;
+        let result =
+            start_transport_layers("test", &[], "db.example.com", 5432, &tunnels, false).await;
         assert_eq!(result.unwrap(), None);
     }
 
     #[tokio::test]
     async fn test_disabled_layers_return_none() {
-        let mut config = ssh_config();
+        let mut config = test_config();
         config.enabled = false;
         let layers = vec![TransportLayerConfig::Ssh(config)];
         let tunnels = TunnelManager::new();
         let result =
-            start_transport_layers("test", &layers, "db.example.com", 5432, &tunnels).await;
+            start_transport_layers("test", &layers, "db.example.com", 5432, &tunnels, false).await;
         assert_eq!(result.unwrap(), None);
-    }
-
-    #[tokio::test]
-    async fn test_multi_hop_rejected() {
-        let layers = vec![
-            TransportLayerConfig::Ssh(ssh_config()),
-            TransportLayerConfig::Ssh(ssh_config()),
-        ];
-        let tunnels = TunnelManager::new();
-        let result =
-            start_transport_layers("test", &layers, "db.example.com", 5432, &tunnels).await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().contains("Multi-hop"));
     }
 
     #[tokio::test]

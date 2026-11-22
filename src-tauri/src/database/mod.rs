@@ -62,6 +62,7 @@
 pub mod adapter;
 pub mod clickhouse;
 pub mod config;
+pub(crate) mod cql;
 pub mod error;
 pub mod explain;
 pub mod http_sql;
@@ -72,6 +73,7 @@ pub mod pool;
 pub mod postgres;
 pub mod rqlite;
 pub mod search;
+pub mod sql_classification;
 pub mod sql_service;
 pub mod sqlite;
 pub mod sqlserver;

@@ -49,11 +49,11 @@ const formattedDdl = computed(() => {
 <template>
   <Dialog :open="open" @update:open="emit('update:open', $event)">
     <DialogContent class="p-0 flex flex-col gap-0 max-h-[80vh] max-w-3xl">
-      <div class="px-4 py-3 border-b flex gap-2 items-center">
-        <DialogTitle class="text-sm font-semibold flex-1 truncate">
+      <div class="py-3 pl-4 pr-12 border-b flex gap-2 items-center">
+        <DialogTitle class="text-sm font-semibold flex-1 min-w-0 truncate">
           {{ title }}
         </DialogTitle>
-        <Button variant="outline" size="sm" class="text-xs h-7" @click="copyDdl">
+        <Button variant="outline" size="sm" class="text-xs shrink-0 h-7" @click="copyDdl">
           <svg
             v-if="!copySuccess"
             xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"

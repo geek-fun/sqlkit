@@ -2,6 +2,7 @@
 import type { LlmProvider } from '@/store/appStore'
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { SettingsFeedback } from '@/components/settings'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,29 @@ const expandedProvider = ref<string | null>(null)
 const testingId = ref<string | null>(null)
 const testResult = ref<{ id: string, success: boolean } | null>(null)
 const syncingId = ref<string | null>(null)
+const actionFeedback = ref<{ state: 'idle' | 'pending' | 'success' | 'error', label: string, detail?: string }>({ state: 'idle', label: '' })
+const feedback = (key: string) => t(`pages.settings.feedback.${key}`)
+const runAction = async (operation: () => Promise<void>, label: string, success = 'saved') => {
+  if (actionFeedback.value.state === 'pending')
+    return
+  actionFeedback.value = { state: 'pending', label }
+  try {
+    await operation()
+    actionFeedback.value = {
+      state: 'success',
+      label: feedback(success),
+    }
+  }
+  catch (error) {
+    actionFeedback.value = {
+      state: 'error',
+      label: feedback('failed'),
+      detail: error instanceof Error
+        ? error.message
+        : String(error),
+    }
+  }
+}
 
 function toggleExpand(id: string) {
   expandedProvider.value = expandedProvider.value === id
@@ -29,36 +53,39 @@ function toggleExpand(id: string) {
     : id
 }
 
-function handleToggleEnabled(id: string) {
-  appStore.toggleProviderEnabled(id)
-}
-
-async function handleTest(id: string) {
+const handleToggleEnabled = (id: string) => runAction(() => appStore.toggleProviderEnabled(id), feedback('saving'))
+const handleRemove = (id: string) => runAction(() => appStore.removeProvider(id), feedback('removing'), 'removed')
+const handleTest = async (id: string) => {
+  if (actionFeedback.value.state === 'pending')
+    return
   testingId.value = id
   testResult.value = null
-  try {
-    const result = await appStore.testProviderConnection(id)
-    testResult.value = { id, success: result.success }
-  }
-  catch {
-    testResult.value = { id, success: false }
-  }
-  finally {
-    testingId.value = null
-  }
+  await runAction(async () => {
+    try {
+      const result = await appStore.testProviderConnection(id)
+      testResult.value = { id, success: result.success }
+      if (!result.success)
+        throw new Error(result.error || t('pages.settings.ai.providerList.testFailed'))
+    }
+    finally {
+      testingId.value = null
+    }
+  }, feedback('testing'))
+  if (actionFeedback.value.state === 'success')
+    actionFeedback.value.label = t('pages.settings.ai.providerList.testSuccess')
 }
-
-async function handleSync(id: string) {
+const handleSync = async (id: string) => {
+  if (actionFeedback.value.state === 'pending')
+    return
   syncingId.value = id
-  try {
-    await appStore.syncProviderModels(id)
-  }
-  catch {
-    // silently fail — syncProviderModels already handles errors
-  }
-  finally {
-    syncingId.value = null
-  }
+  await runAction(async () => {
+    try {
+      await appStore.syncProviderModels(id)
+    }
+    finally {
+      syncingId.value = null
+    }
+  }, feedback('syncing'), 'synced')
 }
 </script>
 
@@ -74,11 +101,12 @@ async function handleSync(id: string) {
           {{ t('pages.settings.ai.providerList.description') }}
         </p>
       </div>
-      <Button @click="$emit('add')">
+      <Button :disabled="actionFeedback.state === 'pending'" @click="$emit('add')">
         {{ t('pages.settings.ai.providerList.addProvider') }}
       </Button>
     </div>
 
+    <SettingsFeedback v-bind="actionFeedback" />
     <!-- Empty state -->
     <div
       v-if="providers.length === 0"
@@ -88,6 +116,7 @@ async function handleSync(id: string) {
       <Button
         variant="outline"
         class="mt-2"
+        :disabled="actionFeedback.state === 'pending'"
         @click="$emit('add')"
       >
         {{ t('pages.settings.ai.providerList.emptyAction') }}
@@ -124,6 +153,8 @@ async function handleSync(id: string) {
             <button
               role="switch"
               :aria-checked="provider.enabled"
+              :disabled="actionFeedback.state === 'pending'"
+              :aria-label="provider.name"
               :class="provider.enabled ? 'bg-primary' : 'bg-muted'"
               class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               @click.stop="handleToggleEnabled(provider.id)"
@@ -190,7 +221,7 @@ async function handleSync(id: string) {
             <Button
               variant="ghost"
               size="sm"
-              :disabled="testingId === provider.id"
+              :disabled="actionFeedback.state === 'pending'"
               @click="handleTest(provider.id)"
             >
               <Spinner
@@ -213,7 +244,7 @@ async function handleSync(id: string) {
               </template>
               <template v-else-if="testResult?.id === provider.id && !testResult.success">
                 <svg
-                  class="text-destructive mr-1 h-3 w-3"
+                  class="text-destructive-text mr-1 h-3 w-3"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -238,7 +269,7 @@ async function handleSync(id: string) {
             <Button
               variant="ghost"
               size="sm"
-              :disabled="syncingId === provider.id"
+              :disabled="actionFeedback.state === 'pending'"
               @click="handleSync(provider.id)"
             >
               <Spinner
@@ -255,6 +286,7 @@ async function handleSync(id: string) {
             <Button
               variant="ghost"
               size="sm"
+              :disabled="actionFeedback.state === 'pending'"
               @click="$emit('edit', provider)"
             >
               {{ t('common.buttons.edit') }}
@@ -265,7 +297,8 @@ async function handleSync(id: string) {
                 <Button
                   variant="ghost"
                   size="sm"
-                  class="text-destructive"
+                  class="text-destructive-text"
+                  :disabled="actionFeedback.state === 'pending'"
                 >
                   {{ t('common.buttons.delete') }}
                 </Button>
@@ -285,7 +318,7 @@ async function handleSync(id: string) {
                   </AlertDialogCancel>
                   <AlertDialogAction
                     class="text-destructive-foreground bg-destructive"
-                    @click="appStore.removeProvider(provider.id)"
+                    @click="handleRemove(provider.id)"
                   >
                     {{ t('common.buttons.delete') }}
                   </AlertDialogAction>

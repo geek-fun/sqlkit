@@ -107,13 +107,13 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
 </script>
 
 <template>
-  <div class="query-tabs border-b border-border flex items-stretch overflow-x-auto">
+  <div class="query-tabs border-b border-border bg-chrome flex items-stretch overflow-x-auto">
     <!-- Tabs -->
     <div class="flex flex-1 min-w-0 items-stretch">
       <div
         v-for="tab in tabs"
         :key="tab.id"
-        class="tab-item group text-xs px-3 border-r border-border flex gap-1 cursor-pointer select-none transition-colors items-center"
+        class="tab-item group text-body px-3 border-r border-border flex gap-1 cursor-pointer select-none transition-colors items-center"
         :class="{
           'bg-background text-foreground font-medium': isActiveTab(tab.id),
           'bg-muted/30 text-muted-foreground hover:bg-background/50 hover:text-foreground': !isActiveTab(tab.id),
@@ -145,7 +145,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
         <DbTypeIcon
           v-if="getTabDbType(tab)"
           :type="getTabDbType(tab)!"
-          :size="12"
+          :size="14"
           class="flex-shrink-0"
         />
 
@@ -220,7 +220,7 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
         <!-- Executing indicator -->
         <svg
           v-if="tab.isExecuting"
-          class="text-primary flex-shrink-0 h-3 w-3 animate-spin"
+          class="text-primary-text flex-shrink-0 h-3 w-3 animate-spin"
           xmlns="http://www.w3.org/2000/svg"
           fill="none"
           viewBox="0 0 24 24"
@@ -231,8 +231,9 @@ const isActiveTab = (tabId: string) => props.activeTabId === tabId
 
         <!-- Close button -->
         <button
-          class="rounded opacity-0 flex flex-shrink-0 h-4 w-4 transition-colors items-center justify-center hover:bg-muted-foreground/20 group-hover:opacity-100"
+          class="rounded opacity-0 flex flex-shrink-0 h-4 w-4 transition-colors items-center justify-center hover:bg-muted-foreground/20 focus-visible:opacity-100 group-hover:opacity-100"
           :class="{ 'opacity-100': isActiveTab(tab.id) }"
+          :aria-label="t('common.buttons.close')"
           @click="handleCloseClick($event, tab)"
         >
           <span class="i-lucide-x shrink-0 h-3 w-3" />

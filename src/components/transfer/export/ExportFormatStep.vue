@@ -49,7 +49,7 @@ watch([
 <template>
   <div class="space-y-4">
     <div class="space-y-2">
-      <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.selectFormat') }}</Label>
+      <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.selectFormat') }}</Label>
       <RadioGroup v-model="selectedFormat" class="gap-2.5 grid grid-cols-1 md:grid-cols-2">
         <label
           v-for="format in formats"
@@ -60,7 +60,7 @@ watch([
           <RadioGroupItem :id="`format-${format.value}`" :value="format.value" class="mt-0.5" />
           <div class="flex-1 space-y-1">
             <div class="text-xs tracking-tight font-semibold">{{ format.label }}</div>
-            <div class="text-[11px] text-muted-foreground">
+            <div class="text-caption text-muted-foreground">
               {{ format.defaults }}
             </div>
           </div>
@@ -68,14 +68,14 @@ watch([
       </RadioGroup>
     </div>
 
-    <Button variant="ghost" size="sm" class="text-[11px] text-muted-foreground h-8 w-full" @click="showAdvanced = !showAdvanced">
+    <Button variant="ghost" size="sm" class="text-caption text-muted-foreground h-8 w-full" @click="showAdvanced = !showAdvanced">
       <span :class="showAdvanced ? 'i-carbon-chevron-up' : 'i-carbon-chevron-down'" class="mr-1.5" />
       {{ showAdvanced ? t('transfer.export.hideAdvanced') : t('transfer.export.showAdvanced') }}
     </Button>
 
     <div v-if="showAdvanced && selectedFormat === 'csv'" class="p-3 border border-border/40 rounded-md bg-muted/20 gap-2.5 grid grid-cols-1 md:grid-cols-3">
       <div class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.delimiter') }}</Label>
+        <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.delimiter') }}</Label>
         <Select v-model="csvDelimiter">
           <SelectTrigger class="text-xs font-mono h-8">
             <SelectValue />
@@ -94,7 +94,7 @@ watch([
         </Select>
       </div>
       <div class="space-y-1.5">
-        <Label class="text-[11px] text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.encoding') }}</Label>
+        <Label class="text-caption text-muted-foreground tracking-wide uppercase">{{ t('transfer.export.encoding') }}</Label>
         <Select v-model="csvEncoding">
           <SelectTrigger class="text-xs font-mono h-8">
             <SelectValue />

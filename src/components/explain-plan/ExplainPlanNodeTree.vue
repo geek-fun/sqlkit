@@ -101,7 +101,7 @@ const costColorClass = computed(() => {
       </span>
       <span
         v-if="node.details.length"
-        class="text-muted-foreground/40 ml-auto shrink-0 whitespace-nowrap text-ellipsis overflow-hidden"
+        class="text-muted-foreground ml-auto shrink-0 whitespace-nowrap text-ellipsis overflow-hidden"
         :title="node.details.join('\n')"
       >{{ node.details.join(' ') }}</span>
     </div>

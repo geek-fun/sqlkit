@@ -122,6 +122,31 @@ pub struct WrapQueryOptions {
 /// 4. Wraps it in a derived table if sort/filter/pagination are needed
 /// 5. Applies WHERE, ORDER BY, and LIMIT/OFFSET clauses
 pub fn wrap_query(options: WrapQueryOptions) -> SqlBuildResult {
+    if crate::database::config::DatabaseType::slug_is_cql(&options.database_type) {
+        let needs_wrapping = !options.sort.is_empty()
+            || !options.filters.is_empty()
+            || options.limit.is_some()
+            || options.offset.is_some();
+        if needs_wrapping {
+            return SqlBuildResult::err(
+                "grid sort/filter/paging is not available for CQL (Cassandra/ScyllaDB) — \
+                 add ORDER BY / LIMIT to the statement itself",
+            );
+        }
+        let Ok(statements) = crate::database::cql::split_statements(&options.original_sql) else {
+            return SqlBuildResult::err("invalid CQL statement");
+        };
+        return match statements.as_slice() {
+            [statement]
+                if crate::database::sql_classification::first_executable_keyword(statement)
+                    .is_some_and(|word| word.eq_ignore_ascii_case("SELECT")) =>
+            {
+                SqlBuildResult::ok(statement.to_string())
+            }
+            _ => SqlBuildResult::err("expected a single CQL SELECT statement"),
+        };
+    }
+
     // ── Step 1: Clean the SQL ──
     let cleaned = strip_trailing(&options.original_sql);
     if cleaned.is_empty() {
@@ -485,9 +510,10 @@ fn extract_select_items(items: &[SelectItem]) -> Vec<(String, usize)> {
             let name = match item {
                 SelectItem::UnnamedExpr(expr) => expr_to_name(expr),
                 SelectItem::ExprWithAlias { alias, .. } => alias.value.clone(),
-                SelectItem::ExprWithAliases { aliases, .. } => {
-                    aliases.first().map(|alias| alias.value.clone()).unwrap_or_default()
-                }
+                SelectItem::ExprWithAliases { expr, aliases } => aliases
+                    .first()
+                    .map(|a| a.value.clone())
+                    .unwrap_or_else(|| expr_to_name(expr)),
                 SelectItem::QualifiedWildcard(kind, _) => match kind {
                     SelectItemQualifiedWildcardKind::ObjectName(obj) => obj.to_string() + ".*",
                     SelectItemQualifiedWildcardKind::Expr(e) => format!("({}).*", expr_to_name(e)),

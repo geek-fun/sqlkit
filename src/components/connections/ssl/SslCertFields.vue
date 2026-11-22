@@ -73,8 +73,8 @@ async function selectFile(type: 'ca' | 'client' | 'key') {
           {{ t('common.browse') }}
         </Button>
       </div>
-      <p v-if="errors?.caCertPath" class="text-sm text-destructive ml-28">
-        {{ errors.caCertPath }}
+      <p v-if="errors?.caCertPath" class="text-sm text-destructive-text ml-28">
+        {{ t(errors.caCertPath) }}
       </p>
     </div>
 
@@ -98,8 +98,8 @@ async function selectFile(type: 'ca' | 'client' | 'key') {
           {{ t('common.browse') }}
         </Button>
       </div>
-      <p v-if="errors?.clientCertPath" class="text-sm text-destructive ml-28">
-        {{ errors.clientCertPath }}
+      <p v-if="errors?.clientCertPath" class="text-sm text-destructive-text ml-28">
+        {{ t(errors.clientCertPath) }}
       </p>
     </div>
 
@@ -123,8 +123,8 @@ async function selectFile(type: 'ca' | 'client' | 'key') {
           {{ t('common.browse') }}
         </Button>
       </div>
-      <p v-if="errors?.clientKeyPath" class="text-sm text-destructive ml-28">
-        {{ errors.clientKeyPath }}
+      <p v-if="errors?.clientKeyPath" class="text-sm text-destructive-text ml-28">
+        {{ t(errors.clientKeyPath) }}
       </p>
     </div>
   </div>

@@ -15,6 +15,7 @@ pub async fn preview_export_data(
     preview_rows: u32,
     state: State<'_, AppState>,
 ) -> Result<ExportPreview, String> {
+    crate::entitlement::ensure_local_ultimate_global("Transfer")?;
     let connection = state.ensure_connection(&request.connection_id).await?;
 
     match connection {
@@ -44,6 +45,7 @@ pub async fn execute_export_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
+    crate::entitlement::ensure_local_ultimate_global("Transfer")?;
     let connection = state.ensure_connection(&request.connection_id).await?;
 
     match connection {
@@ -87,6 +89,7 @@ pub async fn execute_import_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
+    crate::entitlement::ensure_local_ultimate_global("Transfer")?;
     let connection = state.ensure_connection(&request.connection_id).await?;
 
     match connection {
@@ -115,7 +118,10 @@ pub async fn preview_migration_data(
     request: MigrationRequest,
     state: State<'_, AppState>,
 ) -> Result<MigrationPreview, String> {
-    let source_connection = state.ensure_connection(&request.source_connection_id).await?;
+    crate::entitlement::ensure_local_ultimate_global("Transfer")?;
+    let source_connection = state
+        .ensure_connection(&request.source_connection_id)
+        .await?;
 
     match source_connection {
         ActiveConnection::Postgres(adapter) => {
@@ -144,9 +150,14 @@ pub async fn execute_migration_data(
     app_handle: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
-    let source_connection = state.ensure_connection(&request.source_connection_id).await?;
+    crate::entitlement::ensure_local_ultimate_global("Transfer")?;
+    let source_connection = state
+        .ensure_connection(&request.source_connection_id)
+        .await?;
 
-    let target_connection = state.ensure_connection(&request.target_connection_id).await?;
+    let target_connection = state
+        .ensure_connection(&request.target_connection_id)
+        .await?;
 
     macro_rules! run_migration {
         ($source_adapter:expr, $target_adapter:expr) => {
@@ -248,6 +259,7 @@ pub async fn auto_map_migration_columns(
     target_engine: String,
     state: State<'_, AppState>,
 ) -> Result<Vec<crate::transfer::MigrationMapping>, String> {
+    crate::entitlement::ensure_local_ultimate_global("Transfer")?;
     use crate::database::DatabaseAdapter;
 
     let connection = state.ensure_connection(&connection_id).await?;
@@ -285,6 +297,7 @@ pub async fn generate_ddl_for_objects(
     request: DdlRequest,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
+    crate::entitlement::ensure_local_ultimate_global("Transfer")?;
     let connection = state.ensure_connection(&request.connection_id).await?;
 
     let engine = match connection {
@@ -416,6 +429,7 @@ pub async fn execute_sql_content(
     on_error: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<TransferResult, String> {
+    crate::entitlement::ensure_local_ultimate_global("Transfer")?;
     let connection = state.ensure_connection(&connection_id).await?;
 
     let strategy = on_error.as_deref().unwrap_or("stop");

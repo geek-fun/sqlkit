@@ -89,6 +89,16 @@ pub enum QueryValue {
     DateTime(String),
 }
 
+impl QueryValue {
+    /// Text of a string-like value, or `None` for any other variant.
+    pub fn as_string(&self) -> Option<String> {
+        match self {
+            QueryValue::String(s) | QueryValue::DateTime(s) => Some(s.clone()),
+            _ => None,
+        }
+    }
+}
+
 /// Represents a single row in a query result.
 pub type QueryRow = HashMap<String, QueryValue>;
 
@@ -113,6 +123,9 @@ pub struct QueryResult {
     /// Whether the result was truncated (e.g., due to row limit).
     #[serde(default)]
     pub truncated: bool,
+    /// Row-producing results in script order. Empty for single statements.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub result_sets: Vec<QueryResult>,
 }
 
 impl QueryResult {
@@ -125,6 +138,7 @@ impl QueryResult {
             rows_affected: None,
             execution_time_ms: None,
             truncated: false,
+            result_sets: Vec::new(),
         }
     }
 
@@ -137,6 +151,7 @@ impl QueryResult {
             rows_affected: None,
             execution_time_ms: None,
             truncated: false,
+            result_sets: Vec::new(),
         }
     }
 
@@ -149,6 +164,7 @@ impl QueryResult {
             rows_affected: Some(rows_affected),
             execution_time_ms: None,
             truncated: false,
+            result_sets: Vec::new(),
         }
     }
 

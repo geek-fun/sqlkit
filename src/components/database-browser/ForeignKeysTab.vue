@@ -12,6 +12,10 @@ const props = defineProps<{
   tableName: string
 }>()
 
+const emit = defineEmits<{
+  (e: 'countChange', count: number | undefined): void
+}>()
+
 const { t } = useI18n()
 
 const foreignKeys = ref<ForeignKeyInfo[]>([])
@@ -21,16 +25,20 @@ const error = ref<string | null>(null)
 async function fetchForeignKeys() {
   loading.value = true
   error.value = null
+  emit('countChange', undefined)
   try {
-    foreignKeys.value = await browseApi.listForeignKeys(
+    const result = await browseApi.listForeignKeys(
       props.connectionId,
       props.database,
       props.schema,
       props.tableName,
     )
+    foreignKeys.value = result
+    emit('countChange', result.length)
   }
   catch (err) {
     error.value = String(err)
+    emit('countChange', undefined)
   }
   finally {
     loading.value = false
@@ -46,7 +54,7 @@ onMounted(fetchForeignKeys)
       <Spinner size="sm" />
       {{ t('common.loading') }}
     </div>
-    <div v-else-if="error" class="text-sm text-destructive py-8 text-center">
+    <div v-else-if="error" class="text-sm text-destructive-text py-8 text-center">
       {{ error }}
     </div>
     <div v-else-if="foreignKeys.length === 0" class="text-sm text-muted-foreground py-8 text-center">

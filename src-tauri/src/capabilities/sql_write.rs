@@ -7,12 +7,14 @@
 use std::sync::Arc;
 
 use serde_json::{json, Value};
-use sqlparser::ast::Statement;
+use sqlparser::ast::{Query, SetExpr, Statement};
 use sqlparser::dialect::{GenericDialect, MsSqlDialect, MySqlDialect, PostgreSqlDialect};
 use sqlparser::parser::Parser;
 
 use data_studio_agent::capabilities::registry::CapabilityRegistry;
-use data_studio_agent::capabilities::types::{Capability, CapabilityHandler, RiskLevel, SourceKind};
+use data_studio_agent::capabilities::types::{
+    Capability, CapabilityHandler, RiskLevel, SourceKind,
+};
 
 use super::sql::{execute_on_adapter, resolve_adapter};
 
@@ -29,6 +31,9 @@ pub(crate) enum SqlKind {
 /// Classify a SQL statement by its top-level AST variant, using the dialect
 /// that matches the connection's database type.
 pub(crate) fn classify_sql(db_type: &str, sql: &str) -> Result<SqlKind, String> {
+    if crate::database::config::DatabaseType::slug_is_cql(db_type) {
+        return Ok(classify_cql(sql));
+    }
     let dialect: Box<dyn sqlparser::dialect::Dialect> = match db_type.to_lowercase().as_str() {
         "postgres" | "postgresql" | "duckdb" | "cockroachdb" | "gbase8c" | "kingbasees"
         | "yashandb" | "xugudb" | "oceanbase" | "dameng" => Box::new(PostgreSqlDialect {}),
@@ -37,8 +42,7 @@ pub(crate) fn classify_sql(db_type: &str, sql: &str) -> Result<SqlKind, String> 
         _ => Box::new(GenericDialect {}),
     };
 
-    let stmts = Parser::parse_sql(&*dialect, sql)
-        .map_err(|e| format!("parse error: {}", e))?;
+    let stmts = Parser::parse_sql(&*dialect, sql).map_err(|e| format!("parse error: {}", e))?;
     if stmts.len() > 1 {
         return Err("multiple statements are not supported".to_string());
     }
@@ -48,10 +52,80 @@ pub(crate) fn classify_sql(db_type: &str, sql: &str) -> Result<SqlKind, String> 
     Ok(classify_statement(&stmt))
 }
 
+/// Classify exactly one statement as split by the CQL executor.
+fn classify_cql(sql: &str) -> SqlKind {
+    let Ok(statements) = crate::database::cql::split_statements(sql) else {
+        return SqlKind::Other;
+    };
+    let [statement] = statements.as_slice() else {
+        return SqlKind::Other;
+    };
+    match crate::database::sql_classification::first_executable_keyword(statement)
+        .map(str::to_ascii_uppercase)
+        .as_deref()
+    {
+        Some("SELECT") => SqlKind::Read,
+        Some("INSERT" | "UPDATE") => SqlKind::Write,
+        Some("DELETE" | "TRUNCATE") => SqlKind::Delete,
+        Some("CREATE" | "ALTER" | "DROP") => SqlKind::Ddl,
+        _ => SqlKind::Other,
+    }
+}
+
+/// Merge kinds found in different parts of one statement.
+///
+/// The most restrictive kind wins so a destructive statement never rides
+/// along inside a tree otherwise classified as Read.
+fn combine_kind(a: SqlKind, b: SqlKind) -> SqlKind {
+    fn rank(kind: SqlKind) -> u8 {
+        match kind {
+            SqlKind::Read => 0,
+            SqlKind::Write => 1,
+            SqlKind::Ddl => 2,
+            SqlKind::Delete => 3,
+            SqlKind::Other => 4,
+        }
+    }
+    if rank(b) > rank(a) {
+        b
+    } else {
+        a
+    }
+}
+
+/// Classify a Query, walking into its body and every CTE.
+///
+/// sqlparser represents `WITH … INSERT/UPDATE/DELETE/MERGE` (data-modifying
+/// CTEs) as a `Query` whose body carries the DML statement, so checking only
+/// the top-level variant would let write statements through as Read.
+fn classify_query(query: &Query) -> SqlKind {
+    let mut kind = classify_set_expr(&query.body);
+    if let Some(with) = &query.with {
+        for cte in &with.cte_tables {
+            kind = combine_kind(kind, classify_query(&cte.query));
+        }
+    }
+    kind
+}
+
+fn classify_set_expr(body: &SetExpr) -> SqlKind {
+    match body {
+        SetExpr::Select(_) | SetExpr::Values(_) | SetExpr::Table(_) => SqlKind::Read,
+        SetExpr::Query(query) => classify_query(query),
+        SetExpr::SetOperation { left, right, .. } => {
+            combine_kind(classify_set_expr(left), classify_set_expr(right))
+        }
+        SetExpr::Insert(stmt)
+        | SetExpr::Update(stmt)
+        | SetExpr::Delete(stmt)
+        | SetExpr::Merge(stmt) => classify_statement(stmt),
+    }
+}
+
 fn classify_statement(stmt: &Statement) -> SqlKind {
     match stmt {
-        Statement::Query(_)
-        | Statement::Explain { .. }
+        Statement::Query(query) => classify_query(query),
+        Statement::Explain { .. }
         | Statement::ExplainTable { .. }
         | Statement::ShowVariable { .. }
         | Statement::ShowVariables { .. }
@@ -202,7 +276,7 @@ async fn run_classified(
     let sql = sql_from(args)?;
     let adapter = resolve_adapter(&conn_id).await?;
 
-    let db_type = adapter_db_type(&adapter);
+    let db_type = adapter_db_type(&adapter).await;
     let kind = classify_sql(&db_type, &sql)?;
     if !allowed.contains(&kind) {
         return Err(format!(
@@ -228,14 +302,16 @@ async fn run_classified(
     serde_json::to_string(&result).map_err(|e| e.to_string())
 }
 
-pub(crate) fn adapter_db_type(adapter: &crate::state::ActiveConnection) -> String {
+pub(crate) async fn adapter_db_type(adapter: &crate::state::ActiveConnection) -> String {
     match adapter {
         crate::state::ActiveConnection::Postgres(_) => "postgres".to_string(),
         crate::state::ActiveConnection::MySQL(_) => "mysql".to_string(),
         crate::state::ActiveConnection::SQLite(_) => "sqlite".to_string(),
         crate::state::ActiveConnection::SQLServer(_) => "sqlserver".to_string(),
         crate::state::ActiveConnection::ClickHouse(_) => "clickhouse".to_string(),
-        crate::state::ActiveConnection::JdbcBridge(_) => "generic".to_string(),
+        crate::state::ActiveConnection::JdbcBridge(adapter) => {
+            adapter.lock().await.config.db_type.slug()
+        }
         crate::state::ActiveConnection::HttpSql(_) => "generic".to_string(),
         crate::state::ActiveConnection::Rqlite(_) => "generic".to_string(),
         crate::state::ActiveConnection::Turso(_) => "generic".to_string(),
@@ -315,7 +391,7 @@ pub(crate) fn register_write_tools(reg: &mut CapabilityRegistry) {
 
     reg.register(Capability {
         name: "sqlkit__execute_delete",
-        description: "Execute a destructive DELETE or TRUNCATE statement. DESTRUCTIVE: permanently removes data. Requires Full Access with Confirm Destructive in Settings → MCP Bridge.",
+        description: "Execute a destructive DELETE or TRUNCATE statement. DESTRUCTIVE: permanently removes data. Requires Delete data permission for this connection.",
         handler: Arc::new(ExecuteDeleteHandler),
         input_schema: json!({"type": "object", "properties": {
             "connection_id": connection_id_schema(),
@@ -330,7 +406,7 @@ pub(crate) fn register_write_tools(reg: &mut CapabilityRegistry) {
 
     reg.register(Capability {
         name: "sqlkit__execute_ddl",
-        description: "Execute a DDL statement (CREATE, ALTER, DROP, and other schema changes). DESTRUCTIVE for DROP/ALTER: permanently changes schema. Requires Full Access with Confirm Destructive in Settings → MCP Bridge.",
+        description: "Execute a DDL statement (CREATE, ALTER, DROP, and other schema changes). Changes database structure. Requires Manage structure & administration permission for this connection.",
         handler: Arc::new(ExecuteDdlHandler),
         input_schema: json!({"type": "object", "properties": {
             "connection_id": connection_id_schema(),
@@ -348,16 +424,113 @@ pub(crate) fn register_write_tools(reg: &mut CapabilityRegistry) {
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn cql_dialect_does_not_change_while_the_adapter_is_busy() {
+        use crate::database::{ConnectionConfig, DatabaseType, JdbcBridgeAdapter};
+        use crate::state::ActiveConnection;
+        use tokio::sync::Mutex;
+
+        let config = ConnectionConfig::new(DatabaseType::ScyllaDB, "localhost", 9042, "");
+        let adapter = Arc::new(Mutex::new(JdbcBridgeAdapter::new(config)));
+        let connection = ActiveConnection::JdbcBridge(adapter.clone());
+        let busy = adapter.lock().await;
+        assert!(
+            tokio::time::timeout(std::time::Duration::ZERO, adapter_db_type(&connection))
+                .await
+                .is_err()
+        );
+        drop(busy);
+        assert_eq!(adapter_db_type(&connection).await, "scylladb");
+    }
+
+    #[test]
+    fn classifies_cql_without_a_sqlparser_dialect() {
+        assert_eq!(
+            classify_sql("cassandra", "SELECT * FROM ks.tbl WHERE id = 1").unwrap(),
+            SqlKind::Read
+        );
+        assert_eq!(
+            classify_sql(
+                "scylladb",
+                "SELECT JSON * FROM ks.tbl PER PARTITION LIMIT 1"
+            )
+            .unwrap(),
+            SqlKind::Read
+        );
+        assert_eq!(
+            classify_sql("cassandra", "  -- leading comment\n SELECT 1").unwrap(),
+            SqlKind::Read
+        );
+        assert_eq!(
+            classify_sql("cassandra", "INSERT INTO ks.tbl (id) VALUES (1)").unwrap(),
+            SqlKind::Write
+        );
+        assert_eq!(
+            classify_sql("Cassandra", "DELETE FROM ks.tbl WHERE id = 1").unwrap(),
+            SqlKind::Delete
+        );
+        assert_eq!(
+            classify_sql("cassandra", "TRUNCATE ks.tbl").unwrap(),
+            SqlKind::Delete
+        );
+        assert_eq!(
+            classify_sql("cassandra", "CREATE TABLE ks.t (id int PRIMARY KEY)").unwrap(),
+            SqlKind::Ddl
+        );
+        assert_eq!(
+            classify_sql("cassandra", "DROP KEYSPACE ks").unwrap(),
+            SqlKind::Ddl
+        );
+        assert_eq!(classify_sql("cassandra", "USE ks").unwrap(), SqlKind::Other);
+    }
+
+    #[test]
+    fn cql_multi_statement_detection_ignores_literals_and_comments() {
+        assert_eq!(
+            classify_sql(
+                "cassandra",
+                "SELECT * FROM ks.t WHERE v = '-- note'; SELECT * FROM ks.t",
+            )
+            .unwrap(),
+            SqlKind::Other
+        );
+        assert_eq!(
+            classify_sql("cassandra", "SELECT * FROM ks.t WHERE v = 'a;b'").unwrap(),
+            SqlKind::Read
+        );
+        assert_eq!(
+            classify_sql("cassandra", "SELECT * FROM ks.t; -- trailing").unwrap(),
+            SqlKind::Read
+        );
+        assert_eq!(
+            classify_sql("cassandra", "SELECT 1; DROP KEYSPACE ks").unwrap(),
+            SqlKind::Other
+        );
+        assert_eq!(
+            classify_sql("cassandra", "SELECT 'it''s; fine' FROM ks.t").unwrap(),
+            SqlKind::Read
+        );
+    }
+
     #[test]
     fn classifies_select_as_read() {
-        assert_eq!(classify_sql("postgres", "SELECT * FROM users").unwrap(), SqlKind::Read);
-        assert_eq!(classify_sql("postgres", "WITH x AS (SELECT 1) SELECT * FROM x").unwrap(), SqlKind::Read);
+        assert_eq!(
+            classify_sql("postgres", "SELECT * FROM users").unwrap(),
+            SqlKind::Read
+        );
+        assert_eq!(
+            classify_sql("postgres", "WITH x AS (SELECT 1) SELECT * FROM x").unwrap(),
+            SqlKind::Read
+        );
     }
 
     #[test]
     fn classifies_show_as_read() {
         assert_eq!(classify_sql("mysql", "SHOW TABLES").unwrap(), SqlKind::Read);
-        assert_eq!(classify_sql("sqlserver", "SHOW VARIABLES").unwrap(), SqlKind::Read);
+        assert_eq!(
+            classify_sql("sqlserver", "SHOW VARIABLES").unwrap(),
+            SqlKind::Read
+        );
     }
 
     #[test]
@@ -371,7 +544,11 @@ mod tests {
             SqlKind::Write
         );
         assert_eq!(
-            classify_sql("sqlserver", "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = s.x").unwrap(),
+            classify_sql(
+                "sqlserver",
+                "MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN UPDATE SET x = s.x"
+            )
+            .unwrap(),
             SqlKind::Write
         );
     }
@@ -389,6 +566,89 @@ mod tests {
     }
 
     #[test]
+    fn classifies_with_dml_chain_as_write() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH u AS (SELECT id FROM users WHERE email = 'seven@wentsen.com'), \
+                 o AS (INSERT INTO organizations (name, slug, created_by_email) \
+                       VALUES ('wentsen', 'release-org', 'seven@wentsen.com') RETURNING id) \
+                 INSERT INTO memberships (user_id, org_id, role, scope, permissions) \
+                 SELECT u.id, o.id, 'owner', 'org', '{}'::jsonb FROM u, o"
+            )
+            .unwrap(),
+            SqlKind::Write
+        );
+    }
+
+    #[test]
+    fn classifies_with_dml_in_cte_as_write() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH i AS (INSERT INTO t (c) VALUES (1) RETURNING id) SELECT * FROM i"
+            )
+            .unwrap(),
+            SqlKind::Write
+        );
+    }
+
+    #[test]
+    fn classifies_with_update_as_write() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH x AS (SELECT 1 AS v) UPDATE t SET c = (SELECT v FROM x)"
+            )
+            .unwrap(),
+            SqlKind::Write
+        );
+    }
+
+    #[test]
+    fn classifies_with_delete_as_delete() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH x AS (SELECT 1 AS id) DELETE FROM t WHERE id IN (SELECT id FROM x)"
+            )
+            .unwrap(),
+            SqlKind::Delete
+        );
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH d AS (DELETE FROM t RETURNING id) SELECT * FROM d"
+            )
+            .unwrap(),
+            SqlKind::Delete
+        );
+    }
+
+    #[test]
+    fn classifies_with_merge_as_write() {
+        assert_eq!(
+            classify_sql(
+                "postgres",
+                "WITH x AS (SELECT 1 AS id) MERGE INTO t USING x ON t.id = x.id \
+                 WHEN MATCHED THEN UPDATE SET c = 1"
+            )
+            .unwrap(),
+            SqlKind::Write
+        );
+    }
+
+    #[test]
+    fn read_guard_rejects_with_insert() {
+        let err = ensure_read_only(
+            "postgres",
+            "WITH x AS (SELECT 1) INSERT INTO t (c) SELECT 1",
+        )
+        .unwrap_err();
+        assert!(err.contains("execute_write"), "got: {}", err);
+    }
+
+    #[test]
     fn classifies_ddl_as_ddl() {
         assert_eq!(
             classify_sql("postgres", "CREATE TABLE t (id int)").unwrap(),
@@ -398,7 +658,10 @@ mod tests {
             classify_sql("postgres", "ALTER TABLE t ADD COLUMN c int").unwrap(),
             SqlKind::Ddl
         );
-        assert_eq!(classify_sql("postgres", "DROP TABLE t").unwrap(), SqlKind::Ddl);
+        assert_eq!(
+            classify_sql("postgres", "DROP TABLE t").unwrap(),
+            SqlKind::Ddl
+        );
     }
 
     #[test]

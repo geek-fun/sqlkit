@@ -77,7 +77,7 @@ function handleFileInput(e: Event) {
   >
     <CardContent class="p-4 text-center flex flex-col min-h-[120px] items-center justify-center">
       <div
-        class="text-primary mb-2.5 rounded-full bg-primary/5 flex h-9 w-9 items-center justify-center"
+        class="text-primary-text mb-2.5 rounded-full bg-primary/5 flex h-9 w-9 items-center justify-center"
         aria-hidden="true"
       >
         <span class="i-carbon-document-upload h-4.5 w-4.5" />
@@ -85,14 +85,14 @@ function handleFileInput(e: Event) {
       <h3 class="text-sm text-foreground tracking-tight font-medium">
         {{ t('transfer.import.dropzone.title') }}
       </h3>
-      <p class="text-[11px] text-muted-foreground mt-0.5">
+      <p class="text-caption text-muted-foreground mt-0.5">
         {{ t('transfer.import.dropzone.instruction') }}
       </p>
       <div class="mt-3 flex flex-wrap gap-1.5 justify-center">
         <span
           v-for="f in formats"
           :key="f"
-          class="text-[10px] text-muted-foreground tracking-wider font-mono px-1.5 py-0.5 rounded-sm bg-muted/60 uppercase"
+          class="text-caption text-muted-foreground tracking-wider font-mono px-1.5 py-0.5 rounded-sm bg-muted/60 uppercase"
         >
           {{ f }}
         </span>

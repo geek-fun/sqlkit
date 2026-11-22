@@ -2,6 +2,32 @@ import type { CursorPosition, Selection } from '@/common/sqlParser'
 import { extractStatementAtCursor } from '@/common/sqlParser'
 
 describe('extractStatementAtCursor', () => {
+  it.each([
+    'SELECT \'a;b\' AS value',
+    'SELECT \'it\'\'s;a\' AS value',
+    'SELECT "a;b" FROM users',
+    'SELECT `a;b` FROM users',
+    'SELECT [a;b] FROM users',
+    'SELECT 1 /* comment; */ AS n',
+    'SELECT 1 -- comment;\n AS n',
+    'DO $$ BEGIN PERFORM 1; PERFORM 2; END; $$',
+    'DO $body$ BEGIN PERFORM 1; PERFORM 2; END; $body$',
+    `DO $body$ BEGIN RAISE NOTICE '$BODY$'; PERFORM 1; END; $body$`,
+  ])('keeps quoted and commented separators inside %s', (statement) => {
+    const sql = `${statement};\nSELECT 99;`
+    const lines = statement.split('\n')
+    expect(extractStatementAtCursor(sql, {
+      lineNumber: lines.length,
+      column: lines[lines.length - 1].length,
+    })).toBe(statement)
+  })
+
+  it('extracts dollar-quoted blocks with Windows line endings', () => {
+    const sql = 'SELECT 1;\r\nDO $$\r\nBEGIN\r\n PERFORM 2;\r\nEND;\r\n$$;'
+    expect(extractStatementAtCursor(sql, { lineNumber: 4, column: 6 }))
+      .toBe('DO $$\r\nBEGIN\r\n PERFORM 2;\r\nEND;\r\n$$')
+  })
+
   describe('with selection', () => {
     it('extracts single-line selection', () => {
       const sql = 'SELECT * FROM users WHERE id = 1'

@@ -1,3 +1,4 @@
+import type { AccessDenial } from '@/common/aiPermissions'
 import type { AgentMessage as AgentApiMessage, AttachedSourceRow, ConfirmationRuleRow } from '@/datasources/agentApi'
 import { defineStore } from 'pinia'
 import { ulid } from 'ulidx'
@@ -6,6 +7,7 @@ import { agentApi } from '@/datasources/agentApi'
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type DataSourcePermissions = {
+  manage?: boolean
   read: boolean
   create: boolean
   update: boolean
@@ -40,7 +42,7 @@ export type SessionSource = {
 
 export type RiskLevel = 'safe' | 'elevated' | 'destructive'
 
-export type AgentToolCallStatus = 'pending' | 'confirmed' | 'denied' | 'executing' | 'done' | 'error'
+export type AgentToolCallStatus = 'pending' | 'confirmed' | 'denied' | 'executing' | 'done' | 'error' | 'interrupted'
 
 export type AgentToolCall = {
   id: string
@@ -52,6 +54,7 @@ export type AgentToolCall = {
   durationMs?: number
   riskLevel: RiskLevel
   requiresConfirmation: boolean
+  denial?: AccessDenial
 }
 
 export type AgentMessageRole = 'user' | 'assistant' | 'tool' | 'system'
@@ -88,7 +91,7 @@ export type AgentMessage = {
   preparingInProgress?: boolean
 }
 
-export type AgentSessionStatus = 'idle' | 'running' | 'waiting_confirmation' | 'error' | 'stopped'
+export type AgentSessionStatus = 'idle' | 'running' | 'waiting_confirmation' | 'blocked' | 'error' | 'stopped'
 
 export type AgentSessionStopReason = 'iteration_cap' | 'wall_clock_budget' | 'token_budget' | 'llm_error'
 
@@ -196,8 +199,8 @@ function fromBackendMessage(row: AgentApiMessage): AgentMessage {
 
   if (row.role === 'tool') {
     try {
-      const parsed = JSON.parse(row.content) as { content?: string }
-      return { ...base, content: parsed.content ?? row.content }
+      const parsed = JSON.parse(row.content) as { content?: string, tool_call_id?: string }
+      return { ...base, content: parsed.content ?? row.content, toolCallId: parsed.tool_call_id }
     }
     catch { /* fall through */ }
     return { ...base, content: row.content }
@@ -219,12 +222,29 @@ function fromBackendMessage(row: AgentApiMessage): AgentMessage {
       && parsed !== null
       && ('content' in parsed || 'thinking' in parsed || 'tool_calls' in parsed)
     ) {
-      const toolCalls: AgentToolCall[] = (parsed.tool_calls ?? []).map(tc => ({
+      const toolCalls: AgentToolCall[] = row.tool_calls?.map(tc => ({
+        id: tc.id,
+        toolName: tc.tool_name,
+        args: tc.arguments,
+        status: tc.status === 'completed'
+          ? 'done'
+          : tc.status === 'failed' && tc.result
+            ? 'error'
+            : tc.status === 'denied'
+              ? 'denied'
+              : 'interrupted',
+        result: tc.result ?? undefined,
+        denial: tc.denial ?? undefined,
+        riskLevel: tc.denial?.action === 'manage' || tc.denial?.action === 'delete'
+          ? 'destructive'
+          : 'elevated',
+        requiresConfirmation: false,
+      })) ?? (parsed.tool_calls ?? []).map(tc => ({
         id: tc.id,
         toolName: tc.function?.name ?? '',
         args: tc.function?.arguments ?? '{}',
-        status: 'done' as AgentToolCallStatus,
-        riskLevel: 'safe' as RiskLevel,
+        status: 'interrupted' as AgentToolCallStatus,
+        riskLevel: 'elevated' as RiskLevel,
         requiresConfirmation: false,
       }))
       return {
@@ -478,7 +498,7 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
     },
 
-    updateSessionSourcePermissions(sourceId: string, permissions: DataSourcePermissions) {
+    async updateSessionSourcePermissions(sourceId: string, permissions: DataSourcePermissions) {
       const session = this.activeSession
       if (!session)
         return
@@ -492,6 +512,7 @@ export const useDataStudioStore = defineStore('dataStudio', {
                   ? {
                       ...src,
                       permissions: { ...permissions },
+                      permissionsMode: 'custom' as const,
                     }
                   : src,
               ),
@@ -499,9 +520,11 @@ export const useDataStudioStore = defineStore('dataStudio', {
             }
           : s,
       )
+      const updated = this.sessions.find(s => s.id === session.id)
+      await agentApi.updateSessionMeta(session.id, JSON.stringify(updated?.sources ?? []))
     },
 
-    updateSessionSourceMode(sourceId: string, permissionsMode: SourcePermissionsMode) {
+    async updateSessionSourceMode(sourceId: string, permissionsMode: SourcePermissionsMode) {
       const session = this.activeSession
       if (!session)
         return
@@ -519,6 +542,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
             }
           : s,
       )
+      const updated = this.sessions.find(s => s.id === session.id)
+      await agentApi.updateSessionMeta(session.id, JSON.stringify(updated?.sources ?? []))
     },
 
     // ── Session Management ─────────────────────────────────────────────────

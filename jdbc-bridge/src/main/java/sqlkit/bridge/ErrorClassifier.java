@@ -12,7 +12,29 @@ public class ErrorClassifier {
         AUTHENTICATION_FAILED,
         NETWORK_ERROR,
         TIMEOUT,
+        QUERY_ERROR,
         UNKNOWN
+    }
+
+    public static ErrorType classifyRuntime(Throwable throwable) {
+        boolean sqlError = false;
+        for (Throwable cause = throwable; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.sql.SQLTimeoutException) return ErrorType.TIMEOUT;
+            if (cause instanceof java.sql.SQLInvalidAuthorizationSpecException) return ErrorType.AUTHENTICATION_FAILED;
+            if (cause instanceof java.sql.SQLRecoverableException
+                    || cause instanceof java.sql.SQLTransientConnectionException
+                    || cause instanceof java.sql.SQLNonTransientConnectionException
+                    || cause instanceof java.io.IOException) return ErrorType.NETWORK_ERROR;
+            if (cause instanceof java.sql.SQLException) {
+                String state = ((java.sql.SQLException) cause).getSQLState();
+                if (state != null && state.startsWith("08")) return ErrorType.NETWORK_ERROR;
+                if (state != null && state.startsWith("28")) return ErrorType.AUTHENTICATION_FAILED;
+                if ("HYT00".equals(state) || "HYT01".equals(state) || "57014".equals(state)) return ErrorType.TIMEOUT;
+                sqlError = true;
+            }
+        }
+        if (sqlError) return ErrorType.QUERY_ERROR;
+        return classify(throwable);
     }
 
     public static ErrorType classify(Throwable throwable) {

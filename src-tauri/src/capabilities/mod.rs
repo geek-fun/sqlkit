@@ -1,4 +1,5 @@
 pub mod commands;
+pub mod dba;
 pub mod mysql;
 pub mod postgres;
 pub mod sql;

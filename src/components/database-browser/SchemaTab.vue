@@ -24,6 +24,10 @@ const props = defineProps<{
   tableName: string
 }>()
 
+const emit = defineEmits<{
+  (e: 'countChange', count: number | undefined): void
+}>()
+
 const { t } = useI18n()
 
 const columns = ref<ColumnInfo[]>([])
@@ -33,6 +37,7 @@ const error = ref<string | null>(null)
 async function fetchColumns() {
   loading.value = true
   error.value = null
+  emit('countChange', undefined)
   try {
     const result = await invoke<ColumnInfo[]>('list_columns', {
       connectionId: props.connectionId,
@@ -41,9 +46,11 @@ async function fetchColumns() {
       tableName: props.tableName,
     })
     columns.value = result
+    emit('countChange', result.length)
   }
   catch (err) {
     error.value = String(err)
+    emit('countChange', undefined)
   }
   finally {
     loading.value = false
@@ -59,7 +66,7 @@ onMounted(fetchColumns)
       <Spinner size="sm" />
       {{ t('common.loading') }}
     </div>
-    <div v-else-if="error" class="text-sm text-destructive py-8 text-center">
+    <div v-else-if="error" class="text-sm text-destructive-text py-8 text-center">
       {{ error }}
     </div>
     <div v-else class="border rounded-md">
@@ -106,7 +113,7 @@ onMounted(fetchColumns)
             </td>
             <td class="px-3 py-1.5">
               <span v-if="col.nullable" class="text-muted-foreground">{{ t('components.schemaTab.yes') }}</span>
-              <span v-else class="text-destructive font-medium">{{ t('components.schemaTab.no') }}</span>
+              <span v-else class="text-destructive-text font-medium">{{ t('components.schemaTab.no') }}</span>
             </td>
             <td class="text-muted-foreground font-mono px-3 py-1.5 max-w-[150px] truncate">
               {{ col.default_value ?? '—' }}

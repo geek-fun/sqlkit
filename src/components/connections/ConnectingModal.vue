@@ -1,23 +1,31 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { openUrl } from '@tauri-apps/plugin-opener'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { UPGRADE_URL } from '@/common'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Spinner } from '@/components/ui/spinner'
+import { classifyDuckDbFailure } from '@/utils/duckdbErrors'
 
 const { t } = useI18n()
 
 const showModal = ref(false)
 const connectionName = ref('')
 const errorMessage = ref('')
+const errorHint = ref('')
+const warningMessage = ref('')
 const cancelCallback = ref<(() => void) | null>(null)
 const retryCallback = ref<(() => void) | null>(null)
+const failureHint = computed(() => classifyDuckDbFailure(errorMessage.value))
 
-function show(name: string, onCancel: () => void, onRetry: () => void) {
+function show(name: string, onCancel: () => void, onRetry: () => void, warning = '') {
   connectionName.value = name
   cancelCallback.value = onCancel
   retryCallback.value = onRetry
   errorMessage.value = ''
+  errorHint.value = ''
+  warningMessage.value = warning
   showModal.value = true
 }
 
@@ -25,12 +33,19 @@ function hide() {
   showModal.value = false
   connectionName.value = ''
   errorMessage.value = ''
+  errorHint.value = ''
+  warningMessage.value = ''
   cancelCallback.value = null
   retryCallback.value = null
 }
 
-function showError(error: string) {
+function showError(error: string, hint = '') {
   errorMessage.value = error
+  errorHint.value = hint
+}
+
+function openUpgrade() {
+  void openUrl(UPGRADE_URL)
 }
 
 function handleDialogOpenChange(open: boolean) {
@@ -44,20 +59,32 @@ function handleCancel() {
     cancelCallback.value()
   }
   errorMessage.value = ''
+  errorHint.value = ''
   hide()
 }
 
 function handleRetry() {
   errorMessage.value = ''
+  errorHint.value = ''
   if (retryCallback.value) {
     retryCallback.value()
   }
+}
+
+/**
+ * Update the non-fatal warning while the modal is already visible — lets the
+ *  caller show the modal FIRST (instant click feedback) and resolve async
+ *  diagnostics (e.g. the system-proxy probe) afterwards.
+ */
+function setWarning(warning: string | null) {
+  warningMessage.value = warning ?? ''
 }
 
 defineExpose({
   show,
   hide,
   showError,
+  setWarning,
 })
 </script>
 
@@ -75,7 +102,7 @@ defineExpose({
       <div class="py-4 flex flex-col gap-4 items-center">
         <div
           v-if="errorMessage"
-          class="text-sm text-destructive p-4 rounded-md bg-destructive/10 w-full"
+          class="text-sm text-destructive-text p-4 rounded-md bg-destructive/10 w-full"
         >
           <div class="flex gap-3 items-start">
             <svg
@@ -99,6 +126,9 @@ defineExpose({
               <p class="mt-1 opacity-90">
                 {{ errorMessage }}
               </p>
+              <p v-if="failureHint" class="text-xs mt-2 opacity-90">
+                {{ t(failureHint.messageKey) }}
+              </p>
             </div>
             <button
               class="opacity-70 transition-opacity hover:opacity-100"
@@ -121,6 +151,23 @@ defineExpose({
           </div>
         </div>
 
+        <div
+          v-if="errorMessage && errorHint"
+          class="text-sm text-amber-700 p-4 border border-amber-500/40 rounded-md bg-amber-500/10 w-full dark:text-amber-400"
+        >
+          <div class="flex gap-3 items-start">
+            <span class="i-carbon-warning mt-0.5 flex-shrink-0 h-5 w-5" />
+            <div class="flex-1">
+              <p class="opacity-90">
+                {{ errorHint }}
+              </p>
+              <Button size="sm" class="mt-3" @click="openUpgrade">
+                {{ t('plan.upgrade.cta') }}
+              </Button>
+            </div>
+          </div>
+        </div>
+
         <div v-if="!errorMessage" class="py-4">
           <Spinner size="lg" />
         </div>
@@ -131,6 +178,15 @@ defineExpose({
 
         <p v-if="!errorMessage" class="text-sm text-muted-foreground text-center">
           {{ t('components.connectingModal.connectingSubtext') }}
+        </p>
+
+        <!-- Non-fatal heads-up while connecting, e.g. system proxy opted in but
+             no longer detected — the tunnel falls back to a direct connection -->
+        <p
+          v-if="!errorMessage && warningMessage"
+          class="text-xs text-amber-600 text-center max-w-[400px] dark:text-amber-400"
+        >
+          {{ warningMessage }}
         </p>
       </div>
 

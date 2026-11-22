@@ -1,32 +1,26 @@
 <script setup lang="ts">
+import type { PageSize } from '@/composables/pagination'
+import type { TableViewSubPage } from '@/store'
 import { invoke } from '@tauri-apps/api/core'
 import { save as showSaveDialog } from '@tauri-apps/plugin-dialog'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { PaginationControls } from '@/components/pagination'
 import { Button } from '@/components/ui/button'
 import { DestructiveConfirmDialog } from '@/components/ui/destructive-confirm-dialog'
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Spinner } from '@/components/ui/spinner'
+import { isValidPageSize, MAX_FETCH_PAGE_SIZE, usePagination } from '@/composables/pagination'
+import { useDataGridSort } from '@/composables/useDataGridSort'
 import { useMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { toast } from '@/composables/useNotifications'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { ConnectionStatus, useConnectionStore } from '@/store'
+import { isCqlDatabase } from '@/types/connection'
+import { collectSortableColumns, sortRowsByState } from '@/utils/gridSort'
 import {
-  computeOffset,
-  computeTotalPages,
   formatTableValue,
   isTableNullValue,
   rowsToCsv,
@@ -58,16 +52,14 @@ const props = defineProps<{
   database: string
   schema?: string
   tableName: string
+  initialSubPage?: TableViewSubPage
 }>()
 
 const { t } = useI18n()
 
-const ROWS_PER_PAGE_OPTIONS = [100, 500, 1000] as const
-type RowsPerPage = (typeof ROWS_PER_PAGE_OPTIONS)[number]
-
 // Sub-page navigation
-type SubPage = 'data' | 'schema' | 'indexes' | 'foreign_keys' | 'triggers'
-const activeSubPage = ref<SubPage>('data')
+type SubPage = TableViewSubPage
+const activeSubPage = ref<SubPage>(props.initialSubPage ?? 'data')
 const subPages: { id: SubPage, label: string }[] = [
   { id: 'data', label: 'Data' },
   { id: 'schema', label: 'Schema' },
@@ -76,8 +68,36 @@ const subPages: { id: SubPage, label: string }[] = [
   { id: 'triggers', label: 'Triggers' },
 ]
 
-const currentPage = ref(1)
-const rowsPerPage = ref<RowsPerPage>(100)
+watch(() => props.initialSubPage, (subPage) => {
+  if (subPage)
+    activeSubPage.value = subPage
+})
+
+// Counts reported by the metadata sub-pages, shown in their footer.
+const subPageCounts = ref<Partial<Record<SubPage, number>>>({})
+
+function setSubPageCount(subPage: SubPage, count: number | undefined) {
+  subPageCounts.value = { ...subPageCounts.value, [subPage]: count }
+}
+
+const activeSubPageCountLabel = computed(() => {
+  const count = subPageCounts.value[activeSubPage.value]
+  if (count === undefined)
+    return ''
+  switch (activeSubPage.value) {
+    case 'schema':
+      return t('components.dataTableView.columnsCount', { count })
+    case 'indexes':
+      return t('components.dataTableView.indexesCount', { count })
+    case 'foreign_keys':
+      return t('components.dataTableView.foreignKeysCount', { count })
+    case 'triggers':
+      return t('components.dataTableView.triggersCount', { count })
+    default:
+      return ''
+  }
+})
+
 const filterInput = ref('')
 const appliedFilter = ref('')
 const hiddenColumns = ref<Set<string>>(new Set())
@@ -101,7 +121,11 @@ watch(searchTerm, () => {
 
 const data = ref<TableDataResult | null>(null)
 const totalCount = ref(0)
+const { currentPage, pageSize: rowsPerPage, pageCount: totalPages, offset, setPage, setPageSize } = usePagination(totalCount, { maxPageSize: MAX_FETCH_PAGE_SIZE })
 const loading = ref(false)
+const countLoading = ref(false)
+const countAvailable = ref(false)
+const tableScrollRef = ref<HTMLElement | null>(null)
 const error = ref<string | null>(null)
 const executionTimeMs = ref<number | null>(null)
 const columnInfoList = ref<ColumnTypeInfo[]>([])
@@ -109,6 +133,9 @@ const invalidated = ref(false)
 
 // --- Connection state ---
 const connectionStore = useConnectionStore()
+const isCqlPreview = computed(() =>
+  isCqlDatabase(connectionStore.getConnectionById(props.connectionId)?.type),
+)
 const isReconnecting = ref(false)
 const connectionError = ref<string | null>(null)
 
@@ -167,6 +194,38 @@ const columnTypeMap = computed(() =>
   Object.fromEntries(columnInfoList.value.map(c => [c.name, c.data_type])),
 )
 
+// ── Client-side sorting (primitive columns only) ──
+// Sorting applies to the rows already fetched for the current page; JSON,
+// array and BLOB columns stay unsortable because they have no total order.
+const sort = useDataGridSort()
+
+const sortColumnTypes = computed(() => {
+  const result = data.value
+  const fromResult = result
+    ? Object.fromEntries(result.columns.map((col, i) => [col, result.columnTypes?.[i] ?? '']))
+    : {}
+  return {
+    ...fromResult,
+    ...columnTypeMap.value,
+  }
+})
+
+const sortableColumns = computed(() =>
+  collectSortableColumns(visibleColumns.value, data.value?.rows ?? [], sortColumnTypes.value),
+)
+
+const sortedRows = computed(() =>
+  sortRowsByState(data.value?.rows ?? [], sort.sortState.value, sortColumnTypes.value),
+)
+
+const isSortable = (column: string): boolean => sortableColumns.value.has(column)
+
+function handleHeaderSort(column: string) {
+  if (!isSortable(column))
+    return
+  sort.toggleSort(column)
+}
+
 const columnIsPK = computed(() =>
   Object.fromEntries(columnInfoList.value.map(c => [c.name, c.is_primary_key])),
 )
@@ -178,6 +237,9 @@ const columnNullable = computed(() =>
 const columnIsAutoIncrement = computed(() =>
   Object.fromEntries(columnInfoList.value.map(c => [c.name, c.is_auto_increment])),
 )
+
+const isEditColumnReadOnly = (column: string) =>
+  columnIsAutoIncrement.value[column] || (isCqlPreview.value && columnIsPK.value[column])
 
 /** PK columns (in order they appear in the result set) */
 const pkColumns = computed(() =>
@@ -200,30 +262,27 @@ function formatPkSummary(row: Record<string, unknown>): string {
     : Object.entries(row).slice(0, 2).map(([k, v]) => `${k}: ${formatTableValue(v)}`).join(', ')
 }
 
-const totalPages = computed(() => computeTotalPages(totalCount.value, rowsPerPage.value))
-
-const offset = computed(() => computeOffset(currentPage.value, rowsPerPage.value))
-
-const pageNumbers = computed<(number | '...')[]>(() => {
-  const total = totalPages.value
-  const cur = currentPage.value
-  if (total <= 7)
-    return Array.from({ length: total }, (_, i) => i + 1)
-  const middlePages = Array.from(
-    { length: Math.min(total - 1, cur + 1) - Math.max(2, cur - 1) + 1 },
-    (_, i) => Math.max(2, cur - 1) + i,
-  )
-  return [
-    1,
-    ...(cur > 3
-      ? ['...' as const]
-      : []),
-    ...middlePages,
-    ...(cur < total - 2
-      ? ['...' as const]
-      : []),
-    total,
-  ]
+const pageStatus = computed(() => {
+  const count = data.value?.rows.length ?? 0
+  if (isCqlPreview.value)
+    return t('components.dataTableView.previewRows', { count })
+  if (!countAvailable.value) {
+    return t('components.pagination.showingWithoutTotal', {
+      start: count > 0
+        ? offset.value + 1
+        : 0,
+      end: offset.value + count,
+    })
+  }
+  return t('components.dataGrid.status.showing', {
+    start: count > 0
+      ? offset.value + 1
+      : 0,
+    end: count > 0
+      ? Math.min(totalCount.value, offset.value + count)
+      : 0,
+    total: totalCount.value.toLocaleString(),
+  })
 })
 
 const formattedTime = computed(() => {
@@ -251,7 +310,7 @@ async function fetchData() {
           schema: props.schema ?? null,
           filter: appliedFilter.value.trim() || null,
           limit: rowsPerPage.value,
-          offset: offset.value,
+          offset: isCqlPreview.value ? 0 : offset.value,
         },
       })
       data.value = result
@@ -271,6 +330,7 @@ async function fetchCount() {
   if (invalidated.value) {
     return
   }
+  countLoading.value = true
   try {
     const count = await invoke<number>('get_table_count', {
       connectionId: props.connectionId,
@@ -280,9 +340,14 @@ async function fetchCount() {
       filter: appliedFilter.value.trim() || null,
     })
     totalCount.value = count
+    countAvailable.value = true
   }
   catch {
     totalCount.value = 0
+    countAvailable.value = false
+  }
+  finally {
+    countLoading.value = false
   }
 }
 
@@ -315,10 +380,9 @@ async function ensureConnection(): Promise<boolean> {
 }
 
 async function refresh() {
-  await Promise.all([
-    fetchData(),
-    fetchCount(),
-  ])
+  if (!isCqlPreview.value)
+    await fetchCount()
+  await fetchData()
 }
 
 async function handleRetry() {
@@ -464,16 +528,17 @@ function onGlobalKeydown(e: KeyboardEvent) {
   }
 }
 
-function goToPage(page: number) {
-  if (page < 1 || page > totalPages.value)
+const goToPage = (page: number) => {
+  if (isCqlPreview.value || loading.value || countLoading.value || !Number.isSafeInteger(page) || page === currentPage.value)
     return
-  currentPage.value = page
+  setPage(page)
   fetchData()
 }
 
-function changeRowsPerPage(val: string) {
-  rowsPerPage.value = Number(val) as RowsPerPage
-  currentPage.value = 1
+const changeRowsPerPage = (size: PageSize) => {
+  if (loading.value || countLoading.value || size === rowsPerPage.value || !isValidPageSize(size, false, MAX_FETCH_PAGE_SIZE))
+    return
+  setPageSize(size)
   fetchData()
 }
 
@@ -493,7 +558,7 @@ async function exportCSV() {
   if (!data.value)
     return
 
-  const csv = rowsToCsv(data.value.rows, visibleColumns.value)
+  const csv = rowsToCsv(sortedRows.value, visibleColumns.value)
   const conn = connectionStore.getConnectionById(props.connectionId)
   const connName = conn?.name || props.connectionId
   const parts = [connName, props.database]
@@ -599,7 +664,7 @@ async function confirmBatchDelete() {
   let failCount = 0
 
   for (const idx of indices) {
-    const row = data.value.rows[idx]
+    const row = sortedRows.value[idx]
     if (!row || pkColumns.value.length === 0)
       continue
 
@@ -666,7 +731,7 @@ function validateEditForm(): boolean {
 
   for (const col of columns) {
     const field = editForm.value[col]
-    if (!field)
+    if (!field || isEditColumnReadOnly(col))
       continue
 
     // Skip validation if set to NULL
@@ -779,8 +844,7 @@ async function confirmEdit() {
     const updates = Object.fromEntries(
       columns
         .map((col: string) => {
-          // Skip auto-increment columns - they cannot be updated
-          if (columnIsAutoIncrement.value[col]) {
+          if (isEditColumnReadOnly(col)) {
             return null
           }
           const field = editForm.value[col]
@@ -826,6 +890,20 @@ async function confirmEdit() {
 // Clear selection when data changes
 watch(data, () => {
   selectedRows.value = new Set()
+  if (tableScrollRef.value)
+    tableScrollRef.value.scrollTop = 0
+})
+
+watch([currentPage, rowsPerPage], () => {
+  selectedRows.value = new Set()
+  editDialogOpen.value = false
+  deleteDialogOpen.value = false
+  batchDeleteDialogOpen.value = false
+})
+
+// Sorting reorders positional indices, so the current selection no longer maps
+watch(sort.sortState, () => {
+  selectedRows.value = new Set()
 })
 
 const formatValue = formatTableValue
@@ -845,8 +923,13 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.connectionId, props.tableName, props.schema] as const,
-  async ([newConnId, _newTable, _newSchema], [oldConnId]) => {
+  () => [
+    props.connectionId,
+    props.database,
+    props.tableName,
+    props.schema,
+  ] as const,
+  async ([newConnId, _newDatabase, _newTable, _newSchema], [oldConnId]) => {
     currentPage.value = 1
     appliedFilter.value = ''
     filterInput.value = ''
@@ -858,7 +941,9 @@ watch(
       searchDebounceTimer = null
     }
     hiddenColumns.value = new Set()
+    sort.clearSort()
     connectionError.value = null
+    subPageCounts.value = {}
 
     if (newConnId !== oldConnId) {
       data.value = null
@@ -986,7 +1071,7 @@ watch(
                 class="text-sm px-2 py-1 text-left rounded flex gap-2 w-full cursor-pointer items-center hover:bg-accent"
                 @click="toggleColumn(col)"
               >
-                <span v-if="!hiddenColumns.has(col)" class="i-carbon-checkmark text-primary flex-shrink-0 h-3 w-3" />
+                <span v-if="!hiddenColumns.has(col)" class="i-carbon-checkmark text-primary-text flex-shrink-0 h-3 w-3" />
                 <span v-else class="flex-shrink-0 w-3 inline-block" />
                 <span class="truncate">{{ col }}</span>
               </button>
@@ -1011,7 +1096,7 @@ watch(
           variant="ghost"
           size="icon"
           class="flex-shrink-0 h-7 w-7"
-          :disabled="!data || data.rows.length === 0 || isExporting"
+          :disabled="!data || sortedRows.length === 0 || isExporting"
           :title="t('components.dataTableView.exportCsv')"
           @click.stop="exportCSV"
         >
@@ -1030,7 +1115,7 @@ watch(
       </div>
 
       <!-- Table area -->
-      <div class="flex-1 min-h-0 relative overflow-auto">
+      <div ref="tableScrollRef" class="flex-1 min-h-0 relative overflow-auto">
         <!-- Connection error state -->
         <div v-if="connectionError" class="p-4 flex h-full items-center justify-center">
           <div class="text-center max-w-md">
@@ -1038,7 +1123,7 @@ watch(
             <p class="text-sm text-muted-foreground mb-2">
               {{ t('components.dataTableView.connectionLost') }}
             </p>
-            <p class="text-xs text-muted-foreground/70 mb-4">
+            <p class="text-xs text-muted-foreground mb-4">
               {{ connectionError }}
             </p>
             <Button size="sm" @click="handleRetry">
@@ -1051,7 +1136,7 @@ watch(
         <!-- Reconnecting state -->
         <div v-else-if="isReconnecting" class="p-4 flex h-full items-center justify-center">
           <div class="text-center">
-            <span class="i-carbon-loading text-primary mx-auto mb-2 h-8 w-8 block animate-spin" />
+            <span class="i-carbon-loading text-primary-text mx-auto mb-2 h-8 w-8 block animate-spin" />
             <p class="text-sm text-muted-foreground">
               {{ t('components.dataTableView.reconnecting') }}
             </p>
@@ -1064,7 +1149,7 @@ watch(
           class="bg-background/60 flex items-center inset-0 justify-center absolute z-10"
         >
           <div class="text-center">
-            <span class="i-carbon-loading text-primary mx-auto mb-2 h-8 w-8 block animate-spin" />
+            <span class="i-carbon-loading text-primary-text mx-auto mb-2 h-8 w-8 block animate-spin" />
             <p class="text-sm text-muted-foreground">
               {{ t('components.dataTableView.loading') }}
             </p>
@@ -1111,7 +1196,33 @@ watch(
                 :key="col"
                 class="data-table-header text-left"
               >
-                <div class="col-header-cell" :title="columnTypeMap[col] ? `${col} · ${columnTypeMap[col]}` : col">
+                <button
+                  v-if="isSortable(col)"
+                  class="col-header-cell text-left w-full cursor-pointer"
+                  :title="columnTypeMap[col] ? `${col} · ${columnTypeMap[col]}` : col"
+                  @click="handleHeaderSort(col)"
+                >
+                  <span v-if="columnIsPK[col]" class="i-carbon-key text-amber-500 flex-shrink-0 h-3 w-3" />
+                  <span class="col-name truncate">{{ col }}</span>
+                  <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
+                  <span
+                    v-if="sort.getSortDirection(col) === 'ASC'"
+                    class="i-carbon-arrow-up text-foreground flex-shrink-0 h-3 w-3"
+                  />
+                  <span
+                    v-else-if="sort.getSortDirection(col) === 'DESC'"
+                    class="i-carbon-arrow-down text-foreground flex-shrink-0 h-3 w-3"
+                  />
+                  <span
+                    v-else
+                    class="i-carbon-chevron-sort opacity-30 flex-shrink-0 h-3 w-3"
+                  />
+                </button>
+                <div
+                  v-else
+                  class="col-header-cell cursor-default"
+                  :title="$t('components.dataGrid.sort.unsortable')"
+                >
                   <span v-if="columnIsPK[col]" class="i-carbon-key text-amber-500 flex-shrink-0 h-3 w-3" />
                   <span class="col-name truncate">{{ col }}</span>
                   <span v-if="columnTypeMap[col]" class="col-type flex-shrink-0">{{ columnTypeMap[col] }}</span>
@@ -1125,7 +1236,7 @@ watch(
           </thead>
           <tbody>
             <tr
-              v-for="(row, i) in data.rows"
+              v-for="(row, i) in sortedRows"
               :key="i"
               class="border-b hover:bg-muted/50"
               :class="{ 'bg-muted/30': selectedRows.has(i) }"
@@ -1181,7 +1292,7 @@ watch(
 
         <!-- Empty state -->
         <div
-          v-else-if="data && data.rows.length === 0"
+          v-else-if="data && sortedRows.length === 0"
           class="flex h-full items-center justify-center"
         >
           <div class="text-muted-foreground text-center">
@@ -1195,90 +1306,25 @@ watch(
         <!-- No data yet -->
         <div v-else class="flex h-full items-center justify-center">
           <div class="text-muted-foreground text-center">
-            <span class="i-carbon-loading text-primary mx-auto mb-2 h-8 w-8 block animate-spin" />
+            <span class="i-carbon-loading text-primary-text mx-auto mb-2 h-8 w-8 block animate-spin" />
           </div>
         </div>
       </div>
 
-      <!-- Status bar + pagination -->
-      <div class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex shrink-0 gap-3 items-center overflow-hidden">
-        <!-- Left: stats -->
-        <div class="flex flex-shrink-0 gap-3 items-center">
-          <span v-if="totalCount > 0" class="tabular-nums">
-            {{ totalCount.toLocaleString() }} rows
-          </span>
-          <span v-if="formattedTime" class="text-muted-foreground/70">{{ formattedTime }}</span>
-        </div>
-
-        <div class="flex-1 min-w-0" />
-
-        <!-- Right: pagination + rows per page grouped -->
-        <div class="flex flex-shrink-0 gap-2 max-w-[70%] items-center overflow-x-auto">
-          <!-- Page navigation -->
-          <div v-if="data" class="flex flex-nowrap gap-0.5 items-center">
-            <!-- Prev -->
-            <button
-              class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="currentPage === 1 || loading"
-              @click="goToPage(currentPage - 1)"
-            >
-              <span class="i-carbon-chevron-left h-3 w-3" />
-            </button>
-
-            <template v-for="(p, idx) in pageNumbers" :key="idx">
-              <span
-                v-if="p === '...'"
-                class="text-xs text-muted-foreground inline-flex h-6 w-6 items-center justify-center"
-              >…</span>
-              <button
-                v-else
-                class="text-xs font-medium px-1.5 rounded inline-flex h-6 min-w-6 transition-colors items-center justify-center"
-                :class="p === currentPage
-                  ? 'bg-primary text-primary-foreground'
-                  : 'hover:bg-accent'"
-                :disabled="loading"
-                @click="goToPage(p as number)"
-              >
-                {{ p }}
-              </button>
-            </template>
-
-            <!-- Next -->
-            <button
-              class="text-xs rounded inline-flex h-6 w-6 transition-colors items-center justify-center hover:bg-accent disabled:opacity-40 disabled:cursor-not-allowed"
-              :disabled="currentPage >= totalPages || loading"
-              @click="goToPage(currentPage + 1)"
-            >
-              <span class="i-carbon-chevron-right h-3 w-3" />
-            </button>
-          </div>
-
-          <!-- Divider -->
-          <div v-if="data" class="bg-border h-3.5 w-px" />
-
-          <!-- Rows per page -->
-          <div class="flex gap-1.5 items-center">
-            <span class="text-muted-foreground/70">Rows</span>
-            <Select
-              :model-value="String(rowsPerPage)"
-              @update:model-value="changeRowsPerPage"
-            >
-              <SelectTrigger class="text-xs h-6 w-16">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem
-                  v-for="n in ROWS_PER_PAGE_OPTIONS"
-                  :key="n"
-                  :value="String(n)"
-                >
-                  {{ n }}
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </div>
+      <PaginationControls
+        :current-page="currentPage"
+        :page-count="totalPages"
+        :page-size="rowsPerPage"
+        :preview="isCqlPreview"
+        :max-page-size="MAX_FETCH_PAGE_SIZE"
+        :database="props.database"
+        :disabled="loading || countLoading || isReconnecting || !!connectionError || !!error"
+        @page-change="goToPage"
+        @page-size-change="changeRowsPerPage"
+      >
+        <span class="tabular-nums" role="status">{{ pageStatus }}</span>
+        <span v-if="formattedTime">{{ t('components.dataGrid.status.time', { time: formattedTime }) }}</span>
+      </PaginationControls>
     </template>
 
     <!-- Schema sub-page -->
@@ -1289,6 +1335,7 @@ watch(
       :schema="props.schema ?? null"
       :table-name="props.tableName"
       class="flex-1"
+      @count-change="setSubPageCount('schema', $event)"
     />
 
     <!-- Indexes sub-page -->
@@ -1299,6 +1346,7 @@ watch(
       :schema="props.schema ?? null"
       :table-name="props.tableName"
       class="flex-1"
+      @count-change="setSubPageCount('indexes', $event)"
     />
 
     <!-- Foreign Keys sub-page -->
@@ -1309,6 +1357,7 @@ watch(
       :schema="props.schema ?? null"
       :table-name="props.tableName"
       class="flex-1"
+      @count-change="setSubPageCount('foreign_keys', $event)"
     />
 
     <!-- Triggers sub-page -->
@@ -1319,7 +1368,19 @@ watch(
       :schema="props.schema ?? null"
       :table-name="props.tableName"
       class="flex-1"
+      @count-change="setSubPageCount('triggers', $event)"
     />
+
+    <!-- Status footer for metadata sub-pages -->
+    <div
+      v-if="activeSubPage !== 'data'"
+      class="text-xs text-muted-foreground px-3 py-1.5 border-t bg-muted/20 flex shrink-0 gap-3 items-center overflow-hidden"
+    >
+      <span v-if="props.database" class="tabular-nums">
+        {{ t('pages.queries.status.database') }}: {{ props.database }}
+      </span>
+      <span v-if="activeSubPageCountLabel" class="tabular-nums">{{ activeSubPageCountLabel }}</span>
+    </div>
 
     <!-- ── Delete confirmation dialog ── -->
     <DestructiveConfirmDialog
@@ -1367,14 +1428,14 @@ watch(
             <div class="flex gap-2 items-center">
               <!-- Column name, type, and PK icon - inline -->
               <Label :for="`edit-field-${col}`" class="text-xs font-medium whitespace-nowrap">
-                {{ col }}<span v-if="columnTypeMap[col]" class="text-[10px] text-muted-foreground font-mono font-normal ml-1">{{ columnTypeMap[col] }}</span><span
+                {{ col }}<span v-if="columnTypeMap[col]" class="text-caption text-muted-foreground font-mono font-normal ml-1">{{ columnTypeMap[col] }}</span><span
                   v-if="columnIsPK[col]"
                   class="i-carbon-key text-amber-500 ml-1.5 h-3 w-3 inline-block"
                 />
               </Label>
               <div class="flex-1" />
               <!-- Set to NULL toggle -->
-              <label v-if="!columnIsAutoIncrement[col]" class="text-xs text-muted-foreground flex gap-1 cursor-pointer select-none items-center">
+              <label v-if="!isEditColumnReadOnly(col)" class="text-xs text-muted-foreground flex gap-1 cursor-pointer select-none items-center">
                 <input
                   type="checkbox"
                   class="h-3 w-3 cursor-pointer"
@@ -1392,14 +1453,14 @@ watch(
               :id="`edit-field-${col}`"
               :type="getEditInputType(col)"
               :model-value="editForm[col]?.setNull ? '' : (editForm[col]?.value ?? '')"
-              :disabled="editForm[col]?.setNull || columnIsAutoIncrement[col]"
+              :disabled="editForm[col]?.setNull || isEditColumnReadOnly(col)"
               :placeholder="editForm[col]?.setNull ? 'NULL' : columnIsAutoIncrement[col] ? 'Auto-generated' : ''"
               :step="getEditInputType(col) === 'number' ? 'any' : undefined"
               class="text-xs font-mono h-7"
-              :class="{ 'border-destructive': editErrors[col], 'opacity-60': columnIsAutoIncrement[col] }"
+              :class="{ 'border-destructive': editErrors[col], 'opacity-60': isEditColumnReadOnly(col) }"
               @update:model-value="(v) => editForm[col] = { ...editForm[col], value: String(v), setNull: editForm[col]?.setNull ?? false }"
             />
-            <p v-if="editErrors[col]" class="text-xs text-destructive">
+            <p v-if="editErrors[col]" class="text-xs text-destructive-text">
               {{ editErrors[col] }}
             </p>
           </div>
@@ -1431,7 +1492,7 @@ watch(
   z-index: 10;
   background-color: hsl(var(--muted));
   padding: 0.375rem 0.75rem;
-  font-size: 0.75rem;
+  font-size: var(--font-size-dense);
   font-weight: 500;
   max-width: 200px;
   min-width: 80px;
@@ -1470,7 +1531,7 @@ tr:hover .data-table-actions-col {
 }
 
 .col-type {
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   font-weight: 400;
   font-family: monospace;
   color: hsl(var(--muted-foreground));

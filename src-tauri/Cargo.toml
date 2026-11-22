@@ -1,6 +1,6 @@
 [package]
 name = "sqlkit"
-version = "0.8.5"
+version = "0.8.7"
 description = "A Tauri App"
 authors = [ "you" ]
 edition = "2021"
@@ -22,7 +22,10 @@ crate-type = [
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [ "devtools" ] }
+tauri = { version = "2", features = [
+  "devtools",
+  "tray-icon"
+] }
 tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
@@ -97,8 +100,16 @@ zip = { version = "2", features = [ "deflate" ] }
 # TOML parsing (drivers.toml)
 toml = "0.8"
 sha2 = "0.11"
+hmac = "0.13"
 sqlparser = "0.64"
+fast-socks5 = "1.0"
+percent-encoding = "2"
 russh = "0.65"
+hyper-util = { version = "0.1", default-features = false, features = [
+  "client",
+  "client-proxy",
+  "client-proxy-system"
+] }
 axum = "0.8"
 portpicker = "0.1.1"
 pageant = "0.2"
@@ -106,10 +117,16 @@ pageant = "0.2"
 [dev-dependencies]
 mockall = "0.15"
 tempfile = "3"
+wiremock = "0.6"
 
 [features]
 default = [ "rusqlite/bundled" ]
-ohos = []
 # Use SQLCipher (encrypted SQLite) instead of plain SQLite.
 # Build with: cargo build --no-default-features --features sqlcipher
 sqlcipher = [ "rusqlite/bundled-sqlcipher" ]
+
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = [ "deep-link" ] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+system-configuration = "0.7"

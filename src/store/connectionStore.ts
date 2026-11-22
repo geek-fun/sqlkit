@@ -1,8 +1,12 @@
+import type { AiPermissions } from '@/common'
 import type { SslConfig } from '@/types/connection'
 import { listen } from '@tauri-apps/api/event'
 import { defineStore } from 'pinia'
+import { getAiPolicy, markSshTunnelStripped, saveAiPermissions, shouldStripSshTunnel } from '@/common'
 import { sslModeFromBackend, sslModeToBackend } from '@/types/connection'
 import { connectionApi } from '../datasources'
+import { useEntitlementStore } from './entitlementStore'
+import { profileToTransportLayer, useSshProfileStore } from './sshProfileStore'
 
 export enum DatabaseType {
   MYSQL = 'MYSQL',
@@ -17,6 +21,8 @@ export enum DatabaseType {
   REDSHIFT = 'REDSHIFT',
   YUGABYTEDB = 'YUGABYTEDB',
   TIMESCALEDB = 'TIMESCALEDB',
+  CASSANDRA = 'CASSANDRA',
+  SCYLLADB = 'SCYLLADB',
   KINGBASEES = 'KINGBASEES',
   GAUSSDB = 'GAUSSDB',
   HIGHGO = 'HIGHGO',
@@ -56,7 +62,6 @@ export enum DatabaseType {
   BIGQUERY = 'BIGQUERY',
   INFORMIX = 'INFORMIX',
   KYLIN = 'KYLIN',
-  CASSANDRA = 'CASSANDRA',
   IRIS = 'IRIS',
   ACCESS = 'ACCESS',
   FIREBIRD = 'FIREBIRD',
@@ -130,6 +135,7 @@ export const dbTypeToBackend: Record<DatabaseType, string> = {
   [DatabaseType.INFORMIX]: 'informix',
   [DatabaseType.KYLIN]: 'kylin',
   [DatabaseType.CASSANDRA]: 'cassandra',
+  [DatabaseType.SCYLLADB]: 'scylladb',
   [DatabaseType.IRIS]: 'iris',
   [DatabaseType.ACCESS]: 'access',
   [DatabaseType.FIREBIRD]: 'firebird',
@@ -201,6 +207,7 @@ export const dbTypeFromBackend: Record<string, DatabaseType> = {
   'informix': DatabaseType.INFORMIX,
   'kylin': DatabaseType.KYLIN,
   'cassandra': DatabaseType.CASSANDRA,
+  'scylladb': DatabaseType.SCYLLADB,
   'iris': DatabaseType.IRIS,
   'access': DatabaseType.ACCESS,
   'firebird': DatabaseType.FIREBIRD,
@@ -239,6 +246,8 @@ const defaultDatabaseFor: Partial<Record<DatabaseType, string>> = {
   [DatabaseType.CRATEDB]: 'crate',
   [DatabaseType.QUESTDB]: 'qdb',
   [DatabaseType.KINGBASEES]: 'test',
+  [DatabaseType.CASSANDRA]: 'keyspace (default: system)',
+  [DatabaseType.SCYLLADB]: 'keyspace (default: system)',
 }
 
 const requiredDatabaseFor: Set<DatabaseType> = new Set([
@@ -251,6 +260,8 @@ const databasePlaceholderFor: Partial<Record<DatabaseType, string>> = {
   [DatabaseType.ENTERPRISEDB]: 'edb (Oracle-compat) / postgres (PG mode)',
   [DatabaseType.TIMESCALEDB]: 'tsdb (cloud) / postgres (self-hosted)',
   [DatabaseType.REDSHIFT]: 'database name (required)',
+  [DatabaseType.CASSANDRA]: 'keyspace (default: system)',
+  [DatabaseType.SCYLLADB]: 'keyspace (default: system)',
 }
 
 function isDatabaseRequired(type: DatabaseType): boolean {
@@ -258,6 +269,8 @@ function isDatabaseRequired(type: DatabaseType): boolean {
 }
 
 function resolveDatabase(type: DatabaseType, database?: string): string | null {
+  if (type === DatabaseType.CASSANDRA || type === DatabaseType.SCYLLADB)
+    return database?.trim() || 'system'
   return database || defaultDatabaseFor[type] || null
 }
 
@@ -319,6 +332,7 @@ export function isJdbcDatabase(type: DatabaseType): boolean {
     DatabaseType.INFORMIX,
     DatabaseType.KYLIN,
     DatabaseType.CASSANDRA,
+    DatabaseType.SCYLLADB,
     DatabaseType.IRIS,
     DatabaseType.ACCESS,
     DatabaseType.TDENGINE,
@@ -349,6 +363,7 @@ export const jdbcDatabaseTypes: DatabaseType[] = [
   DatabaseType.INFORMIX,
   DatabaseType.KYLIN,
   DatabaseType.CASSANDRA,
+  DatabaseType.SCYLLADB,
   DatabaseType.IRIS,
   DatabaseType.ACCESS,
   DatabaseType.TDENGINE,
@@ -393,6 +408,10 @@ export type SSHTunnelConfig = {
   password?: string
   privateKey?: string
   privateKeyPassphrase?: string
+  /** Ordered profile hops — takes priority over the inline fields. */
+  profileIds?: string[]
+  /** Route the first hop through the OS-detected HTTP proxy. */
+  useSystemProxy?: boolean
 }
 
 export type OracleConnectionOptions = {
@@ -417,11 +436,15 @@ export type ServerConnection = {
   ssl: SslConfig
   sshTunnel?: SSHTunnelConfig
   oracleOptions?: OracleConnectionOptions
+  /** Open a local database file read-only (DuckDB supports this today). */
+  readOnly?: boolean
   connectTimeoutSecs?: number
   queryTimeoutSecs?: number
   isConnected?: boolean
   lastUsed?: Date
   serverVersion?: string
+  aiPermissions?: AiPermissions
+  prompt?: string
 }
 
 type ConnectionStoreState = {
@@ -467,12 +490,14 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     return undefined
   }
 
-  const authMethodRaw = sshLayer.auth_method
-  const authMethod = typeof authMethodRaw === 'object' && authMethodRaw !== null
-    ? (authMethodRaw as Record<string, unknown>)
-    : undefined
+  // Saved layers carry the Rust-contract camelCase shape (see
+  // TransportLayerConfig): auth is a plain "password" | "key" | "agent" string.
+  const authMethodRaw = sshLayer.authMethod
+  const authMethod = typeof authMethodRaw === 'string'
+    ? authMethodRaw
+    : ''
 
-  if (authMethod && authMethod.method === 'agent') {
+  if (authMethod === 'agent') {
     return {
       enabled: safeBool(sshLayer.enabled, true),
       host: safeStr(sshLayer.host, ''),
@@ -482,24 +507,9 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     }
   }
 
-  let method: 'password' | 'privateKey' = 'password'
-  let password: string | undefined
-  let privateKey: string | undefined
-  let passphrase: string | undefined
-
-  if (authMethod) {
-    if (authMethod.method === 'password') {
-      method = 'password'
-      password = safeStr(authMethod.password, '')
-    }
-    else if (authMethod.method === 'privateKey') {
-      method = 'privateKey'
-      privateKey = safeStr(authMethod.private_key_path, '')
-      passphrase = typeof authMethod.passphrase === 'string'
-        ? authMethod.passphrase
-        : undefined
-    }
-  }
+  const method: 'password' | 'privateKey' = authMethod === 'key'
+    ? 'privateKey'
+    : 'password'
 
   return {
     enabled: safeBool(sshLayer.enabled, true),
@@ -507,9 +517,13 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     port: safePort(sshLayer.port),
     username: safeStr(sshLayer.username, ''),
     authMethod: method,
-    password,
-    privateKey,
-    privateKeyPassphrase: passphrase,
+    password: safeStr(sshLayer.password, ''),
+    privateKey: authMethod === 'key'
+      ? safeStr(sshLayer.keyPath, '')
+      : undefined,
+    privateKeyPassphrase: authMethod === 'key'
+      ? safeStr(sshLayer.keyPassphrase, '')
+      : undefined,
   }
 }
 
@@ -550,35 +564,59 @@ function extractOracleOptions(raw: unknown): OracleConnectionOptions | undefined
   }
 }
 
-export function buildTransportLayers(sshTunnel?: SSHTunnelConfig): import('@/datasources/connectionApi').TransportLayerConfig[] | null {
-  if (!sshTunnel?.enabled || !sshTunnel.host) {
+export async function buildTransportLayers(sshTunnel?: SSHTunnelConfig): Promise<import('@/datasources/connectionApi').TransportLayerConfig[] | null> {
+  if (!sshTunnel?.enabled) {
     return null
   }
 
-  let authMethod: import('@/datasources/connectionApi').SshAuthMethod
-
-  switch (sshTunnel.authMethod) {
-    case 'password':
-      authMethod = { method: 'password', password: sshTunnel.password || '' }
-      break
-    case 'privateKey':
-      authMethod = { method: 'privateKey', private_key_path: sshTunnel.privateKey || '', passphrase: sshTunnel.privateKeyPassphrase || null }
-      break
-    default:
-      authMethod = { method: 'agent' }
-      break
+  // Profile hops take priority: expand each id into a full layer from the
+  // profile store, preserving hop order.
+  if (sshTunnel.profileIds?.length) {
+    const profileStore = useSshProfileStore()
+    if (!profileStore.loaded) {
+      // a fresh app session can reach a save before any profile UI ran
+      await profileStore.fetch()
+    }
+    const layers = sshTunnel.profileIds
+      .map(id => profileStore.byId(id))
+      .filter((p): p is NonNullable<typeof p> => !!p)
+      .map(profileToTransportLayer)
+    if (layers.length > 0 && sshTunnel.useSystemProxy) {
+      layers[0].useSystemProxy = true
+    }
+    return layers
   }
+
+  if (!sshTunnel.host) {
+    return null
+  }
+
+  // Legacy inline tunnel (page-level shape): normalize auth to the Rust
+  // strings ('privateKey' → 'key') and keep the proxy-first-hop semantics.
+  const inlineAuthMethod
+    = sshTunnel.authMethod === 'agent'
+      ? 'agent' as const
+      : sshTunnel.authMethod === 'privateKey'
+        ? 'key' as const
+        : 'password' as const
 
   return [
     {
       type: 'ssh',
+      enabled: true,
       host: sshTunnel.host,
       port: sshTunnel.port,
       username: sshTunnel.username,
-      auth_method: authMethod,
-      enabled: true,
-      connect_timeout_secs: 10,
-      keepalive_interval_secs: 30,
+      authMethod: inlineAuthMethod,
+      password: sshTunnel.password ?? '',
+      keyPath: sshTunnel.privateKey ?? '',
+      keyPassphrase: sshTunnel.privateKeyPassphrase ?? '',
+      useSshAgent: inlineAuthMethod === 'agent',
+      sshAgentSockPath: '',
+      // The inline tunnel is the only hop, so an attached system proxy rides it.
+      useSystemProxy: sshTunnel.useSystemProxy === true,
+      connectTimeoutSecs: 10,
+      keepaliveIntervalSecs: 30,
     },
   ]
 }
@@ -652,14 +690,17 @@ export const useConnectionStore = defineStore('connectionStore', {
             password: item.password as string | undefined,
             database: item.database as string | undefined,
             ssl: {
-              mode: sslModeFromBackend(item.ssl_mode as string | null).mode,
+              mode: sslModeFromBackend(item.ssl_mode as string | null, item.db_type as string).mode,
               caCertPath: item.ssl_ca_cert as string | undefined,
               clientCertPath: item.ssl_client_cert as string | undefined,
               clientKeyPath: item.ssl_client_key as string | undefined,
               trustServerCertificate: item.trust_server_certificate as boolean | undefined,
             },
-            sshTunnel: extractSshTunnelFromTransport(item.transport_layers),
+            sshTunnel: (item.sshTunnel as SSHTunnelConfig | undefined)
+              ?? extractSshTunnelFromTransport(item.transport_layers),
             oracleOptions: extractOracleOptions(item.oracle_options),
+            readOnly: (item.read_only as boolean | undefined) ?? false,
+            prompt: item.prompt as string | undefined,
             isConnected: prev?.isConnected ?? (item.is_connected as boolean | undefined),
             lastUsed: item.last_used
               ? new Date(item.last_used as string)
@@ -676,7 +717,7 @@ export const useConnectionStore = defineStore('connectionStore', {
 
     async saveConnection(connection: ServerConnection): Promise<{ success: boolean, message: string }> {
       try {
-        const transportLayers = buildTransportLayers(connection.sshTunnel)
+        const transportLayers = await buildTransportLayers(connection.sshTunnel)
 
         const serverConfig = {
           id: connection.id || crypto.randomUUID(),
@@ -687,23 +728,43 @@ export const useConnectionStore = defineStore('connectionStore', {
           username: connection.username || '',
           password: connection.password || null,
           database: resolveDatabase(connection.type, connection.database),
-          ssl_mode: sslModeToBackend(connection.ssl),
+          ssl_mode: sslModeToBackend(connection.ssl, connection.type),
           ssl_ca_cert: connection.ssl.caCertPath || null,
           ssl_client_cert: connection.ssl.clientCertPath || null,
           ssl_client_key: connection.ssl.clientKeyPath || null,
           trust_server_certificate: connection.ssl.trustServerCertificate ?? false,
           transport_layers: transportLayers,
+          sshTunnel: connection.sshTunnel ?? null,
           oracle_options: buildOracleOptions(connection.oracleOptions),
+          read_only: connection.readOnly ?? false,
+          prompt: connection.prompt || null,
         }
 
-        const resultId = await connectionApi.save(serverConfig)
+        const permissionDraft = useEntitlementStore().isLocalUltimate
+          ? connection.aiPermissions
+          : undefined
+        const previousPermissions = permissionDraft === undefined
+          ? undefined
+          : (await getAiPolicy()).connection_permissions[serverConfig.id] ?? {}
+        if (permissionDraft !== undefined)
+          await saveAiPermissions(serverConfig.id, permissionDraft)
+        let resultId: string
+        try {
+          resultId = await connectionApi.save(serverConfig)
+        }
+        catch (error) {
+          if (previousPermissions !== undefined)
+            await saveAiPermissions(serverConfig.id, previousPermissions)
+          throw error
+        }
 
+        const { aiPermissions: _draftPermissions, ...savedConnection } = connection
         const existingIndex = this.connections.findIndex(c => c.id === resultId)
         if (existingIndex >= 0) {
-          this.connections[existingIndex] = { ...connection, id: resultId }
+          this.connections[existingIndex] = { ...savedConnection, id: resultId }
         }
         else {
-          this.connections.push({ ...connection, id: resultId })
+          this.connections.push({ ...savedConnection, id: resultId })
         }
 
         return { success: true, message: 'Connection saved successfully' }
@@ -725,11 +786,45 @@ export const useConnectionStore = defineStore('connectionStore', {
 
       await connectionApi.delete(connection.id)
       this.connections = this.connections.filter(c => c.id !== connection.id)
+      try {
+        await saveAiPermissions(connection.id, {})
+      }
+      catch (error) {
+        console.warn('Connection deleted, but AI permission cleanup failed:', error)
+      }
+    },
+
+    connectionsUsingProfile(profileId: string): ServerConnection[] {
+      return this.connections.filter(connection =>
+        connection.sshTunnel?.profileIds?.includes(profileId),
+      )
+    },
+
+    async detachSshProfile(profileId: string): Promise<void> {
+      const detach = (connection: ServerConnection): ServerConnection =>
+        connection.sshTunnel
+          ? {
+              ...connection,
+              sshTunnel: {
+                ...connection.sshTunnel,
+                profileIds: connection.sshTunnel.profileIds?.filter(id => id !== profileId) ?? [],
+              },
+            }
+          : connection
+
+      const results = await Promise.all(
+        this.connectionsUsingProfile(profileId).map(connection =>
+          this.saveConnection(detach(connection)),
+        ),
+      )
+      const failure = results.find(result => !result.success)
+      if (failure)
+        throw new Error(failure.message)
     },
 
     async testConnection(connection: ServerConnection): Promise<boolean> {
       try {
-        const transportLayers = buildTransportLayers(connection.sshTunnel)
+        const transportLayers = await buildTransportLayers(connection.sshTunnel)
 
         const serverConfig = {
           id: connection.id || crypto.randomUUID(),
@@ -740,7 +835,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           username: connection.username || '',
           password: connection.password || null,
           database: resolveDatabase(connection.type, connection.database),
-          ssl_mode: sslModeToBackend(connection.ssl),
+          ssl_mode: sslModeToBackend(connection.ssl, connection.type),
           ssl_ca_cert: connection.ssl.caCertPath || null,
           ssl_client_cert: connection.ssl.clientCertPath || null,
           ssl_client_key: connection.ssl.clientKeyPath || null,
@@ -749,6 +844,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           query_timeout_secs: connection.queryTimeoutSecs ?? 30,
           transport_layers: transportLayers,
           oracle_options: buildOracleOptions(connection.oracleOptions),
+          read_only: connection.readOnly ?? false,
         }
 
         const result = await connectionApi.test(serverConfig)
@@ -771,8 +867,17 @@ export const useConnectionStore = defineStore('connectionStore', {
 
       this.connectionStatus[connectionId] = ConnectionStatus.CONNECTING
 
+      // A free plan drops the saved tunnel for this attempt; the config is untouched.
+      const sshTunnelStripped = shouldStripSshTunnel(
+        connection.sshTunnel?.enabled,
+        useEntitlementStore().isLocalUltimate,
+      )
+
       try {
-        const transportLayers = buildTransportLayers(connection.sshTunnel)
+        const transportLayers
+          = sshTunnelStripped
+            ? null
+            : await buildTransportLayers(connection.sshTunnel)
 
         const serverConfig = {
           id: connection.id!,
@@ -783,7 +888,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           username: connection.username || '',
           password: connection.password || null,
           database: resolveDatabase(connection.type, connection.database),
-          ssl_mode: sslModeToBackend(connection.ssl),
+          ssl_mode: sslModeToBackend(connection.ssl, connection.type),
           ssl_ca_cert: connection.ssl.caCertPath || null,
           ssl_client_cert: connection.ssl.clientCertPath || null,
           ssl_client_key: connection.ssl.clientKeyPath || null,
@@ -792,6 +897,7 @@ export const useConnectionStore = defineStore('connectionStore', {
           query_timeout_secs: connection.queryTimeoutSecs ?? 30,
           transport_layers: transportLayers,
           oracle_options: buildOracleOptions(connection.oracleOptions),
+          read_only: connection.readOnly ?? false,
         }
 
         const result = await connectionApi.connect(serverConfig)
@@ -811,7 +917,10 @@ export const useConnectionStore = defineStore('connectionStore', {
       }
       catch (error) {
         this.connectionStatus[connectionId] = ConnectionStatus.ERROR
-        throw new Error(`Failed to connect: ${error}`)
+        const failure = new Error(`Failed to connect: ${error}`)
+        throw sshTunnelStripped
+          ? markSshTunnelStripped(failure)
+          : failure
       }
     },
 
@@ -847,6 +956,9 @@ export const useConnectionStore = defineStore('connectionStore', {
         error: string | null
       }>('connection-state-changed', (event) => {
         const { connection_id, state, error } = event.payload
+        const conn = this.getConnectionById(connection_id)
+        if (conn)
+          conn.isConnected = state === 'healthy' || state === 'degraded'
         if (state === 'dead') {
           this.connectionStatus[connection_id] = ConnectionStatus.ERROR
         }
@@ -854,10 +966,6 @@ export const useConnectionStore = defineStore('connectionStore', {
           this.connectionStatus[connection_id] = ConnectionStatus.CONNECTING
         }
         else if (state === 'healthy' || state === 'degraded') {
-          const conn = this.getConnectionById(connection_id)
-          if (conn) {
-            conn.isConnected = true
-          }
           this.connectionStatus[connection_id] = ConnectionStatus.CONNECTED
         }
         if (error) {

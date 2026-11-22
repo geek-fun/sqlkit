@@ -1,3 +1,4 @@
+import type { AccessDenial, AiPermissions } from '@/common/aiPermissions'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { jsonify } from '@/common/jsonify'
@@ -19,6 +20,14 @@ export type AgentMessage = {
   role: string
   content: string
   created_at: string
+  tool_calls?: Array<{
+    id: string
+    tool_name: string
+    arguments: string
+    status: string
+    result?: string | null
+    denial?: AccessDenial | null
+  }>
 }
 
 export type ToolEnvelope = {
@@ -247,6 +256,8 @@ export const agentApi = {
       session_id: string
       tool_call_id: string
       tool_name: string
+      risk_level?: 'safe' | 'elevated' | 'destructive'
+      confirmation_required?: boolean
       arguments: unknown
     }) => void,
   ): Promise<() => void> =>
@@ -258,9 +269,18 @@ export const agentApi = {
       tool_call_id: string
       envelope: ToolEnvelope
       error?: boolean
+      denied?: boolean
+      denial?: AccessDenial
+      tool_name?: string
+      arguments?: unknown
     }) => void,
   ): Promise<() => void> =>
     listen('agent-loop-tool-result', e => handler(e.payload as any)),
+
+  onAgentLoopBlocked: (
+    handler: (payload: { session_id: string, tool_call_id: string, denial: AccessDenial }) => void,
+  ): Promise<() => void> =>
+    listen('agent-loop-blocked', e => handler(e.payload as any)),
 
   onAgentLoopToolRetry: (
     handler: (payload: {
@@ -351,13 +371,8 @@ export const agentApi = {
     return parseStringResult<any>(result)
   },
 
-  // Capability invocation — returns raw string
-  invokeCapability: (
-    name: string,
-    args: Record<string, unknown>,
-    connectionId?: string,
-  ): Promise<string> =>
-    invoke<string>('invoke_capability', { name, args, connectionId }),
+  getAiContext: (sessionId: string, connections: Record<string, unknown>, contextKind: string): Promise<{ readableConnectionIds: string[], schema: string, effectivePermissions: Record<string, Required<AiPermissions>> }> =>
+    invoke('get_ai_context', { sessionId, connections, contextKind }),
 }
 
 // Standalone function exports

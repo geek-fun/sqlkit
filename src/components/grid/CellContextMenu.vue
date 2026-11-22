@@ -23,6 +23,7 @@ const props = defineProps<{
   rowIndex?: number
   columns: string[]
   tableName?: string
+  filterable?: boolean
 }>()
 
 const emit = defineEmits<CellContextMenuEmits & {
@@ -82,12 +83,14 @@ function closeAnd(fn: () => void) {
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem
+            :disabled="filterable === false"
             @click="closeAnd(() => emit('filter', { column, operator: 'eq', value: String(value) }))"
           >
             <span class="i-carbon-filter mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.cell.filterByValue') }}
           </DropdownMenuItem>
           <DropdownMenuItem
+            :disabled="filterable === false"
             @click="closeAnd(() => emit('filter', { column, operator: 'neq', value: String(value) }))"
           >
             <span class="i-carbon-filter-remove mr-2 h-3.5 w-3.5" />

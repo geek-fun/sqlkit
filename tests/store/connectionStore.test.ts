@@ -1,7 +1,10 @@
 import type { ServerConnection } from '@/store/connectionStore'
+import { invoke } from '@tauri-apps/api/core'
 import { createPinia, setActivePinia } from 'pinia'
+import { isSshTunnelStrippedError } from '@/common'
 import { connectionApi } from '@/datasources/connectionApi'
-import { ConnectionStatus, DatabaseType, dbTypeToBackend, resolveDatabase, useConnectionStore } from '@/store/connectionStore'
+import { buildTransportLayers, ConnectionStatus, DatabaseType, dbTypeToBackend, resolveDatabase, useConnectionStore } from '@/store/connectionStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 
 jest.mock('@/datasources/connectionApi', () => ({
   connectionApi: {
@@ -14,6 +17,158 @@ jest.mock('@/datasources/connectionApi', () => ({
     getStatus: jest.fn(),
   },
 }))
+
+const PROFILES = [
+  {
+    id: 'hop-1',
+    name: 'Bastion A',
+    host: 'bastion-a',
+    port: 22,
+    username: 'ops',
+    authMethod: 'password',
+    password: 'p',
+    keyPath: '',
+    keyPassphrase: '',
+    useSshAgent: false,
+    sshAgentSockPath: '',
+    connectTimeoutSecs: 10,
+    keepaliveIntervalSecs: 30,
+    verifyHostKey: false,
+    exposeLan: false,
+  },
+  {
+    id: 'hop-2',
+    name: 'Bastion B',
+    host: 'bastion-b',
+    port: 22,
+    username: 'ops',
+    authMethod: 'key',
+    password: '',
+    keyPath: '/keys/id_rsa',
+    keyPassphrase: '',
+    useSshAgent: false,
+    sshAgentSockPath: '',
+    connectTimeoutSecs: 10,
+    keepaliveIntervalSecs: 30,
+    verifyHostKey: false,
+    exposeLan: false,
+  },
+]
+
+jest.mock('@tauri-apps/api/core', () => ({
+  invoke: jest.fn(async (cmd: string) =>
+    cmd === 'list_ssh_profiles'
+      ? PROFILES
+      : []),
+}))
+
+/**
+ * SSH-tunnel → transport layers: the attached system proxy must land on the
+ *  FIRST chain item in every layout (profile chain and legacy inline alike).
+ */
+describe('buildTransportLayers — system proxy is the first chain item', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    jest.clearAllMocks()
+  })
+
+  it('returns null when the tunnel is not enabled', async () => {
+    expect(await buildTransportLayers(undefined)).toBeNull()
+    expect(await buildTransportLayers({ enabled: false } as never)).toBeNull()
+  })
+
+  it('pins the proxy onto the first hop of a profile chain', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      profileIds: ['hop-1', 'hop-2'],
+      useSystemProxy: true,
+    } as never)
+    expect(layers).toHaveLength(2)
+    expect(layers?.[0].useSystemProxy).toBe(true)
+    expect(layers?.[1].useSystemProxy).toBe(false)
+  })
+
+  it('emits the Rust camelCase contract with concrete auth on profile hops', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      profileIds: ['hop-1', 'hop-2'],
+    } as never)
+    expect(layers?.[0]).toMatchObject({
+      type: 'ssh',
+      host: 'bastion-a',
+      authMethod: 'password',
+      password: 'p',
+      useSshAgent: false,
+      connectTimeoutSecs: 10,
+    })
+    expect(layers?.[1]).toMatchObject({
+      authMethod: 'key',
+      keyPath: '/keys/id_rsa',
+    })
+  })
+
+  it('normalizes legacy auto-probe (empty/none) profiles to password auth', async () => {
+    ;(PROFILES as Array<Record<string, unknown>>)[0].authMethod = ''
+    const layers = await buildTransportLayers({
+      enabled: true,
+      profileIds: ['hop-1'],
+    } as never)
+    expect(layers?.[0].authMethod).toBe('password')
+    // restore for other tests in this describe
+    ;(PROFILES as Array<Record<string, unknown>>)[0].authMethod = 'password'
+  })
+
+  it('normalizes the legacy inline privateKey method to the Rust key string', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      host: 'jump.example.com',
+      port: 22,
+      username: 'ops',
+      authMethod: 'privateKey',
+      privateKey: '/keys/id_rsa',
+      privateKeyPassphrase: 'pp',
+    } as never)
+    expect(layers?.[0]).toMatchObject({
+      authMethod: 'key',
+      keyPath: '/keys/id_rsa',
+      keyPassphrase: 'pp',
+    })
+  })
+
+  it('leaves the profile chain direct when no proxy is attached', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      profileIds: ['hop-1'],
+    } as never)
+    expect(layers?.[0].useSystemProxy).toBe(false)
+  })
+
+  it('pins the proxy onto the legacy inline single-hop layer', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      host: 'jump.example.com',
+      port: 22,
+      username: 'ops',
+      authMethod: 'password',
+      password: 'p',
+      useSystemProxy: true,
+    } as never)
+    expect(layers).toHaveLength(1)
+    expect(layers?.[0].useSystemProxy).toBe(true)
+  })
+
+  it('keeps the legacy inline single-hop layer direct without the proxy', async () => {
+    const layers = await buildTransportLayers({
+      enabled: true,
+      host: 'jump.example.com',
+      port: 22,
+      username: 'ops',
+      authMethod: 'password',
+      password: 'p',
+    } as never)
+    expect(layers?.[0].useSystemProxy).toBe(false)
+  })
+})
 
 describe('connectionStore', () => {
   beforeEach(() => {
@@ -427,6 +582,35 @@ describe('connectionStore', () => {
     })
 
     describe('saveConnection', () => {
+      it('saves ordinary edits without changing permission drafts when Ultimate is unavailable', async () => {
+        connectionApi.save.mockResolvedValue('community-connection')
+        const store = useConnectionStore()
+        const result = await store.saveConnection(createMockConnection({
+          id: 'community-connection',
+          aiPermissions: { delete: true },
+        }))
+        expect(result.success).toBe(true)
+        expect(connectionApi.save).toHaveBeenCalled()
+        expect(invoke).not.toHaveBeenCalledWith('save_ai_permissions', expect.anything())
+        expect(store.connections[0].aiPermissions).toBeUndefined()
+      })
+
+      it('persists permission changes for local Ultimate users', async () => {
+        useEntitlementStore().view = { localUltimate: true } as never
+        connectionApi.save.mockResolvedValue('ultimate-connection')
+        jest.mocked(invoke).mockResolvedValueOnce({ connection_permissions: {} })
+        const store = useConnectionStore()
+        const result = await store.saveConnection(createMockConnection({
+          id: 'ultimate-connection',
+          aiPermissions: { update: false },
+        }))
+        expect(result.success).toBe(true)
+        expect(invoke).toHaveBeenCalledWith('save_ai_permissions', {
+          connectionId: 'ultimate-connection',
+          permissions: { update: false },
+        })
+      })
+
       it('should add new connection', async () => {
         connectionApi.save.mockResolvedValue('new-uuid-123')
 
@@ -495,6 +679,38 @@ describe('connectionStore', () => {
         expect(connectionApi.delete).toHaveBeenCalledWith('conn-1')
       })
 
+      it('keeps deletion successful when AI permission cleanup fails', async () => {
+        const cleanupError = new Error('Permission store is unavailable')
+        const warning = jest.spyOn(console, 'warn').mockImplementation(() => undefined)
+        connectionApi.delete.mockResolvedValueOnce(undefined)
+        jest.mocked(invoke).mockRejectedValueOnce(cleanupError)
+        const store = useConnectionStore()
+        const removed = createMockConnection({ id: 'removed' })
+        const remaining = createMockConnection({ id: 'remaining' })
+        store.connections = [removed, remaining]
+
+        try {
+          await expect(store.removeConnection(removed)).resolves.toBeUndefined()
+          expect(store.connections).toEqual([remaining])
+          expect(warning).toHaveBeenCalledWith('Connection deleted, but AI permission cleanup failed:', cleanupError)
+        }
+        finally {
+          warning.mockRestore()
+        }
+      })
+
+      it('preserves the connection and permissions when deletion fails', async () => {
+        const deletionError = new Error('Could not delete connection')
+        connectionApi.delete.mockRejectedValueOnce(deletionError)
+        const store = useConnectionStore()
+        const connection = createMockConnection({ id: 'preserved' })
+        store.connections = [connection]
+
+        await expect(store.removeConnection(connection)).rejects.toThrow(deletionError)
+        expect(store.connections).toEqual([connection])
+        expect(invoke).not.toHaveBeenCalledWith('save_ai_permissions', expect.anything())
+      })
+
       it('does nothing when connection has no id', async () => {
         const store = useConnectionStore()
         const conn = createMockConnection({ id: undefined })
@@ -504,6 +720,71 @@ describe('connectionStore', () => {
 
         expect(connectionApi.delete).not.toHaveBeenCalled()
         expect(store.connections).toHaveLength(1)
+      })
+    })
+
+    describe('detachSshProfile', () => {
+      const tunnelled = (id: string, name: string, profileIds: string[]): ServerConnection => ({
+        ...createMockConnection({ id, name }),
+        sshTunnel: {
+          enabled: true,
+          host: 'bastion',
+          port: 22,
+          username: 'ops',
+          authMethod: 'password',
+          profileIds,
+        },
+      })
+
+      it('reports the connections that hop through a profile', () => {
+        const store = useConnectionStore()
+        store.connections = [
+          tunnelled('conn-1', 'Prod', ['hop-1', 'hop-2']),
+          tunnelled('conn-2', 'Dev', ['hop-2']),
+          createMockConnection({ id: 'conn-3', name: 'Plain' }),
+        ]
+
+        expect(store.connectionsUsingProfile('hop-1').map(c => c.id)).toEqual(['conn-1'])
+        expect(store.connectionsUsingProfile('hop-2').map(c => c.id)).toEqual(['conn-1', 'conn-2'])
+        expect(store.connectionsUsingProfile('unused')).toEqual([])
+      })
+
+      it('saves every user of the profile without it', async () => {
+        connectionApi.save.mockImplementation(async (config: { id: string }) => config.id)
+
+        const store = useConnectionStore()
+        store.connections = [
+          tunnelled('conn-1', 'Prod', ['hop-1', 'hop-2']),
+          tunnelled('conn-2', 'Dev', ['hop-2']),
+          createMockConnection({ id: 'conn-3', name: 'Plain' }),
+        ]
+
+        await store.detachSshProfile('hop-2')
+
+        const savedProfilesById = Object.fromEntries(
+          connectionApi.save.mock.calls.map(([config]) => {
+            const saved = config as { sshTunnel?: { profileIds?: string[] }, id: string }
+            return [saved.id, saved.sshTunnel?.profileIds]
+          }),
+        )
+        expect(connectionApi.save).toHaveBeenCalledTimes(2)
+        expect(savedProfilesById).toEqual({
+          'conn-1': ['hop-1'],
+          'conn-2': [],
+        })
+        expect(store.connections[0].sshTunnel?.profileIds).toEqual(['hop-1'])
+        expect(store.connections[2].sshTunnel).toBeUndefined()
+      })
+
+      it('raises the save failure so the caller can keep the profile', async () => {
+        connectionApi.save.mockRejectedValue(new Error('disk full'))
+
+        const store = useConnectionStore()
+        store.connections = [
+          tunnelled('conn-1', 'Prod', ['hop-1']),
+        ]
+
+        await expect(store.detachSshProfile('hop-1')).rejects.toThrow('disk full')
       })
     })
 
@@ -581,6 +862,10 @@ describe('connectionStore', () => {
 
         const connectPromise = store.connect('conn-1')
 
+        // connect awaits the transport-layer build (async) before reaching
+        // the mocked API — flush microtasks until it gets there
+        for (let i = 0; i < 10; i++)
+          await Promise.resolve()
         expect(store.connectionStatus['conn-1']).toBe(ConnectionStatus.CONNECTING)
 
         resolveConnect?.({ is_connected: true })
@@ -652,6 +937,94 @@ describe('connectionStore', () => {
         await store.connect('conn-1')
 
         expect(store.connections[0].lastUsed).toBeInstanceOf(Date)
+      })
+    })
+
+    describe('connect — Ultimate-only SSH tunnel fallback', () => {
+      const sshConnection = (): ServerConnection => ({
+        id: 'conn-1',
+        name: 'Bastioned',
+        type: DatabaseType.POSTGRESQL,
+        host: 'db.internal',
+        port: 5432,
+        ssl: false,
+        sshTunnel: {
+          enabled: true,
+          host: 'bastion',
+          port: 22,
+          username: 'ops',
+          authMethod: 'password',
+          profileIds: ['hop-1'],
+        },
+      })
+
+      it('drops the tunnel and connects directly on a free plan', async () => {
+        connectionApi.connect.mockResolvedValue({ is_connected: true })
+
+        const store = useConnectionStore()
+        store.connections = [
+          sshConnection(),
+        ]
+
+        await store.connect('conn-1')
+
+        expect(connectionApi.connect).toHaveBeenCalledTimes(1)
+        expect(connectionApi.connect.mock.calls[0][0]).toMatchObject({
+          host: 'db.internal',
+          transport_layers: null,
+        })
+        expect(store.connectionStatus['conn-1']).toBe(ConnectionStatus.CONNECTED)
+      })
+
+      it('keeps the tunnel for Ultimate plans', async () => {
+        useEntitlementStore().view = { localUltimate: true } as never
+        connectionApi.connect.mockResolvedValue({ is_connected: true })
+
+        const store = useConnectionStore()
+        store.connections = [
+          sshConnection(),
+        ]
+
+        await store.connect('conn-1')
+
+        const sent = connectionApi.connect.mock.calls[0][0] as { transport_layers: unknown[] }
+        expect(sent.transport_layers).toHaveLength(1)
+      })
+
+      it('reports a failure as tunnel-stripped when the direct attempt dies', async () => {
+        connectionApi.connect.mockRejectedValue(new Error('Connection refused'))
+
+        const store = useConnectionStore()
+        store.connections = [
+          sshConnection(),
+        ]
+
+        const failure = await store.connect('conn-1').catch(err => err)
+
+        expect(failure).toBeInstanceOf(Error)
+        expect((failure as Error).message).toContain('Failed to connect')
+        expect(isSshTunnelStrippedError(failure)).toBe(true)
+        expect(store.connectionStatus['conn-1']).toBe(ConnectionStatus.ERROR)
+      })
+
+      it('leaves a plain failure unmarked when no tunnel was involved', async () => {
+        connectionApi.connect.mockRejectedValue(new Error('Connection refused'))
+
+        const store = useConnectionStore()
+        store.connections = [
+          {
+            id: 'conn-1',
+            name: 'Plain',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: false,
+          },
+        ]
+
+        const failure = await store.connect('conn-1').catch(err => err)
+
+        expect(isSshTunnelStrippedError(failure)).toBe(false)
       })
     })
 

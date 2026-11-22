@@ -1,6 +1,9 @@
+import type { LanguageType } from '@/lang'
 import { defineStore } from 'pinia'
 import { storeApi } from '@/datasources/storeApi'
-import { lang } from '@/lang'
+import { lang, readLanguagePreference, resolveLocale } from '@/lang'
+
+export { LanguageType } from '@/lang'
 
 export enum ThemeType {
   AUTO = 'auto',
@@ -11,12 +14,6 @@ export enum ThemeType {
 // System theme change listener state (managed outside Pinia for lifecycle control)
 let systemThemeMediaQuery: MediaQueryList | null = null
 let systemThemeHandler: ((e: MediaQueryListEvent) => void) | null = null
-
-export enum LanguageType {
-  AUTO = 'auto',
-  ZH_CN = 'zhCN',
-  EN_US = 'enUS',
-}
 
 export type EditorConfig = {
   fontSize: number
@@ -53,6 +50,7 @@ export type ChatRuntimeConfig = {
   maxIterations: number
   wallClockBudgetMin: number
   tokenBudget: number
+  systemPrompt?: string
 }
 
 export type ModelRef = {
@@ -73,6 +71,7 @@ const CHAT_RUNTIME_DEFAULTS: ChatRuntimeConfig = {
   maxIterations: 200,
   wallClockBudgetMin: 30,
   tokenBudget: 20_000_000,
+  systemPrompt: '',
 }
 
 function createModelRef(providerId: string, providerKind: string, modelLabel: string): ModelRef {
@@ -147,6 +146,7 @@ function mergeLlmSettings(stored: {
       maxIterations: stored.chat?.maxIterations ?? CHAT_RUNTIME_DEFAULTS.maxIterations,
       wallClockBudgetMin: stored.chat?.wallClockBudgetMin ?? CHAT_RUNTIME_DEFAULTS.wallClockBudgetMin,
       tokenBudget: stored.chat?.tokenBudget ?? CHAT_RUNTIME_DEFAULTS.tokenBudget,
+      systemPrompt: stored.chat?.systemPrompt ?? '',
     },
   }
 }
@@ -186,7 +186,7 @@ type AppStoreState = {
 export const useAppStore = defineStore('app', {
   state: (): AppStoreState => ({
     themeType: ThemeType.AUTO,
-    languageType: LanguageType.AUTO,
+    languageType: readLanguagePreference(),
     uiThemeType: ThemeType.LIGHT,
     editorConfig: {
       fontSize: 14,
@@ -212,7 +212,6 @@ export const useAppStore = defineStore('app', {
   persist: {
     pick: [
       'themeType',
-      'languageType',
       'uiThemeType',
       'editorConfig',
       'queryConfig',
@@ -282,7 +281,10 @@ export const useAppStore = defineStore('app', {
       this.updateSystemThemeWatcher()
     },
     setLanguageType(languageType: LanguageType) {
+      if (typeof localStorage !== 'undefined')
+        localStorage.setItem('lang', languageType)
       this.languageType = languageType
+      lang.global.locale.value = resolveLocale(languageType)
     },
     setEditorConfig(config: Partial<EditorConfig>) {
       this.editorConfig = {
@@ -313,8 +315,8 @@ export const useAppStore = defineStore('app', {
     },
     getEditorTheme() {
       return this.uiThemeType === ThemeType.DARK
-        ? 'vs-dark'
-        : 'vs-light'
+        ? 'sqlkit-dark'
+        : 'sqlkit-light'
     },
 
     // ── Provider CRUD ────────────────────────────────────────────────────
@@ -322,7 +324,10 @@ export const useAppStore = defineStore('app', {
     async addProvider(provider: LlmProvider) {
       this.llmSettings = {
         ...this.llmSettings,
-        providers: [...this.llmSettings.providers, provider],
+        providers: [
+          ...this.llmSettings.providers.filter(p => p.id !== provider.id),
+          provider,
+        ],
       }
       await this.persistLlmSettings()
     },
@@ -447,29 +452,23 @@ export const useAppStore = defineStore('app', {
     async syncProviderModels(providerId: string) {
       const idx = this.llmSettings.providers.findIndex(p => p.id === providerId)
       if (idx === -1)
-        return
+        throw new Error('Provider not found')
       const provider = this.llmSettings.providers[idx]
-      if (!provider.apiKey)
-        return
 
-      try {
-        const { invoke } = await import('@tauri-apps/api/core')
-        const models = await invoke<string[]>('list_llm_models', {
-          provider: provider.apiCompatibility,
-          apiKey: provider.apiKey,
-          baseUrl: provider.baseUrl || null,
-          httpProxy: provider.proxy || null,
-          proxyMode: provider.proxyMode || 'none',
-        })
-        if (models.length > 0) {
-          const updated = [...this.llmSettings.providers]
-          updated[idx] = { ...updated[idx], models }
-          this.llmSettings = { ...this.llmSettings, providers: updated }
-        }
+      const { invoke } = await import('@tauri-apps/api/core')
+      const models = await invoke<string[]>('list_llm_models', {
+        provider: provider.apiCompatibility,
+        apiKey: provider.apiKey,
+        baseUrl: provider.baseUrl || null,
+        httpProxy: provider.proxy || null,
+        proxyMode: provider.proxyMode || 'none',
+      })
+      if (models.length > 0) {
+        const updated = [...this.llmSettings.providers]
+        updated[idx] = { ...updated[idx], models }
+        this.llmSettings = { ...this.llmSettings, providers: updated }
       }
-      catch {
-        // Silently fail - models remain as defaults
-      }
+      await this.persistLlmSettings()
     },
 
     async testProviderConnection(providerId: string): Promise<{ success: boolean, error?: string }> {
@@ -535,6 +534,30 @@ export const useAppStore = defineStore('app', {
       this.llmSettings = {
         ...this.llmSettings,
         chat: { ...this.llmSettings.chat, tokenBudget },
+      }
+    },
+
+    async saveChatSettings(chat: Partial<ChatRuntimeConfig>): Promise<{ success: boolean, error?: string }> {
+      const previous = { ...this.llmSettings.chat }
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: {
+          ...this.llmSettings.chat,
+          ...chat,
+        },
+      }
+      try {
+        await this.persistLlmSettings()
+        return { success: true }
+      }
+      catch (error) {
+        this.llmSettings = { ...this.llmSettings, chat: previous }
+        return {
+          success: false,
+          error: error instanceof Error
+            ? error.message
+            : String(error),
+        }
       }
     },
   },

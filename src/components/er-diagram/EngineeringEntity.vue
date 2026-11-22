@@ -109,7 +109,7 @@ defineExpose({})
 .er-entity {
   @apply bg-card border-2 border-blue-500/50 rounded-xl shadow-sm;
   width: 260px;
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   user-select: none;
   overflow: hidden;
 }
@@ -133,7 +133,7 @@ defineExpose({})
   @apply p-2 flex flex-wrap gap-1.5;
 }
 .er-entity-pill {
-  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-mono border;
+  @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-caption font-mono border;
   max-width: 100%;
   @apply bg-muted/50 border-border/60 text-muted-foreground;
 }

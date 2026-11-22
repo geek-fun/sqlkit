@@ -4,6 +4,8 @@
 //! including databases, schemas, tables, columns, and table data.
 
 use crate::connection::handle::ConnectionHandle;
+use crate::connection::read::execute_read;
+use crate::database::error::DbResult;
 use crate::database::{
     search, ClickHouseAdapter, ColumnInfo, DatabaseAdapter, DatabaseSchema, ForeignKeyInfo,
     HttpSqlAdapter, IndexInfo, JdbcBridgeAdapter, MySQLAdapter, ObjectInfo, PostgresAdapter,
@@ -14,7 +16,7 @@ use crate::state::{ActiveConnection, AppState};
 /// Switch to a different database by creating a temporary connection and executing the query.
 /// Falls back to the original connection if no database switch is needed.
 macro_rules! with_db_switch {
-    ($adapter:expr, $adapter_type:ty, $sql:expr, $database:expr, $connection:expr, $error_msg:expr) => {{
+    ($adapter:expr, $adapter_type:ty, $sql:expr, $database:expr, $connection:expr) => {{
         let __adapter = $adapter;
         if let Some(ref __db) = $database {
             let __guard = __adapter.lock().await;
@@ -24,20 +26,13 @@ macro_rules! with_db_switch {
                 drop(__guard);
                 __temp_config.database = Some(db_str.to_string());
                 let mut __temp = <$adapter_type>::new(__temp_config);
-                __temp
-                    .connect()
-                    .await
-                    .map_err(|e| format!("Failed to connect to database '{}': {}", db_str, e))?;
-                return __temp
-                    .execute_query(&$sql)
-                    .await
-                    .map_err(|e| format!("{}: {}", $error_msg, e));
+                __temp.connect().await?;
+                let result = __temp.execute_query(&$sql).await;
+                let _ = __temp.disconnect().await;
+                return result;
             }
         }
-        $connection
-            .execute_query(&$sql)
-            .await
-            .map_err(|e| format!("{}: {}", $error_msg, e))
+        $connection.execute_query(&$sql).await
     }};
 }
 use serde::{Deserialize, Serialize};
@@ -112,6 +107,10 @@ fn build_paginated_select(
         .unwrap_or_default();
 
     match db_type {
+        "cql" => format!(
+            "SELECT * FROM {qualified_table}{where_clause} LIMIT {}",
+            limit.max(1)
+        ),
         "sqlserver" => format!(
             "SELECT * FROM {}{} ORDER BY (SELECT NULL) OFFSET {} ROWS FETCH NEXT {} ROWS ONLY",
             qualified_table, where_clause, offset, limit
@@ -341,26 +340,23 @@ pub async fn get_table_data(
     query: TableDataQuery,
     state: State<'_, AppState>,
 ) -> Result<QueryResult, String> {
-    let connection = state.ensure_connection(&connection_id).await?;
-
-    let limit_val = query.limit.unwrap_or(100);
-    let offset_val = query.offset.unwrap_or(0);
-    let filter_ref = query.filter.as_deref();
-    let db_type = get_db_type_string(&connection);
-
-    // Execute query based on connection type with proper identifier quoting
-    let result = self::get_table_data_inner(
-        &connection,
-        &query,
-        filter_ref,
-        limit_val,
-        offset_val,
-        db_type,
-    )
+    execute_read(&state, &connection_id, |connection| {
+        let query = query.clone();
+        async move {
+            let db_type = get_db_type_string(&connection);
+            get_table_data_inner(
+                &connection,
+                &query,
+                query.filter.as_deref(),
+                query.limit.unwrap_or(100),
+                query.offset.unwrap_or(0),
+                db_type,
+            )
+            .await
+        }
+    })
     .await
-    .map_err(|e| format!("Failed to get table data: {}", e))?;
-
-    Ok(result)
+    .map_err(|error| format!("Failed to get table data: {}", error))
 }
 
 async fn get_table_data_inner(
@@ -370,79 +366,55 @@ async fn get_table_data_inner(
     limit_val: u32,
     offset_val: u32,
     db_type: &str,
-) -> Result<QueryResult, String> {
+) -> DbResult<QueryResult> {
+    if let ActiveConnection::JdbcBridge(adapter) = connection {
+        let adapter = adapter.lock().await;
+        if adapter.config.db_type.is_cql() {
+            if offset_val != 0 {
+                return Err(crate::database::error::DbError::UnsupportedOperation(
+                    "CQL does not support row offsets. Use a filtered query to browse more rows."
+                        .into(),
+                ));
+            }
+            let keyspace = query
+                .schema
+                .as_deref()
+                .or(query.database.as_deref())
+                .unwrap_or_else(|| adapter.config.cql_keyspace());
+            let qualified = build_qualified_table(Some(keyspace), &query.table, db_type);
+            let sql = build_paginated_select(&qualified, filter_ref, limit_val, 0, "cql");
+            return adapter.execute_query(&sql).await;
+        }
+    }
     let qualified = build_qualified_table(query.schema.as_deref(), &query.table, db_type);
     let sql = build_paginated_select(&qualified, filter_ref, limit_val, offset_val, db_type);
 
     match connection {
-        ActiveConnection::Postgres(a) => with_db_switch!(
-            a,
-            PostgresAdapter,
-            sql,
-            query.database,
-            connection,
-            "Failed to get table data"
-        ),
-        ActiveConnection::MySQL(a) => with_db_switch!(
-            a,
-            MySQLAdapter,
-            sql,
-            query.database,
-            connection,
-            "Failed to get table data"
-        ),
-        ActiveConnection::SQLServer(a) => with_db_switch!(
-            a,
-            SqlServerAdapter,
-            sql,
-            query.database,
-            connection,
-            "Failed to get table data"
-        ),
-        ActiveConnection::ClickHouse(a) => with_db_switch!(
-            a,
-            ClickHouseAdapter,
-            sql,
-            query.database,
-            connection,
-            "Failed to get table data"
-        ),
-        ActiveConnection::JdbcBridge(a) => with_db_switch!(
-            a,
-            JdbcBridgeAdapter,
-            sql,
-            query.database,
-            connection,
-            "Failed to get table data"
-        ),
-        ActiveConnection::Rqlite(a) => with_db_switch!(
-            a,
-            RqliteAdapter,
-            sql,
-            query.database,
-            connection,
-            "Failed to get table data"
-        ),
-        ActiveConnection::Turso(a) => with_db_switch!(
-            a,
-            TursoAdapter,
-            sql,
-            query.database,
-            connection,
-            "Failed to get table data"
-        ),
-        ActiveConnection::HttpSql(a) => with_db_switch!(
-            a,
-            HttpSqlAdapter,
-            sql,
-            query.database,
-            connection,
-            "Failed to get table data"
-        ),
-        ActiveConnection::SQLite(_) => connection
-            .execute_query(&sql)
-            .await
-            .map_err(|e| format!("Failed to get table data: {}", e)),
+        ActiveConnection::Postgres(a) => {
+            with_db_switch!(a, PostgresAdapter, sql, query.database, connection)
+        }
+        ActiveConnection::MySQL(a) => {
+            with_db_switch!(a, MySQLAdapter, sql, query.database, connection)
+        }
+        ActiveConnection::SQLServer(a) => {
+            with_db_switch!(a, SqlServerAdapter, sql, query.database, connection)
+        }
+        ActiveConnection::ClickHouse(a) => {
+            with_db_switch!(a, ClickHouseAdapter, sql, query.database, connection)
+        }
+        ActiveConnection::JdbcBridge(a) => {
+            with_db_switch!(a, JdbcBridgeAdapter, sql, query.database, connection)
+        }
+        ActiveConnection::Rqlite(a) => {
+            with_db_switch!(a, RqliteAdapter, sql, query.database, connection)
+        }
+        ActiveConnection::Turso(a) => {
+            with_db_switch!(a, TursoAdapter, sql, query.database, connection)
+        }
+        ActiveConnection::HttpSql(a) => {
+            with_db_switch!(a, HttpSqlAdapter, sql, query.database, connection)
+        }
+        ActiveConnection::SQLite(_) => connection.execute_query(&sql).await,
     }
 }
 
@@ -468,21 +440,28 @@ pub async fn get_table_count(
     filter: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<u64, String> {
-    let connection = state.ensure_connection(&connection_id).await?;
-
-    let filter_ref = filter.as_deref();
-    let db_type = get_db_type_string(&connection);
-
-    let result = get_table_count_inner(
-        &connection,
-        &table,
-        schema.as_deref(),
-        database.as_deref(),
-        filter_ref,
-        db_type,
-    )
+    let result = execute_read(&state, &connection_id, |connection| {
+        let (table, schema, database, filter) = (
+            table.clone(),
+            schema.clone(),
+            database.clone(),
+            filter.clone(),
+        );
+        async move {
+            let db_type = get_db_type_string(&connection);
+            get_table_count_inner(
+                &connection,
+                &table,
+                schema.as_deref(),
+                database.as_deref(),
+                filter.as_deref(),
+                db_type,
+            )
+            .await
+        }
+    })
     .await
-    .map_err(|e| format!("Failed to get table count: {}", e))?;
+    .map_err(|error| format!("Failed to get table count: {}", error))?;
 
     extract_count(result)
 }
@@ -494,79 +473,44 @@ async fn get_table_count_inner(
     database: Option<&str>,
     filter_ref: Option<&str>,
     db_type: &str,
-) -> Result<QueryResult, String> {
+) -> DbResult<QueryResult> {
+    if let ActiveConnection::JdbcBridge(adapter) = connection {
+        let adapter = adapter.lock().await;
+        if adapter.config.db_type.is_cql() {
+            let keyspace = schema
+                .or(database)
+                .unwrap_or_else(|| adapter.config.cql_keyspace());
+            let qualified = build_qualified_table(Some(keyspace), table, db_type);
+            return adapter
+                .execute_query(&build_count_query(&qualified, filter_ref))
+                .await;
+        }
+    }
     let qualified = build_qualified_table(schema, table, db_type);
     let query = build_count_query(&qualified, filter_ref);
 
     match connection {
-        ActiveConnection::Postgres(a) => with_db_switch!(
-            a,
-            PostgresAdapter,
-            query,
-            database,
-            connection,
-            "Failed to get table count"
-        ),
-        ActiveConnection::MySQL(a) => with_db_switch!(
-            a,
-            MySQLAdapter,
-            query,
-            database,
-            connection,
-            "Failed to get table count"
-        ),
-        ActiveConnection::SQLServer(a) => with_db_switch!(
-            a,
-            SqlServerAdapter,
-            query,
-            database,
-            connection,
-            "Failed to get table count"
-        ),
-        ActiveConnection::ClickHouse(a) => with_db_switch!(
-            a,
-            ClickHouseAdapter,
-            query,
-            database,
-            connection,
-            "Failed to get table count"
-        ),
-        ActiveConnection::JdbcBridge(a) => with_db_switch!(
-            a,
-            JdbcBridgeAdapter,
-            query,
-            database,
-            connection,
-            "Failed to get table count"
-        ),
-        ActiveConnection::Rqlite(a) => with_db_switch!(
-            a,
-            RqliteAdapter,
-            query,
-            database,
-            connection,
-            "Failed to get table count"
-        ),
-        ActiveConnection::Turso(a) => with_db_switch!(
-            a,
-            TursoAdapter,
-            query,
-            database,
-            connection,
-            "Failed to get table count"
-        ),
-        ActiveConnection::HttpSql(a) => with_db_switch!(
-            a,
-            HttpSqlAdapter,
-            query,
-            database,
-            connection,
-            "Failed to get table count"
-        ),
-        ActiveConnection::SQLite(_) => connection
-            .execute_query(&query)
-            .await
-            .map_err(|e| format!("Failed to get table count: {}", e)),
+        ActiveConnection::Postgres(a) => {
+            with_db_switch!(a, PostgresAdapter, query, database, connection)
+        }
+        ActiveConnection::MySQL(a) => with_db_switch!(a, MySQLAdapter, query, database, connection),
+        ActiveConnection::SQLServer(a) => {
+            with_db_switch!(a, SqlServerAdapter, query, database, connection)
+        }
+        ActiveConnection::ClickHouse(a) => {
+            with_db_switch!(a, ClickHouseAdapter, query, database, connection)
+        }
+        ActiveConnection::JdbcBridge(a) => {
+            with_db_switch!(a, JdbcBridgeAdapter, query, database, connection)
+        }
+        ActiveConnection::Rqlite(a) => {
+            with_db_switch!(a, RqliteAdapter, query, database, connection)
+        }
+        ActiveConnection::Turso(a) => with_db_switch!(a, TursoAdapter, query, database, connection),
+        ActiveConnection::HttpSql(a) => {
+            with_db_switch!(a, HttpSqlAdapter, query, database, connection)
+        }
+        ActiveConnection::SQLite(_) => connection.execute_query(&query).await,
     }
 }
 
@@ -613,6 +557,24 @@ fn build_pk_where(pk_values: &HashMap<String, JsonValue>, db_type: &str) -> Stri
         .join(" AND ")
 }
 
+async fn cql_mutation_keyspace<'a>(
+    connection: &ActiveConnection,
+    schema: Option<&'a str>,
+    database: Option<&'a str>,
+) -> Result<Option<&'a str>, String> {
+    if let ActiveConnection::JdbcBridge(adapter) = connection {
+        let adapter = adapter.lock().await;
+        if adapter.config.db_type.is_cql() {
+            return schema
+                .filter(|name| !name.is_empty())
+                .or(database.filter(|name| !name.is_empty()))
+                .map(Some)
+                .ok_or_else(|| "A target keyspace is required for CQL row changes".to_string());
+        }
+    }
+    Ok(None)
+}
+
 /// Update a single row in a table identified by its primary key values.
 ///
 /// # Arguments
@@ -640,12 +602,17 @@ pub async fn update_table_row(
     let connection = state.ensure_connection(&connection_id).await?;
 
     let db_type = get_db_type_string(&connection);
+    let cql_keyspace =
+        cql_mutation_keyspace(&connection, schema.as_deref(), database.as_deref()).await?;
+    if cql_keyspace.is_some() && updates.keys().any(|column| pk_values.contains_key(column)) {
+        return Err("CQL primary-key columns cannot be updated".to_string());
+    }
 
     let build_update_sql = |db_type: &str| -> Result<String, String> {
         if pk_values.is_empty() {
             return Err("Cannot update row: no primary key values provided".to_string());
         }
-        let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
+        let qualified = build_qualified_table(cql_keyspace.or(schema.as_deref()), &table, db_type);
         let set_clause = updates
             .iter()
             .map(|(col, val)| {
@@ -772,9 +739,11 @@ pub async fn delete_table_row(
     let connection = state.ensure_connection(&connection_id).await?;
 
     let db_type = get_db_type_string(&connection);
+    let cql_keyspace =
+        cql_mutation_keyspace(&connection, schema.as_deref(), database.as_deref()).await?;
 
     let build_delete_sql = |db_type: &str| -> String {
-        let qualified = build_qualified_table(schema.as_deref(), &table, db_type);
+        let qualified = build_qualified_table(cql_keyspace.or(schema.as_deref()), &table, db_type);
         let where_clause = build_pk_where(&pk_values, db_type);
         format!("DELETE FROM {} WHERE {}", qualified, where_clause)
     };
@@ -1224,6 +1193,39 @@ mod tests {
             build_paginated_select("\"table\"", Some("id = 1"), 10, 5, "postgres");
         assert!(query_with_filter.contains("WHERE id = 1"));
         assert!(query_with_filter.contains("OFFSET 5"));
+    }
+
+    #[test]
+    fn cql_preview_uses_a_limit_without_an_offset() {
+        let qualified = build_qualified_table(Some("events_keyspace"), "events", "jdbc");
+        assert_eq!(
+            build_paginated_select(&qualified, Some("id = 7"), 100, 0, "cql"),
+            "SELECT * FROM \"events_keyspace\".\"events\" WHERE id = 7 LIMIT 100"
+        );
+    }
+
+    #[tokio::test]
+    async fn cql_row_changes_require_the_selected_keyspace() {
+        let config = crate::database::ConnectionConfig::new(
+            crate::database::DatabaseType::Cassandra,
+            "localhost",
+            9042,
+            "",
+        )
+        .with_database("default_keyspace");
+        let connection = ActiveConnection::JdbcBridge(std::sync::Arc::new(
+            tokio::sync::Mutex::new(JdbcBridgeAdapter::new(config)),
+        ));
+        let target = cql_mutation_keyspace(&connection, None, Some("CaseReview"))
+            .await
+            .unwrap();
+        assert_eq!(
+            build_qualified_table(target, "events", "jdbc"),
+            "\"CaseReview\".\"events\""
+        );
+        assert!(cql_mutation_keyspace(&connection, None, None)
+            .await
+            .is_err());
     }
 
     #[test]

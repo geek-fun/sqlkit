@@ -19,6 +19,8 @@ const props = defineProps<{
   columnType?: string
   hasActiveFilter: boolean
   currentSortDirection: SortDirection | null
+  sortable?: boolean
+  filterable?: boolean
 }>()
 
 const emit = defineEmits<ColumnHeaderContextMenuEmits>()
@@ -74,11 +76,11 @@ function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
         <DropdownMenuTrigger />
         <DropdownMenuContent align="start" class="min-w-48" @keydown.escape="emit('close')">
           <!-- Sort options -->
-          <DropdownMenuItem @click="emit('sort', column, 'ASC'); emit('close')">
+          <DropdownMenuItem :disabled="!sortable" @click="emit('sort', column, 'ASC'); emit('close')">
             <span class="i-carbon-arrow-up mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.sort.asc') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="emit('sort', column, 'DESC'); emit('close')">
+          <DropdownMenuItem :disabled="!sortable" @click="emit('sort', column, 'DESC'); emit('close')">
             <span class="i-carbon-arrow-down mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.sort.desc') }}
           </DropdownMenuItem>
@@ -89,31 +91,34 @@ function handleFilterWithPrompt(operator: ColumnFilter['operator']) {
             <span class="i-carbon-close mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.sort.clear') }}
           </DropdownMenuItem>
+          <div v-if="!sortable" class="text-xs text-muted-foreground px-2 py-1.5">
+            {{ t('components.dataGrid.sort.unsortable') }}
+          </div>
 
           <DropdownMenuSeparator />
 
           <!-- Filter options -->
-          <DropdownMenuItem @click="handleFilterWithPrompt('eq')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('eq')">
             <span class="i-carbon-filter mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.byValue') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('like')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('like')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.byLike') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('gte')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('gte')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.greaterThan') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('lte')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('lte')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.lessThan') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('between')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('between')">
             <span class="i-carbon-filter-edit mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.between') }}
           </DropdownMenuItem>
-          <DropdownMenuItem @click="handleFilterWithPrompt('neq')">
+          <DropdownMenuItem :disabled="filterable === false" @click="handleFilterWithPrompt('neq')">
             <span class="i-carbon-filter-remove mr-2 h-3.5 w-3.5" />
             {{ t('components.dataGrid.filter.excludeValue') }}
           </DropdownMenuItem>

@@ -7,11 +7,12 @@ import { useI18n } from 'vue-i18n'
 import { ProgressBar } from '@/components/ui/progress'
 import { useMonacoEditor } from '@/composables/useMonacoEditor'
 import { usePlatform } from '@/composables/usePlatform'
-import { useTheme } from '@/composables/useTheme'
+import { ThemeType, useAppStore } from '@/store/appStore'
 
 type Props = {
   modelValue?: string
   dialect?: SQLDialect
+  cql?: boolean
   readOnly?: boolean
   minimap?: boolean
   fontSize?: number
@@ -48,7 +49,8 @@ const emit = defineEmits<{
 }>()
 
 const editorContainer = ref<HTMLElement | null>(null)
-const { isDark } = useTheme()
+const appStore = useAppStore()
+const isDark = computed(() => appStore.uiThemeType === ThemeType.DARK)
 const { modifierKey, altKey } = usePlatform()
 const { t } = useI18n()
 
@@ -69,6 +71,7 @@ const isSettingValueFromProp = ref(false)
 
 const editorOptions: MonacoEditorOptions = {
   language: props.dialect,
+  isCql: () => props.cql ?? false,
   readOnly: props.readOnly,
   minimap: props.minimap,
   fontSize: props.fontSize,
@@ -268,19 +271,24 @@ defineExpose({ getValue, setValue, handleFormat })
 <style scoped>
 .sql-editor-wrapper {
   position: relative;
-  border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 0.375rem;
+  border: 1px solid hsl(var(--border));
   overflow: hidden;
-  background-color: var(--background-color, #ffffff);
-}
-
-.dark .sql-editor-wrapper {
-  --border-color: #374151;
-  --background-color: #1e1e1e;
+  background-color: hsl(var(--background));
 }
 
 .sql-editor-container {
   position: relative;
+}
+
+/* Match the app's thin native scrollbars (assets/index.css). */
+:deep(.monaco-scrollable-element > .scrollbar > .slider) {
+  border-radius: 3px;
+  background: hsl(var(--muted-foreground) / 0.25);
+}
+
+:deep(.monaco-scrollable-element > .scrollbar > .slider:hover),
+:deep(.monaco-scrollable-element > .scrollbar > .slider.active) {
+  background: hsl(var(--muted-foreground) / 0.4);
 }
 
 .sql-context-menu {
@@ -307,11 +315,11 @@ defineExpose({ getValue, setValue, handleFormat })
   gap: 16px;
   padding: 6px 12px;
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .sql-context-menu li .shortcut {
-  font-size: 11px;
+  font-size: var(--font-size-dense);
   opacity: 0.5;
   white-space: nowrap;
 }

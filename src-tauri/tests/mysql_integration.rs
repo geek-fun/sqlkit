@@ -27,6 +27,7 @@ use std::env;
 use std::time::Duration;
 
 fn get_test_config() -> ConnectionConfig {
+    let _ = rustls::crypto::ring::default_provider().install_default();
     let host = env::var("MYSQL_HOST").unwrap_or_else(|_| "localhost".to_string());
     let port = env::var("MYSQL_PORT")
         .ok()

@@ -16,7 +16,7 @@ const sizeClasses: Record<SpinnerSize, string> = {
 
 <template>
   <svg
-    class="text-primary animate-spin"
+    class="text-primary-text animate-spin"
     :class="sizeClasses[props.size]"
     xmlns="http://www.w3.org/2000/svg"
     fill="none"
@@ -37,3 +37,7 @@ const sizeClasses: Record<SpinnerSize, string> = {
     />
   </svg>
 </template>
+
+<style scoped>
+@media (prefers-reduced-motion: reduce) { svg { animation: none; } }
+</style>

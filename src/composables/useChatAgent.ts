@@ -4,8 +4,11 @@ import type { AgentToolCall, AgentToolCallStatus, ConfirmationRule } from '@/sto
 import type { ChatContextConfig, ChatMessage, ChatMessageStatus, ChatPermissions, ChatSession, ChatSessionStatus, SendMessageOptions } from '@/types/chat'
 import { ulid } from 'ulidx'
 import { computed, ref } from 'vue'
+import { assembleSystemPrompt, buildAgentModeInstructions, buildAgentPermissionInstructions } from '@/common'
 import { agentApi } from '@/datasources/agentApi'
+import { useConnectionStore } from '@/store/connectionStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
+import { useEntitlementStore } from '@/store/entitlementStore'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -173,26 +176,12 @@ function buildSystemPrompt({ schema, sources, permissionsMode }: {
 
     for (const source of sources) {
       const dbType = source.databaseType ?? 'SQL'
-      const permParts: string[] = []
-
-      if (source.permissions) {
-        if (source.permissions.read)
-          permParts.push('read')
-        if (source.permissions.create)
-          permParts.push('create')
-        if (source.permissions.update)
-          permParts.push('update')
-        if (source.permissions.delete)
-          permParts.push('delete')
-      }
-
-      const permStr = permParts.length > 0
-        ? ` (permissions: ${permParts.join(', ')})`
-        : ''
-      parts.push(`- ${source.connectionId}: ${dbType}${permStr}`)
+      parts.push(`- ${source.connectionId}: ${dbType}`)
     }
 
     parts.push('')
+
+    parts.push(...buildAgentPermissionInstructions(sources), '')
 
     // Database-specific knowledge blocks
     const dbTypes = sources.map(s => s.databaseType ?? '').filter(Boolean)
@@ -213,21 +202,7 @@ function buildSystemPrompt({ schema, sources, permissionsMode }: {
   }
 
   // Mode instructions
-  const isAuto = permissionsMode === 'AUTO'
-  if (isAuto) {
-    parts.push('## Mode: AUTO')
-    parts.push(
-      'You are in AUTO mode. You may execute queries automatically.',
-      'For destructive operations (DROP, TRUNCATE, ALTER, DELETE without WHERE), you must still request confirmation before proceeding.',
-    )
-  }
-  else {
-    parts.push('## Mode: ASK')
-    parts.push(
-      'You are in ASK mode (default). Before executing any query, explain what you plan to do and ask for confirmation.',
-      'The user must explicitly approve each operation before you execute it.',
-    )
-  }
+  parts.push(...buildAgentModeInstructions(permissionsMode === 'AUTO'))
   parts.push('')
 
   // Tool usage rules
@@ -319,15 +294,51 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const autoMode = config.autoMode?.value ?? false
       const permissionsMode = autoMode ? 'AUTO' : 'ASK'
 
+      const { useAppStore } = await import('@/store/appStore')
+      const appStore = useAppStore()
+      const entitlementStore = useEntitlementStore()
+      const canUseCustomPrompts = entitlementStore.isLocalUltimate
+      const connectionStore = useConnectionStore()
+      const hasConnections = Object.keys(contextSnapshot?.connections ?? {}).length > 0
+
+      const connectionPrompts = canUseCustomPrompts
+        ? Object.entries(contextSnapshot?.connections ?? {}).flatMap(([alias, conn]) => {
+            const connection = connectionStore.getConnectionById(String(conn.connectionId))
+            const prompt = connection?.prompt?.trim()
+            return prompt
+              ? [
+                  { alias, prompt },
+                ]
+              : []
+          })
+        : []
+
+      const activePanel = contextSnapshot?.activePanel
+      const sidebarContext = config.feature === 'sidebarAssistant' && activePanel
+        ? [
+            activePanel.connectionType && `Connection type: ${activePanel.connectionType}`,
+            activePanel.indexName && `Index: ${activePanel.indexName}`,
+            activePanel.tableName && `Table: ${activePanel.tableName}`,
+            activePanel.editorContent && `Current editor content:\n${activePanel.editorContent}`,
+          ].filter(Boolean).join('\n')
+        : undefined
+
       const systemPrompt = buildSystemPrompt({
         schema: schemaContext || contextSnapshot?.schema,
         sources,
         permissionsMode,
       })
 
+      const assembledSystemPrompt = assembleSystemPrompt({
+        base: systemPrompt,
+        userGlobal: hasConnections && canUseCustomPrompts
+          ? appStore.llmSettings.chat.systemPrompt
+          : undefined,
+        connectionPrompts,
+        sidebarContext,
+      })
+
       // Get provider+model config from app store (handles dynamic import inline)
-      const { useAppStore } = await import('@/store/appStore')
-      const appStore = useAppStore()
       const modelConfig = await appStore.getFeatureModelConfig(config.feature)
 
       // Get runtime tools
@@ -340,9 +351,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
         ? Object.fromEntries(
             Object.entries(contextSnapshot.connections).flatMap(([alias, conn]) => {
               const entry = {
+                sourceId: conn.sourceId,
                 connectionId: String(conn.connectionId),
                 dbType: conn.dbType,
-                permissions: conn.permissions,
               }
               return [
                 [
@@ -356,7 +367,8 @@ export function useChatAgent(config: UseChatAgentConfig) {
         : {}
 
       const settings: Record<string, unknown> = {
-        systemPrompt,
+        contextKind: config.feature,
+        systemPrompt: assembledSystemPrompt,
         provider: modelConfig.provider.name,
         model: modelConfig.model.label,
         baseUrl: modelConfig.provider.baseUrl,
@@ -476,27 +488,19 @@ export function useChatAgent(config: UseChatAgentConfig) {
         return
       }
 
-      let schemaContext = ''
-      if (connections && Object.keys(connections).length > 0) {
-        const schemaParts: string[] = []
-        for (const [alias, conn] of Object.entries(connections)) {
-          try {
-            const schemaResult = await agentApi.invokeCapability('sqlkit__get_schema', {}, String(conn.connectionId))
-            if (schemaResult && schemaResult !== '[]' && !schemaResult.startsWith('[')) {
-              schemaParts.push(`-- Source: ${alias} (${conn.dbType})`)
-              schemaParts.push(schemaResult)
-            }
-          }
-          catch {
-            // Schema fetching is best-effort; continue without it
-          }
-        }
-        if (schemaParts.length > 0) {
-          schemaContext = schemaParts.join('\n')
-        }
+      const aiContext = await agentApi.getAiContext(sessionId, connections, config.feature)
+      const canReadContext = Object.values(connections).length > 0
+        && Object.values(connections).every(conn => aiContext.readableConnectionIds.includes(String(conn.connectionId)))
+      const safeContext = {
+        ...context,
+        connections: Object.fromEntries(Object.entries(connections).map(([alias, connection]) => [
+          alias,
+          { ...connection, permissions: aiContext.effectivePermissions[alias] },
+        ])),
+        schema: canReadContext ? context?.schema : undefined,
+        activePanel: canReadContext ? context?.activePanel : undefined,
       }
-
-      await runAgentLoop(sessionId, options.content, schemaContext, context ?? { connections: {} })
+      await runAgentLoop(sessionId, options.content, aiContext.schema, safeContext)
     }
     catch (err) {
       localError.value = err instanceof Error
@@ -545,6 +549,20 @@ export function useChatAgent(config: UseChatAgentConfig) {
       return tc?.toolName ?? ''
     }
 
+    const markRejected = () => {
+      const message = config.sessionStore.activeSession.value?.messages.find(item => item.id === assistantMsgId)
+      if (message) {
+        config.sessionStore.setMessageToolCalls(sessionId, assistantMsgId, (message.toolCalls ?? []).map(call => call.id === toolCallId
+          ? {
+              ...call,
+              status: 'denied',
+              requiresConfirmation: false,
+              denial: { kind: 'user', source: 'unknown', message: 'Rejected by you' },
+            }
+          : call))
+      }
+    }
+
     switch (action) {
       case 'allow_once': {
         config.sessionStore.setSessionStatus(sessionId, 'running')
@@ -571,6 +589,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
       case 'deny': {
         config.sessionStore.setSessionStatus(sessionId, 'running')
         config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'denied', undefined, undefined, sessionId)
+        markRejected()
         await agentApi.confirmToolCall(toolCallId, false)
         break
       }
@@ -586,6 +605,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
         config.addConfirmationRule?.(denyRule)
         config.sessionStore.setSessionStatus(sessionId, 'running')
         config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'denied', undefined, undefined, sessionId)
+        markRejected()
         await agentApi.confirmToolCall(toolCallId, false)
         break
       }
@@ -593,6 +613,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
       case 'cancel': {
         // Mark tool call as denied first, then cancel the loop
         config.sessionStore.updateToolCallStatus(assistantMsgId, toolCallId, 'denied', undefined, undefined, sessionId)
+        markRejected()
         config.sessionStore.setSessionStatus(sessionId, 'idle')
         await cancelSessionHandler()
         break

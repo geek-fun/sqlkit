@@ -56,7 +56,7 @@ const triggerClasses = computed(() =>
 const panelClasses = computed(() =>
   props.compact
     ? 'w-[280px] p-0 bg-popover text-foreground border-border'
-    : 'w-[360px] p-0 bg-[#151515] text-white border-[#2b2b2b]',
+    : 'w-[360px] p-0 bg-popover text-popover-foreground border-border',
 )
 
 const flattenedModels = computed(() => props.groups.flatMap(group => group.models))
@@ -180,16 +180,16 @@ function selectModel(value: string) {
 }
 
 .model-picker-title {
-  font-size: 14px;
+  font-size: var(--font-size-form);
   font-weight: 700;
   letter-spacing: 0.03em;
 }
 
 .model-picker-subtitle {
   margin-top: 2px;
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   text-transform: uppercase;
-  color: hsl(var(--muted-foreground) / 0.6);
+  color: hsl(var(--muted-foreground));
 }
 
 .model-picker-list {
@@ -203,9 +203,9 @@ function selectModel(value: string) {
 
 .model-picker-heading {
   padding: 0 6px 6px;
-  font-size: 11px;
+  font-size: var(--font-size-dense);
   font-weight: 700;
-  color: hsl(var(--primary) / 0.8);
+  color: hsl(var(--primary-text));
 }
 
 .model-picker-row {
@@ -225,11 +225,11 @@ function selectModel(value: string) {
 }
 
 .model-picker-row.selected .model-picker-name {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .model-picker-row.selected .model-picker-checkmark {
-  color: hsl(var(--primary));
+  color: hsl(var(--primary-text));
 }
 
 .model-picker-main {
@@ -255,18 +255,18 @@ function selectModel(value: string) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .model-picker-provider,
 .model-picker-meta {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   color: hsl(var(--muted-foreground));
 }
 
 .model-picker-empty {
   padding: 14px 8px;
-  font-size: 12px;
+  font-size: var(--font-size-dense);
   color: hsl(var(--muted-foreground));
 }
 

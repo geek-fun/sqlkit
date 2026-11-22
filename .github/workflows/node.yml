@@ -47,6 +47,16 @@ jobs:
       - name: run Rust tests
         if: matrix.os == 'ubuntu-latest'
         run: cargo test --manifest-path src-tauri/Cargo.toml
+      - name: setup JDK 25 (bridge tests)
+        if: matrix.os == 'ubuntu-latest'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven
+      - name: run JDBC bridge tests
+        if: matrix.os == 'ubuntu-latest'
+        run: mvn -f jdbc-bridge/pom.xml test
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v4
         env:

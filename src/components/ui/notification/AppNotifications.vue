@@ -25,11 +25,11 @@ const { toasts, dismiss } = useNotifications()
           <!-- Success -->
           <span v-if="item.type === 'success'" class="i-carbon-checkmark text-green-500 h-4 w-4" />
           <!-- Error -->
-          <span v-else-if="item.type === 'error'" class="i-carbon-error text-destructive h-4 w-4" />
+          <span v-else-if="item.type === 'error'" class="i-carbon-error text-destructive-text h-4 w-4" />
           <!-- Warning -->
           <span v-else-if="item.type === 'warning'" class="i-carbon-warning text-yellow-500 h-4 w-4" />
           <!-- Info -->
-          <span v-else class="i-carbon-information text-primary h-4 w-4" />
+          <span v-else class="i-carbon-information text-primary-text h-4 w-4" />
         </div>
 
         <!-- Content -->

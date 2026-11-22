@@ -3,6 +3,7 @@ import type { LlmProvider } from '@/store/appStore'
 import { ulid } from 'ulidx'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { SettingsFeedback } from '@/components/settings'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -20,6 +21,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { toast } from '@/composables/useNotifications'
 import { useAppStore } from '@/store/appStore'
 
 const props = defineProps<{
@@ -65,6 +67,55 @@ const presets = computed<Preset[]>(() => [
     apiCompatibility: 'openai',
     baseUrl: 'https://openrouter.ai/api/v1',
     kind: 'openrouter',
+  },
+  {
+    id: 'requesty',
+    name: 'Requesty',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://router.requesty.ai/v1',
+    kind: 'requesty',
+  },
+  {
+    id: 'opper',
+    name: 'Opper',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.opper.ai/v3/compat',
+    kind: 'opper',
+  },
+  {
+    id: 'api-route',
+    name: 'API Route',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://global.api-route.com/v1',
+    kind: 'api-route',
+  },
+  {
+    id: 'cheaper-inference',
+    name: 'Cheaper Inference',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.cheaperinference.com/v1',
+    kind: 'cheaper-inference',
+  },
+  {
+    id: 'runcrate',
+    name: 'Runcrate',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.runcrate.ai/v1',
+    kind: 'runcrate',
+  },
+  {
+    id: 'cloudgpu',
+    name: 'CloudGPU',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://cloudgpu.app/v1',
+    kind: 'cloudgpu',
+  },
+  {
+    id: 'uberllm',
+    name: 'UberLLM',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.uberllm.dev/v1',
+    kind: 'uberllm',
   },
   {
     id: 'anthropic',
@@ -238,7 +289,8 @@ function resetForm(provider?: LlmProvider | null) {
       contextWindowOverride: provider.contextWindowOverride ?? undefined,
     }
     // Derive the matching preset id from the provider's kind
-    const match = presets.value.find(p => p.id === provider.kind || (p.apiCompatibility === provider.apiCompatibility && !p.id.startsWith('custom-')))
+    const match = presets.value.find(p => p.id === provider.kind)
+      ?? presets.value.find(p => p.apiCompatibility === provider.apiCompatibility && !p.id.startsWith('custom-'))
     selectedPresetId.value = match ? match.id : 'custom-openai'
   }
   else {
@@ -283,7 +335,12 @@ function validateForm(): boolean {
   return Object.keys(errors).length === 0
 }
 
-function handleSave() {
+const saving = ref(false)
+const saveError = ref('')
+
+const handleSave = async () => {
+  if (saving.value)
+    return
   if (!validateForm())
     return
 
@@ -302,28 +359,42 @@ function handleSave() {
     contextWindowOverride: draft.value.contextWindowOverride || undefined,
   }
 
-  if (isEdit.value) {
-    appStore.updateProvider(draft.value.id, { ...cleaned })
-  }
-  else {
-    appStore.addProvider(cleaned)
-  }
+  saving.value = true
+  saveError.value = ''
+  try {
+    if (isEdit.value) {
+      await appStore.updateProvider(draft.value.id, { ...cleaned })
+    }
+    else {
+      await appStore.addProvider(cleaned)
+    }
 
-  emit('close')
+    toast.success(t('pages.settings.feedback.saved'))
+    emit('close')
+  }
+  catch (error) {
+    saveError.value = error instanceof Error
+      ? error.message
+      : String(error)
+  }
+  finally {
+    saving.value = false
+  }
 }
 
 // ── Watchers ──────────────────────────────────────────────────────────────────
 
 watch(() => props.open, (open) => {
   if (open) {
+    saveError.value = ''
     resetForm(props.provider)
-    // Always start with key masked; user must click eye icon to reveal
+    // Always start with the key masked.
   }
 })
 </script>
 
 <template>
-  <Dialog :open="open" @update:open="$emit('close')">
+  <Dialog :open="open" @update:open="!saving && $emit('close')">
     <DialogContent class="sm:max-w-[480px]">
       <DialogTitle>
         {{ isEdit ? t('pages.settings.ai.form.editTitle') : t('pages.settings.ai.form.addTitle') }}
@@ -368,7 +439,7 @@ watch(() => props.open, (open) => {
             :placeholder="t('pages.settings.ai.form.namePlaceholder')"
             :class="{ 'border-destructive': formErrors.name }"
           />
-          <p v-if="formErrors.name" class="text-sm text-destructive">
+          <p v-if="formErrors.name" class="text-sm text-destructive-text">
             {{ formErrors.name }}
           </p>
         </div>
@@ -386,7 +457,7 @@ watch(() => props.open, (open) => {
               'cursor-not-allowed opacity-60': isApiCompatibilityReadonly,
             }"
           />
-          <p v-if="formErrors.apiCompatibility" class="text-sm text-destructive">
+          <p v-if="formErrors.apiCompatibility" class="text-sm text-destructive-text">
             {{ formErrors.apiCompatibility }}
           </p>
         </div>
@@ -459,7 +530,7 @@ watch(() => props.open, (open) => {
             :placeholder="t('pages.settings.ai.form.baseUrlPlaceholder')"
             :class="{ 'border-destructive': formErrors.baseUrl }"
           />
-          <p v-if="formErrors.baseUrl" class="text-sm text-destructive">
+          <p v-if="formErrors.baseUrl" class="text-sm text-destructive-text">
             {{ formErrors.baseUrl }}
           </p>
         </div>
@@ -516,11 +587,12 @@ watch(() => props.open, (open) => {
         </div>
       </div>
 
+      <SettingsFeedback v-if="saving || saveError" :state="saveError ? 'error' : 'pending'" :label="t(`pages.settings.feedback.${saveError ? 'failed' : 'saving'}`)" :detail="saveError" />
       <DialogFooter>
-        <Button variant="outline" @click="$emit('close')">
+        <Button variant="outline" :disabled="saving" @click="$emit('close')">
           {{ t('common.buttons.cancel') }}
         </Button>
-        <Button @click="handleSave">
+        <Button :disabled="saving" :aria-busy="saving" @click="handleSave">
           {{ isEdit ? t('common.buttons.save') : t('pages.settings.ai.form.save') }}
         </Button>
       </DialogFooter>

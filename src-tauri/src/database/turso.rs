@@ -260,32 +260,13 @@ impl TursoAdapter {
             .json(&body)
             .send()
             .await
-            .map_err(|e| {
-                if e.is_timeout() {
-                    DbError::Timeout(format!("Turso query timed out: {}", e))
-                } else if e.is_connect() {
-                    DbError::Connection(format!(
-                        "Cannot connect to Turso at {}: {}",
-                        self.build_base_url(),
-                        e
-                    ))
-                } else {
-                    DbError::QueryExecution(format!("HTTP request failed: {}", e))
-                }
-            })?;
+            .map_err(DbError::from_http)?;
 
         let status = response.status();
-        let body_text = response
-            .text()
-            .await
-            .map_err(|e| DbError::QueryExecution(format!("Failed to read response body: {}", e)))?;
+        let body_text = response.text().await.map_err(DbError::from_http)?;
 
         if !status.is_success() {
-            return Err(DbError::QueryExecution(format!(
-                "Turso error (HTTP {}): {}",
-                status.as_u16(),
-                body_text.trim()
-            )));
+            return Err(DbError::from_http_status(status, &body_text));
         }
 
         serde_json::from_str::<TursoPipelineResponse>(&body_text).map_err(|e| {

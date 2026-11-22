@@ -21,8 +21,8 @@ export type StatementToExecute = {
 // ── Character-based SQL statement splitter ──
 // Replaces the old line-based + regex approach that broke on correlated
 // subqueries spanning multiple lines (e.g. (SELECT count(*) ...) as alias).
-// This is the same algorithm dbx uses in Rust: character-by-character,
-// tracking quote/comment context, and splitting only on `;` outside of quotes.
+// The splitter scans character-by-character, tracking quote/comment context,
+// and splits only on `;` outside of quotes.
 
 type ScannerState = {
   inSingleQuote: boolean
@@ -56,9 +56,13 @@ function isOutsideString(state: ScannerState): boolean {
   return !state.inSingleQuote && !state.inDoubleQuote && !state.inBacktick
 }
 
-function scanStatements(content: string): StatementRange[] {
+function scanStatements(content: string, cql: boolean): StatementRange[] {
   const ranges: StatementRange[] = []
   const state: ScannerState = { ...DEFAULT_STATE }
+  const cqlWord = /\w+/y
+  let sawCqlToken = false
+  let inCqlBatch = false
+  let afterApply = false
   let bufStart = 0
   let _line = 1
 
@@ -87,7 +91,7 @@ function scanStatements(content: string): StatementRange[] {
     }
 
     if (state.inLineComment) {
-      if (ch === '\n') {
+      if (ch === '\n' || (cql && ch === '\r')) {
         state.inLineComment = false
       }
       state.prevChar = ch
@@ -103,14 +107,14 @@ function scanStatements(content: string): StatementRange[] {
     }
 
     // Start line comment?
-    if (isOutsideString(state) && ch === '-' && next === '-') {
+    if (isOutsideString(state) && ((ch === '-' && next === '-') || (cql && ch === '/' && next === '/'))) {
       state.inLineComment = true
       state.prevChar = ch
       continue
     }
 
     // Hash comment (MySQL dialect)?
-    if (isOutsideString(state) && ch === '#') {
+    if (!cql && isOutsideString(state) && ch === '#') {
       state.inLineComment = true
       state.prevChar = ch
       continue
@@ -123,12 +127,35 @@ function scanStatements(content: string): StatementRange[] {
       continue
     }
 
-    // Dollar-quote start (PostgreSQL)?
+    if (cql && isOutsideString(state) && ch.trim() && (ch !== ';' || inCqlBatch)) {
+      cqlWord.lastIndex = i
+      const word = cqlWord.exec(content)?.[0]
+      const keyword = word?.toUpperCase()
+      if (!sawCqlToken && keyword === 'BEGIN')
+        inCqlBatch = true
+      else if (inCqlBatch && afterApply && keyword === 'BATCH')
+        inCqlBatch = false
+      sawCqlToken = true
+      afterApply = inCqlBatch && keyword === 'APPLY'
+      if (word) {
+        i += word.length - 1
+        state.prevChar = word[word.length - 1]
+        continue
+      }
+    }
+
+    // CQL supports untagged dollar quotes. PostgreSQL also supports tags.
     if (isOutsideString(state) && ch === '$') {
-      const tagEnd = content.indexOf('$', i + 1)
+      const tagEnd = cql
+        ? (next === '$'
+            ? i + 1
+            : -1)
+        : content.indexOf('$', i + 1)
       if (tagEnd !== -1) {
         const tag = content.slice(i, tagEnd + 1)
         state.dollarTag = tag
+        if (cql)
+          i = tagEnd
         state.prevChar = ch
         continue
       }
@@ -157,20 +184,21 @@ function scanStatements(content: string): StatementRange[] {
       continue
     }
 
-    if (ch === '`' && !state.inSingleQuote && !state.inDoubleQuote) {
+    if (!cql && ch === '`' && !state.inSingleQuote && !state.inDoubleQuote) {
       state.inBacktick = !state.inBacktick
       state.prevChar = ch
       continue
     }
 
     // Statement separator: semicolon outside quotes
-    if (ch === ';' && isOutsideString(state) && !state.inLineComment && !state.inBlockComment) {
+    if (ch === ';' && !inCqlBatch && isOutsideString(state) && !state.inLineComment && !state.inBlockComment) {
       const text = content.slice(bufStart, i + 1)
       const textTrimmed = text.trim()
-      if (textTrimmed.length > 0) {
+      if (textTrimmed.length > 0 && (!cql || sawCqlToken)) {
         ranges.push(buildRange(content, bufStart, i + 1))
       }
       bufStart = i + 1
+      sawCqlToken = false
       state.prevChar = ch
       continue
     }
@@ -181,7 +209,7 @@ function scanStatements(content: string): StatementRange[] {
   // Trailing statement (no trailing semicolon)
   if (bufStart < content.length) {
     const text = content.slice(bufStart)
-    if (text.trim().length > 0) {
+    if (text.trim().length > 0 && (!cql || sawCqlToken)) {
       ranges.push(buildRange(content, bufStart, content.length))
     }
   }
@@ -214,7 +242,7 @@ function lineAtOffset(content: string, offset: number): number {
  * (`--` line comments, `/ * ... * /` block comments). Used to position the
  * gutter execute icon on the first line with actual SQL content.
  */
-function skipLeadingComments(text: string): number {
+function skipLeadingComments(text: string, cql = false): number {
   const lines = text.split('\n')
   let inBlockComment = false
   let skipped = 0
@@ -240,7 +268,7 @@ function skipLeadingComments(text: string): number {
       continue
     }
 
-    if (trimmed.startsWith('--')) {
+    if (trimmed.startsWith('--') || (cql && trimmed.startsWith('//'))) {
       skipped++
       continue
     }
@@ -415,9 +443,11 @@ function splitRangesAtBlankLines(ranges: StatementRange[], content: string): Sta
   return result.filter(r => r.text.trim().length > 0)
 }
 
-export function parseSqlStatements(content: string): SqlStatement[] {
-  const rawRanges = scanStatements(content)
-  const ranges = splitRangesAtBlankLines(rawRanges, content)
+export function parseSqlStatements(content: string, cql = false): SqlStatement[] {
+  const rawRanges = scanStatements(content, cql)
+  const ranges = cql
+    ? rawRanges
+    : splitRangesAtBlankLines(rawRanges, content)
   const lines = content.split('\n')
 
   return ranges
@@ -430,7 +460,7 @@ export function parseSqlStatements(content: string): SqlStatement[] {
       return {
         statement,
         position: {
-          startLineNumber: r.startLine + skipLeadingComments(r.text),
+          startLineNumber: r.startLine + skipLeadingComments(r.text, cql),
           endLineNumber: r.endLine,
           startColumn: 1,
           endColumn: (lines[r.endLine - 1]?.length ?? 1) + 1,
