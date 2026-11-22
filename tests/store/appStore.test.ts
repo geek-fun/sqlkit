@@ -2,7 +2,9 @@ import { invoke } from '@tauri-apps/api/core'
 import { createPinia, setActivePinia } from 'pinia'
 import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }))
+jest.mock('@tauri-apps/api/core', () => ({
+  invoke: jest.fn(),
+}))
 
 // Mock window and document for Node.js environment
 const mockMediaQuery = {
@@ -546,7 +548,11 @@ describe('appStore', () => {
       await store.syncProviderModels('openai')
       expect(store.llmSettings.providers[0].models).toEqual(['local-model'])
       expect(mockSetSecret).toHaveBeenLastCalledWith('llmSettings', expect.objectContaining({
-        providers: [expect.objectContaining({ models: ['local-model'] })],
+        providers: [
+          expect.objectContaining({
+            models: ['local-model'],
+          }),
+        ],
       }))
     })
   })

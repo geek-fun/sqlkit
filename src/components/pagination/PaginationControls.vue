@@ -22,7 +22,12 @@ const props = withDefaults(defineProps<{
   allowAll?: boolean
   maxPageSize?: number
   database?: string
-}>(), { disabled: false, allowAll: false, maxPageSize: Number.MAX_SAFE_INTEGER, database: undefined })
+}>(), {
+  disabled: false,
+  allowAll: false,
+  maxPageSize: Number.MAX_SAFE_INTEGER,
+  database: undefined,
+})
 const emit = defineEmits<{
   pageChange: [page: number]
   pageSizeChange: [size: PageSize]
@@ -39,10 +44,30 @@ const validCustomSize = computed(() => isValidPageSize(Number(customSize.value),
 const navigation = computed(() => props.preview
   ? []
   : [
-      { label: 'firstPage', icon: 'i-lucide-chevrons-left', page: 1, disabled: props.currentPage <= 1 },
-      { label: 'previousPage', icon: 'i-lucide-chevron-left', page: props.currentPage - 1, disabled: props.currentPage <= 1 },
-      { label: 'nextPage', icon: 'i-lucide-chevron-right', page: props.currentPage + 1, disabled: props.currentPage >= props.pageCount },
-      { label: 'lastPage', icon: 'i-lucide-chevrons-right', page: props.pageCount, disabled: props.currentPage >= props.pageCount },
+      {
+        label: 'firstPage',
+        icon: 'i-lucide-chevrons-left',
+        page: 1,
+        disabled: props.currentPage <= 1,
+      },
+      {
+        label: 'previousPage',
+        icon: 'i-lucide-chevron-left',
+        page: props.currentPage - 1,
+        disabled: props.currentPage <= 1,
+      },
+      {
+        label: 'nextPage',
+        icon: 'i-lucide-chevron-right',
+        page: props.currentPage + 1,
+        disabled: props.currentPage >= props.pageCount,
+      },
+      {
+        label: 'lastPage',
+        icon: 'i-lucide-chevrons-right',
+        page: props.pageCount,
+        disabled: props.currentPage >= props.pageCount,
+      },
     ])
 
 watch(() => [props.currentPage, props.pageCount, props.disabled], () => {

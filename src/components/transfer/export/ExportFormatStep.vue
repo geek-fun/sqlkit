@@ -26,7 +26,12 @@ const csvDelimiter = ref(',')
 const csvEncoding = ref('UTF-8')
 const csvIncludeHeader = ref(true)
 
-watch([selectedFormat, csvDelimiter, csvEncoding, csvIncludeHeader], () => {
+watch([
+  selectedFormat,
+  csvDelimiter,
+  csvEncoding,
+  csvIncludeHeader,
+], () => {
   transferStore.exportRequest = {
     ...transferStore.exportRequest,
     format: selectedFormat.value,

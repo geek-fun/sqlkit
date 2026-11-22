@@ -43,7 +43,9 @@ const expiryText = computed(() => {
   const expiresAt = entitlementStore.view?.ultimateExpiresAt
   if (!expiresAt || !entitlementStore.isCloudUltimate)
     return ''
-  return t('plan.section.expiresAt', { time: new Date(expiresAt).toLocaleString() })
+  return t('plan.section.expiresAt', {
+    time: new Date(expiresAt).toLocaleString(),
+  })
 })
 
 const compareRows = [
@@ -65,7 +67,15 @@ const runAccountAction = async (operation: () => Promise<void>, label: string, s
     await operation()
     accountFeedback.value = { state: 'success', label: success }
   }
-  catch (error) { accountFeedback.value = { state: 'error', label: t('pages.settings.feedback.failed'), detail: error instanceof Error ? error.message : String(error) } }
+  catch (error) {
+    accountFeedback.value = {
+      state: 'error',
+      label: t('pages.settings.feedback.failed'),
+      detail: error instanceof Error
+        ? error.message
+        : String(error),
+    }
+  }
   finally {
     refreshing.value = false
   }

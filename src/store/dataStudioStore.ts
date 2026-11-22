@@ -134,7 +134,12 @@ function fromAttachedSourceRow(row: AttachedSourceRow): AttachedSource {
     connectionId: row.connection_id ?? '',
     name: row.alias || row.name,
     databaseType: (row.database_type as DatabaseSource['databaseType']) ?? 'POSTGRESQL',
-    permissions: { read: true, create: false, update: false, delete: false },
+    permissions: {
+      read: true,
+      create: false,
+      update: false,
+      delete: false,
+    },
   }
 }
 
@@ -181,7 +186,9 @@ function fromBackendMessage(row: AgentApiMessage): AgentMessage {
             summary: parsed.summary ?? '',
             preTokens: parsed.pre_tokens ?? 0,
             postTokens: parsed.post_tokens ?? 0,
-            trigger: (parsed.trigger === 'manual' ? 'manual' : 'auto') as CompactionMarker['trigger'],
+            trigger: (parsed.trigger === 'manual'
+              ? 'manual'
+              : 'auto') as CompactionMarker['trigger'],
           },
         }
       }
@@ -219,10 +226,18 @@ function fromBackendMessage(row: AgentApiMessage): AgentMessage {
         id: tc.id,
         toolName: tc.tool_name,
         args: tc.arguments,
-        status: tc.status === 'completed' ? 'done' : tc.status === 'failed' && tc.result ? 'error' : tc.status === 'denied' ? 'denied' : 'interrupted',
+        status: tc.status === 'completed'
+          ? 'done'
+          : tc.status === 'failed' && tc.result
+            ? 'error'
+            : tc.status === 'denied'
+              ? 'denied'
+              : 'interrupted',
         result: tc.result ?? undefined,
         denial: tc.denial ?? undefined,
-        riskLevel: tc.denial?.action === 'manage' || tc.denial?.action === 'delete' ? 'destructive' : 'elevated',
+        riskLevel: tc.denial?.action === 'manage' || tc.denial?.action === 'delete'
+          ? 'destructive'
+          : 'elevated',
         requiresConfirmation: false,
       })) ?? (parsed.tool_calls ?? []).map(tc => ({
         id: tc.id,
@@ -236,17 +251,27 @@ function fromBackendMessage(row: AgentApiMessage): AgentMessage {
         ...base,
         content: parsed.content ?? '',
         thinking: parsed.thinking ?? undefined,
-        toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+        toolCalls: toolCalls.length > 0
+          ? toolCalls
+          : undefined,
       }
     }
   }
   catch {
     const isLlmError = row.role === 'assistant' && row.content.startsWith('LLM HTTP ')
-    return { ...base, status: isLlmError ? 'error' : 'done', content: row.content }
+    return {
+      ...base,
+      status: isLlmError ? 'error' : 'done',
+      content: row.content,
+    }
   }
 
   const isLlmError = row.role === 'assistant' && row.content.startsWith('LLM HTTP ')
-  return { ...base, status: isLlmError ? 'error' : 'done', content: row.content }
+  return {
+    ...base,
+    status: isLlmError ? 'error' : 'done',
+    content: row.content,
+  }
 }
 
 function dedupAdjacentCompactions(messages: AgentMessage[]): AgentMessage[] {
@@ -328,7 +353,9 @@ export const useDataStudioStore = defineStore('dataStudio', {
     async updateAttachedSource(source: AttachedSource) {
       await saveAttachedSourceWithFields(source)
       this.attachedSources = this.attachedSources.map(s =>
-        s.sourceId === source.sourceId ? source : s,
+        s.sourceId === source.sourceId
+          ? source
+          : s,
       )
     },
 
@@ -364,7 +391,9 @@ export const useDataStudioStore = defineStore('dataStudio', {
       if (existing) {
         const updated = { ...existing, permissions: params.permissions }
         this.attachedSources = this.attachedSources.map(s =>
-          s.sourceId === existing.sourceId ? updated : s,
+          s.sourceId === existing.sourceId
+            ? updated
+            : s,
         )
         return updated
       }
@@ -412,7 +441,11 @@ export const useDataStudioStore = defineStore('dataStudio', {
 
       this.sessions = this.sessions.map(s =>
         s.id === session.id
-          ? { ...s, sources: [...s.sources, sessionSource], updated_at: Date.now() }
+          ? {
+              ...s,
+              sources: [...s.sources, sessionSource],
+              updated_at: Date.now(),
+            }
           : s,
       )
 
@@ -430,7 +463,11 @@ export const useDataStudioStore = defineStore('dataStudio', {
               ...s,
               sources: s.sources.map(src =>
                 src.sourceId === sourceId
-                  ? { ...src, detached: true, detachedAt: Date.now() }
+                  ? {
+                      ...src,
+                      detached: true,
+                      detachedAt: Date.now(),
+                    }
                   : src,
               ),
               updated_at: Date.now(),
@@ -448,7 +485,11 @@ export const useDataStudioStore = defineStore('dataStudio', {
 
       this.sessions = this.sessions.map(s =>
         s.id === session.id
-          ? { ...s, permissionsMode: mode, updated_at: Date.now() }
+          ? {
+              ...s,
+              permissionsMode: mode,
+              updated_at: Date.now(),
+            }
           : s,
       )
 
@@ -468,7 +509,11 @@ export const useDataStudioStore = defineStore('dataStudio', {
               ...s,
               sources: s.sources.map(src =>
                 src.sourceId === sourceId
-                  ? { ...src, permissions: { ...permissions }, permissionsMode: 'custom' as const }
+                  ? {
+                      ...src,
+                      permissions: { ...permissions },
+                      permissionsMode: 'custom' as const,
+                    }
                   : src,
               ),
               updated_at: Date.now(),
@@ -594,7 +639,11 @@ export const useDataStudioStore = defineStore('dataStudio', {
 
       this.sessions = this.sessions.map(s =>
         s.id === session.id
-          ? { ...s, messages: [...s.messages, msg], updated_at: Date.now() }
+          ? {
+              ...s,
+              messages: [...s.messages, msg],
+              updated_at: Date.now(),
+            }
           : s,
       )
       return msg
@@ -610,7 +659,9 @@ export const useDataStudioStore = defineStore('dataStudio', {
           ? {
               ...s,
               messages: s.messages.map(m =>
-                m.id === messageId ? { ...m, content: m.content + chunk } : m,
+                m.id === messageId
+                  ? { ...m, content: m.content + chunk }
+                  : m,
               ),
             }
           : s,
@@ -627,7 +678,9 @@ export const useDataStudioStore = defineStore('dataStudio', {
           ? {
               ...s,
               messages: s.messages.map(m =>
-                m.id === messageId ? { ...m, thinking: (m.thinking ?? '') + chunk } : m,
+                m.id === messageId
+                  ? { ...m, thinking: (m.thinking ?? '') + chunk }
+                  : m,
               ),
             }
           : s,
@@ -667,7 +720,9 @@ export const useDataStudioStore = defineStore('dataStudio', {
           ? {
               ...s,
               messages: s.messages.map(m =>
-                m.id === messageId ? { ...m, toolCalls } : m,
+                m.id === messageId
+                  ? { ...m, toolCalls }
+                  : m,
               ),
             }
           : s,
@@ -703,9 +758,15 @@ export const useDataStudioStore = defineStore('dataStudio', {
                           ? {
                               ...tc,
                               status,
-                              ...(storedResult !== undefined ? { result: storedResult } : {}),
-                              ...(resultTruncated ? { resultTruncated: `Showing first ${TOOL_RESULT_PREVIEW_CHARS} of ${resultFullLength} characters` } : {}),
-                              ...(durationMs !== undefined ? { durationMs } : {}),
+                              ...(storedResult !== undefined
+                                ? { result: storedResult }
+                                : {}),
+                              ...(resultTruncated
+                                ? { resultTruncated: `Showing first ${TOOL_RESULT_PREVIEW_CHARS} of ${resultFullLength} characters` }
+                                : {}),
+                              ...(durationMs !== undefined
+                                ? { durationMs }
+                                : {}),
                             }
                           : tc,
                       ),
@@ -844,7 +905,10 @@ export const useDataStudioStore = defineStore('dataStudio', {
     setSessionProgress(sessionId: string, progress: Omit<SessionProgress, 'updatedAt'>) {
       this.sessionProgress = {
         ...this.sessionProgress,
-        [sessionId]: { ...progress, updatedAt: Date.now() },
+        [sessionId]: {
+          ...progress,
+          updatedAt: Date.now(),
+        },
       }
     },
 
@@ -871,10 +935,19 @@ export const useDataStudioStore = defineStore('dataStudio', {
 
     setSessionStatus(sessionId: string, status: AgentSessionStatus) {
       this.sessions = this.sessions.map(s =>
-        s.id === sessionId ? { ...s, status, updated_at: Date.now() } : s,
+        s.id === sessionId
+          ? {
+              ...s,
+              status,
+              updated_at: Date.now(),
+            }
+          : s,
       )
       if (status === 'running') {
-        this.sessionStartTimes = { ...this.sessionStartTimes, [sessionId]: Date.now() }
+        this.sessionStartTimes = {
+          ...this.sessionStartTimes,
+          [sessionId]: Date.now(),
+        }
       }
       if (status !== 'error') {
         const { [sessionId]: _removed, ...rest } = this.sessionErrors
@@ -908,7 +981,13 @@ export const useDataStudioStore = defineStore('dataStudio', {
     setSessionStopped(sessionId: string, reason: AgentSessionStopReason, message?: string) {
       this.sessions = this.sessions.map(s =>
         s.id === sessionId
-          ? { ...s, status: 'stopped', stopReason: reason, stopMessage: message, updated_at: Date.now() }
+          ? {
+              ...s,
+              status: 'stopped',
+              stopReason: reason,
+              stopMessage: message,
+              updated_at: Date.now(),
+            }
           : s,
       )
     },
@@ -916,14 +995,25 @@ export const useDataStudioStore = defineStore('dataStudio', {
     clearSessionStop(sessionId: string) {
       this.sessions = this.sessions.map(s =>
         s.id === sessionId
-          ? { ...s, stopReason: undefined, stopMessage: undefined, updated_at: Date.now() }
+          ? {
+              ...s,
+              stopReason: undefined,
+              stopMessage: undefined,
+              updated_at: Date.now(),
+            }
           : s,
       )
     },
 
     async setSessionModelId(sessionId: string, modelId: string) {
       this.sessions = this.sessions.map(s =>
-        s.id === sessionId ? { ...s, model_id: modelId, updated_at: Date.now() } : s,
+        s.id === sessionId
+          ? {
+              ...s,
+              model_id: modelId,
+              updated_at: Date.now(),
+            }
+          : s,
       )
       await agentApi.updateSessionMeta(sessionId, undefined, undefined, modelId).catch(e =>
         console.warn('[persist] updateSessionMeta failed:', e),
@@ -937,7 +1027,13 @@ export const useDataStudioStore = defineStore('dataStudio', {
         const rows = await agentApi.loadSessionMessages(sessionId)
         const messages = dedupAdjacentCompactions(rows.map(fromBackendMessage))
         this.sessions = this.sessions.map(s =>
-          s.id === sessionId ? { ...s, messages, updated_at: Date.now() } : s,
+          s.id === sessionId
+            ? {
+                ...s,
+                messages,
+                updated_at: Date.now(),
+              }
+            : s,
         )
       }
       catch (error) {
@@ -968,7 +1064,10 @@ export const useDataStudioStore = defineStore('dataStudio', {
         rule.toolName,
         rule.action,
       )
-      this.confirmationRules = [...this.confirmationRules, fromConfirmationRuleRow(row)]
+      this.confirmationRules = [
+        ...this.confirmationRules,
+        fromConfirmationRuleRow(row),
+      ]
     },
 
     async removeConfirmationRule(ruleId: string) {
@@ -986,7 +1085,14 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
       this.sessions = this.sessions.map(s =>
         s.id === sessionId
-          ? { ...s, messages: [], status: 'idle', stopReason: undefined, stopMessage: undefined, updated_at: Date.now() }
+          ? {
+              ...s,
+              messages: [],
+              status: 'idle',
+              stopReason: undefined,
+              stopMessage: undefined,
+              updated_at: Date.now(),
+            }
           : s,
       )
       this.clearSessionError(sessionId)
@@ -1010,7 +1116,9 @@ export const useDataStudioStore = defineStore('dataStudio', {
             )
             const sources: SessionSource[] = (() => {
               try {
-                return s.sources ? JSON.parse(s.sources) : []
+                return s.sources
+                  ? JSON.parse(s.sources)
+                  : []
               }
               catch {
                 return []

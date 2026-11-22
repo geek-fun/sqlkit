@@ -90,7 +90,9 @@ async function confirmProfileDelete() {
     profileDeleteOpen.value = false
   }
   catch (error) {
-    toast.error(error instanceof Error ? error.message : String(error))
+    toast.error(error instanceof Error
+      ? error.message
+      : String(error))
   }
 }
 const connectingModal = ref<InstanceType<typeof ConnectingModal> | null>(null)
@@ -149,7 +151,9 @@ const systemProxyWarning = async (connection: ServerConnection): Promise<string 
     const detected = firstHop
       ? await invoke<string | null>('detect_system_proxy', { host: firstHop.host, port: firstHop.port })
       : await invoke<string | null>('detect_system_proxy')
-    return detected ? undefined : t('components.serverForm.ssh.systemProxyNotDetected')
+    return detected
+      ? undefined
+      : t('components.serverForm.ssh.systemProxyNotDetected')
   }
   catch {
     return undefined
@@ -178,7 +182,9 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
     () => establishConnection(connection, navigateOnSuccess),
   )
   const tunnelWarning = sshTunnelSkippedWarning(connection)
-  const proxyWarning = tunnelWarning ? undefined : await systemProxyWarning(connection)
+  const proxyWarning = tunnelWarning
+    ? undefined
+    : await systemProxyWarning(connection)
   connectingModal.value?.setWarning(tunnelWarning ?? proxyWarning ?? null)
 
   const startTime = Date.now()
@@ -224,10 +230,14 @@ async function establishConnection(connection: ServerConnection, navigateOnSucce
       return
     }
 
-    const errorMessage = err instanceof Error ? err.message : String(err)
+    const errorMessage = err instanceof Error
+      ? err.message
+      : String(err)
     connectingModal.value?.showError(
       errorMessage,
-      isSshTunnelStrippedError(err) ? t('components.connectingModal.sshTunnelStripped') : '',
+      isSshTunnelStrippedError(err)
+        ? t('components.connectingModal.sshTunnelStripped')
+        : '',
     )
   }
 }
@@ -315,7 +325,9 @@ async function handleDisconnect(connection: ServerConnection) {
     await connectionStore.disconnect(connection.id)
   }
   catch (error) {
-    connectError.value = error instanceof Error ? error.message : String(error)
+    connectError.value = error instanceof Error
+      ? error.message
+      : String(error)
   }
 }
 

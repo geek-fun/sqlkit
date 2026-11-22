@@ -9,25 +9,43 @@ import { storeApi } from '@/datasources/storeApi'
 import { enUS } from '@/lang/enUS'
 import AiSettings from '@/views/setting/ai-settings.vue'
 
-jest.mock('@tauri-apps/plugin-opener', () => ({ openUrl: jest.fn() }))
+jest.mock('@tauri-apps/plugin-opener', () => ({
+  openUrl: jest.fn(),
+}))
 jest.mock('@/store/entitlementStore', () => ({
   useEntitlementStore: () => ({ isLocalUltimate: true }),
 }))
 jest.mock('@/datasources/storeApi', () => ({
-  storeApi: { getSecret: jest.fn(), setSecret: jest.fn() },
+  storeApi: {
+    getSecret: jest.fn(),
+    setSecret: jest.fn(),
+  },
 }))
-jest.mock('@/components/upgrade', () => ({ ProBadge: { template: '<span />' } }))
+jest.mock('@/components/upgrade', () => ({
+  ProBadge: { template: '<span />' },
+}))
 jest.mock('@/components/ui/button', () => ({
   Button: { template: '<button><slot /></button>' },
 }))
 jest.mock('@/components/ui/card', () => Object.fromEntries(
-  ['Card', 'CardContent', 'CardDescription', 'CardHeader', 'CardTitle']
-    .map(name => [name, { template: '<div><slot /></div>' }]),
+  [
+    'Card',
+    'CardContent',
+    'CardDescription',
+    'CardHeader',
+    'CardTitle',
+  ]
+    .map(name => [
+      name,
+      { template: '<div><slot /></div>' },
+    ]),
 ))
 jest.mock('@/components/ui/checkbox', () => ({
   Checkbox: { template: '<input type="checkbox" />' },
 }))
-jest.mock('@/components/ui/input', () => ({ Input: { template: '<input />' } }))
+jest.mock('@/components/ui/input', () => ({
+  Input: { template: '<input />' },
+}))
 jest.mock('@/views/setting/provider-list.vue', () => ({
   default: { template: '<div data-testid="provider-list" />' },
 }))
@@ -36,16 +54,18 @@ jest.mock('@/views/setting/provider-form-dialog.vue', () => ({
 }))
 
 const savedSettings = () => ({
-  providers: [{
-    id: 'provider',
-    kind: 'openai',
-    name: 'OpenAI',
-    apiCompatibility: 'openai',
-    apiKey: 'saved-api-key',
-    baseUrl: 'https://example.com/v1',
-    enabled: true,
-    models: ['model'],
-  }],
+  providers: [
+    {
+      id: 'provider',
+      kind: 'openai',
+      name: 'OpenAI',
+      apiCompatibility: 'openai',
+      apiKey: 'saved-api-key',
+      baseUrl: 'https://example.com/v1',
+      enabled: true,
+      models: ['model'],
+    },
+  ],
   models: {
     sidebarAssistant: { selectedModelId: 'provider::model', preferredCategory: 'general', useRecommendedModel: false },
     dataStudio: { selectedModelId: 'provider::model', preferredCategory: 'reasoning', useRecommendedModel: false },
@@ -62,7 +82,13 @@ const savedSettings = () => ({
 let persisted: ReturnType<typeof savedSettings>
 const render = () => mount(AiSettings, {
   global: {
-    plugins: [createI18n({ legacy: false, locale: 'enUS', messages: { enUS } })],
+    plugins: [
+      createI18n({
+        legacy: false,
+        locale: 'enUS',
+        messages: { enUS },
+      }),
+    ],
   },
 })
 const button = (wrapper: ReturnType<typeof render>, label: string) => {

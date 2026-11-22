@@ -17,7 +17,9 @@ describe('sqlCompletion domain types', () => {
   it('satisfies the CompletionContext shape', () => {
     const ctx: CompletionContext = {
       word: 'us',
-      tableRefs: [{ table: 'users', alias: 'u' }],
+      tableRefs: [
+        { table: 'users', alias: 'u' },
+      ],
       activeTable: { table: 'users', alias: 'u' },
       qualifier: 'u.',
       isAfterDot: true,
@@ -29,11 +31,20 @@ describe('sqlCompletion domain types', () => {
 
   it('satisfies the SchemaSnapshot shape with column cache entries', () => {
     const snapshot: SchemaSnapshot = {
-      databases: [{ name: 'app', isSystem: false }],
-      schemasByDb: { app: ['public'] },
-      tablesByKey: { 'app': ['users'], 'app.public': ['orders'] },
+      databases: [
+        { name: 'app', isSystem: false },
+      ],
+      schemasByDb: {
+        app: ['public'],
+      },
+      tablesByKey: {
+        'app': ['users'],
+        'app.public': ['orders'],
+      },
       columnsByTable: {
-        'c1|app|public|orders': [{ name: 'id', dataType: 'int4', isPrimaryKey: true }],
+        'c1|app|public|orders': [
+          { name: 'id', dataType: 'int4', isPrimaryKey: true },
+        ],
       },
       derivedTables: { x: 'users' },
       hasSchemaData: true,
@@ -55,12 +66,23 @@ describe('sqlCompletion domain types', () => {
   })
 
   it('satisfies Suggestion / TableRef / DatabaseRef / ColumnSuggestion / CompletionContextInput shapes', () => {
-    const s: Suggestion = { label: 'users', kind: 'table', insertText: 'users', sortPrefix: 1 }
+    const s: Suggestion = {
+      label: 'users',
+      kind: 'table',
+      insertText: 'users',
+      sortPrefix: 1,
+    }
     const t: TableRef = { table: 'users', alias: 'u', schema: 'public' }
     const d: DatabaseRef = { name: 'app', isSystem: false }
     const c: ColumnSuggestion = { name: 'id', dataType: 'int4', isPrimaryKey: true }
     const input: CompletionContextInput = { connectionId: 'c1', database: 'app', schema: 'public' }
-    expect([s.kind, t.table, d.name, c.name, input.connectionId]).toEqual(['table', 'users', 'app', 'id', 'c1'])
+    expect([
+      s.kind,
+      t.table,
+      d.name,
+      c.name,
+      input.connectionId,
+    ]).toEqual(['table', 'users', 'app', 'id', 'c1'])
   })
 
   it('gRAMMAR_DIALECTS contains exactly the dialects with monaco grammar contributions', () => {

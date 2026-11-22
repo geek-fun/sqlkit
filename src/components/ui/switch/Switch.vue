@@ -1,14 +1,22 @@
 <script setup lang="ts">
-import type { SwitchRootEmits, SwitchRootProps } from 'radix-vue'
 import { SwitchRoot, SwitchThumb, useForwardPropsEmits } from 'radix-vue'
 import { cn } from '@/lib/utils'
 
+// Props/emits are inlined from radix-vue's SwitchRootProps/SwitchRootEmits:
+// importing the types breaks @vue/vue3-jest under jsdom (type resolution needs fs).
 type Props = {
   class?: string
-} & SwitchRootProps
+  defaultChecked?: boolean
+  checked?: boolean
+  disabled?: boolean
+  required?: boolean
+  name?: string
+  id?: string
+  value?: string
+}
 
 const props = defineProps<Props>()
-const emits = defineEmits<SwitchRootEmits>()
+const emits = defineEmits<{ 'update:checked': [payload: boolean] }>()
 
 const forwarded = useForwardPropsEmits(props, emits)
 </script>

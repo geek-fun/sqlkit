@@ -43,11 +43,23 @@ describe('result pagination', () => {
   it('ignores unsafe and invalid sizes and page numbers', () => {
     const scope = effectScope()
     const pagination = scope.run(() => useDataGridPagination(ref(makeRows(235))))!
-    ;[0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1].forEach((size) => {
+    ;[
+      0,
+      -1,
+      1.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.MAX_SAFE_INTEGER + 1,
+    ].forEach((size) => {
       pagination.setPageSize(size)
       expect(pagination.pageSize.value).toBe(100)
     })
-    ;[1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1].forEach((page) => {
+    ;[
+      1.5,
+      Number.NaN,
+      Number.POSITIVE_INFINITY,
+      Number.MAX_SAFE_INTEGER + 1,
+    ].forEach((page) => {
       pagination.setPage(page)
       expect(pagination.currentPage.value).toBe(1)
     })

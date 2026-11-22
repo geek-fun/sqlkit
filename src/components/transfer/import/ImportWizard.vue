@@ -66,7 +66,10 @@ async function handleFileBrowse() {
   const selected = await open({
     multiple: false,
     filters: [
-      { name: 'Import File', extensions: ['csv', 'jsonl', 'sql', 'xlsx'] },
+      {
+        name: 'Import File',
+        extensions: ['csv', 'jsonl', 'sql', 'xlsx'],
+      },
     ],
   })
   if (selected) {
@@ -179,7 +182,9 @@ const targetParams = computed(() => {
 
 watch(targetParams, (params, oldParams) => {
   const tables: ImportTarget[] | undefined = params.table
-    ? [{ targetTable: params.table, columnMappings: mappings.value }]
+    ? [
+        { targetTable: params.table, columnMappings: mappings.value },
+      ]
     : undefined
 
   transferStore.importRequest = {
@@ -229,10 +234,22 @@ const previewColumns = ref<string[]>([])
 const isLoadingPreview = ref(false)
 
 const conflictOptions = computed<{ value: ConflictStrategy, label: string }[]>(() => [
-  { value: 'skip', label: t('transfer.import.conflict.skip') },
-  { value: 'replace', label: t('transfer.import.conflict.replace') },
-  { value: 'upsert', label: t('transfer.import.conflict.upsert') },
-  { value: 'abort', label: t('transfer.import.conflict.abort') },
+  {
+    value: 'skip',
+    label: t('transfer.import.conflict.skip'),
+  },
+  {
+    value: 'replace',
+    label: t('transfer.import.conflict.replace'),
+  },
+  {
+    value: 'upsert',
+    label: t('transfer.import.conflict.upsert'),
+  },
+  {
+    value: 'abort',
+    label: t('transfer.import.conflict.abort'),
+  },
 ])
 
 async function loadPreview() {
@@ -258,7 +275,14 @@ async function loadPreview() {
   }
 }
 
-watch([conflictStrategy, batchSize, truncateBefore, dryRun, excelSheetName, excelHasHeader], () => {
+watch([
+  conflictStrategy,
+  batchSize,
+  truncateBefore,
+  dryRun,
+  excelSheetName,
+  excelHasHeader,
+], () => {
   transferStore.importRequest = {
     ...transferStore.importRequest,
     conflictStrategy: conflictStrategy.value,
@@ -320,7 +344,11 @@ async function startImport() {
       skippedRows: 0,
       errorCount: 1,
       durationMs: 0,
-      errors: [{ message: String(error) }],
+      errors: [
+        {
+          message: String(error),
+        },
+      ],
     }
   }
   finally {

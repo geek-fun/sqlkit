@@ -3,15 +3,38 @@ import type { QueryResult } from '@/store/tabStore'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import QueryResultPanel from '@/components/database-browser/QueryResultPanel.vue'
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }))
-jest.mock('@/store', () => ({ useConnectionStore: () => ({ getConnectionById: (id: string) => ({ type: id === 'cql' ? 'cassandra' : 'postgresql' }) }) }))
-jest.mock('@/composables/useDataGridCopy', () => ({
-  useDataGridCopy: () => ({ copyRowsAs: jest.fn(), exportToFile: jest.fn() }),
+jest.mock('@tauri-apps/api/core', () => ({
+  invoke: jest.fn(),
 }))
-jest.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-jest.mock('@/components/explain-plan', () => ({ ExplainPlanPanel: { template: '<div />' } }))
-jest.mock('@/components/ui/button', () => ({ Button: { template: '<button><slot /></button>' } }))
-jest.mock('@/components/ui/spinner', () => ({ Spinner: { template: '<span />' } }))
+jest.mock('@/store', () => ({
+  useConnectionStore: () => ({
+    getConnectionById: (id: string) => ({
+      type: id === 'cql'
+        ? 'cassandra'
+        : 'postgresql',
+    }),
+  }),
+}))
+jest.mock('@/composables/useDataGridCopy', () => ({
+  useDataGridCopy: () => ({
+    copyRowsAs: jest.fn(),
+    exportToFile: jest.fn(),
+  }),
+}))
+jest.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (key: string) => key,
+  }),
+}))
+jest.mock('@/components/explain-plan', () => ({
+  ExplainPlanPanel: { template: '<div />' },
+}))
+jest.mock('@/components/ui/button', () => ({
+  Button: { template: '<button><slot /></button>' },
+}))
+jest.mock('@/components/ui/spinner', () => ({
+  Spinner: { template: '<span />' },
+}))
 jest.mock('@/components/ui/tooltip', () => ({
   Tooltip: { template: '<div><slot /></div>' },
   TooltipContent: { template: '<div><slot /></div>' },
@@ -19,7 +42,12 @@ jest.mock('@/components/ui/tooltip', () => ({
   TooltipTrigger: { template: '<div><slot /></div>' },
 }))
 jest.mock('@/components/ui/select', () => ({
-  Select: { name: 'Select', props: ['modelValue'], emits: ['update:modelValue', 'update:open'], template: '<div><slot /></div>' },
+  Select: {
+    name: 'Select',
+    props: ['modelValue'],
+    emits: ['update:modelValue', 'update:open'],
+    template: '<div><slot /></div>',
+  },
   SelectContent: { template: '<div><slot /></div>' },
   SelectItem: { template: '<div><slot /></div>' },
   SelectTrigger: { template: '<div><slot /></div>' },
@@ -36,7 +64,13 @@ jest.mock('@/components/grid/DataGrid.vue', () => ({
   __esModule: true,
   default: {
     name: 'DataGrid',
-    props: ['columns', 'rows', 'columnTypes', 'filterable', 'tableName'],
+    props: [
+      'columns',
+      'rows',
+      'columnTypes',
+      'filterable',
+      'tableName',
+    ],
     emits: ['filter-change'],
     template: '<div class="test-grid">{{ columns }} {{ rows }}</div>',
   },
@@ -48,14 +82,23 @@ const resultSet = (column: string, rows: Record<string, unknown>[]): QueryResult
   rows,
 })
 
-const first = resultSet('email', [{ email: 'test@example.com' }])
+const first = resultSet('email', [
+  { email: 'test@example.com' },
+])
 const empty = resultSet('refund_id', [])
-const last = resultSet('balance', [{ balance: '2700' }])
-const scriptResult = { ...last, resultSets: [first, empty, last] }
+const last = resultSet('balance', [
+  { balance: '2700' },
+])
+const scriptResult = {
+  ...last,
+  resultSets: [first, empty, last],
+}
 
 const mountPanel = (results: QueryResult | null = scriptResult, connectionId = 'test') => shallowMount(QueryResultPanel, {
   props: { results, sql: 'SELECT * FROM events', connectionId },
-  global: { stubs: { DataGrid: false } },
+  global: {
+    stubs: { DataGrid: false },
+  },
 })
 
 describe('script query results', () => {
@@ -77,7 +120,9 @@ describe('script query results', () => {
 
     wrapper.findComponent({ name: 'Select' }).vm.$emit('update:modelValue', '2')
     await wrapper.vm.$nextTick()
-    expect(grid().props('rows')).toEqual([{ balance: '2700' }])
+    expect(grid().props('rows')).toEqual([
+      { balance: '2700' },
+    ])
     expect(grid().props('columnTypes')).toEqual({ balance: 'text' })
   })
 
@@ -85,7 +130,9 @@ describe('script query results', () => {
     const wrapper = mountPanel()
     wrapper.findComponent({ name: 'Select' }).vm.$emit('update:modelValue', '2')
     await wrapper.vm.$nextTick()
-    await wrapper.setProps({ results: { ...scriptResult } })
+    await wrapper.setProps({
+      results: { ...scriptResult },
+    })
     expect(wrapper.findComponent({ name: 'DataGrid' }).props('columns')).toEqual(['email'])
     await wrapper.setProps({ results: null, error: 'division by zero' })
     expect(wrapper.findComponent({ name: 'DataGrid' }).exists()).toBe(false)
@@ -97,7 +144,9 @@ describe('script query results', () => {
     const wrapper = mountPanel()
     await flushPromises()
     invoke.mockClear()
-    wrapper.findComponent({ name: 'DataGrid' }).vm.$emit('filter-change', [{ column: 'email', operator: 'eq', value: 'test' }])
+    wrapper.findComponent({ name: 'DataGrid' }).vm.$emit('filter-change', [
+      { column: 'email', operator: 'eq', value: 'test' },
+    ])
     await flushPromises()
     expect(invoke).not.toHaveBeenCalled()
   })
@@ -126,7 +175,9 @@ describe('script query results', () => {
     const grid = wrapper.findComponent({ name: 'DataGrid' })
     expect(grid.props('filterable')).toBe(false)
     expect(grid.props('rows')).toEqual(last.rows)
-    grid.vm.$emit('filter-change', [{ column: 'balance', operator: 'eq', value: '2700' }])
+    grid.vm.$emit('filter-change', [
+      { column: 'balance', operator: 'eq', value: '2700' },
+    ])
     await flushPromises()
     expect(invoke).not.toHaveBeenCalled()
   })

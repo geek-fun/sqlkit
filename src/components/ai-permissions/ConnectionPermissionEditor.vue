@@ -52,7 +52,13 @@ const load = async () => {
   }
 }
 watch(() => [props.connectionId, canEdit.value], load, { immediate: true })
-const presets = ['inherit', 'none', 'read', 'data', 'full']
+const presets = [
+  'inherit',
+  'none',
+  'read',
+  'data',
+  'full',
+]
 const preset = computed(() => editingCustom.value
   ? 'custom'
   : (
@@ -60,7 +66,9 @@ const preset = computed(() => editingCustom.value
     ))
 const effective = computed(() => resolveAiPermissions(defaults.value, props.modelValue))
 const decisionText = (action: AiAction) => props.modelValue?.[action] === undefined
-  ? t('aiPermissions.defaultDecision', { decision: t(defaults.value[action] ? 'aiPermissions.allow' : 'aiPermissions.deny') })
+  ? t('aiPermissions.defaultDecision', {
+      decision: t(defaults.value[action] ? 'aiPermissions.allow' : 'aiPermissions.deny'),
+    })
   : `${t(props.modelValue[action] ? 'aiPermissions.allow' : 'aiPermissions.deny')} · ${t('aiPermissions.fromConnection')}`
 const update = (action: AiAction, value: boolean) => {
   if (!canEdit.value)
@@ -69,7 +77,9 @@ const update = (action: AiAction, value: boolean) => {
   const { [action]: _previous, ...rest } = props.modelValue ?? {}
   emit('update:modelValue', { ...rest, [action]: value })
 }
-defineExpose({ ready: computed(() => !canEdit.value || (!loading.value && !error.value)) })
+defineExpose({
+  ready: computed(() => !canEdit.value || (!loading.value && !error.value)),
+})
 const selectPreset = (value: string) => {
   if (!canEdit.value)
     return

@@ -41,13 +41,19 @@ export const buildAgentPermissionInstructions = (sources: Array<{ connectionId: 
 const isNonEmpty = (value: string | undefined | null): value is string => Boolean(value?.trim())
 
 export const assembleSystemPrompt = (layers: SystemPromptLayers): string => {
-  const parts = isNonEmpty(layers.base) ? [layers.base.trim()] : []
+  const parts = isNonEmpty(layers.base)
+    ? [
+        layers.base.trim(),
+      ]
+    : []
   if (isNonEmpty(layers.userGlobal))
     parts.push(layers.userGlobal.trim())
 
   const prompts = (layers.connectionPrompts ?? []).filter(({ prompt }) => isNonEmpty(prompt))
   prompts.forEach(({ alias, prompt }) => {
-    parts.push(prompts.length > 1 ? `## Connection Context: ${alias}\n\n${prompt.trim()}` : prompt.trim())
+    parts.push(prompts.length > 1
+      ? `## Connection Context: ${alias}\n\n${prompt.trim()}`
+      : prompt.trim())
   })
 
   if (isNonEmpty(layers.sidebarContext))

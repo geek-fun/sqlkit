@@ -48,7 +48,9 @@ const contextMenuDatabase = ref<{ database: string, x: number, y: number } | nul
 const selectedTreeItem = ref<{ type: string, name: string, schema?: string } | null>(null)
 
 const activeConnection = computed(() =>
-  props.connectionId ? connectionStore.getConnectionById(props.connectionId) : null,
+  props.connectionId
+    ? connectionStore.getConnectionById(props.connectionId)
+    : null,
 )
 
 const isActiveConnectionConnected = computed(() =>
@@ -93,7 +95,9 @@ function getTablesForSchema(schema: string): TableInfo[] {
   const allItems = databaseStore.metadata[props.connectionId]?.tables[key] ?? []
   const tables = allItems.filter(item => item.table_type !== 'VIEW')
   const query = searchQuery.value.toLowerCase().trim()
-  return query ? tables.filter(item => item.name.toLowerCase().includes(query)) : tables
+  return query
+    ? tables.filter(item => item.name.toLowerCase().includes(query))
+    : tables
 }
 
 // Per-schema objects (views, procedures, functions)
@@ -112,7 +116,9 @@ const flatTables = computed<TableInfo[]>(() => {
   const allItems = meta.tables[currentDb] || []
   const tables = allItems.filter(item => item.table_type !== 'VIEW')
   const query = searchQuery.value.toLowerCase().trim()
-  return query ? tables.filter(item => item.name.toLowerCase().includes(query)) : tables
+  return query
+    ? tables.filter(item => item.name.toLowerCase().includes(query))
+    : tables
 })
 
 // Toggle schema node (expand/collapse + lazy load tables + set selectedSchema)
@@ -153,7 +159,13 @@ function handleDoubleClick(table: TableInfo, schema: string | undefined) {
 function handleContextMenu(event: MouseEvent, table: TableInfo, schema: string | undefined) {
   event.preventDefault()
   contextMenuDatabase.value = null
-  contextMenuTable.value = { table, database: props.selectedDatabase!, schema, x: event.clientX, y: event.clientY }
+  contextMenuTable.value = {
+    table,
+    database: props.selectedDatabase!,
+    schema,
+    x: event.clientX,
+    y: event.clientY,
+  }
 }
 
 function closeContextMenus() {
@@ -265,7 +277,9 @@ function getTablesForDbSchema(dbName: string, schema?: string): TableInfo[] {
   const meta = databaseStore.metadata[props.connectionId]
   if (!meta)
     return []
-  const key = schema ? `${dbName}.${schema}` : dbName
+  const key = schema
+    ? `${dbName}.${schema}`
+    : dbName
   return (meta.tables[key] || []).filter(item => item.table_type !== 'VIEW')
 }
 

@@ -112,7 +112,9 @@ describe('databaseStore', () => {
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
         databases: [mockDb1, mockDb2],
-        schemas: { db1: ['public'] },
+        schemas: {
+          db1: ['public'],
+        },
         tables: {},
         lastRefresh: new Date(2020, 0, 1).toISOString(),
       }
@@ -185,7 +187,9 @@ describe('databaseStore', () => {
     })
 
     it('should use database only as key when no schema', async () => {
-      invoke.mockResolvedValue([{ name: 'users' }])
+      invoke.mockResolvedValue([
+        { name: 'users' },
+      ])
 
       const store = useDatabaseStore()
       store.metadata['conn-1'] = {
@@ -197,7 +201,9 @@ describe('databaseStore', () => {
 
       await store.fetchTables('conn-1', 'db1')
 
-      expect(store.metadata['conn-1']?.tables.db1).toEqual([{ name: 'users' }])
+      expect(store.metadata['conn-1']?.tables.db1).toEqual([
+        { name: 'users' },
+      ])
     })
   })
 
@@ -267,7 +273,9 @@ describe('databaseStore', () => {
       store.selectedDatabase = 'db1'
       store.metadata['conn-1'] = {
         databases: [mockDb1],
-        schemas: { db1: ['public', 'private'] },
+        schemas: {
+          db1: ['public', 'private'],
+        },
         tables: {},
         lastRefresh: new Date().toISOString(),
       }
@@ -283,7 +291,10 @@ describe('databaseStore', () => {
       store.selectedDatabase = 'db1'
       store.selectedSchema = 'public'
 
-      const mockTables = [{ name: 'users' }, { name: 'orders' }]
+      const mockTables = [
+        { name: 'users' },
+        { name: 'orders' },
+      ]
       store.metadata['conn-1'] = {
         databases: [mockDb1],
         schemas: {},

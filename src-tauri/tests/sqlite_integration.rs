@@ -114,12 +114,7 @@ async fn test_empty_and_comment_only_sql() {
         .await
         .expect("Failed to create table");
 
-    for sql in [
-        "-- only a comment",
-        "/* block comment */",
-        "",
-        "   \n\t  ",
-    ] {
+    for sql in ["-- only a comment", "/* block comment */", "", "   \n\t  "] {
         let result = adapter
             .execute_query(sql)
             .await

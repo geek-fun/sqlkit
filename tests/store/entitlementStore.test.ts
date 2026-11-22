@@ -84,7 +84,9 @@ describe('entitlementStore', () => {
       mockLoggedIn = false
       mockInvoke.mockResolvedValue(view({ fetchedAtMs: null }))
       const store = useEntitlementStore()
-      store.$patch({ view: view({ localUltimate: true, fetchedAtMs: 42 }) })
+      store.$patch({
+        view: view({ localUltimate: true, fetchedAtMs: 42 }),
+      })
 
       await store.refreshEntitlement(true)
 
@@ -394,19 +396,27 @@ describe('entitlementStore', () => {
 
       expect(store.sessionPhase).toBe('signed-in')
 
-      store.$patch({ view: view({ lastError: 'network error: timeout' }) })
+      store.$patch({
+        view: view({ lastError: 'network error: timeout' }),
+      })
       expect(store.sessionPhase).toBe('signed-in')
       expect(store.sessionExpired).toBe(false)
       expect(store.hasEntitlementError).toBe(true)
 
-      store.$patch({ view: view({ sessionPhase: 'expired', lastError: 'session expired' }) })
+      store.$patch({
+        view: view({ sessionPhase: 'expired', lastError: 'session expired' }),
+      })
       expect(store.sessionPhase).toBe('expired')
       expect(store.sessionExpired).toBe(true)
 
-      store.$patch({ view: view({ localUltimate: true, sessionPhase: 'signed-in' }) })
+      store.$patch({
+        view: view({ localUltimate: true, sessionPhase: 'signed-in' }),
+      })
       expect(store.sessionExpired).toBe(false)
 
-      store.$patch({ view: view({ lastError: 'not logged in' }) })
+      store.$patch({
+        view: view({ lastError: 'not logged in' }),
+      })
       expect(store.sessionExpired).toBe(false)
     })
 
@@ -415,11 +425,15 @@ describe('entitlementStore', () => {
 
       expect(store.planState).toBe('checking')
 
-      store.$patch({ view: view({ lastError: 'network error: timeout' }) })
+      store.$patch({
+        view: view({ lastError: 'network error: timeout' }),
+      })
       expect(store.planState).toBe('unknown')
       expect(store.hasEntitlementError).toBe(true)
 
-      store.$patch({ view: view() })
+      store.$patch({
+        view: view(),
+      })
       expect(store.planState).toBe('community')
     })
 

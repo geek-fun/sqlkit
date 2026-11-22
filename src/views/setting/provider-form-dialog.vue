@@ -47,25 +47,139 @@ type Preset = {
 }
 
 const presets = computed<Preset[]>(() => [
-  { id: 'openai', name: 'OpenAI', apiCompatibility: 'openai', baseUrl: 'https://api.openai.com/v1', kind: 'openai' },
-  { id: 'deepseek', name: 'DeepSeek', apiCompatibility: 'openai', baseUrl: 'https://api.deepseek.com/v1', kind: 'deepseek' },
-  { id: 'openrouter', name: 'OpenRouter', apiCompatibility: 'openai', baseUrl: 'https://openrouter.ai/api/v1', kind: 'openrouter' },
-  { id: 'requesty', name: 'Requesty', apiCompatibility: 'openai', baseUrl: 'https://router.requesty.ai/v1', kind: 'requesty' },
-  { id: 'opper', name: 'Opper', apiCompatibility: 'openai', baseUrl: 'https://api.opper.ai/v3/compat', kind: 'opper' },
-  { id: 'api-route', name: 'API Route', apiCompatibility: 'openai', baseUrl: 'https://global.api-route.com/v1', kind: 'api-route' },
-  { id: 'cheaper-inference', name: 'Cheaper Inference', apiCompatibility: 'openai', baseUrl: 'https://api.cheaperinference.com/v1', kind: 'cheaper-inference' },
-  { id: 'runcrate', name: 'Runcrate', apiCompatibility: 'openai', baseUrl: 'https://api.runcrate.ai/v1', kind: 'runcrate' },
-  { id: 'cloudgpu', name: 'CloudGPU', apiCompatibility: 'openai', baseUrl: 'https://cloudgpu.app/v1', kind: 'cloudgpu' },
-  { id: 'uberllm', name: 'MartLLM', apiCompatibility: 'openai', baseUrl: 'https://api.martllm.com/v1', kind: 'uberllm' },
-  { id: 'anthropic', name: 'Anthropic', apiCompatibility: 'anthropic', baseUrl: 'https://api.anthropic.com/v1', kind: 'anthropic' },
-  { id: 'gemini', name: 'Google Gemini', apiCompatibility: 'openai', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', kind: 'gemini' },
-  { id: 'grok', name: 'Grok', apiCompatibility: 'openai', baseUrl: 'https://api.x.ai/v1', kind: 'grok' },
-  { id: 'mistral', name: 'Mistral', apiCompatibility: 'openai', baseUrl: 'https://api.mistral.ai/v1', kind: 'mistral' },
-  { id: 'azure-openai', name: 'Azure OpenAI', apiCompatibility: 'openai', baseUrl: '', kind: 'azure-openai' },
-  { id: 'ollama', name: 'Ollama', apiCompatibility: 'openai', baseUrl: 'http://127.0.0.1:11434', kind: 'ollama' },
-  { id: 'lm-studio', name: 'LM Studio', apiCompatibility: 'openai', baseUrl: 'http://127.0.0.1:1234/v1', kind: 'lm-studio' },
-  { id: 'custom-openai', name: 'Custom OpenAI', apiCompatibility: 'openai', baseUrl: '', kind: 'custom-openai' },
-  { id: 'custom-anthropic', name: 'Custom Anthropic', apiCompatibility: 'anthropic', baseUrl: '', kind: 'custom-anthropic' },
+  {
+    id: 'openai',
+    name: 'OpenAI',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.openai.com/v1',
+    kind: 'openai',
+  },
+  {
+    id: 'deepseek',
+    name: 'DeepSeek',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.deepseek.com/v1',
+    kind: 'deepseek',
+  },
+  {
+    id: 'openrouter',
+    name: 'OpenRouter',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://openrouter.ai/api/v1',
+    kind: 'openrouter',
+  },
+  {
+    id: 'requesty',
+    name: 'Requesty',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://router.requesty.ai/v1',
+    kind: 'requesty',
+  },
+  {
+    id: 'opper',
+    name: 'Opper',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.opper.ai/v3/compat',
+    kind: 'opper',
+  },
+  {
+    id: 'api-route',
+    name: 'API Route',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://global.api-route.com/v1',
+    kind: 'api-route',
+  },
+  {
+    id: 'cheaper-inference',
+    name: 'Cheaper Inference',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.cheaperinference.com/v1',
+    kind: 'cheaper-inference',
+  },
+  {
+    id: 'runcrate',
+    name: 'Runcrate',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.runcrate.ai/v1',
+    kind: 'runcrate',
+  },
+  {
+    id: 'cloudgpu',
+    name: 'CloudGPU',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://cloudgpu.app/v1',
+    kind: 'cloudgpu',
+  },
+  {
+    id: 'uberllm',
+    name: 'MartLLM',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.martllm.com/v1',
+    kind: 'uberllm',
+  },
+  {
+    id: 'anthropic',
+    name: 'Anthropic',
+    apiCompatibility: 'anthropic',
+    baseUrl: 'https://api.anthropic.com/v1',
+    kind: 'anthropic',
+  },
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    kind: 'gemini',
+  },
+  {
+    id: 'grok',
+    name: 'Grok',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.x.ai/v1',
+    kind: 'grok',
+  },
+  {
+    id: 'mistral',
+    name: 'Mistral',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.mistral.ai/v1',
+    kind: 'mistral',
+  },
+  {
+    id: 'azure-openai',
+    name: 'Azure OpenAI',
+    apiCompatibility: 'openai',
+    baseUrl: '',
+    kind: 'azure-openai',
+  },
+  {
+    id: 'ollama',
+    name: 'Ollama',
+    apiCompatibility: 'openai',
+    baseUrl: 'http://127.0.0.1:11434',
+    kind: 'ollama',
+  },
+  {
+    id: 'lm-studio',
+    name: 'LM Studio',
+    apiCompatibility: 'openai',
+    baseUrl: 'http://127.0.0.1:1234/v1',
+    kind: 'lm-studio',
+  },
+  {
+    id: 'custom-openai',
+    name: 'Custom OpenAI',
+    apiCompatibility: 'openai',
+    baseUrl: '',
+    kind: 'custom-openai',
+  },
+  {
+    id: 'custom-anthropic',
+    name: 'Custom Anthropic',
+    apiCompatibility: 'anthropic',
+    baseUrl: '',
+    kind: 'custom-anthropic',
+  },
 ])
 
 // ── Proxy mode options ────────────────────────────────────────────────────────
@@ -110,7 +224,9 @@ const contextWindowInput = computed({
   get: () => draft.value.contextWindowOverride?.toString() ?? '',
   set: (val: string) => {
     const num = Number.parseInt(val, 10)
-    draft.value.contextWindowOverride = Number.isNaN(num) ? undefined : num
+    draft.value.contextWindowOverride = Number.isNaN(num)
+      ? undefined
+      : num
   },
 })
 
@@ -257,7 +373,9 @@ const handleSave = async () => {
     emit('close')
   }
   catch (error) {
-    saveError.value = error instanceof Error ? error.message : String(error)
+    saveError.value = error instanceof Error
+      ? error.message
+      : String(error)
   }
   finally {
     saving.value = false

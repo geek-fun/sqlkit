@@ -54,7 +54,9 @@ export function useSidebarChatAgent() {
   const sessions = computed(() => rawSessions.value.map(adaptSidebarSession))
   const activeSession = computed(() => {
     const found = rawSessions.value.find(s => s.id === dataStudioStore.sidebarSessionId)
-    return found ? adaptSidebarSession(found) : undefined
+    return found
+      ? adaptSidebarSession(found)
+      : undefined
   })
 
   const contextProvider = () => {

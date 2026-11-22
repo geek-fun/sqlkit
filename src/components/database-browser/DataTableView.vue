@@ -185,7 +185,9 @@ const isExporting = ref(false)
 const { withMinLoadingTime } = useMinLoadingTime()
 
 const visibleColumns = computed(() =>
-  data.value ? data.value.columns.filter((c: string) => !hiddenColumns.value.has(c)) : [],
+  data.value
+    ? data.value.columns.filter((c: string) => !hiddenColumns.value.has(c))
+    : [],
 )
 
 const columnTypeMap = computed(() =>
@@ -202,7 +204,10 @@ const sortColumnTypes = computed(() => {
   const fromResult = result
     ? Object.fromEntries(result.columns.map((col, i) => [col, result.columnTypes?.[i] ?? '']))
     : {}
-  return { ...fromResult, ...columnTypeMap.value }
+  return {
+    ...fromResult,
+    ...columnTypeMap.value,
+  }
 })
 
 const sortableColumns = computed(() =>
@@ -242,7 +247,9 @@ const pkColumns = computed(() =>
 )
 
 function extractPkValues(row: Record<string, unknown>): Record<string, unknown> {
-  const cols = pkColumns.value.length > 0 ? pkColumns.value : (data.value?.columns ?? [])
+  const cols = pkColumns.value.length > 0
+    ? pkColumns.value
+    : (data.value?.columns ?? [])
   return Object.fromEntries(cols.map((col: string) => [col, row[col] ?? null]))
 }
 
@@ -259,11 +266,21 @@ const pageStatus = computed(() => {
   const count = data.value?.rows.length ?? 0
   if (isCqlPreview.value)
     return t('components.dataTableView.previewRows', { count })
-  if (!countAvailable.value)
-    return t('components.pagination.showingWithoutTotal', { start: count > 0 ? offset.value + 1 : 0, end: offset.value + count })
+  if (!countAvailable.value) {
+    return t('components.pagination.showingWithoutTotal', {
+      start: count > 0
+        ? offset.value + 1
+        : 0,
+      end: offset.value + count,
+    })
+  }
   return t('components.dataGrid.status.showing', {
-    start: count > 0 ? offset.value + 1 : 0,
-    end: count > 0 ? Math.min(totalCount.value, offset.value + count) : 0,
+    start: count > 0
+      ? offset.value + 1
+      : 0,
+    end: count > 0
+      ? Math.min(totalCount.value, offset.value + count)
+      : 0,
     total: totalCount.value.toLocaleString(),
   })
 })
@@ -355,7 +372,9 @@ async function ensureConnection(): Promise<boolean> {
   }
   catch (err) {
     isReconnecting.value = false
-    connectionError.value = err instanceof Error ? err.message : String(err)
+    connectionError.value = err instanceof Error
+      ? err.message
+      : String(err)
     return false
   }
 }
@@ -550,14 +569,21 @@ async function exportCSV() {
 
   try {
     const selectedPath = await showSaveDialog({
-      filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      filters: [
+        {
+          name: 'CSV Files',
+          extensions: ['csv'],
+        },
+      ],
       defaultPath: defaultName,
     })
     if (!selectedPath)
       return
 
     isExporting.value = true
-    const filePath = selectedPath.endsWith('.csv') ? selectedPath : `${selectedPath}.csv`
+    const filePath = selectedPath.endsWith('.csv')
+      ? selectedPath
+      : `${selectedPath}.csv`
 
     try {
       await withMinLoadingTime(async () => {
@@ -570,7 +596,9 @@ async function exportCSV() {
     }
   }
   catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = err instanceof Error
+      ? err.message
+      : String(err)
     toast.error(t('components.dataTableView.notifications.exportFailed'), { description: msg })
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -616,7 +644,9 @@ async function confirmDelete() {
   }
   catch (err) {
     toast.error(t('components.dataTableView.notifications.deleteFailed'), {
-      description: err instanceof Error ? err.message : String(err),
+      description: err instanceof Error
+        ? err.message
+        : String(err),
     })
   }
   finally {
@@ -764,7 +794,18 @@ function isValidNumber(value: string): boolean {
 
 function isValidBoolean(value: string): boolean {
   const lower = value.toLowerCase()
-  return ['true', 'false', '1', '0', 't', 'f', 'y', 'n', 'yes', 'no'].includes(lower)
+  return [
+    'true',
+    'false',
+    '1',
+    '0',
+    't',
+    'f',
+    'y',
+    'n',
+    'yes',
+    'no',
+  ].includes(lower)
 }
 
 function getEditInputType(col: string): string {
@@ -807,7 +848,14 @@ async function confirmEdit() {
             return null
           }
           const field = editForm.value[col]
-          return field ? [col, field.setNull ? null : coerceEditValue(col, field.value)] : null
+          return field
+            ? [
+                col,
+                field.setNull
+                  ? null
+                  : coerceEditValue(col, field.value),
+              ]
+            : null
         })
         .filter((entry): entry is [string, unknown] => entry !== null),
     )
@@ -829,7 +877,9 @@ async function confirmEdit() {
   }
   catch (err) {
     toast.error(t('components.dataTableView.notifications.updateFailed'), {
-      description: err instanceof Error ? err.message : String(err),
+      description: err instanceof Error
+        ? err.message
+        : String(err),
     })
   }
   finally {
@@ -873,7 +923,12 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.connectionId, props.database, props.tableName, props.schema] as const,
+  () => [
+    props.connectionId,
+    props.database,
+    props.tableName,
+    props.schema,
+  ] as const,
   async ([newConnId, _newDatabase, _newTable, _newSchema], [oldConnId]) => {
     currentPage.value = 1
     appliedFilter.value = ''

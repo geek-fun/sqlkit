@@ -89,7 +89,10 @@ export const useTransferStore = defineStore('transfer', () => {
       t.id === taskId
         ? {
             ...t,
-            runtime: { ...t.runtime, ...runtime },
+            runtime: {
+              ...t.runtime,
+              ...runtime,
+            },
             progress: {
               complete: runtime.complete ?? t.progress.complete,
               total: runtime.total ?? t.progress.total,
@@ -105,7 +108,9 @@ export const useTransferStore = defineStore('transfer', () => {
         ? {
             ...t,
             status,
-            endTime: status === 'completed' || status === 'failed' ? new Date() : undefined,
+            endTime: status === 'completed' || status === 'failed'
+              ? new Date()
+              : undefined,
             error,
           }
         : t,
@@ -189,7 +194,12 @@ export const useTransferStore = defineStore('transfer', () => {
       status: 'running',
       progress: { complete: 0, total },
       config,
-      runtime: { complete: 0, total, skipped: 0, errorCount: 0 },
+      runtime: {
+        complete: 0,
+        total,
+        skipped: 0,
+        errorCount: 0,
+      },
       label,
       startTime: new Date(),
     }

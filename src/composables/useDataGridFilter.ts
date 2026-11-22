@@ -66,7 +66,9 @@ export function useDataGridFilter() {
       }
     }).filter(Boolean)
 
-    return clauses.length > 0 ? clauses.join(' AND ') : null
+    return clauses.length > 0
+      ? clauses.join(' AND ')
+      : null
   }
 
   return {

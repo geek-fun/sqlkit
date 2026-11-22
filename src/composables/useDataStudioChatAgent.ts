@@ -68,17 +68,23 @@ export function useDataStudioChatAgent() {
   const sessions = computed(() => rawSessions.value.map(adaptDataStudioSession))
   const activeSession = computed(() => {
     const found = rawSessions.value.find(s => s.id === dataStudioStore.activeSessionId)
-    return found ? adaptDataStudioSession(found) : undefined
+    return found
+      ? adaptDataStudioSession(found)
+      : undefined
   })
 
   const activeSessionSources = computed(() => {
     const session = rawSessions.value.find(e => e.id === dataStudioStore.activeSessionId)
-    return session ? getNonDetachedSources(session.sources) : []
+    return session
+      ? getNonDetachedSources(session.sources)
+      : []
   })
 
   const contextProvider = () => {
     const session = rawSessions.value.find(e => e.id === dataStudioStore.activeSessionId)
-    const activeSources = session ? getNonDetachedSources(session.sources) : []
+    const activeSources = session
+      ? getNonDetachedSources(session.sources)
+      : []
 
     const connections = activeSources.reduce<Record<string, ConnectionEntry>>(
       (acc, sessionSource) => {
@@ -96,7 +102,9 @@ export function useDataStudioChatAgent() {
           sourceId: sessionSource.sourceId,
           connectionId: String(connection.id),
           dbType: attachedSource.databaseType,
-          permissions: sessionSource.permissionsMode === 'custom' ? sessionSource.permissions : undefined,
+          permissions: sessionSource.permissionsMode === 'custom'
+            ? sessionSource.permissions
+            : undefined,
         }
         return acc
       },

@@ -21,7 +21,10 @@ export default defineConfig({
     }),
     presetAnimations(),
   ],
-  transformers: [transformerDirectives(), transformerVariantGroup()],
+  transformers: [
+    transformerDirectives(),
+    transformerVariantGroup(),
+  ],
   content: {
     filesystem: ['./index.html', './src/**/*.{vue,js,ts,jsx,tsx}'],
   },

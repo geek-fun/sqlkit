@@ -42,7 +42,11 @@ async function startExport() {
       skippedRows: 0,
       errorCount: 1,
       durationMs: 0,
-      errors: [{ message: String(error) }],
+      errors: [
+        {
+          message: String(error),
+        },
+      ],
     }
   }
   finally {

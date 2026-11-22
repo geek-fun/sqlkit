@@ -17,7 +17,9 @@ import SshTunnelConfigPanel from '@/components/connections/SshTunnelConfigPanel.
 
 jest.mock('@tauri-apps/api/core', () => ({
   invoke: jest.fn(async (cmd: string) =>
-    cmd === 'detect_system_proxy' ? 'http://127.0.0.1:7890' : []),
+    cmd === 'detect_system_proxy'
+      ? 'http://127.0.0.1:7890'
+      : []),
 }))
 
 jest.mock('@tauri-apps/plugin-opener', () => ({
@@ -40,7 +42,11 @@ jest.mock('vue-i18n', () => ({
 // the drag handle path is exercised in the real app, not here.
 jest.mock('sortablejs', () => ({
   __esModule: true,
-  default: { create: jest.fn(() => ({ destroy: jest.fn() })) },
+  default: {
+    create: jest.fn(() => ({
+      destroy: jest.fn(),
+    })),
+  },
 }))
 
 const mockSaveProfile = jest.fn(async (profile: { id: string, name: string }) => ({ ...profile, id: profile.id || 'new-1' }))
@@ -95,11 +101,21 @@ jest.mock('@/store/entitlementStore', () => ({
 
 jest.mock('@/components/connections/SshProfileDialog.vue', () => ({
   __esModule: true,
-  default: { name: 'SshProfileDialog', template: '<span />', methods: { show: jest.fn() } },
+  default: {
+    name: 'SshProfileDialog',
+    template: '<span />',
+    methods: {
+      show: jest.fn(),
+    },
+  },
 }))
 
-jest.mock('@/components/ui/button', () => ({ Button: { template: '<button><slot /></button>' } }))
-jest.mock('@/components/ui/label', () => ({ Label: { template: '<label><slot /></label>' } }))
+jest.mock('@/components/ui/button', () => ({
+  Button: { template: '<button><slot /></button>' },
+}))
+jest.mock('@/components/ui/label', () => ({
+  Label: { template: '<label><slot /></label>' },
+}))
 jest.mock('@/components/ui/input', () => ({
   Input: {
     props: ['modelValue'],
@@ -108,7 +124,10 @@ jest.mock('@/components/ui/input', () => ({
   },
 }))
 jest.mock('@/components/ui/dialog', () => ({
-  Dialog: { props: ['open'], template: '<div v-if="open" role="dialog"><slot /></div>' },
+  Dialog: {
+    props: ['open'],
+    template: '<div v-if="open" role="dialog"><slot /></div>',
+  },
   DialogContent: { template: '<div><slot /></div>' },
   DialogHeader: { template: '<header><slot /></header>' },
   DialogTitle: { template: '<h2><slot /></h2>' },
@@ -126,16 +145,56 @@ jest.mock('@/components/ui/select', () => ({
 jest.mock('@/components/ui/combobox', () => ({
   SearchableSelect: {
     name: 'SearchableSelect',
-    props: ['modelValue', 'options', 'placeholder', 'searchThreshold', 'disabled'],
+    props: [
+      'modelValue',
+      'options',
+      'placeholder',
+      'searchThreshold',
+      'disabled',
+    ],
     emits: ['update:modelValue'],
     template: '<select class="stub-combobox" :disabled="disabled" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><option v-for="o in options" :key="o.value" :value="o.value">{{ o.label }}</option></select>',
   },
 }))
-jest.mock('@/components/upgrade', () => ({ ProBadge: { template: '<span />' } }))
+jest.mock('@/components/upgrade', () => ({
+  ProBadge: { template: '<span />' },
+}))
 
 const HOP_PROFILES = [
-  { id: 'p1', name: 'Bastion A', host: 'bastion-a', port: 22, username: 'ops', authMethod: 'password', password: '', keyPath: '', keyPassphrase: '', useSshAgent: false, sshAgentSockPath: '', connectTimeoutSecs: 10, keepaliveIntervalSecs: 30, verifyHostKey: false, exposeLan: false },
-  { id: 'p2', name: 'Bastion B', host: 'bastion-b', port: 22, username: 'ops', authMethod: 'password', password: '', keyPath: '', keyPassphrase: '', useSshAgent: false, sshAgentSockPath: '', connectTimeoutSecs: 10, keepaliveIntervalSecs: 30, verifyHostKey: false, exposeLan: false },
+  {
+    id: 'p1',
+    name: 'Bastion A',
+    host: 'bastion-a',
+    port: 22,
+    username: 'ops',
+    authMethod: 'password',
+    password: '',
+    keyPath: '',
+    keyPassphrase: '',
+    useSshAgent: false,
+    sshAgentSockPath: '',
+    connectTimeoutSecs: 10,
+    keepaliveIntervalSecs: 30,
+    verifyHostKey: false,
+    exposeLan: false,
+  },
+  {
+    id: 'p2',
+    name: 'Bastion B',
+    host: 'bastion-b',
+    port: 22,
+    username: 'ops',
+    authMethod: 'password',
+    password: '',
+    keyPath: '',
+    keyPassphrase: '',
+    useSshAgent: false,
+    sshAgentSockPath: '',
+    connectTimeoutSecs: 10,
+    keepaliveIntervalSecs: 30,
+    verifyHostKey: false,
+    exposeLan: false,
+  },
 ]
 
 const mountPanel = (modelValue?: Record<string, unknown>) =>
@@ -203,7 +262,10 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
   })
 
   it('detaching the last hop removes it from the list and derives enabled=false', async () => {
-    const wrapper = mountPanel({ enabled: true, profileIds: ['p1'] })
+    const wrapper = mountPanel({
+      enabled: true,
+      profileIds: ['p1'],
+    })
     await flushPromises()
     const detachButton = wrapper.findAll('button').find(b => b.attributes('title') === 'components.serverForm.ssh.detachAction')
     expect(detachButton).toBeTruthy()
@@ -229,7 +291,11 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
   })
 
   it('an attached system proxy renders pinned and detaches without dropping hops', async () => {
-    const wrapper = mountPanel({ enabled: true, profileIds: ['p1'], useSystemProxy: true })
+    const wrapper = mountPanel({
+      enabled: true,
+      profileIds: ['p1'],
+      useSystemProxy: true,
+    })
     await flushPromises()
     expect(wrapper.text()).not.toContain('components.serverForm.ssh.systemProxyAdd')
     const detachButton = wrapper.findAll('button').find(b => b.attributes('title') === 'components.serverForm.ssh.systemProxyDetach')
@@ -286,7 +352,12 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
   })
 
   it.each(['password', 'privateKey', 'agent'])('converts %s only on click and preserves authentication and proxy', async (authMethod) => {
-    const config = { ...legacyConfig, authMethod, privateKey: '/synthetic/key', privateKeyPassphrase: 'synthetic-passphrase' }
+    const config = {
+      ...legacyConfig,
+      authMethod,
+      privateKey: '/synthetic/key',
+      privateKeyPassphrase: 'synthetic-passphrase',
+    }
     const wrapper = mountPanel(config)
     await flushPromises()
     const convert = wrapper.findAll('button').find(b => b.text() === 'components.serverForm.ssh.convertToProfile')!
@@ -297,7 +368,9 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
       host: config.host,
       port: config.port,
       username: config.username,
-      authMethod: authMethod === 'privateKey' ? 'key' : authMethod,
+      authMethod: authMethod === 'privateKey'
+        ? 'key'
+        : authMethod,
       password: config.password,
       keyPath: config.privateKey,
       keyPassphrase: config.privateKeyPassphrase,
@@ -332,11 +405,19 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
   it('detaches the inline tunnel while retaining its attached proxy', async () => {
     const wrapper = mountPanel(legacyConfig)
     await wrapper.get('button[title="components.serverForm.ssh.detachAction"]').trigger('click')
-    expect(lastPayload(wrapper)).toMatchObject({ enabled: true, useSystemProxy: true, host: '', password: '' })
+    expect(lastPayload(wrapper)).toMatchObject({
+      enabled: true,
+      useSystemProxy: true,
+      host: '',
+      password: '',
+    })
   })
 
   it('reorders saved hops with keyboard-accessible buttons', async () => {
-    const wrapper = mountPanel({ enabled: true, profileIds: ['p1', 'p2'] })
+    const wrapper = mountPanel({
+      enabled: true,
+      profileIds: ['p1', 'p2'],
+    })
     await wrapper.findAll('button[title="components.serverForm.ssh.moveDown"]')[0]!.trigger('click')
     await syncProps(wrapper)
     expect(lastPayload(wrapper).profileIds).toEqual(['p2', 'p1'])
@@ -347,7 +428,10 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
   })
 
   it('restores the sortable DOM before applying a drag reorder and reinitializes after detach', async () => {
-    const wrapper = mountPanel({ enabled: true, profileIds: ['p1', 'p2'] })
+    const wrapper = mountPanel({
+      enabled: true,
+      profileIds: ['p1', 'p2'],
+    })
     await flushPromises()
     const create = Sortable.create as jest.Mock
     const options = create.mock.calls[create.mock.calls.length - 1]![1]
@@ -358,15 +442,25 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
     expect(lastPayload(wrapper).profileIds).toEqual(['p2', 'p1'])
     expect(wrapper.findAll('.ssh-hop-handle')[0]!.element.parentElement?.textContent).toContain('Bastion B')
     const instance = create.mock.results[create.mock.results.length - 1]!.value
-    await wrapper.setProps({ modelValue: { enabled: false, profileIds: [] } as never })
+    await wrapper.setProps({
+      modelValue: { enabled: false, profileIds: [] } as never,
+    })
     expect(instance.destroy).toHaveBeenCalled()
     const previous = create.mock.calls.length
-    await wrapper.setProps({ modelValue: { enabled: true, profileIds: ['p1'] } as never })
+    await wrapper.setProps({
+      modelValue: {
+        enabled: true,
+        profileIds: ['p1'],
+      } as never,
+    })
     expect(create.mock.calls.length).toBe(previous + 1)
   })
 
   it('saving a NEW profile appends it to the chain', async () => {
-    const wrapper = mountPanel({ enabled: true, profileIds: ['p1'] })
+    const wrapper = mountPanel({
+      enabled: true,
+      profileIds: ['p1'],
+    })
     await wrapper.getComponent(SshProfileDialog).vm.$emit('save', { id: 'p2', name: 'Bastion B' })
     await wrapper.vm.$nextTick()
 
@@ -374,7 +468,10 @@ describe('sshTunnelConfigPanel — configure-as-intent', () => {
   })
 
   it('saving an EXISTING hop does not duplicate it', async () => {
-    const wrapper = mountPanel({ enabled: true, profileIds: ['p1'] })
+    const wrapper = mountPanel({
+      enabled: true,
+      profileIds: ['p1'],
+    })
     const before = wrapper.emitted('update:modelValue')?.length ?? 0
     await wrapper.getComponent(SshProfileDialog).vm.$emit('save', { id: 'p1', name: 'Bastion A' })
     await wrapper.vm.$nextTick()
