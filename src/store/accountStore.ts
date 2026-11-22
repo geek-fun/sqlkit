@@ -12,8 +12,10 @@ type AccountState = {
   email: string
   /** Stable console account id — passed through the desktop handoff. */
   userId: string
-  /** Console avatar URL, empty when the account has none. */
+  /** Console avatar URL — a signed, expiring credential, never a stable link. */
   avatar: string
+  /** Signature expiry of `avatar` (unix seconds, 0 = unknown). */
+  avatarExpiresAt: number
 }
 
 export const useAccountStore = defineStore('account', {
@@ -25,6 +27,7 @@ export const useAccountStore = defineStore('account', {
     email: '',
     userId: '',
     avatar: '',
+    avatarExpiresAt: 0,
   }),
   persist: {
     pick: [
@@ -34,6 +37,7 @@ export const useAccountStore = defineStore('account', {
       'email',
       'userId',
       'avatar',
+      'avatarExpiresAt',
     ],
   },
   getters: {
@@ -45,15 +49,20 @@ export const useAccountStore = defineStore('account', {
         return
       this.$patch({ token: accessToken, refreshToken })
     },
-    setAuth(token: string, username: string, email: string, userId = '', avatar = '') {
+    setAuth(token: string, username: string, email: string, userId = '', avatar = '', avatarExpiresAt = 0) {
       this.sessionRevision += 1
       this.token = token
       this.username = username
       this.email = email
       this.userId = userId
       this.avatar = avatar
+      this.avatarExpiresAt = avatarExpiresAt
       // A web login has no device lease yet — never carry one over.
       this.refreshToken = ''
+    },
+    setAvatar(avatar: string, avatarExpiresAt = 0) {
+      this.avatar = avatar
+      this.avatarExpiresAt = avatarExpiresAt
     },
     setToken(token: string) {
       this.token = token
@@ -69,6 +78,7 @@ export const useAccountStore = defineStore('account', {
       this.email = ''
       this.userId = ''
       this.avatar = ''
+      this.avatarExpiresAt = 0
     },
   },
 })

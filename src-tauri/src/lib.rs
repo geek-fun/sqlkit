@@ -62,14 +62,17 @@ use data_studio_agent as lib;
 use data_studio_agent::storage;
 
 #[derive(Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
 struct AuthPayload {
     token: String,
     username: String,
     email: String,
     // optional: the console handoff passes them when the account has an
-    // avatar / stable id; older console builds may omit both
+    // avatar / stable id; older console builds may omit all of them
     user_id: Option<String>,
     avatar: Option<String>,
+    // unix seconds — signature expiry of `avatar` when the console provides it
+    avatar_expires_at: Option<i64>,
 }
 
 fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
@@ -87,6 +90,9 @@ fn parse_auth_from_url(url: &str) -> Option<AuthPayload> {
         email,
         user_id: params.get("userId").map(|v| v.to_string()),
         avatar: params.get("avatar").map(|v| v.to_string()),
+        avatar_expires_at: params
+            .get("avatarExpiresAt")
+            .and_then(|v| v.parse::<i64>().ok()),
     })
 }
 
@@ -411,6 +417,7 @@ pub fn run() {
             crate::entitlement::clear_entitlement,
             crate::session::rotate_session_now,
             crate::session::revoke_session,
+            crate::session::refresh_avatar,
             crate::device_activation::activate_device,
             crate::device_activation::set_ui_locale,
             crate::mcp_bridge::get_mcp_status,

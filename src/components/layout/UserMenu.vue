@@ -3,11 +3,12 @@ import { openUrl } from '@tauri-apps/plugin-opener'
 import { Loader2, LogOut, RefreshCw, Settings, UserRound } from 'lucide-vue-next'
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { createAvatarFailureGuard, refreshAvatar } from '@/common'
 import DefaultAvatar from '@/components/DefaultAvatar.vue'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { useAccountStore } from '@/store/accountStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
-import { GEEKFUN_BASE_URL as CONSOLE_BASE_URL, openLoginUrl, openRegisterUrl } from '@/utils/authService'
+import { GEEKFUN_BASE_URL as CONSOLE_BASE_URL, isSafeAvatarUrl, openLoginUrl, openRegisterUrl } from '@/utils/authService'
 
 const { t } = useI18n()
 const accountStore = useAccountStore()
@@ -101,6 +102,27 @@ async function handleLogout() {
   open.value = false
   await entitlementStore.clearSessionState()
 }
+
+// A dead signature renders blank — fall back and re-sign once per failed URL.
+const avatarBroken = ref(false)
+const avatarFailure = createAvatarFailureGuard()
+
+const avatarRenderable = computed(() =>
+  Boolean(accountStore.avatar)
+  && isSafeAvatarUrl(accountStore.avatar, import.meta.env.DEV)
+  && !avatarBroken.value,
+)
+
+const onAvatarError = () => {
+  avatarBroken.value = true
+  if (avatarFailure.recordFailed(accountStore.avatar))
+    void refreshAvatar()
+}
+
+watch(() => accountStore.avatar, (url) => {
+  if (avatarFailure.hasRecovered(url))
+    avatarBroken.value = false
+})
 </script>
 
 <template>
@@ -115,10 +137,11 @@ async function handleLogout() {
           class="text-lg text-primary-foreground font-bold rounded-md bg-primary flex h-8 w-8 items-center justify-center overflow-hidden"
         >
           <img
-            v-if="accountStore.avatar"
+            v-if="avatarRenderable"
             :src="accountStore.avatar"
             alt=""
             class="h-full w-full object-cover"
+            @error="onAvatarError"
           >
           <DefaultAvatar
             v-else
