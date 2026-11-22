@@ -287,7 +287,10 @@ export const useAppStore = defineStore('app', {
       lang.global.locale.value = resolveLocale(languageType)
     },
     setEditorConfig(config: Partial<EditorConfig>) {
-      this.editorConfig = { ...this.editorConfig, ...config }
+      this.editorConfig = {
+        ...this.editorConfig,
+        ...config,
+      }
     },
     setQueryTimeout(timeout: number) {
       this.queryConfig.queryTimeout = timeout
@@ -299,7 +302,10 @@ export const useAppStore = defineStore('app', {
       this.queryConfig.autoSave = autoSave
     },
     updateQueryConfig(config: Partial<QueryConfig>) {
-      this.queryConfig = { ...this.queryConfig, ...config }
+      this.queryConfig = {
+        ...this.queryConfig,
+        ...config,
+      }
     },
     toggleSidebar() {
       this.sidebarCollapsed = !this.sidebarCollapsed
@@ -308,7 +314,9 @@ export const useAppStore = defineStore('app', {
       this.sidebarCollapsed = collapsed
     },
     getEditorTheme() {
-      return this.uiThemeType === ThemeType.DARK ? 'sqlkit-dark' : 'sqlkit-light'
+      return this.uiThemeType === ThemeType.DARK
+        ? 'sqlkit-dark'
+        : 'sqlkit-light'
     },
 
     // ── Provider CRUD ────────────────────────────────────────────────────
@@ -316,7 +324,10 @@ export const useAppStore = defineStore('app', {
     async addProvider(provider: LlmProvider) {
       this.llmSettings = {
         ...this.llmSettings,
-        providers: [...this.llmSettings.providers.filter(p => p.id !== provider.id), provider],
+        providers: [
+          ...this.llmSettings.providers.filter(p => p.id !== provider.id),
+          provider,
+        ],
       }
       await this.persistLlmSettings()
     },
@@ -333,7 +344,12 @@ export const useAppStore = defineStore('app', {
       this.llmSettings = {
         ...this.llmSettings,
         providers: this.llmSettings.providers.map(p =>
-          p.id === providerId ? { ...p, ...updates } : p,
+          p.id === providerId
+            ? {
+                ...p,
+                ...updates,
+              }
+            : p,
         ),
       }
       await this.persistLlmSettings()
@@ -343,7 +359,9 @@ export const useAppStore = defineStore('app', {
       this.llmSettings = {
         ...this.llmSettings,
         providers: this.llmSettings.providers.map(p =>
-          p.id === providerId ? { ...p, enabled: !p.enabled } : p,
+          p.id === providerId
+            ? { ...p, enabled: !p.enabled }
+            : p,
         ),
       }
       await this.persistLlmSettings()
@@ -475,7 +493,10 @@ export const useAppStore = defineStore('app', {
         return { success: valid }
       }
       catch (err) {
-        return { success: false, error: String(err) }
+        return {
+          success: false,
+          error: String(err),
+        }
       }
     },
 
@@ -518,14 +539,25 @@ export const useAppStore = defineStore('app', {
 
     async saveChatSettings(chat: Partial<ChatRuntimeConfig>): Promise<{ success: boolean, error?: string }> {
       const previous = { ...this.llmSettings.chat }
-      this.llmSettings = { ...this.llmSettings, chat: { ...this.llmSettings.chat, ...chat } }
+      this.llmSettings = {
+        ...this.llmSettings,
+        chat: {
+          ...this.llmSettings.chat,
+          ...chat,
+        },
+      }
       try {
         await this.persistLlmSettings()
         return { success: true }
       }
       catch (error) {
         this.llmSettings = { ...this.llmSettings, chat: previous }
-        return { success: false, error: error instanceof Error ? error.message : String(error) }
+        return {
+          success: false,
+          error: error instanceof Error
+            ? error.message
+            : String(error),
+        }
       }
     },
   },

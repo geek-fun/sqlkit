@@ -53,7 +53,9 @@ export const useDatabaseStore = defineStore('databases', {
     currentMetadata(state): DatabaseMetadata | null {
       const connectionStore = useConnectionStore()
       const connId = connectionStore.activeConnectionId
-      return connId ? state.metadata[connId] ?? null : null
+      return connId
+        ? state.metadata[connId] ?? null
+        : null
     },
 
     databases(): DatabaseSchema[] {
@@ -78,7 +80,9 @@ export const useDatabaseStore = defineStore('databases', {
       const key = state.selectedSchema
         ? `${state.selectedDatabase}.${state.selectedSchema}`
         : state.selectedDatabase
-      return key ? this.currentMetadata?.tables[key] ?? [] : []
+      return key
+        ? this.currentMetadata?.tables[key] ?? []
+        : []
     },
   },
 
@@ -101,7 +105,9 @@ export const useDatabaseStore = defineStore('databases', {
           const connectionStore = useConnectionStore()
           const currentDb = connectionStore.getCurrentDatabase(connectionId)
           if (currentDb) {
-            databases = [{ name: currentDb, is_system: false }]
+            databases = [
+              { name: currentDb, is_system: false },
+            ]
           }
           else {
             // JDBC databases (Oracle, Dameng, DB2, etc.) often don't support
@@ -110,7 +116,9 @@ export const useDatabaseStore = defineStore('databases', {
             // displayed underneath.
             const conn = connectionStore.getConnectionById(connectionId)
             const label = conn?.name || 'Default'
-            databases = [{ name: label, is_system: false }]
+            databases = [
+              { name: label, is_system: false },
+            ]
           }
         }
 
@@ -180,7 +188,9 @@ export const useDatabaseStore = defineStore('databases', {
 
         const meta = this.metadata[connectionId]
         if (meta) {
-          const key = schema ? `${database}.${schema}` : database
+          const key = schema
+            ? `${database}.${schema}`
+            : database
           meta.tables[key] = result
         }
       }

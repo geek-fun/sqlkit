@@ -63,7 +63,7 @@ function handleDismiss(taskId: string) {
         </Button>
       </DialogTitle>
 
-      <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border mt-2 pr-2 flex-1 overflow-y-auto space-y-2">
+      <div class="mt-2 pr-2 flex-1 overflow-y-auto scrollbar-thumb-border scrollbar-track-transparent scrollbar-thin space-y-2">
         <div v-if="transferStore.runningTasks.length === 0" class="text-muted-foreground py-10 flex flex-col gap-3 items-center justify-center">
           <div class="p-3 border border-border/40 rounded-full bg-muted/30">
             <span class="i-carbon-task-complete opacity-40 h-6 w-6 block" />

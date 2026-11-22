@@ -53,7 +53,9 @@ export const ROUTE_PADDING = 56
 export const ROUTE_BLOCK_MARGIN = 18
 
 export function calcNodeHeight(columnsCount: number, hasMore: boolean, isExpanded: boolean): number {
-  const colCount = isExpanded ? columnsCount : Math.min(5, columnsCount)
+  const colCount = isExpanded
+    ? columnsCount
+    : Math.min(5, columnsCount)
   const expandBtn = hasMore ? EXPAND_BTN_HEIGHT : 0
   return HEADER_HEIGHT + colCount * COL_HEIGHT + expandBtn + CARD_PADDING
 }

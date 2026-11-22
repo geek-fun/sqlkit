@@ -45,7 +45,10 @@ describe('storeApi', () => {
 
       await storeApi.set('myKey', { data: 'value' })
 
-      expect(invoke).toHaveBeenCalledWith('store_set', { key: 'myKey', value: { data: 'value' } })
+      expect(invoke).toHaveBeenCalledWith('store_set', {
+        key: 'myKey',
+        value: { data: 'value' },
+      })
     })
 
     it('handles primitive values', async () => {
@@ -111,7 +114,12 @@ describe('storeApi', () => {
 
     it('prepends entry to existing history', async () => {
       const existingHistory: QueryHistoryItem[] = [
-        { id: 2, query: 'OLD QUERY', database: 'db', executedAt: '2023-01-01' },
+        {
+          id: 2,
+          query: 'OLD QUERY',
+          database: 'db',
+          executedAt: '2023-01-01',
+        },
       ]
       invoke.mockResolvedValueOnce(existingHistory)
       invoke.mockResolvedValueOnce(undefined)
@@ -160,7 +168,12 @@ describe('storeApi', () => {
   describe('getQueryHistory', () => {
     it('returns query history array', async () => {
       const history: QueryHistoryItem[] = [
-        { id: 1, query: 'SELECT 1', database: 'db', executedAt: '2024-01-01' },
+        {
+          id: 1,
+          query: 'SELECT 1',
+          database: 'db',
+          executedAt: '2024-01-01',
+        },
       ]
       invoke.mockResolvedValue(history)
 

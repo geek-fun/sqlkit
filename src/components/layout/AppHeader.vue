@@ -26,7 +26,9 @@ const { isMac, platformReady } = usePlatform()
 const trafficLightInset = computed(() => {
   if (!platformReady.value)
     return '78px'
-  return shouldReserveMacTrafficLightInset(isMac.value, windowControls.isFullscreen.value, true) ? '78px' : '0px'
+  return shouldReserveMacTrafficLightInset(isMac.value, windowControls.isFullscreen.value, true)
+    ? '78px'
+    : '0px'
 })
 </script>
 

@@ -18,18 +18,41 @@ const recovering = ref(false)
 const open = ref(false)
 
 const planBadge = computed(() => {
-  if (recovering.value)
-    return { label: t('plan.state.checking'), cls: 'bg-muted text-muted-foreground border-transparent' }
+  if (recovering.value) {
+    return {
+      label: t('plan.state.checking'),
+      cls: 'bg-muted text-muted-foreground border-transparent',
+    }
+  }
   const s = entitlementStore.planState
-  if (entitlementStore.sessionExpired)
-    return { label: t(`plan.state.${s}`), cls: 'bg-muted text-muted-foreground border-transparent' }
-  if (s === 'ultimate')
-    return { label: t('plan.state.ultimate'), cls: 'bg-primary/15 text-primary-text border-primary/30' }
-  if (s === 'community')
-    return { label: t('plan.state.community'), cls: 'bg-muted text-muted-foreground border-transparent' }
-  if (s === 'checking')
-    return { label: t('plan.state.checking'), cls: 'bg-muted text-muted-foreground border-transparent' }
-  return { label: t('plan.state.unknown'), cls: 'bg-muted text-muted-foreground border-transparent' }
+  if (entitlementStore.sessionExpired) {
+    return {
+      label: t(`plan.state.${s}`),
+      cls: 'bg-muted text-muted-foreground border-transparent',
+    }
+  }
+  if (s === 'ultimate') {
+    return {
+      label: t('plan.state.ultimate'),
+      cls: 'bg-primary/15 text-primary-text border-primary/30',
+    }
+  }
+  if (s === 'community') {
+    return {
+      label: t('plan.state.community'),
+      cls: 'bg-muted text-muted-foreground border-transparent',
+    }
+  }
+  if (s === 'checking') {
+    return {
+      label: t('plan.state.checking'),
+      cls: 'bg-muted text-muted-foreground border-transparent',
+    }
+  }
+  return {
+    label: t('plan.state.unknown'),
+    cls: 'bg-muted text-muted-foreground border-transparent',
+  }
 })
 
 const expiryText = computed(() => {
@@ -38,7 +61,9 @@ const expiryText = computed(() => {
   const expiresAt = entitlementStore.view?.ultimateExpiresAt
   if (!expiresAt || !entitlementStore.isCloudUltimate)
     return ''
-  return t('plan.section.expiresAt', { time: new Date(expiresAt).toLocaleString() })
+  return t('plan.section.expiresAt', {
+    time: new Date(expiresAt).toLocaleString(),
+  })
 })
 
 async function handleRefresh() {

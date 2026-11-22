@@ -13,6 +13,7 @@ import { PaidGate, ProBadge } from '@/components/upgrade'
 import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import AiSettings from '@/views/setting/ai-settings.vue'
+import BridgeStatus from '@/views/setting/bridge-status.vue'
 import JreDriverSection from '@/views/setting/jre-driver-section.vue'
 import McpBridge from '@/views/setting/mcp-bridge.vue'
 import PlanSection from '@/views/setting/plan-section.vue'
@@ -22,16 +23,30 @@ const { t, locale: _locale } = useI18n()
 const entitlementStore = useEntitlementStore()
 
 const preferencesSaved = ref(false)
-watch(() => [appStore.themeType, appStore.languageType, appStore.editorConfig, appStore.queryConfig], () => {
+watch(() => [
+  appStore.themeType,
+  appStore.languageType,
+  appStore.editorConfig,
+  appStore.queryConfig,
+], () => {
   preferencesSaved.value = true
 }, { deep: true })
 // --- Theme ---
 const currentTheme = computed(() => appStore.themeType)
 
 const themeOptions = [
-  { value: ThemeType.AUTO, label: () => t('pages.settings.general.themes.system') },
-  { value: ThemeType.DARK, label: () => t('pages.settings.general.themes.dark') },
-  { value: ThemeType.LIGHT, label: () => t('pages.settings.general.themes.light') },
+  {
+    value: ThemeType.AUTO,
+    label: () => t('pages.settings.general.themes.system'),
+  },
+  {
+    value: ThemeType.DARK,
+    label: () => t('pages.settings.general.themes.dark'),
+  },
+  {
+    value: ThemeType.LIGHT,
+    label: () => t('pages.settings.general.themes.light'),
+  },
 ]
 
 const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)
@@ -40,14 +55,38 @@ const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)
 const currentLanguage = computed(() => appStore.languageType)
 
 const languageOptions = [
-  { value: LanguageType.AUTO, label: () => t('pages.settings.general.languages.auto') },
-  { value: LanguageType.EN_US, label: () => t('pages.settings.general.languages.enUS') },
-  { value: LanguageType.ZH_CN, label: () => t('pages.settings.general.languages.zhCN') },
-  { value: LanguageType.ZH_TW, label: () => t('pages.settings.general.languages.zhTW') },
-  { value: LanguageType.PT_BR, label: () => t('pages.settings.general.languages.ptBR') },
-  { value: LanguageType.JA_JP, label: () => t('pages.settings.general.languages.jaJP') },
-  { value: LanguageType.KO_KR, label: () => t('pages.settings.general.languages.koKR') },
-  { value: LanguageType.ES_ES, label: () => t('pages.settings.general.languages.esES') },
+  {
+    value: LanguageType.AUTO,
+    label: () => t('pages.settings.general.languages.auto'),
+  },
+  {
+    value: LanguageType.EN_US,
+    label: () => t('pages.settings.general.languages.enUS'),
+  },
+  {
+    value: LanguageType.ZH_CN,
+    label: () => t('pages.settings.general.languages.zhCN'),
+  },
+  {
+    value: LanguageType.ZH_TW,
+    label: () => t('pages.settings.general.languages.zhTW'),
+  },
+  {
+    value: LanguageType.PT_BR,
+    label: () => t('pages.settings.general.languages.ptBR'),
+  },
+  {
+    value: LanguageType.JA_JP,
+    label: () => t('pages.settings.general.languages.jaJP'),
+  },
+  {
+    value: LanguageType.KO_KR,
+    label: () => t('pages.settings.general.languages.koKR'),
+  },
+  {
+    value: LanguageType.ES_ES,
+    label: () => t('pages.settings.general.languages.esES'),
+  },
 ]
 
 const handleLanguageChange = (value: string) => {
@@ -314,7 +353,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
               </CardHeader>
               <CardContent class="space-y-5">
                 <!-- Font Size -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.fontSize') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -337,7 +376,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Tab Size -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.tabSize') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -360,7 +399,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Indent Width -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.indentWidth') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -383,7 +422,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Line Width -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.lineWidth') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -483,7 +522,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
               </CardHeader>
               <CardContent class="space-y-5">
                 <!-- Default Row Limit -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.query.defaultLimit') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -506,7 +545,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Query Timeout -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.query.queryTimeout') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -561,7 +600,10 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
           </TabsContent>
 
           <!-- MCP Bridge Tab -->
-          <TabsContent value="mcp" class="mt-0">
+          <TabsContent value="mcp" class="mt-0 space-y-6">
+            <!-- Bridge status stays outside the gate: users without an active
+                 subscription need the "why is it stopped" answer most. -->
+            <BridgeStatus />
             <PaidGate feature="mcp_bridge">
               <McpBridge />
             </PaidGate>

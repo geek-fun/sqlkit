@@ -221,7 +221,9 @@ describe('session ownership across asynchronous operations', () => {
       }
       else {
         request.resolve({
-          sessionPhase: result === 'expired' ? 'expired' : 'signed-in',
+          sessionPhase: result === 'expired'
+            ? 'expired'
+            : 'signed-in',
         })
       }
       await pending
@@ -235,7 +237,9 @@ describe('session ownership across asynchronous operations', () => {
     const { account, entitlement } = fixture()
     const clearing = deferred<unknown>()
     mockInvoke.mockImplementation(name =>
-      name === 'clear_entitlement' ? clearing.promise : Promise.resolve(),
+      name === 'clear_entitlement'
+        ? clearing.promise
+        : Promise.resolve(),
     )
     const pending = entitlement.clearSessionState()
     expect(account.isLoggedIn).toBe(false)

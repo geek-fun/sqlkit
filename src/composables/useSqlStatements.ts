@@ -68,7 +68,9 @@ function scanStatements(content: string, cql: boolean): StatementRange[] {
 
   for (let i = 0; i < content.length; i++) {
     const ch = content[i]
-    const next = i + 1 < content.length ? content[i + 1] : null
+    const next = i + 1 < content.length
+      ? content[i + 1]
+      : null
 
     // Track lines
     if (ch === '\n') {
@@ -144,7 +146,11 @@ function scanStatements(content: string, cql: boolean): StatementRange[] {
 
     // CQL supports untagged dollar quotes. PostgreSQL also supports tags.
     if (isOutsideString(state) && ch === '$') {
-      const tagEnd = cql ? (next === '$' ? i + 1 : -1) : content.indexOf('$', i + 1)
+      const tagEnd = cql
+        ? (next === '$'
+            ? i + 1
+            : -1)
+        : content.indexOf('$', i + 1)
       if (tagEnd !== -1) {
         const tag = content.slice(i, tagEnd + 1)
         state.dollarTag = tag
@@ -352,7 +358,14 @@ function splitRangesAtBlankLines(ranges: StatementRange[], content: string): Sta
     // When the segment starts with `WITH`, suppress soft-split for the next DML
     // keyword — it's the main query of a CTE, not a new statement.
     let segmentFirstKeyword: string | null = null
-    const FIRST_DML_KEYWORDS = new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'MERGE', 'REPLACE'])
+    const FIRST_DML_KEYWORDS = new Set([
+      'SELECT',
+      'INSERT',
+      'UPDATE',
+      'DELETE',
+      'MERGE',
+      'REPLACE',
+    ])
     // Each split: { sqlLine: the SQL keyword line, prevContentLine: last content before blank run }
     const splits: { sqlLine: number, prevContentLine: number }[] = []
 
@@ -432,7 +445,9 @@ function splitRangesAtBlankLines(ranges: StatementRange[], content: string): Sta
 
 export function parseSqlStatements(content: string, cql = false): SqlStatement[] {
   const rawRanges = scanStatements(content, cql)
-  const ranges = cql ? rawRanges : splitRangesAtBlankLines(rawRanges, content)
+  const ranges = cql
+    ? rawRanges
+    : splitRangesAtBlankLines(rawRanges, content)
   const lines = content.split('\n')
 
   return ranges

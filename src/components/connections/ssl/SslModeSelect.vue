@@ -12,20 +12,26 @@ const props = defineProps<{
 
 const modelValue = defineModel<SslMode>({ required: true })
 
-const modes = computed(() => props.hidePrefer ? SSL_MODES.filter(mode => mode !== 'prefer') : SSL_MODES)
+const modes = computed(() => props.hidePrefer
+  ? SSL_MODES.filter(mode => mode !== 'prefer')
+  : SSL_MODES)
 
 const { t } = useI18n()
 
 function getLabel(mode: SslMode): string {
   const key = `ssl.mode.${mode.replace('-', '')}`
   const translated = t(key)
-  return translated !== key ? translated : SSL_MODE_LABELS[mode]
+  return translated !== key
+    ? translated
+    : SSL_MODE_LABELS[mode]
 }
 
 function getDescription(mode: SslMode): string {
   const key = `ssl.modeDesc.${mode.replace('-', '')}`
   const translated = t(key)
-  return translated !== key ? translated : ''
+  return translated !== key
+    ? translated
+    : ''
 }
 
 function selectMode(mode: SslMode) {

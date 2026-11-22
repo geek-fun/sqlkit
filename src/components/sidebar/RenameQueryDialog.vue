@@ -36,7 +36,9 @@ watch(() => props.open, (open) => {
 function handleConfirm() {
   const trimmed = newName.value.trim()
   if (trimmed) {
-    const withExt = trimmed.endsWith('.sql') ? trimmed : `${trimmed}.sql`
+    const withExt = trimmed.endsWith('.sql')
+      ? trimmed
+      : `${trimmed}.sql`
     emit('confirm', withExt)
   }
 }

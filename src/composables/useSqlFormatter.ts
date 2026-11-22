@@ -120,7 +120,9 @@ export function formatSql(sql: string, dialect: string, options: FormatOptions =
     return { sql: formatted, error: null }
   }
   catch (err) {
-    const message = err instanceof Error ? err.message : String(err)
+    const message = err instanceof Error
+      ? err.message
+      : String(err)
     return { sql, error: message }
   }
 }

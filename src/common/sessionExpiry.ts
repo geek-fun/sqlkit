@@ -15,13 +15,17 @@ const decodeJwtPayload = (token: string): Record<string, unknown> | null => {
 
 export function parseJwtExpMs(token: string): number | null {
   const exp = decodeJwtPayload(token)?.exp
-  return typeof exp === 'number' && Number.isFinite(exp) && exp > 0 ? exp * 1000 : null
+  return typeof exp === 'number' && Number.isFinite(exp) && exp > 0
+    ? exp * 1000
+    : null
 }
 
 /** String claim lookup (e.g. the stable `id`) for handoff payloads that omit it. */
 export function parseJwtStringClaim(token: string, claim: string): string | null {
   const value = decodeJwtPayload(token)?.[claim]
-  return typeof value === 'string' && value.length > 0 ? value : null
+  return typeof value === 'string' && value.length > 0
+    ? value
+    : null
 }
 
 /** Opaque (non-JWT) tokens return false — the reactive 401 path decides. */

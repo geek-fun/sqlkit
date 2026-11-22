@@ -101,7 +101,12 @@ describe('file probe assessment', () => {
   it('flags directories and read-only files', () => {
     expect(assessDatabaseFile(probe({ exists: true, isDirectory: true }), 'duckdb', '/tmp/app.duckdb').status)
       .toBe('directory')
-    expect(assessDatabaseFile(probe({ exists: true, sizeBytes: 10, writable: false, format: 'duckdb' }), 'duckdb', '/tmp/app.duckdb').status)
+    expect(assessDatabaseFile(probe({
+      exists: true,
+      sizeBytes: 10,
+      writable: false,
+      format: 'duckdb',
+    }), 'duckdb', '/tmp/app.duckdb').status)
       .toBe('unwritable')
   })
 

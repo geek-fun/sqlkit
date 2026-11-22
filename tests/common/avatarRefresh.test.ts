@@ -83,7 +83,10 @@ describe('avatarRefresh', () => {
   describe('refreshAvatar', () => {
     it('deduplicates concurrent triggers into one fetch', async () => {
       const { ports } = fixture('https://oss/stale.webp?Expires=1', 0)
-      const [first, second] = await Promise.all([refreshAvatar(), refreshAvatar()])
+      const [first, second] = await Promise.all([
+        refreshAvatar(),
+        refreshAvatar(),
+      ])
       expect(ports.fetch).toHaveBeenCalledTimes(1)
       expect(second).toBe(first)
     })

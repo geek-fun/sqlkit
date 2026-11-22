@@ -878,7 +878,13 @@ describe('findMostExpensiveNode', () => {
 
   it('ignores nodes without totalCost', () => {
     const nodes: ExplainPlanNode[] = [
-      { id: '1', title: 'Result', nodeType: 'Result', details: [], children: [] },
+      {
+        id: '1',
+        title: 'Result',
+        nodeType: 'Result',
+        details: [],
+        children: [],
+      },
     ]
     expect(findMostExpensiveNode(nodes)).toBeUndefined()
   })
@@ -887,9 +893,30 @@ describe('findMostExpensiveNode', () => {
 describe('calculateTotalCost', () => {
   it('sums totalCost of all root nodes', () => {
     const nodes: ExplainPlanNode[] = [
-      { id: '1', title: 'A', nodeType: 'A', totalCost: 10, details: [], children: [] },
-      { id: '2', title: 'B', nodeType: 'B', totalCost: 20, details: [], children: [] },
-      { id: '3', title: 'C', nodeType: 'C', totalCost: 30, details: [], children: [] },
+      {
+        id: '1',
+        title: 'A',
+        nodeType: 'A',
+        totalCost: 10,
+        details: [],
+        children: [],
+      },
+      {
+        id: '2',
+        title: 'B',
+        nodeType: 'B',
+        totalCost: 20,
+        details: [],
+        children: [],
+      },
+      {
+        id: '3',
+        title: 'C',
+        nodeType: 'C',
+        totalCost: 30,
+        details: [],
+        children: [],
+      },
     ]
     expect(calculateTotalCost(nodes)).toBe(60)
   })
@@ -900,8 +927,21 @@ describe('calculateTotalCost', () => {
 
   it('skips nodes without totalCost', () => {
     const nodes: ExplainPlanNode[] = [
-      { id: '1', title: 'A', nodeType: 'A', totalCost: 10, details: [], children: [] },
-      { id: '2', title: 'B', nodeType: 'B', details: [], children: [] },
+      {
+        id: '1',
+        title: 'A',
+        nodeType: 'A',
+        totalCost: 10,
+        details: [],
+        children: [],
+      },
+      {
+        id: '2',
+        title: 'B',
+        nodeType: 'B',
+        details: [],
+        children: [],
+      },
     ]
     expect(calculateTotalCost(nodes)).toBe(10)
   })
@@ -909,8 +949,20 @@ describe('calculateTotalCost', () => {
 
 describe('flattenNodes', () => {
   it('flattens a tree structure into an array', () => {
-    const leaf1: ExplainPlanNode = { id: '1.0', title: 'Leaf1', nodeType: 'Scan', details: [], children: [] }
-    const leaf2: ExplainPlanNode = { id: '1.1', title: 'Leaf2', nodeType: 'Index', details: [], children: [] }
+    const leaf1: ExplainPlanNode = {
+      id: '1.0',
+      title: 'Leaf1',
+      nodeType: 'Scan',
+      details: [],
+      children: [],
+    }
+    const leaf2: ExplainPlanNode = {
+      id: '1.1',
+      title: 'Leaf2',
+      nodeType: 'Index',
+      details: [],
+      children: [],
+    }
     const parent: ExplainPlanNode = {
       id: '1',
       title: 'Join',
@@ -930,9 +982,27 @@ describe('flattenNodes', () => {
   })
 
   it('flattens deeply nested trees', () => {
-    const leaf: ExplainPlanNode = { id: '0.0.0', title: 'Deep Leaf', nodeType: 'Scan', details: [], children: [] }
-    const mid: ExplainPlanNode = { id: '0.0', title: 'Mid', nodeType: 'Join', details: [], children: [leaf] }
-    const root: ExplainPlanNode = { id: '0', title: 'Root', nodeType: 'Sort', details: [], children: [mid] }
+    const leaf: ExplainPlanNode = {
+      id: '0.0.0',
+      title: 'Deep Leaf',
+      nodeType: 'Scan',
+      details: [],
+      children: [],
+    }
+    const mid: ExplainPlanNode = {
+      id: '0.0',
+      title: 'Mid',
+      nodeType: 'Join',
+      details: [],
+      children: [leaf],
+    }
+    const root: ExplainPlanNode = {
+      id: '0',
+      title: 'Root',
+      nodeType: 'Sort',
+      details: [],
+      children: [mid],
+    }
     const flat = flattenNodes([root])
     expect(flat).toHaveLength(3)
   })

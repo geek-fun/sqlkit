@@ -30,8 +30,12 @@ const show = (config: SSHTunnelConfig) => {
   dialogOpen.value = true
 }
 const updateDraft = (value: Partial<SSHTunnelConfig>) => {
-  if (draft.value)
-    draft.value = { ...draft.value, ...value }
+  if (draft.value) {
+    draft.value = {
+      ...draft.value,
+      ...value,
+    }
+  }
 }
 const loadConfigHosts = async () => {
   importError.value = ''
@@ -56,7 +60,11 @@ const applyConfigHost = (host: ConfigHost) => {
 const save = () => {
   if (!valid.value || !draft.value)
     return
-  emit('save', { ...draft.value, host: draft.value.host.trim(), username: draft.value.username.trim() })
+  emit('save', {
+    ...draft.value,
+    host: draft.value.host.trim(),
+    username: draft.value.username.trim(),
+  })
   dialogOpen.value = false
 }
 defineExpose({ show })

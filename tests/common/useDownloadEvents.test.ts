@@ -4,17 +4,24 @@ import { flushPromises } from '@vue/test-utils'
 import { createApp } from 'vue'
 import { useDownloadEvents } from '@/composables/useDownloadEvents'
 
-jest.mock('@tauri-apps/api/event', () => ({ listen: jest.fn() }))
+jest.mock('@tauri-apps/api/event', () => ({
+  listen: jest.fn(),
+}))
 const listenMock = listen as jest.Mock
 let receive: (event: { payload: unknown }) => void
 const mountDownloads = () => {
   let downloads!: ReturnType<typeof useDownloadEvents>
-  const app = createApp({ setup: () => {
-    downloads = useDownloadEvents()
-    return () => null
-  } })
+  const app = createApp({
+    setup: () => {
+      downloads = useDownloadEvents()
+      return () => null
+    },
+  })
   app.mount(document.createElement('div'))
-  return { downloads, unmount: () => app.unmount() }
+  return {
+    downloads,
+    unmount: () => app.unmount(),
+  }
 }
 
 beforeEach(() => {
@@ -45,9 +52,19 @@ it('registers before invoking and stays busy until installation resolves', async
   registered(jest.fn())
   await flushPromises()
   expect(invoke).toHaveBeenCalledTimes(1)
-  receive({ payload: { phase: 'progress', id: 'test-runtime', kind: 'jre', downloaded: 25, total: 100 } })
+  receive({
+    payload: {
+      phase: 'progress',
+      id: 'test-runtime',
+      kind: 'jre',
+      downloaded: 25,
+      total: 100,
+    },
+  })
   expect(downloads.getProgress('test-runtime')).toEqual({ downloaded: 25, total: 100 })
-  receive({ payload: { phase: 'complete', id: 'test-runtime', kind: 'jre' } })
+  receive({
+    payload: { phase: 'complete', id: 'test-runtime', kind: 'jre' },
+  })
   expect(downloads.getState('test-runtime')).toBe('installing')
   expect(downloads.isDownloading('test-runtime')).toBe(true)
   finish()
@@ -63,7 +80,15 @@ it('registers again after leaving and returning to settings', async () => {
   const second = mountDownloads()
   await flushPromises()
   expect(listenMock).toHaveBeenCalledTimes(2)
-  receive({ payload: { phase: 'progress', id: 'remount-driver', kind: 'driver', downloaded: 5, total: 0 } })
+  receive({
+    payload: {
+      phase: 'progress',
+      id: 'remount-driver',
+      kind: 'driver',
+      downloaded: 5,
+      total: 0,
+    },
+  })
   expect(second.downloads.getProgress('remount-driver')).toEqual({ downloaded: 5, total: 0 })
   second.unmount()
 })
@@ -84,7 +109,14 @@ it('cached downloads complete without progress events and failures can retry', a
 it('does not lose a backend error when the command resolves', async () => {
   const { downloads, unmount } = mountDownloads()
   expect(await downloads.startDownload('driver', 'backend-error', async () => {
-    receive({ payload: { phase: 'error', id: 'backend-error', kind: 'driver', error: 'Checksum failed' } })
+    receive({
+      payload: {
+        phase: 'error',
+        id: 'backend-error',
+        kind: 'driver',
+        error: 'Checksum failed',
+      },
+    })
   })).toBe(false)
   expect(downloads.getState('backend-error')).toBe('error')
   expect(downloads.getError('backend-error')).toBe('Checksum failed')

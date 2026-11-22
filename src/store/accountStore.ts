@@ -29,7 +29,17 @@ export const useAccountStore = defineStore('account', {
     avatar: '',
     avatarExpiresAt: 0,
   }),
-  persist: { pick: ['token', 'refreshToken', 'username', 'email', 'userId', 'avatar', 'avatarExpiresAt'] },
+  persist: {
+    pick: [
+      'token',
+      'refreshToken',
+      'username',
+      'email',
+      'userId',
+      'avatar',
+      'avatarExpiresAt',
+    ],
+  },
   getters: {
     isLoggedIn: (state): boolean => state.token.length > 0,
   },

@@ -119,7 +119,9 @@ export class SchemaMetadataService {
     const meta = this.getMetadata(connectionId)
     if (!meta)
       return []
-    const key = schema ? `${database}.${schema}` : database
+    const key = schema
+      ? `${database}.${schema}`
+      : database
     const tables = meta.tables[key]
     if (!tables)
       return []

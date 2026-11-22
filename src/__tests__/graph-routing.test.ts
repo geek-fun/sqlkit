@@ -10,9 +10,27 @@ import {
   routeSideX,
 } from '@/components/er-diagram/graph-routing'
 
-const rectA: TableRect = { name: 'A', x: 0, y: 0, width: 220, height: 100 }
-const rectB: TableRect = { name: 'B', x: 300, y: 0, width: 220, height: 100 }
-const rectBlocker: TableRect = { name: 'Blocker', x: 150, y: 50, width: 220, height: 100 }
+const rectA: TableRect = {
+  name: 'A',
+  x: 0,
+  y: 0,
+  width: 220,
+  height: 100,
+}
+const rectB: TableRect = {
+  name: 'B',
+  x: 300,
+  y: 0,
+  width: 220,
+  height: 100,
+}
+const rectBlocker: TableRect = {
+  name: 'Blocker',
+  x: 150,
+  y: 50,
+  width: 220,
+  height: 100,
+}
 
 describe('rangesOverlap', () => {
   it('returns true when ranges overlap', () => {

@@ -30,11 +30,16 @@ const updateLabel = computed(() => {
     return t('updater.restarting')
   if (isInstalling.value)
     return t('pages.settings.updates.installing')
-  if (isDownloading.value)
-    return downloadProgress.value === null ? t('updater.downloading') : t('updater.downloadingPercent', { percent: downloadProgress.value })
+  if (isDownloading.value) {
+    return downloadProgress.value === null
+      ? t('updater.downloading')
+      : t('updater.downloadingPercent', { percent: downloadProgress.value })
+  }
   if (isChecking.value)
     return t('pages.settings.updates.checking')
-  return updateAvailable.value ? t('updater.updateNow') : t('pages.settings.updates.check')
+  return updateAvailable.value
+    ? t('updater.updateNow')
+    : t('pages.settings.updates.check')
 })
 const feedbackLabel = computed(() => {
   if (updateError.value)

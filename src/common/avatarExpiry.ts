@@ -13,7 +13,9 @@ export const parseSignedUrlExpiresSec = (url: string): number | null => {
     if (!raw)
       return null
     const value = Number(raw)
-    return Number.isFinite(value) && value > 0 ? value : null
+    return Number.isFinite(value) && value > 0
+      ? value
+      : null
   }
   catch {
     return null
@@ -31,7 +33,9 @@ export const resolveAvatarExpiresSec = (url: string, storedExpiresSec: number): 
   const signedExpiresSec = parseSignedUrlExpiresSec(url)
   if (signedExpiresSec !== null)
     return signedExpiresSec
-  return storedExpiresSec > 0 && storedExpiresSec < MAX_PLAUSIBLE_EXPIRES_SEC ? storedExpiresSec : null
+  return storedExpiresSec > 0 && storedExpiresSec < MAX_PLAUSIBLE_EXPIRES_SEC
+    ? storedExpiresSec
+    : null
 }
 
 /**

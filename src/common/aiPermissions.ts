@@ -1,6 +1,12 @@
 import { invoke } from '@tauri-apps/api/core'
 
-export const AI_ACTIONS = ['read', 'create', 'update', 'delete', 'manage'] as const
+export const AI_ACTIONS = [
+  'read',
+  'create',
+  'update',
+  'delete',
+  'manage',
+] as const
 export type AiAction = typeof AI_ACTIONS[number]
 export type AiPermissions = Partial<Record<AiAction, boolean>>
 export type AccessDenial = {

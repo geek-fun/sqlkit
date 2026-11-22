@@ -109,7 +109,7 @@ function formatDuration(seconds: number) {
         </h4>
       </div>
       <div class="border border-border/40 rounded-md bg-muted/40">
-        <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border text-caption leading-snug font-mono p-3 max-h-40 overflow-auto">
+        <div class="text-caption leading-snug font-mono p-3 max-h-40 overflow-auto scrollbar-thumb-border scrollbar-track-transparent scrollbar-thin">
           <div
             v-for="(error, index) in props.result.errors.slice(0, 10)"
             :key="index"

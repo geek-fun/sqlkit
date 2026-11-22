@@ -135,7 +135,7 @@ const isColumnSelected = (colName: string) => selectedColumns.value.includes(col
       <span class="i-carbon-circle-dash mr-1.5 animate-spin" /> Loading columns...
     </div>
 
-    <div v-else class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border pr-2 gap-1.5 grid grid-cols-1 max-h-60 overflow-y-auto md:grid-cols-5 sm:grid-cols-3">
+    <div v-else class="pr-2 gap-1.5 grid grid-cols-1 max-h-60 overflow-y-auto scrollbar-thumb-border scrollbar-track-transparent scrollbar-thin md:grid-cols-5 sm:grid-cols-3">
       <label
         v-for="col in availableColumns"
         :key="col.name"

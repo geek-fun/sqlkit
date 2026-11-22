@@ -32,13 +32,19 @@ export const useHistoryStore = defineStore('history', {
     sortedEntries: (state): HistoryEntry[] => {
       const favorites = state.entries.filter(e => e.isFavorite).sort((a, b) => b.timestamp - a.timestamp)
       const rest = state.entries.filter(e => !e.isFavorite).sort((a, b) => b.timestamp - a.timestamp)
-      return [...favorites, ...rest]
+      return [
+        ...favorites,
+        ...rest,
+      ]
     },
 
     filteredEntries: state => (search: string, status?: HistoryEntryStatus | ''): HistoryEntry[] => {
       const favorites = state.entries.filter(e => e.isFavorite).sort((a, b) => b.timestamp - a.timestamp)
       const rest = state.entries.filter(e => !e.isFavorite).sort((a, b) => b.timestamp - a.timestamp)
-      const sorted = [...favorites, ...rest]
+      const sorted = [
+        ...favorites,
+        ...rest,
+      ]
 
       return sorted.filter((entry) => {
         const matchesSearch = !search
@@ -65,7 +71,10 @@ export const useHistoryStore = defineStore('history', {
         const favorites = this.entries.filter(e => e.isFavorite)
         const nonFavorites = this.entries.filter(e => !e.isFavorite)
         const nonFavoriteSlot = Math.max(0, this.maxEntries - favorites.length)
-        this.entries = [...favorites, ...nonFavorites.slice(0, nonFavoriteSlot)]
+        this.entries = [
+          ...favorites,
+          ...nonFavorites.slice(0, nonFavoriteSlot),
+        ]
       }
     },
 

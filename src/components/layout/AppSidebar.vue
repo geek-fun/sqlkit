@@ -13,12 +13,38 @@ const entitlementStore = useEntitlementStore()
 const showProDots = computed(() => !entitlementStore.isLocalUltimate)
 
 const menuItems = [
-  { id: 'connections', label: 'Connections', icon: 'dns', path: '/connections' },
+  {
+    id: 'connections',
+    label: 'Connections',
+    icon: 'dns',
+    path: '/connections',
+  },
   // free page — only the ER-diagram action inside it is Ultimate-gated
-  { id: 'queries', label: 'Queries', icon: 'code', path: '/queries' },
-  { id: 'data-studio', label: 'Data Studio', icon: 'smart_toy', path: '/data-studio', gated: true },
-  { id: 'history', label: 'History', icon: 'history', path: '/history' },
-  { id: 'github', label: 'GitHub', icon: 'github', path: '' },
+  {
+    id: 'queries',
+    label: 'Queries',
+    icon: 'code',
+    path: '/queries',
+  },
+  {
+    id: 'data-studio',
+    label: 'Data Studio',
+    icon: 'smart_toy',
+    path: '/data-studio',
+    gated: true,
+  },
+  {
+    id: 'history',
+    label: 'History',
+    icon: 'history',
+    path: '/history',
+  },
+  {
+    id: 'github',
+    label: 'GitHub',
+    icon: 'github',
+    path: '',
+  },
 ]
 
 const isActive = (path: string) => route.path === path

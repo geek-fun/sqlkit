@@ -38,12 +38,13 @@ impl client::Handler for SshClient {
     /// the key is accepted unconditionally (legacy lenient mode).
     async fn check_server_key(
         &mut self,
-        server_public_key: &russh::keys::ssh_key::PublicKey,
+        server_public_key: &russh::keys::PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
         if !self.verify_host_key {
             return Ok(true);
         }
         let fingerprint = server_public_key
+            .public_key()
             .fingerprint(russh::keys::HashAlg::Sha256)
             .to_string();
         match crate::ssh::known_hosts::verify_or_pin(&self.host, self.port, &fingerprint) {

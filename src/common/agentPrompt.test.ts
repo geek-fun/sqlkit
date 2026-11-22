@@ -5,7 +5,9 @@ describe('assembleSystemPrompt', () => {
     expect(assembleSystemPrompt({
       base: 'base',
       userGlobal: 'global',
-      connectionPrompts: [{ alias: 'warehouse', prompt: 'warehouse context' }],
+      connectionPrompts: [
+        { alias: 'warehouse', prompt: 'warehouse context' },
+      ],
       sidebarContext: 'editor context',
     })).toBe('base\n\nglobal\n\nwarehouse context\n\neditor context')
   })
@@ -24,7 +26,9 @@ describe('assembleSystemPrompt', () => {
     expect(assembleSystemPrompt({
       base: 'base',
       userGlobal: '  ',
-      connectionPrompts: [{ alias: 'warehouse', prompt: '\n' }],
+      connectionPrompts: [
+        { alias: 'warehouse', prompt: '\n' },
+      ],
       sidebarContext: '',
     })).toBe('base')
   })
@@ -36,8 +40,18 @@ describe('assembleSystemPrompt', () => {
 
 describe('agent mode contract', () => {
   it('refreshes manage access after a connection grant instead of replaying a historical default denial', () => {
-    const denied = buildAgentPermissionInstructions([{ connectionId: 'example', permissions: { read: true, manage: false } }]).join('\n')
-    const granted = buildAgentPermissionInstructions([{ connectionId: 'example', permissions: { read: true, manage: true } }]).join('\n')
+    const denied = buildAgentPermissionInstructions([
+      {
+        connectionId: 'example',
+        permissions: { read: true, manage: false },
+      },
+    ]).join('\n')
+    const granted = buildAgentPermissionInstructions([
+      {
+        connectionId: 'example',
+        permissions: { read: true, manage: true },
+      },
+    ]).join('\n')
     expect(denied).toContain('denied actions: manage')
     expect(granted).toContain('allowed actions: read, manage; denied actions: none')
     expect(granted).toContain('Never claim a new attempt failed without a new tool result from this turn')

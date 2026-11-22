@@ -107,7 +107,12 @@ function patch(value: Partial<SSHTunnelConfig>) {
 function addHop(id: string) {
   if (!id || legacyInline.value)
     return
-  patch({ profileIds: [...(props.modelValue?.profileIds ?? []), id] })
+  patch({
+    profileIds: [
+      ...(props.modelValue?.profileIds ?? []),
+      id,
+    ],
+  })
 }
 
 /**
@@ -116,7 +121,9 @@ function addHop(id: string) {
  *  anytime — the profile itself is never deleted.
  */
 const detachHop = (index: number) => {
-  patch({ profileIds: (props.modelValue?.profileIds ?? []).filter((_, i) => i !== index) })
+  patch({
+    profileIds: (props.modelValue?.profileIds ?? []).filter((_, i) => i !== index),
+  })
 }
 
 const moveHop = (from: number, to: number) => {
@@ -124,7 +131,13 @@ const moveHop = (from: number, to: number) => {
   if (from < 0 || to < 0 || from >= ids.length || to >= ids.length || from === to)
     return
   const remaining = ids.filter((_, index) => index !== from)
-  patch({ profileIds: [...remaining.slice(0, to), ids[from]!, ...remaining.slice(to)] })
+  patch({
+    profileIds: [
+      ...remaining.slice(0, to),
+      ids[from]!,
+      ...remaining.slice(to),
+    ],
+  })
 }
 
 const hopListRef = ref<HTMLElement | null>(null)
@@ -185,7 +198,13 @@ const openLegacyDetails = () => {
     legacyDialogRef.value?.show(props.modelValue)
 }
 
-const detachLegacy = () => patch({ host: '', username: '', privateKey: '', password: '', privateKeyPassphrase: '' })
+const detachLegacy = () => patch({
+  host: '',
+  username: '',
+  privateKey: '',
+  password: '',
+  privateKeyPassphrase: '',
+})
 
 const convertLegacyToProfile = async () => {
   const config = props.modelValue
@@ -200,13 +219,22 @@ const convertLegacyToProfile = async () => {
       host: config.host || '',
       port: config.port ?? 22,
       username: config.username || '',
-      authMethod: config.authMethod === 'privateKey' ? 'key' : (config.authMethod || 'password'),
+      authMethod: config.authMethod === 'privateKey'
+        ? 'key'
+        : (config.authMethod || 'password'),
       password: config.password || '',
       keyPath: config.privateKey || '',
       keyPassphrase: config.privateKeyPassphrase || '',
       useSshAgent: config.authMethod === 'agent',
     })
-    patch({ profileIds: [saved.id], host: '', username: '', privateKey: '', password: '', privateKeyPassphrase: '' })
+    patch({
+      profileIds: [saved.id],
+      host: '',
+      username: '',
+      privateKey: '',
+      password: '',
+      privateKeyPassphrase: '',
+    })
   }
   catch (error) {
     conversionError.value = String(error)

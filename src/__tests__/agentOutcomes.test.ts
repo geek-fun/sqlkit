@@ -7,16 +7,30 @@ import { zhCN } from '@/lang/zhCN'
 
 let mockMessages: Record<string, any> = enUS
 jest.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string, values: Record<string, string> = {}) => {
-    const text = key.split('.').reduce<unknown>((value, key) => value && typeof value === 'object' ? (value as Record<string, unknown>)[key] : undefined, mockMessages)
-    return typeof text === 'string' ? text.replace(/\{(\w+)\}/g, (_match, name) => values[name] ?? name) : key
-  } }),
+  useI18n: () => ({
+    t: (key: string, values: Record<string, string> = {}) => {
+      const text = key.split('.').reduce<unknown>((value, key) => value && typeof value === 'object'
+        ? (value as Record<string, unknown>)[key]
+        : undefined, mockMessages)
+      return typeof text === 'string'
+        ? text.replace(/\{(\w+)\}/g, (_match, name) => values[name] ?? name)
+        : key
+    },
+  }),
 }))
 
 jest.mock('@/components/markdown-render.vue', () => ({ template: '<div />' }))
-jest.mock('@/store/dataStudioStore', () => ({ useDataStudioStore: () => ({ toolResultFullBodies: {} }) }))
-jest.mock('@/store/connectionStore', () => ({ useConnectionStore: () => ({ getConnectionById: () => ({ name: 'Development database' }) }) }))
-jest.mock('@/components/ui/button', () => ({ Button: { template: '<button><slot /></button>' } }))
+jest.mock('@/store/dataStudioStore', () => ({
+  useDataStudioStore: () => ({ toolResultFullBodies: {} }),
+}))
+jest.mock('@/store/connectionStore', () => ({
+  useConnectionStore: () => ({
+    getConnectionById: () => ({ name: 'Development database' }),
+  }),
+}))
+jest.mock('@/components/ui/button', () => ({
+  Button: { template: '<button><slot /></button>' },
+}))
 
 const call: AgentToolCall = {
   id: 'call',
@@ -26,12 +40,27 @@ const call: AgentToolCall = {
   riskLevel: 'destructive',
   requiresConfirmation: false,
   result: 'Manage denied',
-  denial: { kind: 'permission', source: 'connection', connectionId: 'db', action: 'manage', message: 'Manage denied' },
+  denial: {
+    kind: 'permission',
+    source: 'connection',
+    connectionId: 'db',
+    action: 'manage',
+    message: 'Manage denied',
+  },
 }
 const render = (tool = call, locale = 'enUS', canRetry = true) => {
-  mockMessages = locale === 'zhCN' ? zhCN : enUS
+  mockMessages = locale === 'zhCN'
+    ? zhCN
+    : enUS
   return mount(AgentMessageBubble, {
-    props: { message: { role: 'assistant', status: 'done', toolCalls: [tool] }, canRetry },
+    props: {
+      message: {
+        role: 'assistant',
+        status: 'done',
+        toolCalls: [tool],
+      },
+      canRetry,
+    },
   })
 }
 
@@ -60,7 +89,10 @@ describe('tool outcome notices', () => {
   })
 
   it('distinguishes user rejection without offering to change permissions', () => {
-    const wrapper = render({ ...call, denial: { ...call.denial!, kind: 'user' } })
+    const wrapper = render({
+      ...call,
+      denial: { ...call.denial!, kind: 'user' },
+    })
     expect(wrapper.get('[role="alert"]').text()).toContain('Rejected by you — action not executed')
     expect(wrapper.get('.tool-verb-label').text()).toBe('Rejected')
     expect(wrapper.text()).not.toContain('Review permissions')
@@ -80,7 +112,10 @@ describe('tool outcome notices', () => {
   })
 
   it('does not mislabel unavailable sources or invalid requests as permission failures', () => {
-    const wrapper = render({ ...call, denial: { kind: 'unavailable', source: 'unknown', message: 'Saved connection is no longer available' } })
+    const wrapper = render({
+      ...call,
+      denial: { kind: 'unavailable', source: 'unknown', message: 'Saved connection is no longer available' },
+    })
     expect(wrapper.get('[role="alert"]').text()).toContain('Action unavailable — action not executed')
     expect(wrapper.get('[role="alert"]').text()).toContain('Saved connection is no longer available')
     expect(wrapper.text()).not.toContain('Review permissions')

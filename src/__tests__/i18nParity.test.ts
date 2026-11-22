@@ -19,7 +19,9 @@ jest.mock('vue-i18n', () => ({
       messages: options.messages,
     },
   }),
-  useI18n: () => ({ t: (key: string) => key }),
+  useI18n: () => ({
+    t: (key: string) => key,
+  }),
 }))
 
 jest.mock('@/datasources/storeApi', () => ({

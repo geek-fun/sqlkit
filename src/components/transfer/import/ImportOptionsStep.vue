@@ -26,10 +26,22 @@ const previewColumns = ref<string[]>([])
 const isLoading = ref(false)
 
 const conflictOptions = computed<{ value: ConflictStrategy, label: string }[]>(() => [
-  { value: 'skip', label: t('transfer.import.conflict.skip') },
-  { value: 'replace', label: t('transfer.import.conflict.replace') },
-  { value: 'upsert', label: t('transfer.import.conflict.upsert') },
-  { value: 'abort', label: t('transfer.import.conflict.abort') },
+  {
+    value: 'skip',
+    label: t('transfer.import.conflict.skip'),
+  },
+  {
+    value: 'replace',
+    label: t('transfer.import.conflict.replace'),
+  },
+  {
+    value: 'upsert',
+    label: t('transfer.import.conflict.upsert'),
+  },
+  {
+    value: 'abort',
+    label: t('transfer.import.conflict.abort'),
+  },
 ])
 
 async function loadPreview() {
@@ -55,7 +67,12 @@ async function loadPreview() {
   }
 }
 
-watch([conflictStrategy, batchSize, truncateBefore, dryRun], () => {
+watch([
+  conflictStrategy,
+  batchSize,
+  truncateBefore,
+  dryRun,
+], () => {
   transferStore.importRequest = {
     ...transferStore.importRequest,
     conflictStrategy: conflictStrategy.value,
