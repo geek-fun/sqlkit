@@ -8,14 +8,47 @@ import { agentApi } from '@/datasources/agentApi'
 const mockRemoveRule = jest.fn().mockResolvedValue(undefined)
 const mockConnection = jest.fn()
 const mockEntitlement = reactive({ isLocalUltimate: true })
-jest.mock('@/common', () => ({ saveAiPermissions: jest.fn() }))
-jest.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-jest.mock('@/store/dataStudioStore', () => ({ useDataStudioStore: () => ({ activeSession: { id: 'chat', sources: [] }, removeConfirmationRule: mockRemoveRule }) }))
-jest.mock('@/datasources/agentApi', () => ({ agentApi: { loadConfirmationRules: jest.fn() } }))
-jest.mock('@/store', () => ({ useConnectionStore: () => ({ getConnectionById: mockConnection }), useEntitlementStore: () => mockEntitlement }))
-jest.mock('@/components/ui/button', () => ({ Button: { template: '<button><slot /></button>' } }))
-jest.mock('@/components/ui/dialog', () => Object.fromEntries(['Dialog', 'DialogContent', 'DialogDescription', 'DialogFooter', 'DialogHeader', 'DialogTitle'].map(name => [name, { template: '<section><slot /></section>' }])))
-jest.mock('@/views/data-studio/components/modify-source-modal.vue', () => ({ __esModule: true, default: { template: '<div />' } }))
+jest.mock('@/common', () => ({
+  saveAiPermissions: jest.fn(),
+}))
+jest.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (key: string) => key,
+  }),
+}))
+jest.mock('@/store/dataStudioStore', () => ({
+  useDataStudioStore: () => ({
+    activeSession: { id: 'chat', sources: [] },
+    removeConfirmationRule: mockRemoveRule,
+  }),
+}))
+jest.mock('@/datasources/agentApi', () => ({
+  agentApi: {
+    loadConfirmationRules: jest.fn(),
+  },
+}))
+jest.mock('@/store', () => ({
+  useConnectionStore: () => ({ getConnectionById: mockConnection }),
+  useEntitlementStore: () => mockEntitlement,
+}))
+jest.mock('@/components/ui/button', () => ({
+  Button: { template: '<button><slot /></button>' },
+}))
+jest.mock('@/components/ui/dialog', () => Object.fromEntries([
+  'Dialog',
+  'DialogContent',
+  'DialogDescription',
+  'DialogFooter',
+  'DialogHeader',
+  'DialogTitle',
+].map(name => [
+  name,
+  { template: '<section><slot /></section>' },
+])))
+jest.mock('@/views/data-studio/components/modify-source-modal.vue', () => ({
+  __esModule: true,
+  default: { template: '<div />' },
+}))
 jest.mock('@/components/ai-permissions/ConnectionPermissionEditor.vue', () => ({
   __esModule: true,
   default: {
@@ -27,9 +60,20 @@ jest.mock('@/components/ai-permissions/ConnectionPermissionEditor.vue', () => ({
   },
 }))
 
-const denial = { kind: 'permission' as const, source: 'connection' as const, connectionId: 'db', action: 'manage' as const, message: 'Manage denied' }
+const denial = {
+  kind: 'permission' as const,
+  source: 'connection' as const,
+  connectionId: 'db',
+  action: 'manage' as const,
+  message: 'Manage denied',
+}
 const openReview = (source = denial.source as 'connection' | 'system' | 'rule') => mount(ToolPermissionReview, {
-  props: { open: true, denial: { ...denial, source }, toolName: 'ddl', sessionId: 'chat' },
+  props: {
+    open: true,
+    denial: { ...denial, source },
+    toolName: 'ddl',
+    sessionId: 'chat',
+  },
 })
 
 describe('permission recovery', () => {
@@ -51,7 +95,9 @@ describe('permission recovery', () => {
     await save.trigger('click')
     await flushPromises()
     expect(saveAiPermissions).toHaveBeenCalledWith('db', { manage: true })
-    expect(wrapper.emitted('update:open')).toEqual([[false]])
+    expect(wrapper.emitted('update:open')).toEqual([
+      [false],
+    ])
     expect(wrapper.emitted('retryToolCall')).toBeUndefined()
   })
 
@@ -68,7 +114,14 @@ describe('permission recovery', () => {
   })
 
   it('never falls back to editing defaults when a connection cannot be identified', () => {
-    const wrapper = mount(ToolPermissionReview, { props: { open: true, denial: { ...denial, source: 'system', connectionId: undefined }, toolName: 'ddl', sessionId: 'chat' } })
+    const wrapper = mount(ToolPermissionReview, {
+      props: {
+        open: true,
+        denial: { ...denial, source: 'system', connectionId: undefined },
+        toolName: 'ddl',
+        sessionId: 'chat',
+      },
+    })
     expect(wrapper.text()).toContain('dataStudio.agent.message.connectionUnavailable')
     expect(wrapper.text()).not.toContain('dataStudio.modifySource.saveChanges')
     expect(saveAiPermissions).not.toHaveBeenCalled()
@@ -91,8 +144,20 @@ describe('permission recovery', () => {
 
   it('removes only the matching saved deny rule in the current conversation', async () => {
     jest.mocked(agentApi.loadConfirmationRules).mockResolvedValue([
-      { id: 'other', session_id: 'chat', tool_name: 'read', action: 'deny', created_at: '0' },
-      { id: 'target', session_id: 'chat', tool_name: 'ddl', action: 'deny', created_at: '0' },
+      {
+        id: 'other',
+        session_id: 'chat',
+        tool_name: 'read',
+        action: 'deny',
+        created_at: '0',
+      },
+      {
+        id: 'target',
+        session_id: 'chat',
+        tool_name: 'ddl',
+        action: 'deny',
+        created_at: '0',
+      },
     ])
     const wrapper = openReview('rule')
     await wrapper.findAll('button').find(button => button.text() === 'dataStudio.agent.message.removeDenyRule')!.trigger('click')

@@ -116,7 +116,9 @@ export const isCqlDatabase = (dbType?: string) =>
   dbType != null && ['cassandra', 'scylladb'].includes(normalizeDbType(dbType))
 
 export const normalizeSslMode = (mode: SslMode, dbType?: string): SslMode =>
-  mode === 'prefer' && isCqlDatabase(dbType) ? 'disable' : mode
+  mode === 'prefer' && isCqlDatabase(dbType)
+    ? 'disable'
+    : mode
 
 /**
  * Check if database type supports SSL
@@ -162,7 +164,9 @@ export function sslModeToBackend(sslConfig: SslConfig, dbType?: string): string 
 export function sslModeFromBackend(sslMode: string | null | undefined, dbType?: string): SslConfig {
   const mode = (sslMode as SslMode) || 'disable'
   if (SSL_MODES.includes(mode)) {
-    return { mode: normalizeSslMode(mode, dbType) }
+    return {
+      mode: normalizeSslMode(mode, dbType),
+    }
   }
   return { mode: 'disable' }
 }

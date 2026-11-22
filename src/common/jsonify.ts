@@ -3,7 +3,9 @@ import { JSONParse, JSONStringify } from 'json-with-bigint'
 
 function bigIntStringify(text: string) {
   return text.replace(/([-+]?\d+)\b/g, (match) => {
-    return Number.isSafeInteger(Number(match)) ? match : `"${match}n"`
+    return Number.isSafeInteger(Number(match))
+      ? match
+      : `"${match}n"`
   })
 }
 

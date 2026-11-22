@@ -108,7 +108,9 @@ export function formatApiError(error: ApiError, t: (key: string) => string): str
   const parts: string[] = []
 
   const titleKey = `errors.codes.${error.code}`
-  const title = t(titleKey) !== titleKey ? t(titleKey) : error.message
+  const title = t(titleKey) !== titleKey
+    ? t(titleKey)
+    : error.message
   parts.push(title)
 
   if (error.details) {
@@ -117,7 +119,9 @@ export function formatApiError(error: ApiError, t: (key: string) => string): str
 
   if (error.hint) {
     const hintKey = `errors.hints.${error.code}`
-    const hint = t(hintKey) !== hintKey ? t(hintKey) : error.hint
+    const hint = t(hintKey) !== hintKey
+      ? t(hintKey)
+      : error.hint
     parts.push(hint)
   }
 
@@ -127,5 +131,7 @@ export function formatApiError(error: ApiError, t: (key: string) => string): str
 export function getErrorTitle(error: ApiError, t: (key: string) => string): string {
   const titleKey = `errors.titles.${error.code}`
   const translated = t(titleKey)
-  return translated !== titleKey ? translated : error.message
+  return translated !== titleKey
+    ? translated
+    : error.message
 }

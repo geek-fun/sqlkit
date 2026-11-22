@@ -307,7 +307,9 @@ export function formatServerVersion(version: string): string {
     return `V${versionMatch[1]}`
   }
 
-  return version.length > 20 ? `${version.slice(0, 20)}...` : version
+  return version.length > 20
+    ? `${version.slice(0, 20)}...`
+    : version
 }
 
 export function isJdbcDatabase(type: DatabaseType): boolean {
@@ -453,11 +455,15 @@ type ConnectionStoreState = {
 }
 
 function safeBool(value: unknown, fallback: boolean): boolean {
-  return typeof value === 'boolean' ? value : fallback
+  return typeof value === 'boolean'
+    ? value
+    : fallback
 }
 
 function safeStr(value: unknown, fallback: string): string {
-  return typeof value === 'string' ? value : fallback
+  return typeof value === 'string'
+    ? value
+    : fallback
 }
 
 function safePort(value: unknown): number {
@@ -465,7 +471,9 @@ function safePort(value: unknown): number {
     return value
   if (typeof value === 'string') {
     const parsed = Number.parseInt(value, 10)
-    return Number.isNaN(parsed) ? 22 : parsed
+    return Number.isNaN(parsed)
+      ? 22
+      : parsed
   }
   return 22
 }
@@ -485,7 +493,9 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
   // Saved layers carry the Rust-contract camelCase shape (see
   // TransportLayerConfig): auth is a plain "password" | "key" | "agent" string.
   const authMethodRaw = sshLayer.authMethod
-  const authMethod = typeof authMethodRaw === 'string' ? authMethodRaw : ''
+  const authMethod = typeof authMethodRaw === 'string'
+    ? authMethodRaw
+    : ''
 
   if (authMethod === 'agent') {
     return {
@@ -497,7 +507,9 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     }
   }
 
-  const method: 'password' | 'privateKey' = authMethod === 'key' ? 'privateKey' : 'password'
+  const method: 'password' | 'privateKey' = authMethod === 'key'
+    ? 'privateKey'
+    : 'password'
 
   return {
     enabled: safeBool(sshLayer.enabled, true),
@@ -506,8 +518,12 @@ function extractSshTunnelFromTransport(transportLayers: unknown): SSHTunnelConfi
     username: safeStr(sshLayer.username, ''),
     authMethod: method,
     password: safeStr(sshLayer.password, ''),
-    privateKey: authMethod === 'key' ? safeStr(sshLayer.keyPath, '') : undefined,
-    privateKeyPassphrase: authMethod === 'key' ? safeStr(sshLayer.keyPassphrase, '') : undefined,
+    privateKey: authMethod === 'key'
+      ? safeStr(sshLayer.keyPath, '')
+      : undefined,
+    privateKeyPassphrase: authMethod === 'key'
+      ? safeStr(sshLayer.keyPassphrase, '')
+      : undefined,
   }
 }
 
@@ -584,23 +600,25 @@ export async function buildTransportLayers(sshTunnel?: SSHTunnelConfig): Promise
         ? 'key' as const
         : 'password' as const
 
-  return [{
-    type: 'ssh',
-    enabled: true,
-    host: sshTunnel.host,
-    port: sshTunnel.port,
-    username: sshTunnel.username,
-    authMethod: inlineAuthMethod,
-    password: sshTunnel.password ?? '',
-    keyPath: sshTunnel.privateKey ?? '',
-    keyPassphrase: sshTunnel.privateKeyPassphrase ?? '',
-    useSshAgent: inlineAuthMethod === 'agent',
-    sshAgentSockPath: '',
-    // The inline tunnel is the only hop, so an attached system proxy rides it.
-    useSystemProxy: sshTunnel.useSystemProxy === true,
-    connectTimeoutSecs: 10,
-    keepaliveIntervalSecs: 30,
-  }]
+  return [
+    {
+      type: 'ssh',
+      enabled: true,
+      host: sshTunnel.host,
+      port: sshTunnel.port,
+      username: sshTunnel.username,
+      authMethod: inlineAuthMethod,
+      password: sshTunnel.password ?? '',
+      keyPath: sshTunnel.privateKey ?? '',
+      keyPassphrase: sshTunnel.privateKeyPassphrase ?? '',
+      useSshAgent: inlineAuthMethod === 'agent',
+      sshAgentSockPath: '',
+      // The inline tunnel is the only hop, so an attached system proxy rides it.
+      useSystemProxy: sshTunnel.useSystemProxy === true,
+      connectTimeoutSecs: 10,
+      keepaliveIntervalSecs: 30,
+    },
+  ]
 }
 
 export const useConnectionStore = defineStore('connectionStore', {
@@ -655,7 +673,10 @@ export const useConnectionStore = defineStore('connectionStore', {
         const result = await connectionApi.list()
         // The backend doesn't track runtime connection state, so we preserve
         // `isConnected` from the existing store entries.
-        const existing = new Map(this.connections.map(c => [c.id, { isConnected: c.isConnected, serverVersion: c.serverVersion }]))
+        const existing = new Map(this.connections.map(c => [
+          c.id,
+          { isConnected: c.isConnected, serverVersion: c.serverVersion },
+        ]))
         this.connections = result.map((item: Record<string, unknown>) => {
           const id = item.id as string
           const prev = existing.get(id)
@@ -681,7 +702,9 @@ export const useConnectionStore = defineStore('connectionStore', {
             readOnly: (item.read_only as boolean | undefined) ?? false,
             prompt: item.prompt as string | undefined,
             isConnected: prev?.isConnected ?? (item.is_connected as boolean | undefined),
-            lastUsed: item.last_used ? new Date(item.last_used as string) : undefined,
+            lastUsed: item.last_used
+              ? new Date(item.last_used as string)
+              : undefined,
             serverVersion: prev?.serverVersion,
           }
         })
@@ -717,8 +740,12 @@ export const useConnectionStore = defineStore('connectionStore', {
           prompt: connection.prompt || null,
         }
 
-        const permissionDraft = useEntitlementStore().isLocalUltimate ? connection.aiPermissions : undefined
-        const previousPermissions = permissionDraft === undefined ? undefined : (await getAiPolicy()).connection_permissions[serverConfig.id] ?? {}
+        const permissionDraft = useEntitlementStore().isLocalUltimate
+          ? connection.aiPermissions
+          : undefined
+        const previousPermissions = permissionDraft === undefined
+          ? undefined
+          : (await getAiPolicy()).connection_permissions[serverConfig.id] ?? {}
         if (permissionDraft !== undefined)
           await saveAiPermissions(serverConfig.id, permissionDraft)
         let resultId: string
@@ -744,7 +771,12 @@ export const useConnectionStore = defineStore('connectionStore', {
       }
       catch (error) {
         console.error('Failed to save connection:', error)
-        return { success: false, message: error instanceof Error ? error.message : 'Unknown error' }
+        return {
+          success: false,
+          message: error instanceof Error
+            ? error.message
+            : 'Unknown error',
+        }
       }
     },
 
@@ -843,7 +875,9 @@ export const useConnectionStore = defineStore('connectionStore', {
 
       try {
         const transportLayers
-          = sshTunnelStripped ? null : await buildTransportLayers(connection.sshTunnel)
+          = sshTunnelStripped
+            ? null
+            : await buildTransportLayers(connection.sshTunnel)
 
         const serverConfig = {
           id: connection.id!,
@@ -884,7 +918,9 @@ export const useConnectionStore = defineStore('connectionStore', {
       catch (error) {
         this.connectionStatus[connectionId] = ConnectionStatus.ERROR
         const failure = new Error(`Failed to connect: ${error}`)
-        throw sshTunnelStripped ? markSshTunnelStripped(failure) : failure
+        throw sshTunnelStripped
+          ? markSshTunnelStripped(failure)
+          : failure
       }
     },
 

@@ -36,7 +36,9 @@ const options = computed<ComboboxOption[]>(() => {
 })
 
 const selectedConnection = computed(() =>
-  props.modelValue ? connectionStore.getConnectionById(props.modelValue) : null,
+  props.modelValue
+    ? connectionStore.getConnectionById(props.modelValue)
+    : null,
 )
 
 const status = computed(() => {

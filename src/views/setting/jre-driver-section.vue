@@ -25,14 +25,22 @@ const loadErrors = reactive({ jre: '', bridge: '', drivers: '' })
 const tasks = reactive<Record<string, Task>>({})
 const idle: Task = { state: 'idle', label: '' }
 const feedback = (key: string) => t(`pages.settings.feedback.${key}`)
-const message = (error: unknown) => error instanceof Error ? error.message : String(error)
+const message = (error: unknown) => error instanceof Error
+  ? error.message
+  : String(error)
 const task = (id: string): Task => tasks[id] ?? idle
 const busy = (id: string) => task(id).state === 'pending' || dl.isDownloading(id)
 const anyBusy = computed(() => Object.values(tasks).some(task => task.state === 'pending') || Object.values(loading).some(Boolean) || Object.values(dl.states).some(state => ['preparing', 'downloading', 'installing'].includes(state)))
 const systemJreValid = computed(() => jreStatus.value?.source === 'system' && Number.parseInt(jreStatus.value.version ?? '', 10) >= 25)
 const sortedDrivers = computed(() => [...drivers.value].sort((a, b) => Number(b.installed) - Number(a.installed) || a.name.localeCompare(b.name)))
-const getDriverIcon = (type: string) => dbTypeFromBackend[type] ? getDatabaseIcon(dbTypeFromBackend[type]) : ''
-const formatFileSize = (bytes: number) => bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+const getDriverIcon = (type: string) => dbTypeFromBackend[type]
+  ? getDatabaseIcon(dbTypeFromBackend[type])
+  : ''
+const formatFileSize = (bytes: number) => bytes < 1024
+  ? `${bytes} B`
+  : bytes < 1024 * 1024
+    ? `${(bytes / 1024).toFixed(1)} KB`
+    : `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 
 const runTask = async (id: string, label: string, operation: () => Promise<void | string>, done = 'saved') => {
   if (busy(id))
@@ -43,7 +51,11 @@ const runTask = async (id: string, label: string, operation: () => Promise<void 
     tasks[id] = { state: 'success', label: result ?? feedback(done) }
   }
   catch (error) {
-    tasks[id] = { state: 'error', label: feedback('failed'), detail: message(error) }
+    tasks[id] = {
+      state: 'error',
+      label: feedback('failed'),
+      detail: message(error),
+    }
   }
 }
 
@@ -71,7 +83,11 @@ const loadBridgeStatus = () => load('bridge', async () => {
 const loadDrivers = () => load('drivers', async () => {
   drivers.value = await jdbcApi.listDrivers()
 })
-const loadAll = () => Promise.all([loadJreStatus(), loadBridgeStatus(), loadDrivers()])
+const loadAll = () => Promise.all([
+  loadJreStatus(),
+  loadBridgeStatus(),
+  loadDrivers(),
+])
 const handleRefresh = () => runTask('refresh', feedback('refreshing'), async () => {
   const results = await loadAll()
   if (results.some(result => !result))
@@ -83,7 +99,10 @@ const download = async (id: string, kind: 'jre' | 'bridge' | 'driver', invoke: (
   const ok = await dl.startDownload(kind, id, invoke)
   if (!ok)
     throw new Error(dl.getError(id) ?? feedback('failed'))
-  tasks[id] = { state: 'pending', label: feedback('installing') }
+  tasks[id] = {
+    state: 'pending',
+    label: feedback('installing'),
+  }
   if (!await reload())
     throw new Error(feedback('loadFailed'))
 }
@@ -131,25 +150,50 @@ const downloadFeedback = (id: string): Task & { progress: number | null } => {
   const current = task(id)
   const progress = dl.getProgress(id)
   if (!dl.isDownloading(id)) {
-    if (current.state === 'idle' && state === 'error')
-      return { state: 'error', label: feedback('failed'), detail: dl.getError(id) ?? undefined, progress: null }
-    if (current.state === 'idle' && state === 'complete')
-      return { state: 'success', label: feedback('complete'), progress: null }
+    if (current.state === 'idle' && state === 'error') {
+      return {
+        state: 'error',
+        label: feedback('failed'),
+        detail: dl.getError(id) ?? undefined,
+        progress: null,
+      }
+    }
+    if (current.state === 'idle' && state === 'complete') {
+      return {
+        state: 'success',
+        label: feedback('complete'),
+        progress: null,
+      }
+    }
     return { ...current, progress: null }
   }
   const total = progress?.total ?? 0
   const downloaded = progress?.downloaded ?? 0
   return {
     state: 'pending',
-    label: feedback(state === 'installing' ? 'installing' : state === 'downloading' ? 'downloading' : 'preparing'),
-    detail: progress ? `${formatFileSize(downloaded)}${total > 0 ? ` / ${formatFileSize(total)}` : ''}` : undefined,
-    progress: state === 'downloading' && total > 0 && downloaded < total ? downloaded / total * 100 : null,
+    label: feedback(state === 'installing'
+      ? 'installing'
+      : state === 'downloading'
+        ? 'downloading'
+        : 'preparing'),
+    detail: progress
+      ? `${formatFileSize(downloaded)}${total > 0
+        ? ` / ${formatFileSize(total)}`
+        : ''}`
+      : undefined,
+    progress: state === 'downloading' && total > 0 && downloaded < total
+      ? downloaded / total * 100
+      : null,
   }
 }
 
 watch(() => ({ ...dl.states }), (states, previous) => {
   Object.entries(states).filter(([id, state]) => state === 'complete' && previous[id] !== 'complete' && task(id).state === 'idle').forEach(([id]) => {
-    void (id === 'jre' ? loadJreStatus() : id === 'bridge' ? loadBridgeStatus() : loadDrivers())
+    void (id === 'jre'
+      ? loadJreStatus()
+      : id === 'bridge'
+        ? loadBridgeStatus()
+        : loadDrivers())
   })
 })
 

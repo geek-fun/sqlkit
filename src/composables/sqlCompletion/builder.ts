@@ -54,7 +54,9 @@ function functionSuggestions(word: string, dialect: DialectProfile): Suggestion[
     .map(f => ({
       label: f,
       kind: 'function' as const,
-      insertText: dialect.noParenFunctions.includes(f) ? f : `${f}()`,
+      insertText: dialect.noParenFunctions.includes(f)
+        ? f
+        : `${f}()`,
     }))
 }
 

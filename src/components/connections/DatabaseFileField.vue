@@ -49,16 +49,24 @@ const pathModel = computed({
   set: value => emit('update:modelValue', value),
 })
 
-const expectedFormat = computed<DatabaseFileFormat>(() => (props.engine === 'duckdb' ? 'duckdb' : 'sqlite'))
+const expectedFormat = computed<DatabaseFileFormat>(() => (props.engine === 'duckdb'
+  ? 'duckdb'
+  : 'sqlite'))
 
 const filters = computed(() => props.engine === 'duckdb'
   ? [
       { name: 'DuckDB', extensions: DUCKDB_EXTENSIONS },
-      { name: 'All Files', extensions: ['*'] },
+      {
+        name: 'All Files',
+        extensions: ['*'],
+      },
     ]
   : [
       { name: 'Database', extensions: SQLITE_EXTENSIONS },
-      { name: 'All Files', extensions: ['*'] },
+      {
+        name: 'All Files',
+        extensions: ['*'],
+      },
     ])
 
 const storageKey = computed(() => recentDatabasesKey(props.engine))
@@ -68,7 +76,9 @@ const assessment = computed(() => assessDatabaseFile(probeResult.value, expected
 function loadRecentDatabases() {
   try {
     const stored = localStorage.getItem(storageKey.value)
-    recentDatabases.value = stored ? JSON.parse(stored) : []
+    recentDatabases.value = stored
+      ? JSON.parse(stored)
+      : []
   }
   catch {
     recentDatabases.value = []
@@ -107,7 +117,7 @@ let probeTimer: ReturnType<typeof setTimeout> | undefined
 watch(() => props.modelValue, (value) => {
   if (probeTimer)
     clearTimeout(probeTimer)
-  probeTimer = setTimeout(() => runProbe(value ?? ''), 250)
+  probeTimer = setTimeout(runProbe, 250, value ?? '')
 })
 
 watch(assessment, value => emit('status', value), { immediate: true })
@@ -122,7 +132,9 @@ function selectPath(path: string) {
 }
 
 function applyPicked(path: string) {
-  const normalized = props.engine === 'duckdb' ? withDatabaseExtension(path, 'duckdb') : path
+  const normalized = props.engine === 'duckdb'
+    ? withDatabaseExtension(path, 'duckdb')
+    : path
   selectPath(normalized)
   rememberDatabase(normalized)
   runProbe(normalized)
@@ -141,7 +153,9 @@ async function createDatabaseFile() {
   }
   catch (error) {
     toast.error(t('components.serverForm.errors.filePickerFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
@@ -160,7 +174,9 @@ async function openDatabaseFile() {
   }
   catch (error) {
     toast.error(t('components.serverForm.errors.filePickerFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
@@ -177,7 +193,9 @@ async function createParentDirectory() {
   }
   catch (error) {
     toast.error(t('components.serverForm.fileStatus.createDirectoryFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
 }
@@ -188,7 +206,9 @@ async function revealDatabaseFile(path: string) {
   }
   catch (error) {
     toast.error(t('components.serverForm.fileStatus.revealFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
 }
@@ -201,22 +221,46 @@ type StatusDescriptor = {
 
 const status = computed<StatusDescriptor | null>(() => {
   const value = assessment.value
-  const engineName = props.engine === 'duckdb' ? 'DuckDB' : 'SQLite'
-  const formatName = value.format === 'sqlite' ? 'SQLite' : t('components.serverForm.fileStatus.unknownFormat')
+  const engineName = props.engine === 'duckdb'
+    ? 'DuckDB'
+    : 'SQLite'
+  const formatName = value.format === 'sqlite'
+    ? 'SQLite'
+    : t('components.serverForm.fileStatus.unknownFormat')
 
   const descriptors: Record<Exclude<DatabaseFileAssessment['status'], 'memory'>, StatusDescriptor> = {
     'unknown': { tone: 'info', message: '' },
-    'will-create': { tone: 'info', message: t('components.serverForm.fileStatus.willCreate', { engine: engineName }) },
+    'will-create': {
+      tone: 'info',
+      message: t('components.serverForm.fileStatus.willCreate', { engine: engineName }),
+    },
     'missing-parent': {
       tone: 'warning',
       message: t('components.serverForm.fileStatus.missingParent'),
       action: 'create-directory',
     },
-    'unwritable': { tone: 'warning', message: t('components.serverForm.fileStatus.unwritable') },
-    'directory': { tone: 'error', message: t('components.serverForm.fileStatus.directory') },
-    'empty': { tone: 'info', message: t('components.serverForm.fileStatus.empty') },
-    'ready': { tone: 'success', message: t('components.serverForm.fileStatus.ready', { size: formatFileSize(value.sizeBytes) }) },
-    'unsupported-path': { tone: 'error', message: t('components.serverForm.fileStatus.unsupportedPath') },
+    'unwritable': {
+      tone: 'warning',
+      message: t('components.serverForm.fileStatus.unwritable'),
+    },
+    'directory': {
+      tone: 'error',
+      message: t('components.serverForm.fileStatus.directory'),
+    },
+    'empty': {
+      tone: 'info',
+      message: t('components.serverForm.fileStatus.empty'),
+    },
+    'ready': {
+      tone: 'success',
+      message: t('components.serverForm.fileStatus.ready', {
+        size: formatFileSize(value.sizeBytes),
+      }),
+    },
+    'unsupported-path': {
+      tone: 'error',
+      message: t('components.serverForm.fileStatus.unsupportedPath'),
+    },
     'wrong-format': {
       tone: 'warning',
       message: t('components.serverForm.fileStatus.wrongFormat', { format: formatName, engine: engineName }),

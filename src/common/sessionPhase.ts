@@ -38,6 +38,8 @@ export const sessionPhaseFromTokens = (
     hasAccessToken: accessToken.trim() !== '',
     hasLease: lease.trim() !== '',
     serverPhase,
-    accessTokenExpMs: accessToken.trim() === '' ? null : parseJwtExpMs(accessToken),
+    accessTokenExpMs: accessToken.trim() === ''
+      ? null
+      : parseJwtExpMs(accessToken),
     now,
   })

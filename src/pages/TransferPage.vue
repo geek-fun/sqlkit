@@ -22,8 +22,16 @@ const activeTab = computed({
 })
 
 const tabConfig = computed(() => [
-  { value: 'export', label: t('transfer.tabs.export'), icon: 'i-carbon-document-export' },
-  { value: 'import', label: t('transfer.tabs.import'), icon: 'i-carbon-document-import' },
+  {
+    value: 'export',
+    label: t('transfer.tabs.export'),
+    icon: 'i-carbon-document-export',
+  },
+  {
+    value: 'import',
+    label: t('transfer.tabs.import'),
+    icon: 'i-carbon-document-import',
+  },
 ])
 </script>
 
@@ -66,7 +74,7 @@ const tabConfig = computed(() => [
             </div>
 
             <!-- Steps Content (scrollable) -->
-            <div class="scrollbar-thin scrollbar-track-transparent scrollbar-thumb-border pr-2 flex flex-1 flex-col gap-3 overflow-y-auto">
+            <div class="pr-2 flex flex-1 flex-col gap-3 overflow-y-auto scrollbar-thumb-border scrollbar-track-transparent scrollbar-thin">
               <ExportWizard v-if="activeTab === 'export'" />
               <ImportWizard v-else-if="activeTab === 'import'" />
             </div>

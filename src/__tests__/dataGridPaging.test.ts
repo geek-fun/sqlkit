@@ -2,15 +2,30 @@
 import { shallowMount } from '@vue/test-utils'
 import { DataGrid } from '@/components/grid'
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }))
-jest.mock('@vueuse/core', () => ({ useResizeObserver: jest.fn() }))
-jest.mock('@/composables/useNotifications', () => ({ toast: { error: jest.fn() } }))
+jest.mock('@tauri-apps/api/core', () => ({
+  invoke: jest.fn(),
+}))
+jest.mock('@vueuse/core', () => ({
+  useResizeObserver: jest.fn(),
+}))
+jest.mock('@/composables/useNotifications', () => ({
+  toast: {
+    error: jest.fn(),
+  },
+}))
 jest.mock('@/composables/useDataGridCopy', () => {
-  const copyUtil = { copyRowsAs: jest.fn(), exportToFile: jest.fn() }
-  return { useDataGridCopy: () => copyUtil }
+  const copyUtil = {
+    copyRowsAs: jest.fn(),
+    exportToFile: jest.fn(),
+  }
+  return {
+    useDataGridCopy: () => copyUtil,
+  }
 })
 jest.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string, params?: Record<string, unknown>) => `${key} ${JSON.stringify(params ?? {})}` }),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) => `${key} ${JSON.stringify(params ?? {})}`,
+  }),
 }))
 jest.mock('@tanstack/vue-virtual', () => ({
   useVirtualizer: (options: { value: { count: number } }) => ({
@@ -19,30 +34,87 @@ jest.mock('@tanstack/vue-virtual', () => ({
   }),
 }))
 jest.mock('@/components/pagination', () => ({
-  PaginationControls: { name: 'PaginationControls', props: ['currentPage', 'pageCount', 'pageSize', 'disabled'], template: '<footer><slot /></footer>' },
+  PaginationControls: {
+    name: 'PaginationControls',
+    props: [
+      'currentPage',
+      'pageCount',
+      'pageSize',
+      'disabled',
+    ],
+    template: '<footer><slot /></footer>',
+  },
 }))
-jest.mock('@/components/grid/EditRowDialog.vue', () => ({ __esModule: true, default: { template: '<div />' } }))
+jest.mock('@/components/grid/EditRowDialog.vue', () => ({
+  __esModule: true,
+  default: { template: '<div />' },
+}))
 jest.mock('@/components/grid/RowDetailsDialog.vue', () => ({
   __esModule: true,
-  default: { name: 'RowDetailsDialog', props: ['row'], template: '<div />' },
+  default: {
+    name: 'RowDetailsDialog',
+    props: ['row'],
+    template: '<div />',
+  },
 }))
-jest.mock('@/components/grid/JsonViewDialog.vue', () => ({ __esModule: true, default: { template: '<div />' } }))
-jest.mock('@/components/grid/CellContextMenu.vue', () => ({ __esModule: true, default: { template: '<div />' } }))
-jest.mock('@/components/grid/ColumnHeaderContextMenu.vue', () => ({ __esModule: true, default: { template: '<div />' } }))
-jest.mock('@/components/grid/BatchActionBar.vue', () => ({ __esModule: true, default: { template: '<div />' } }))
-jest.mock('@/components/grid/FilterBar.vue', () => ({ __esModule: true, default: { template: '<div />' } }))
-jest.mock('@/components/ui/button', () => ({ Button: { name: 'Button', template: '<button><slot /></button>' } }))
-jest.mock('@/components/ui/checkbox', () => ({ Checkbox: { name: 'Checkbox', template: '<input type="checkbox">' } }))
+jest.mock('@/components/grid/JsonViewDialog.vue', () => ({
+  __esModule: true,
+  default: { template: '<div />' },
+}))
+jest.mock('@/components/grid/CellContextMenu.vue', () => ({
+  __esModule: true,
+  default: { template: '<div />' },
+}))
+jest.mock('@/components/grid/ColumnHeaderContextMenu.vue', () => ({
+  __esModule: true,
+  default: { template: '<div />' },
+}))
+jest.mock('@/components/grid/BatchActionBar.vue', () => ({
+  __esModule: true,
+  default: { template: '<div />' },
+}))
+jest.mock('@/components/grid/FilterBar.vue', () => ({
+  __esModule: true,
+  default: { template: '<div />' },
+}))
+jest.mock('@/components/ui/button', () => ({
+  Button: { name: 'Button', template: '<button><slot /></button>' },
+}))
+jest.mock('@/components/ui/checkbox', () => ({
+  Checkbox: { name: 'Checkbox', template: '<input type="checkbox">' },
+}))
 jest.mock('@/components/ui/dropdown-menu', () => ({}))
 jest.mock('@/components/ui/alert-dialog', () => Object.fromEntries(
-  ['AlertDialog', 'AlertDialogAction', 'AlertDialogCancel', 'AlertDialogContent', 'AlertDialogDescription', 'AlertDialogFooter', 'AlertDialogHeader', 'AlertDialogTitle']
-    .map(name => [name, { name, template: '<div><slot /></div>' }]),
+  [
+    'AlertDialog',
+    'AlertDialogAction',
+    'AlertDialogCancel',
+    'AlertDialogContent',
+    'AlertDialogDescription',
+    'AlertDialogFooter',
+    'AlertDialogHeader',
+    'AlertDialogTitle',
+  ]
+    .map(name => [
+      name,
+      { name, template: '<div><slot /></div>' },
+    ]),
 ))
 
 const rows = Array.from({ length: 235 }, (_, id) => ({ id: 235 - id }))
 const mountGrid = () => shallowMount(DataGrid, {
-  props: { columns: ['id'], rows, rowCount: rows.length, columnTypes: { id: 'integer' } },
-  global: { renderStubDefaultSlot: true, mocks: { $t: (key: string) => key } },
+  props: {
+    columns: ['id'],
+    rows,
+    rowCount: rows.length,
+    columnTypes: { id: 'integer' },
+  },
+  global: {
+    renderStubDefaultSlot: true,
+    mocks: {
+      $t: (key: string) => key,
+    },
+  },
 })
 
 describe('paged result grid', () => {
@@ -51,7 +123,13 @@ describe('paged result grid', () => {
     await wrapper.setProps({
       columns: ['id', 'payload', 'unknown'],
       columnTypes: { id: 'numeric(18,4)', payload: 'jsonb' },
-      rows: [{ id: 1, payload: { enabled: true }, unknown: 'value' }],
+      rows: [
+        {
+          id: 1,
+          payload: { enabled: true },
+          unknown: 'value',
+        },
+      ],
       rowCount: 1,
     })
     const typeLabels = wrapper.findAll('.column-type')
@@ -60,7 +138,9 @@ describe('paged result grid', () => {
     expect(typeLabels[0].element.previousElementSibling?.textContent).toBe('id')
     expect(typeLabels[0].element.closest('button')?.classList.contains('justify-end')).toBe(true)
     expect(typeLabels[1].element.closest('button')).toBeNull()
-    await wrapper.setProps({ columnTypes: { id: 'bigint' } })
+    await wrapper.setProps({
+      columnTypes: { id: 'bigint' },
+    })
     expect(wrapper.find('.column-type').text()).toBe('bigint')
     await wrapper.setProps({ columnTypes: {} })
     expect(wrapper.findAll('.column-type')).toHaveLength(0)
@@ -127,7 +207,12 @@ describe('paged result grid', () => {
     pagination.vm.$emit('pageChange', 4)
     await wrapper.vm.$nextTick()
     expect(pagination.props('currentPage')).toBe(4)
-    await wrapper.setProps({ rows: [{ id: 7 }], rowCount: 1 })
+    await wrapper.setProps({
+      rows: [
+        { id: 7 },
+      ],
+      rowCount: 1,
+    })
     expect(pagination.props('currentPage')).toBe(1)
     expect(pagination.props('pageSize')).toBe(50)
     expect(wrapper.findAll('[data-index]')).toHaveLength(1)

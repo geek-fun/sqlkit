@@ -23,7 +23,9 @@ const { t } = useI18n()
 const formattedJson = computed(() => {
   try {
     return JSON.stringify(
-      typeof props.value === 'string' ? JSON.parse(props.value) : props.value,
+      typeof props.value === 'string'
+        ? JSON.parse(props.value)
+        : props.value,
       null,
       2,
     )

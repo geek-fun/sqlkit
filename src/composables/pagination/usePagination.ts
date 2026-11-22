@@ -7,7 +7,9 @@ export const PAGE_SIZE_OPTIONS = [50, 100, 200, 500, 1000] as const
 export const MAX_FETCH_PAGE_SIZE = 0xFFFF_FFFF
 
 export const isValidPageSize = (size: PageSize, allowAll = false, maximum = Number.MAX_SAFE_INTEGER) =>
-  size === 'all' ? allowAll : Number.isSafeInteger(size) && size > 0 && size <= maximum
+  size === 'all'
+    ? allowAll
+    : Number.isSafeInteger(size) && size > 0 && size <= maximum
 
 export const usePagination = (
   total: Ref<number>,
@@ -18,7 +20,9 @@ export const usePagination = (
   const pageCount = computed(() => pageSize.value === 'all'
     ? 1
     : Math.max(1, Math.ceil(total.value / pageSize.value)))
-  const offset = computed(() => pageSize.value === 'all' ? 0 : (currentPage.value - 1) * pageSize.value)
+  const offset = computed(() => pageSize.value === 'all'
+    ? 0
+    : (currentPage.value - 1) * pageSize.value)
 
   const setPage = (page: number) => {
     if (Number.isSafeInteger(page))
@@ -38,5 +42,13 @@ export const usePagination = (
 
   watch(pageCount, () => setPage(currentPage.value), { flush: 'sync' })
 
-  return { currentPage, pageSize, pageCount, offset, setPage, setPageSize, resetPage }
+  return {
+    currentPage,
+    pageSize,
+    pageCount,
+    offset,
+    setPage,
+    setPageSize,
+    resetPage,
+  }
 }

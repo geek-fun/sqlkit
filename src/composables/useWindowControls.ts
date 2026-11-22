@@ -51,5 +51,11 @@ export function useWindowControls() {
     unlistenResize?.()
   })
 
-  return { isMaximized, isFullscreen, minimize, toggleMaximize, close }
+  return {
+    isMaximized,
+    isFullscreen,
+    minimize,
+    toggleMaximize,
+    close,
+  }
 }

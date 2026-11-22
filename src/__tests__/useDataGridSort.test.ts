@@ -5,10 +5,14 @@ describe('useDataGridSort', () => {
     const sort = useDataGridSort()
 
     sort.toggleSort('id')
-    expect(sort.sortState.value).toEqual([{ column: 'id', direction: 'ASC' }])
+    expect(sort.sortState.value).toEqual([
+      { column: 'id', direction: 'ASC' },
+    ])
 
     sort.toggleSort('id')
-    expect(sort.sortState.value).toEqual([{ column: 'id', direction: 'DESC' }])
+    expect(sort.sortState.value).toEqual([
+      { column: 'id', direction: 'DESC' },
+    ])
 
     sort.toggleSort('id')
     expect(sort.sortState.value).toEqual([])
@@ -18,7 +22,9 @@ describe('useDataGridSort', () => {
     const sort = useDataGridSort()
     sort.toggleSort('id')
     sort.toggleSort('name')
-    expect(sort.sortState.value).toEqual([{ column: 'name', direction: 'ASC' }])
+    expect(sort.sortState.value).toEqual([
+      { column: 'name', direction: 'ASC' },
+    ])
   })
 
   it('appends columns for multi-column sort when shift is held', () => {
@@ -48,7 +54,9 @@ describe('useDataGridSort', () => {
     sort.toggleSort('id')
     sort.toggleSort('name', true)
     sort.pruneSort(['name'])
-    expect(sort.sortState.value).toEqual([{ column: 'name', direction: 'ASC' }])
+    expect(sort.sortState.value).toEqual([
+      { column: 'name', direction: 'ASC' },
+    ])
     expect(sort.getSortDirection('id')).toBeNull()
   })
 })

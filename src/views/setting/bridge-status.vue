@@ -40,8 +40,11 @@ const saveError = ref('')
 const feedback = ref('')
 
 const statusText = computed(() => {
-  if (!status.value)
-    return loading.value ? t('aiPermissions.loading') : t('aiPermissions.unavailable')
+  if (!status.value) {
+    return loading.value
+      ? t('aiPermissions.loading')
+      : t('aiPermissions.unavailable')
+  }
   return status.value.running
     ? t('pages.settings.mcp.running', { port: status.value.port })
     : t('pages.settings.mcp.stopped')

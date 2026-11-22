@@ -25,7 +25,14 @@ const CLAUDE_COMMAND
   = 'claude mcp add --transport stdio data-studio -- npx -y @geek-fun/data-studio-mcp'
 const CODEX_COMMAND = 'codex mcp add data-studio -- npx -y @geek-fun/data-studio-mcp'
 const MCP_JSON = JSON.stringify(
-  { mcpServers: { 'data-studio': { command: 'npx', args: ['-y', '@geek-fun/data-studio-mcp'] } } },
+  {
+    mcpServers: {
+      'data-studio': {
+        command: 'npx',
+        args: ['-y', '@geek-fun/data-studio-mcp'],
+      },
+    },
+  },
   null,
   2,
 )
@@ -38,12 +45,18 @@ const sessionNames = computed(() =>
   (status.value?.sessions ?? []).map(s => s.client ?? `data-studio-mcp/${s.version ?? '?'}`))
 
 const serverText = computed(() => {
-  if (!status.value)
-    return loading.value ? t('aiPermissions.loading') : t('aiPermissions.unavailable')
+  if (!status.value) {
+    return loading.value
+      ? t('aiPermissions.loading')
+      : t('aiPermissions.unavailable')
+  }
   if (!status.value.running)
     return t('pages.settings.mcp.serverStopped')
   return status.value.sessions.length
-    ? t('pages.settings.mcp.sessions', { count: status.value.sessions.length, clients: sessionNames.value.join(', ') }, status.value.sessions.length)
+    ? t('pages.settings.mcp.sessions', {
+        count: status.value.sessions.length,
+        clients: sessionNames.value.join(', '),
+      }, status.value.sessions.length)
     : t('pages.settings.mcp.serverIdle')
 })
 
@@ -102,7 +115,7 @@ onBeforeUnmount(() => clearInterval(poll))
             :href="DOCS_URL"
             target="_blank"
             rel="noopener noreferrer"
-            class="text-primary-text hover:underline inline-flex gap-1 items-center"
+            class="text-primary-text inline-flex gap-1 items-center hover:underline"
           >
             {{ t('pages.settings.mcp.install.docsLink') }}
             <span aria-hidden="true" class="i-lucide-external-link h-3 w-3" />

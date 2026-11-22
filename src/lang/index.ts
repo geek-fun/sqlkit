@@ -49,7 +49,9 @@ const detectFromNavigator = (): AppLocale => {
 }
 
 const resolveLocale = (preference: LanguageType): AppLocale =>
-  preference === LanguageType.AUTO ? detectFromNavigator() : preference
+  preference === LanguageType.AUTO
+    ? detectFromNavigator()
+    : preference
 
 const lang = createI18n({
   globalInjection: true,

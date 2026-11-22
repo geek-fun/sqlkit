@@ -1,4 +1,4 @@
-import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api'
+import type * as Monaco from 'monaco-editor/editor/editor.api'
 
 const colorToHex = (value: string): string => {
   const [hue, saturation, lightness] = value.match(/[\d.]+/g)!.map(Number)
@@ -20,11 +20,26 @@ export const applyEditorTheme = (monaco: typeof Monaco, dark: boolean): string =
     base: dark ? 'vs-dark' : 'vs',
     inherit: true,
     rules: [
-      { token: 'keyword', foreground: color('syntax-keyword').slice(1) },
-      { token: 'string', foreground: color('syntax-string').slice(1) },
-      { token: 'number', foreground: color('syntax-number').slice(1) },
-      { token: 'comment', foreground: color('syntax-comment').slice(1) },
-    ].flatMap(rule => [rule, { ...rule, token: `${rule.token}.sql` }]),
+      {
+        token: 'keyword',
+        foreground: color('syntax-keyword').slice(1),
+      },
+      {
+        token: 'string',
+        foreground: color('syntax-string').slice(1),
+      },
+      {
+        token: 'number',
+        foreground: color('syntax-number').slice(1),
+      },
+      {
+        token: 'comment',
+        foreground: color('syntax-comment').slice(1),
+      },
+    ].flatMap(rule => [
+      rule,
+      { ...rule, token: `${rule.token}.sql` },
+    ]),
     colors: {
       'editor.background': color('background'),
       'editor.foreground': color('foreground'),

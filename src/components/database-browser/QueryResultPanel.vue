@@ -92,11 +92,36 @@ const exportIconColors = {
   insert: 'text-emerald-600 dark:text-emerald-400',
 } as const
 const exportActions = [
-  { label: 'copyAllCsv', icon: 'i-lucide-file-spreadsheet', format: 'csv', download: false },
-  { label: 'copyAllJson', icon: 'i-lucide-file-json', format: 'json', download: false },
-  { label: 'copyAllInsert', icon: 'i-lucide-database', format: 'insert', download: false },
-  { label: 'exportCsv', icon: 'i-lucide-file-down', format: 'csv', download: true },
-  { label: 'exportJson', icon: 'i-lucide-file-down', format: 'json', download: true },
+  {
+    label: 'copyAllCsv',
+    icon: 'i-lucide-file-spreadsheet',
+    format: 'csv',
+    download: false,
+  },
+  {
+    label: 'copyAllJson',
+    icon: 'i-lucide-file-json',
+    format: 'json',
+    download: false,
+  },
+  {
+    label: 'copyAllInsert',
+    icon: 'i-lucide-database',
+    format: 'insert',
+    download: false,
+  },
+  {
+    label: 'exportCsv',
+    icon: 'i-lucide-file-down',
+    format: 'csv',
+    download: true,
+  },
+  {
+    label: 'exportJson',
+    icon: 'i-lucide-file-down',
+    format: 'json',
+    download: true,
+  },
 ] as const
 
 const panelHeight = ref(300)
@@ -124,7 +149,9 @@ const activeFilters = ref<ColumnFilter[]>([])
 // ── Result editability (single-table SELECTs only) ──
 const connectionStore = useConnectionStore()
 const canFilter = computed(() => {
-  const type = props.connectionId ? connectionStore.getConnectionById(props.connectionId)?.type : undefined
+  const type = props.connectionId
+    ? connectionStore.getConnectionById(props.connectionId)?.type
+    : undefined
   return !isScriptResult.value && !isCqlDatabase(type)
 })
 
@@ -144,7 +171,9 @@ const connectionTypeForAnalysis = computed(() => {
   if (!props.connectionId)
     return undefined
   const conn = connectionStore.getConnectionById(props.connectionId)
-  return conn?.type ? String(conn.type).toLowerCase() : undefined
+  return conn?.type
+    ? String(conn.type).toLowerCase()
+    : undefined
 })
 
 async function refreshEditability() {
@@ -188,7 +217,12 @@ async function refreshEditability() {
 }
 
 watch(
-  () => [props.sql, props.connectionId, props.database, isScriptResult.value],
+  () => [
+    props.sql,
+    props.connectionId,
+    props.database,
+    isScriptResult.value,
+  ],
   () => {
     void refreshEditability()
   },
@@ -297,7 +331,9 @@ function close() {
 }
 
 // Determine what to show
-const displayResults = computed(() => isScriptResult.value ? selectedResults.value : gridResults.value ?? props.results)
+const displayResults = computed(() => isScriptResult.value
+  ? selectedResults.value
+  : gridResults.value ?? props.results)
 const displayColumnTypes = computed(() => {
   const result = displayResults.value
   if (!result || !result.columnTypes || result.columnTypes.length === 0)

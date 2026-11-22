@@ -16,11 +16,11 @@
 [![MCP Toplist](https://mcptoplist.com/badge/io.github.geek-fun%2Fdata-studio.svg)](https://mcptoplist.com/server/io.github.geek-fun%2Fdata-studio)
 
 <p>
-  <img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white"/>
-  <img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Tauri-FFC131?logo=tauri&logoColor=black"/>
-  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white"/>
+  <img src="https://img.shields.io/badge/macOS-000000?logo=apple&logoColor=white" alt="macOS-000000"/>
+  <img src="https://img.shields.io/badge/Windows-0078D6?logo=windows&logoColor=white" alt="Windows-0078D6"/>
+  <img src="https://img.shields.io/badge/Linux-FCC624?logo=linux&logoColor=black" alt="Linux-FCC624"/>
+  <img src="https://img.shields.io/badge/Tauri-FFC131?logo=tauri&logoColor=black" alt="Tauri-FFC131"/>
+  <img src="https://img.shields.io/badge/Rust-000000?logo=rust&logoColor=white" alt="Rust-000000"/>
 </p>
 
 [다운로드](https://www.geekfun.club/download) · [문서](docs/DISTRIBUTION.md) · [웹사이트](https://www.geekfun.club) · [릴리스](https://github.com/geek-fun/sqlkit/releases)
@@ -38,33 +38,33 @@ SqlKit은 **Agentic 데이터베이스 클라이언트**입니다 — 단순히 
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" />
-  <img src="https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white" />
-  <img src="https://img.shields.io/badge/Oracle-F80000?logo=oracle&logoColor=white" />
-  <img src="https://img.shields.io/badge/SQL%20Server-CC2927?logo=microsoftsqlserver&logoColor=white" />
-  <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" />
-  <img src="https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black" />
-  <img src="https://img.shields.io/badge/ClickHouse-FFCC01?logo=clickhouse&logoColor=black" />
-  <img src="https://img.shields.io/badge/Firebird-E5402B?logo=firebird&logoColor=white" />
+  <img src="https://img.shields.io/badge/PostgreSQL-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL-4169E1" />
+  <img src="https://img.shields.io/badge/MySQL-4479A1?logo=mysql&logoColor=white" alt="MySQL-4479A1" />
+  <img src="https://img.shields.io/badge/Oracle-F80000?logo=oracle&logoColor=white" alt="Oracle-F80000" />
+  <img src="https://img.shields.io/badge/SQL%20Server-CC2927?logo=microsoftsqlserver&logoColor=white" alt="SQL Server-CC2927" />
+  <img src="https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white" alt="SQLite-003B57" />
+  <img src="https://img.shields.io/badge/DuckDB-FFF000?logo=duckdb&logoColor=black" alt="DuckDB-FFF000" />
+  <img src="https://img.shields.io/badge/ClickHouse-FFCC01?logo=clickhouse&logoColor=black" alt="ClickHouse-FFCC01" />
+  <img src="https://img.shields.io/badge/Firebird-E5402B?logo=firebird&logoColor=white" alt="Firebird-E5402B" />
   <br/>
-  <img src="https://img.shields.io/badge/MariaDB-003545?logo=mariadb&logoColor=white" />
-  <img src="https://img.shields.io/badge/CockroachDB-6933FF?logo=cockroachlabs&logoColor=white" />
-  <img src="https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white" />
-  <img src="https://img.shields.io/badge/DB2-052FAD?logo=ibm&logoColor=white" />
-  <img src="https://img.shields.io/badge/H2-004080?logoColor=white" />
-  <img src="https://img.shields.io/badge/Trino-DD00A1?logo=trino&logoColor=white" />
-  <img src="https://img.shields.io/badge/Redshift-8C4FFF?logo=amazonredshift&logoColor=white" />
-  <img src="https://img.shields.io/badge/Teradata-F37440?logo=teradata&logoColor=white" />
+  <img src="https://img.shields.io/badge/MariaDB-003545?logo=mariadb&logoColor=white" alt="MariaDB-003545" />
+  <img src="https://img.shields.io/badge/CockroachDB-6933FF?logo=cockroachlabs&logoColor=white" alt="CockroachDB-6933FF" />
+  <img src="https://img.shields.io/badge/Snowflake-29B5E8?logo=snowflake&logoColor=white" alt="Snowflake-29B5E8" />
+  <img src="https://img.shields.io/badge/DB2-052FAD?logo=ibm&logoColor=white" alt="DB2-052FAD" />
+  <img src="https://img.shields.io/badge/H2-004080?logoColor=white" alt="H2-004080" />
+  <img src="https://img.shields.io/badge/Trino-DD00A1?logo=trino&logoColor=white" alt="Trino-DD00A1" />
+  <img src="https://img.shields.io/badge/Redshift-8C4FFF?logo=amazonredshift&logoColor=white" alt="Redshift-8C4FFF" />
+  <img src="https://img.shields.io/badge/Teradata-F37440?logo=teradata&logoColor=white" alt="Teradata-F37440" />
   <br/>
-  <img src="https://img.shields.io/badge/TiDB-DC150B?logo=tidb&logoColor=white" />
-  <img src="https://img.shields.io/badge/OceanBase-006AFF?logoColor=white" />
-  <img src="https://img.shields.io/badge/OpenGauss-0052CC?logoColor=white" />
-  <img src="https://img.shields.io/badge/Doris-0052CC?logoColor=white" />
-  <img src="https://img.shields.io/badge/StarRocks-5C2D91?logoColor=white" />
-  <img src="https://img.shields.io/badge/TimescaleDB-F2F2F2?logo=timescale&logoColor=black" />
-  <img src="https://img.shields.io/badge/Hive-FDEE21?logo=apachehive&logoColor=black" />
-  <img src="https://img.shields.io/badge/Databricks-FF3621?logo=databricks&logoColor=white" />
-  <img src="https://img.shields.io/badge/BigQuery-669DF6?logo=googlebigquery&logoColor=white" />
+  <img src="https://img.shields.io/badge/TiDB-DC150B?logo=tidb&logoColor=white" alt="TiDB-DC150B" />
+  <img src="https://img.shields.io/badge/OceanBase-006AFF?logoColor=white" alt="OceanBase-006AFF" />
+  <img src="https://img.shields.io/badge/OpenGauss-0052CC?logoColor=white" alt="OpenGauss-0052CC" />
+  <img src="https://img.shields.io/badge/Doris-0052CC?logoColor=white" alt="Doris-0052CC" />
+  <img src="https://img.shields.io/badge/StarRocks-5C2D91?logoColor=white" alt="StarRocks-5C2D91" />
+  <img src="https://img.shields.io/badge/TimescaleDB-F2F2F2?logo=timescale&logoColor=black" alt="TimescaleDB-F2F2F2" />
+  <img src="https://img.shields.io/badge/Hive-FDEE21?logo=apachehive&logoColor=black" alt="Hive-FDEE21" />
+  <img src="https://img.shields.io/badge/Databricks-FF3621?logo=databricks&logoColor=white" alt="Databricks-FF3621" />
+  <img src="https://img.shields.io/badge/BigQuery-669DF6?logo=googlebigquery&logoColor=white" alt="BigQuery-669DF6" />
   <br/>
   <img src="https://img.shields.io/badge/SQLCipher-003B57?logoColor=white" alt="SQLCipher" />
   <img src="https://img.shields.io/badge/YugabyteDB-FF6E42?logoColor=white" alt="YugabyteDB" />
@@ -111,7 +111,7 @@ SqlKit은 **Agentic 데이터베이스 클라이언트**입니다 — 단순히 
   <img src="https://img.shields.io/badge/Cloud%20SQL%20for%20PostgreSQL-4285F4?logo=googlecloud&logoColor=white" alt="Cloud SQL for PostgreSQL" />
   <img src="https://img.shields.io/badge/Cloud%20SQL%20for%20MySQL-4285F4?logo=googlecloud&logoColor=white" alt="Cloud SQL for MySQL" />
   <img src="https://img.shields.io/badge/Fujitsu%20Enterprise%20Postgres-E60012?logoColor=white" alt="Fujitsu Enterprise Postgres" />
-  <img src="https://img.shields.io/badge/and%20more...-555555?logoColor=white" />
+  <img src="https://img.shields.io/badge/and%20more...-555555?logoColor=white" alt="and more...-555555" />
 </p>
 
 ## 설치

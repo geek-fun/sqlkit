@@ -46,7 +46,13 @@ export type RecentDatabaseEntry = {
 }
 
 export const DUCKDB_EXTENSION = 'duckdb'
-export const SQLITE_EXTENSIONS = ['db', 'sqlite', 'sqlite3', 'sqlcipher', 'db3']
+export const SQLITE_EXTENSIONS = [
+  'db',
+  'sqlite',
+  'sqlite3',
+  'sqlcipher',
+  'db3',
+]
 export const DUCKDB_EXTENSIONS = ['duckdb', 'db']
 export const DUCKDB_MEMORY_PREFIX = 'memory:'
 export const MAX_RECENT_DATABASES = 10
@@ -72,7 +78,9 @@ export function isMemoryDatabaseHost(host: string): boolean {
 export const buildMemoryDatabaseHost = (label: string): string => `${DUCKDB_MEMORY_PREFIX}${label}`
 
 export function memoryDatabaseLabel(host: string): string {
-  return isMemoryDatabaseHost(host) ? host.slice(DUCKDB_MEMORY_PREFIX.length) : ''
+  return isMemoryDatabaseHost(host)
+    ? host.slice(DUCKDB_MEMORY_PREFIX.length)
+    : ''
 }
 
 export function createMemoryDatabaseLabel(): string {
@@ -100,7 +108,9 @@ export function withDatabaseExtension(path: string, extension: string): string {
 export function normalizeComparablePath(path: string, platform: string): string {
   const collapsed = path.trim().replace(/[/\\]+$/, '')
   const caseInsensitive = platform === 'macos' || platform === 'windows'
-  return caseInsensitive ? collapsed.toLowerCase() : collapsed
+  return caseInsensitive
+    ? collapsed.toLowerCase()
+    : collapsed
 }
 
 export function isSameDatabaseFile(a: string, b: string, platform: string): boolean {
@@ -117,7 +127,9 @@ export function formatFileSize(bytes: number | null | undefined): string {
   const units = ['KB', 'MB', 'GB', 'TB']
   const exponent = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length)
   const value = bytes / 1024 ** exponent
-  return `${value.toFixed(value >= 10 ? 0 : 1)} ${units[exponent - 1]}`
+  return `${value.toFixed(value >= 10
+    ? 0
+    : 1)} ${units[exponent - 1]}`
 }
 
 /**

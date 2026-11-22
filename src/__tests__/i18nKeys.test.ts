@@ -19,12 +19,17 @@ const KEY_PATTERN = /\$?\bt\(\s*'([\w.-]+)'/g
 function collectSourceFiles(dir: string): string[] {
   return fs.readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const fullPath = path.join(dir, entry.name)
-    if (entry.isDirectory())
-      return SKIPPED_DIRECTORIES.has(entry.name) ? [] : collectSourceFiles(fullPath)
+    if (entry.isDirectory()) {
+      return SKIPPED_DIRECTORIES.has(entry.name)
+        ? []
+        : collectSourceFiles(fullPath)
+    }
     // This guard file mentions key patterns in its own documentation.
     if (entry.name === 'i18nKeys.test.ts')
       return []
-    return /\.(?:vue|ts)$/.test(entry.name) ? [fullPath] : []
+    return /\.(?:vue|ts)$/.test(entry.name)
+      ? [fullPath]
+      : []
   })
 }
 
@@ -37,7 +42,9 @@ function lookup(messages: Record<string, unknown>, key: string): unknown {
   return key
     .split('.')
     .reduce<unknown>(
-      (acc, part) => (acc && typeof acc === 'object' ? (acc as Record<string, unknown>)[part] : undefined),
+      (acc, part) => (acc && typeof acc === 'object'
+        ? (acc as Record<string, unknown>)[part]
+        : undefined),
       messages,
     )
 }
@@ -65,7 +72,9 @@ describe('i18n message keys', () => {
   })
 
   it('resolves every literal key in enUS', () => {
-    const missing = [...keys.entries()]
+    const missing = [
+      ...keys.entries(),
+    ]
       .filter(([key]) => lookup(enUS as unknown as Record<string, unknown>, key) === undefined)
       .map(([key, file]) => `${key} (${file})`)
 
@@ -73,7 +82,9 @@ describe('i18n message keys', () => {
   })
 
   it('resolves every literal key in zhCN', () => {
-    const missing = [...keys.entries()]
+    const missing = [
+      ...keys.entries(),
+    ]
       .filter(([key]) => lookup(zhCN as unknown as Record<string, unknown>, key) === undefined)
       .map(([key, file]) => `${key} (${file})`)
 

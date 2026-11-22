@@ -40,7 +40,9 @@ const LAST_ACTIVATED_KEY = 'device_last_activated_at'
 const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms))
 
 function isActivationFatal(err: unknown): boolean {
-  const raw = typeof err === 'string' ? err : String(err)
+  const raw = typeof err === 'string'
+    ? err
+    : String(err)
   return raw.includes('session expired') || raw.includes('not logged in')
 }
 
@@ -123,7 +125,9 @@ export const useDeviceStore = defineStore('device', {
               || isActivationFatal(err)
             ) {
               this.activationError
-                = typeof err === 'string' ? err : String(err)
+                = typeof err === 'string'
+                  ? err
+                  : String(err)
               return
             }
             await sleep(ACTIVATION_RETRY_DELAYS_MS[attempt])
@@ -202,7 +206,9 @@ export const useDeviceStore = defineStore('device', {
 
 function parseLimitReached(err: unknown): DeviceLimitInfo | null {
   try {
-    const raw = typeof err === 'string' ? err : JSON.stringify(err)
+    const raw = typeof err === 'string'
+      ? err
+      : JSON.stringify(err)
     const parsed = JSON.parse(raw) as {
       error_type?: string
       limit_reached?: DeviceLimitInfo

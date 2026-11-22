@@ -27,19 +27,31 @@ describe('isPrimitiveValue', () => {
 
 describe('isSortableColumn', () => {
   it('allows primitive columns', () => {
-    const rows: Row[] = [{ id: 1 }, { id: 2 }, { id: null }]
+    const rows: Row[] = [
+      { id: 1 },
+      { id: 2 },
+      { id: null },
+    ]
     expect(isSortableColumn('id', rows, { id: 'integer' })).toBe(true)
   })
 
   it('rejects declared JSON/BLOB column types', () => {
-    const rows: Row[] = [{ payload: '{"a":1}' }, { payload: '"x"' }]
+    const rows: Row[] = [
+      { payload: '{"a":1}' },
+      { payload: '"x"' },
+    ]
     expect(isSortableColumn('payload', rows, { payload: 'jsonb' })).toBe(false)
     expect(isSortableColumn('payload', rows, { payload: 'BYTEA' })).toBe(false)
     expect(isSortableColumn('payload', rows, { payload: 'blob' })).toBe(false)
   })
 
   it('rejects columns holding object or array cells', () => {
-    const rows: Row[] = [{ payload: 'ok' }, { payload: { a: 1 } }]
+    const rows: Row[] = [
+      { payload: 'ok' },
+      {
+        payload: { a: 1 },
+      },
+    ]
     expect(isSortableColumn('payload', rows, { payload: 'text' })).toBe(false)
   })
 
@@ -48,7 +60,13 @@ describe('isSortableColumn', () => {
   })
 
   it('collects only sortable columns', () => {
-    const rows: Row[] = [{ id: 1, meta: { a: 1 }, label: 'x' }]
+    const rows: Row[] = [
+      {
+        id: 1,
+        meta: { a: 1 },
+        label: 'x',
+      },
+    ]
     const sortable = collectSortableColumns(['id', 'meta', 'label'], rows, { meta: 'jsonb' })
     expect([...sortable]).toEqual(['id', 'label'])
   })
@@ -62,7 +80,9 @@ describe('mixed-type columns', () => {
       { v: 2 },
       { v: null },
     ]
-    const sorted = sortRowsByState(rows, [{ column: 'v', direction: 'ASC' }])
+    const sorted = sortRowsByState(rows, [
+      { column: 'v', direction: 'ASC' },
+    ])
     expect(sorted.map(r => r.v)).toEqual([2, 10, 'abc', null])
   })
 
@@ -77,7 +97,9 @@ describe('mixed-type columns', () => {
       { v: '9' },
       { v: '10' },
     ]
-    const sorted = sortRowsByState(rows, [{ column: 'v', direction: 'ASC' }], { v: 'integer' })
+    const sorted = sortRowsByState(rows, [
+      { column: 'v', direction: 'ASC' },
+    ], { v: 'integer' })
     expect(sorted.map(r => r.v)).toEqual(['9', '10'])
   })
 
@@ -121,13 +143,17 @@ describe('sortRowsByState', () => {
   })
 
   it('sorts ascending without mutating the input', () => {
-    const result = sortRowsByState(rows, [{ column: 'id', direction: 'ASC' }])
+    const result = sortRowsByState(rows, [
+      { column: 'id', direction: 'ASC' },
+    ])
     expect(result.map(r => r.id)).toEqual([1, 2, 3])
     expect(rows.map(r => r.id)).toEqual([3, 1, 2])
   })
 
   it('sorts descending', () => {
-    const result = sortRowsByState(rows, [{ column: 'id', direction: 'DESC' }])
+    const result = sortRowsByState(rows, [
+      { column: 'id', direction: 'DESC' },
+    ])
     expect(result.map(r => r.id)).toEqual([3, 2, 1])
   })
 
@@ -151,26 +177,44 @@ describe('sortRowsByState', () => {
       { group: 'x', seq: 2 },
       { group: 'x', seq: 3 },
     ]
-    const result = sortRowsByState(data, [{ column: 'group', direction: 'ASC' }])
+    const result = sortRowsByState(data, [
+      { column: 'group', direction: 'ASC' },
+    ])
     expect(result.map(r => r.seq)).toEqual([1, 2, 3])
   })
 
   it('puts nulls last ascending and first descending', () => {
-    const data: Row[] = [{ n: 2 }, { n: null }, { n: 1 }]
-    expect(sortRowsByState(data, [{ column: 'n', direction: 'ASC' }]).map(r => r.n)).toEqual([1, 2, null])
-    expect(sortRowsByState(data, [{ column: 'n', direction: 'DESC' }]).map(r => r.n)).toEqual([null, 2, 1])
+    const data: Row[] = [
+      { n: 2 },
+      { n: null },
+      { n: 1 },
+    ]
+    expect(sortRowsByState(data, [
+      { column: 'n', direction: 'ASC' },
+    ]).map(r => r.n)).toEqual([1, 2, null])
+    expect(sortRowsByState(data, [
+      { column: 'n', direction: 'DESC' },
+    ]).map(r => r.n)).toEqual([null, 2, 1])
   })
 
   it('uses the declared column type for ordering', () => {
-    const data: Row[] = [{ v: '10' }, { v: '9' }]
-    expect(sortRowsByState(data, [{ column: 'v', direction: 'ASC' }], { v: 'bigint' }).map(r => r.v))
+    const data: Row[] = [
+      { v: '10' },
+      { v: '9' },
+    ]
+    expect(sortRowsByState(data, [
+      { column: 'v', direction: 'ASC' },
+    ], { v: 'bigint' }).map(r => r.v))
       .toEqual(['9', '10'])
   })
 })
 
 describe('formatSortState', () => {
   it('renders column and direction', () => {
-    expect(formatSortState([{ column: 'id', direction: 'ASC' }, { column: 'name', direction: 'DESC' }]))
+    expect(formatSortState([
+      { column: 'id', direction: 'ASC' },
+      { column: 'name', direction: 'DESC' },
+    ]))
       .toBe('id ↑, name ↓')
   })
 

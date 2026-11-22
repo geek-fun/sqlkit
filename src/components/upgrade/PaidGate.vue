@@ -50,7 +50,9 @@ const tiles = computed(() => {
 })
 
 const provTitleKey = computed(() =>
-  props.feature === 'mcp_bridge' ? 'plan.gate.detail.mcp' : 'plan.gate.detail.ai',
+  props.feature === 'mcp_bridge'
+    ? 'plan.gate.detail.mcp'
+    : 'plan.gate.detail.ai',
 )
 
 const providerGroups = computed(() => {

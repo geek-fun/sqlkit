@@ -26,7 +26,9 @@ function mockLocalStorage(): Storage {
     setItem: (key: string, value: string) => void store.set(key, value),
     removeItem: (key: string) => void store.delete(key),
     clear: () => store.clear(),
-    key: (index: number) => [...store.keys()][index] ?? null,
+    key: (index: number) => [
+      ...store.keys(),
+    ][index] ?? null,
     get length() {
       return store.size
     },
@@ -59,7 +61,12 @@ const limitPayload = {
   manageUrl: 'https://console/home/devices',
 }
 
-const activatedPayload = { deviceId: 'dev_new', limit: 3, used: 3, refreshToken: 'lease-2' }
+const activatedPayload = {
+  deviceId: 'dev_new',
+  limit: 3,
+  used: 3,
+  refreshToken: 'lease-2',
+}
 
 describe('deviceStore', () => {
   beforeEach(() => {

@@ -31,12 +31,21 @@ const testResult = ref<TestSshResult | null>(null)
  * and a brand-new profile starts on the password tab.
  */
 const normalizeAuthMethod = (method?: string) =>
-  method === 'key' || method === 'agent' ? method : 'password'
+  method === 'key' || method === 'agent'
+    ? method
+    : 'password'
 
 function show(profile?: SshProfile) {
   form.value = profile
-    ? { ...emptySshProfile(), ...profile, authMethod: normalizeAuthMethod(profile.authMethod) }
-    : { ...emptySshProfile(), authMethod: 'password' }
+    ? {
+        ...emptySshProfile(),
+        ...profile,
+        authMethod: normalizeAuthMethod(profile.authMethod),
+      }
+    : {
+        ...emptySshProfile(),
+        authMethod: 'password',
+      }
   isEdit.value = !!profile?.id
   error.value = ''
   showSecrets.value = false
@@ -110,7 +119,9 @@ async function save() {
     dialogOpen.value = false
   }
   catch (e) {
-    error.value = e instanceof Error ? e.message : String(e)
+    error.value = e instanceof Error
+      ? e.message
+      : String(e)
   }
   finally {
     saving.value = false

@@ -15,7 +15,9 @@ const databaseStore = useDatabaseStore()
 const { t } = useI18n()
 
 const activeConnection = computed(() =>
-  props.connectionId ? connectionStore.getConnectionById(props.connectionId) : connectionStore.activeConnection,
+  props.connectionId
+    ? connectionStore.getConnectionById(props.connectionId)
+    : connectionStore.activeConnection,
 )
 
 const isConnected = computed(() =>
@@ -32,7 +34,9 @@ const databaseCount = computed(() =>
 
 const currentDatabase = computed(() =>
   props.selectedDatabase
-  || (props.connectionId ? connectionStore.getCurrentDatabase(props.connectionId) : '')
+  || (props.connectionId
+    ? connectionStore.getCurrentDatabase(props.connectionId)
+    : '')
   || activeConnection.value?.database
   || '',
 )

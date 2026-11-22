@@ -265,7 +265,15 @@ pub async fn connection_host_port(
     // tunnel across connections instead of stacking duplicates per bastion.
     let connection_key = tunnel_key(&layers, &config.host, config.port);
 
-    match start_transport_layers(&connection_key, &layers, &config.host, config.port, tunnels, true).await?
+    match start_transport_layers(
+        &connection_key,
+        &layers,
+        &config.host,
+        config.port,
+        tunnels,
+        true,
+    )
+    .await?
     {
         Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),
         None => Ok((config.host.clone(), config.port)),
