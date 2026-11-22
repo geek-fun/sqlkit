@@ -8,8 +8,8 @@ import { UPGRADE_URL } from '@/common'
 import { SettingsFeedback } from '@/components/settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { ProBadge } from '@/components/upgrade'
 import { useAppStore } from '@/store/appStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
@@ -234,7 +234,7 @@ function handleCloseDialog() {
               {{ t('pages.settings.ai.chat.autoCompactDescription') }}
             </p>
           </div>
-          <Checkbox
+          <Switch
             class="shrink-0"
             :checked="llmSettings.chat.autoCompact"
             @update:checked="(val: boolean | string) => saveChat(() => appStore.setAutoCompact(val === true || val === 'true'))"

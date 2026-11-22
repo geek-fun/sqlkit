@@ -147,6 +147,7 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_window_state::Builder::default().build())
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(AppState::new())
         .manage(store.clone())
         .setup(move |app| {
@@ -167,6 +168,10 @@ pub fn run() {
                 store.set_app_handle(handle.clone()).await;
             });
             menu::create_menu(app)?;
+            // Tray-visible MCP state must exist before desktop::setup spawns
+            // the status refresh loop.
+            app.manage(crate::mcp_bridge::McpSessionRegistry::default());
+            app.manage(crate::mcp_bridge::BridgeStopStatus::default());
             #[cfg(desktop)]
             desktop::setup(app);
 
