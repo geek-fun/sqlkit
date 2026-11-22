@@ -118,6 +118,13 @@ const presets = computed<Preset[]>(() => [
     kind: 'uberllm',
   },
   {
+    id: 'cheapaimodel',
+    name: 'cheapaimodel',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://api.cheapaimodel.ai/v1',
+    kind: 'cheapaimodel',
+  },
+  {
     id: 'anthropic',
     name: 'Anthropic',
     apiCompatibility: 'anthropic',
