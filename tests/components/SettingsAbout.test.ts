@@ -11,12 +11,27 @@ import { useAppUpdater } from '@/composables/useAppUpdater'
 import { enUS } from '@/lang/enUS'
 import { version as buildVersion } from '../../package.json'
 
-jest.mock('@tauri-apps/api/app', () => ({ getVersion: jest.fn() }))
-jest.mock('@/composables/useAppUpdater', () => ({ useAppUpdater: jest.fn() }))
-jest.mock('@/components/ui/button', () => ({ Button: { template: '<button><slot /></button>' } }))
+jest.mock('@tauri-apps/api/app', () => ({
+  getVersion: jest.fn(),
+}))
+jest.mock('@/composables/useAppUpdater', () => ({
+  useAppUpdater: jest.fn(),
+}))
+jest.mock('@/components/ui/button', () => ({
+  Button: { template: '<button><slot /></button>' },
+}))
 jest.mock('@/components/ui/card', () => Object.fromEntries(
-  ['Card', 'CardContent', 'CardDescription', 'CardHeader', 'CardTitle']
-    .map(name => [name, { template: '<div><slot /></div>' }]),
+  [
+    'Card',
+    'CardContent',
+    'CardDescription',
+    'CardHeader',
+    'CardTitle',
+  ]
+    .map(name => [
+      name,
+      { template: '<div><slot /></div>' },
+    ]),
 ))
 
 const updater = {
@@ -33,7 +48,15 @@ const updater = {
   isUpToDate: ref(false),
 }
 const render = () => mount(SettingsAbout, {
-  global: { plugins: [createI18n({ legacy: false, locale: 'enUS', messages: { enUS } })] },
+  global: {
+    plugins: [
+      createI18n({
+        legacy: false,
+        locale: 'enUS',
+        messages: { enUS },
+      }),
+    ],
+  },
 })
 
 beforeEach(() => {

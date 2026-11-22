@@ -1,9 +1,9 @@
 import type { Ref } from 'vue'
 import type { CompletionContextInput, SQLDialect } from './sqlCompletion/types'
 import type { SqlStatement, StatementToExecute } from './useSqlStatements'
-import * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
+import * as monaco from 'monaco-editor/editor/editor.api'
 
-import EditorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker'
+import EditorWorker from 'monaco-editor/editor/editor.worker?worker'
 import { onBeforeUnmount, watch } from 'vue'
 import { ThemeType, useAppStore } from '@/store/appStore'
 import { applyEditorTheme } from './editorTheme'
@@ -20,9 +20,9 @@ import {
 
 // Import only SQL-related grammars instead of all Monaco languages
 // (Typescript/CSS/HTML/JSON workers alone add ~8MB to the bundle).
-import 'monaco-editor/esm/vs/basic-languages/sql/sql.contribution'
-import 'monaco-editor/esm/vs/basic-languages/mysql/mysql.contribution'
-import 'monaco-editor/esm/vs/basic-languages/pgsql/pgsql.contribution'
+import 'monaco-editor/languages/definitions/sql/register.js'
+import 'monaco-editor/languages/definitions/mysql/register.js'
+import 'monaco-editor/languages/definitions/pgsql/register.js'
 
 export type { ExecuteSource, StatementToExecute } from './useSqlStatements'
 export type { SQLDialect }
@@ -70,7 +70,9 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
   const appStore = useAppStore()
 
   /** Monaco ships grammars only for sql/mysql/pgsql; other dialect ids use the generic sql grammar. Completion still resolves the real dialect profile per-editor. */
-  const resolveEditorLanguage = (id: SQLDialect): SQLDialect => hasGrammar(id) ? id : 'sql'
+  const resolveEditorLanguage = (id: SQLDialect): SQLDialect => hasGrammar(id)
+    ? id
+    : 'sql'
 
   const refreshGutterDecorations = () => {
     if (refreshDebounceTimer !== null)
@@ -115,8 +117,12 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
       minimap: { enabled: options.minimap !== false },
       fontSize: options.fontSize || 14,
       tabSize: options.tabSize || 2,
-      lineNumbers: options.showLineNumbers === false ? 'off' : 'on',
-      wordWrap: options.wordWrap === false ? 'off' : 'on',
+      lineNumbers: options.showLineNumbers === false
+        ? 'off'
+        : 'on',
+      wordWrap: options.wordWrap === false
+        ? 'off'
+        : 'on',
       roundedSelection: false,
       contextmenu: true,
       formatOnPaste: true,
@@ -214,11 +220,17 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
     if (!editor)
       return
     editor.updateOptions({
-      ...(newOpts.showLineNumbers !== undefined && { lineNumbers: newOpts.showLineNumbers ? 'on' : 'off' }),
+      ...(newOpts.showLineNumbers !== undefined && {
+        lineNumbers: newOpts.showLineNumbers ? 'on' : 'off',
+      }),
       ...(newOpts.fontSize !== undefined && { fontSize: newOpts.fontSize }),
       ...(newOpts.tabSize !== undefined && { tabSize: newOpts.tabSize }),
-      ...(newOpts.minimap !== undefined && { minimap: { enabled: newOpts.minimap } }),
-      ...(newOpts.wordWrap !== undefined && { wordWrap: newOpts.wordWrap ? 'on' : 'off' }),
+      ...(newOpts.minimap !== undefined && {
+        minimap: { enabled: newOpts.minimap },
+      }),
+      ...(newOpts.wordWrap !== undefined && {
+        wordWrap: newOpts.wordWrap ? 'on' : 'off',
+      }),
     })
   }
 

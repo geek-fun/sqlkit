@@ -34,7 +34,9 @@ const cardClasses = computed(() => {
 })
 
 const stepLabel = computed(() =>
-  props.stepNumber ? String(props.stepNumber).padStart(2, '0') : null,
+  props.stepNumber
+    ? String(props.stepNumber).padStart(2, '0')
+    : null,
 )
 </script>
 

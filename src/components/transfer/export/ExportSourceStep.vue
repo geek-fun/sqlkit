@@ -28,16 +28,27 @@ const whereClause = ref('')
 const orderBy = ref('')
 const limit = ref<number | undefined>()
 
-watch([connectionId, database, schema, table, columns, whereClause, orderBy, limit], () => {
+watch([
+  connectionId,
+  database,
+  schema,
+  table,
+  columns,
+  whereClause,
+  orderBy,
+  limit,
+], () => {
   emit('update:modelValue', {
     ...props.modelValue,
     connectionId: connectionId.value || undefined,
     database: database.value || undefined,
     schema: schema.value || undefined,
-    sources: [{
-      table: table.value,
-      columns: columns.value,
-    }],
+    sources: [
+      {
+        table: table.value,
+        columns: columns.value,
+      },
+    ],
   })
 })
 

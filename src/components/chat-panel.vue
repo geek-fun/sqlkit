@@ -60,7 +60,6 @@ const { llmSettings } = storeToRefs(appStore)
 
 const inputText = ref('')
 const scrollAreaRef = ref<{ viewportElement: HTMLElement | null } | null>(null)
-const contextIndicatorRef = ref<{ refresh: () => Promise<void> } | null>(null)
 const reviewingTool = ref<AgentToolCall | null>(null)
 const recoveryBusy = computed(() => props.isLoading || (props.progress?.phase === 'preparing' && !props.error))
 const retryToolCall = (tool: AgentToolCall) => {
@@ -69,7 +68,9 @@ const retryToolCall = (tool: AgentToolCall) => {
   emit('send', t('dataStudio.agent.message.retryPrompt', { tool: tool.toolName, args: tool.args }))
   forceScrollToBottom()
 }
-const currentTurnStart = computed(() => props.messages.reduce((index, message, current) => message.role === 'user' ? current : index, -1))
+const currentTurnStart = computed(() => props.messages.reduce((index, message, current) => message.role === 'user'
+  ? current
+  : index, -1))
 const awaitingDecision = computed(() => {
   if (props.isLoading)
     return false
@@ -184,7 +185,9 @@ const featureRoute = computed(() =>
 )
 
 const selectedModelId = computed(() => featureRoute.value.selectedModelId ?? undefined)
-const recentModelIds = computed(() => (selectedModelId.value ? [selectedModelId.value] : []))
+const recentModelIds = computed(() => (selectedModelId.value
+  ? [selectedModelId.value]
+  : []))
 
 // ── Input ─────────────────────────────────────────────────────────────
 
@@ -394,7 +397,6 @@ onBeforeUnmount(() => {
 
           <div class="toolbar-center">
             <ContextIndicator
-              ref="contextIndicatorRef"
               :session-id="sessionId"
               :settings="contextSettings ?? null"
             />

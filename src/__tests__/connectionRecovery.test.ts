@@ -2,11 +2,21 @@ import { listen } from '@tauri-apps/api/event'
 import { createPinia, setActivePinia } from 'pinia'
 import { ConnectionStatus, useConnectionStore } from '@/store/connectionStore'
 
-jest.mock('@tauri-apps/api/event', () => ({ listen: jest.fn().mockResolvedValue(jest.fn()) }))
+jest.mock('@tauri-apps/api/event', () => ({
+  listen: jest.fn().mockResolvedValue(jest.fn()),
+}))
 jest.mock('@/datasources', () => ({ connectionApi: {} }))
-jest.mock('@/common', () => ({ markSshTunnelStripped: jest.fn(), shouldStripSshTunnel: jest.fn() }))
-jest.mock('@/store/entitlementStore', () => ({ useEntitlementStore: jest.fn() }))
-jest.mock('@/store/sshProfileStore', () => ({ useSshProfileStore: jest.fn(), profileToTransportLayer: jest.fn() }))
+jest.mock('@/common', () => ({
+  markSshTunnelStripped: jest.fn(),
+  shouldStripSshTunnel: jest.fn(),
+}))
+jest.mock('@/store/entitlementStore', () => ({
+  useEntitlementStore: jest.fn(),
+}))
+jest.mock('@/store/sshProfileStore', () => ({
+  useSshProfileStore: jest.fn(),
+  profileToTransportLayer: jest.fn(),
+}))
 
 describe('connection recovery events', () => {
   beforeEach(() => {
@@ -16,7 +26,9 @@ describe('connection recovery events', () => {
 
   it('keeps connection flags and status synchronized through a failed reconnect and recovery', async () => {
     const store = useConnectionStore()
-    store.connections = [{ id: 'test', isConnected: true } as typeof store.connections[number]]
+    store.connections = [
+      { id: 'test', isConnected: true } as typeof store.connections[number],
+    ]
     store.activeConnectionId = 'test'
     store.currentDatabases.test = 'sample_database'
     await store.startStateListener()

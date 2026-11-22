@@ -44,7 +44,29 @@ const MYSQL_CHARSETS = [
   'gbk',
 ]
 
-const PG_ENCODINGS = ['UTF8', 'LATIN1', 'LATIN2', 'LATIN3', 'LATIN4', 'SQL_ASCII', 'BIG5', 'EUC_JP', 'EUC_KR', 'GB18030', 'GBK', 'ISO_8859_5', 'ISO_8859_13', 'ISO_8859_15', 'KOI8R', 'KOI8U', 'UNICODE', 'WIN1250', 'WIN1251', 'WIN1252', 'WIN866']
+const PG_ENCODINGS = [
+  'UTF8',
+  'LATIN1',
+  'LATIN2',
+  'LATIN3',
+  'LATIN4',
+  'SQL_ASCII',
+  'BIG5',
+  'EUC_JP',
+  'EUC_KR',
+  'GB18030',
+  'GBK',
+  'ISO_8859_5',
+  'ISO_8859_13',
+  'ISO_8859_15',
+  'KOI8R',
+  'KOI8U',
+  'UNICODE',
+  'WIN1250',
+  'WIN1251',
+  'WIN1252',
+  'WIN866',
+]
 
 const MYSQL_COMPAT = new Set<DatabaseType>([
   DatabaseType.MYSQL,
@@ -120,10 +142,18 @@ function handleConfirm() {
   if (!trimmed)
     return
   emit('confirm', trimmed, {
-    charset: hasCharset.value ? charset.value || undefined : undefined,
-    collation: hasCollation.value ? collation.value || undefined : undefined,
-    encoding: hasEncoding.value ? encoding.value || undefined : undefined,
-    locale: hasLocale.value ? locale.value || undefined : undefined,
+    charset: hasCharset.value
+      ? charset.value || undefined
+      : undefined,
+    collation: hasCollation.value
+      ? collation.value || undefined
+      : undefined,
+    encoding: hasEncoding.value
+      ? encoding.value || undefined
+      : undefined,
+    locale: hasLocale.value
+      ? locale.value || undefined
+      : undefined,
   })
 }
 </script>

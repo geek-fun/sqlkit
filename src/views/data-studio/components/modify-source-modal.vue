@@ -82,7 +82,13 @@ const save = async () => {
       await store.updateSessionSourceMode(current.sourceId, 'inherit')
     }
     else {
-      const permissions = { read: local.value.read === true, create: local.value.create === true, update: local.value.update === true, delete: local.value.delete === true, manage: local.value.manage === true }
+      const permissions = {
+        read: local.value.read === true,
+        create: local.value.create === true,
+        update: local.value.update === true,
+        delete: local.value.delete === true,
+        manage: local.value.manage === true,
+      }
       await store.updateSessionSourcePermissions(current.sourceId, permissions)
     }
     emit('update:open', false)
@@ -105,7 +111,11 @@ const detach = async () => {
   catch (e) { error.value = String(e) }
   finally { saving.value = false }
 }
-const retry = () => failedAction.value === 'load' ? load() : failedAction.value === 'save' ? save() : detach()
+const retry = () => failedAction.value === 'load'
+  ? load()
+  : failedAction.value === 'save'
+    ? save()
+    : detach()
 </script>
 
 <template>

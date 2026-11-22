@@ -6,7 +6,6 @@
     "useDefineForClassFields": true,
 
     /* Path aliases */
-    "baseUrl": ".",
     "module": "ESNext",
 
     /* Bundler mode */
@@ -16,6 +15,8 @@
       "#/*": ["./types/*"]
     },
     "resolveJsonModule": true,
+    /* TS 6 no longer auto-includes all @types packages */
+    "types": ["jest", "node"],
     "allowImportingTsExtensions": true,
 
     /* Linting */

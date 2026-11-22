@@ -21,7 +21,9 @@ const appStore = useAppStore()
 // module-level <link> so it can be swapped at runtime without flicker.
 let highlightLink: HTMLLinkElement | null = null
 function applyHighlightTheme(uiThemeType: Exclude<ThemeType, ThemeType.AUTO>) {
-  const href = uiThemeType === ThemeType.DARK ? hljsThemeDarkUrl : hljsThemeLightUrl
+  const href = uiThemeType === ThemeType.DARK
+    ? hljsThemeDarkUrl
+    : hljsThemeLightUrl
   if (!highlightLink) {
     highlightLink = document.createElement('link')
     highlightLink.rel = 'stylesheet'

@@ -58,7 +58,9 @@ export function candidateRouteXs(source: TableRect, target: TableRect, rects: Ta
   if (target.x + target.width + ROUTE_PADDING <= source.x)
     candidates.add((target.x + target.width + source.x) / 2)
 
-  const columns = [...new Set(rects.map(r => r.x))].sort((a, b) => a - b)
+  const columns = [
+    ...new Set(rects.map(r => r.x)),
+  ].sort((a, b) => a - b)
   for (let i = 0; i < columns.length - 1; i++) {
     const gap = columns[i + 1] - (columns[i] + NODE_WIDTH)
     if (gap >= ROUTE_PADDING)

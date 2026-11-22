@@ -8,7 +8,9 @@ export function parseJwtExpMs(token: string): number | null {
     const b64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
     const payload = JSON.parse(atob(b64)) as { exp?: unknown }
     const exp = payload.exp
-    return typeof exp === 'number' && Number.isFinite(exp) && exp > 0 ? exp * 1000 : null
+    return typeof exp === 'number' && Number.isFinite(exp) && exp > 0
+      ? exp * 1000
+      : null
   }
   catch {
     return null

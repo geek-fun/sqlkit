@@ -12,11 +12,22 @@ jest.mock('@tauri-apps/api/core', () => ({
 const mockInvoke = invoke as jest.MockedFunction<typeof invoke>
 
 const fakeStore: StoreMetadata = {
-  databases: [{ name: 'app', is_system: false }, { name: 'postgres', is_system: true }],
-  schemas: { app: ['public', 'analytics'] },
+  databases: [
+    { name: 'app', is_system: false },
+    { name: 'postgres', is_system: true },
+  ],
+  schemas: {
+    app: ['public', 'analytics'],
+  },
   tables: {
-    'app': [{ name: 'users', schema: 'public' }, { name: 'orders', schema: 'public' }],
-    'app.public': [{ name: 'users', schema: 'public' }, { name: 'orders', schema: 'public' }],
+    'app': [
+      { name: 'users', schema: 'public' },
+      { name: 'orders', schema: 'public' },
+    ],
+    'app.public': [
+      { name: 'users', schema: 'public' },
+      { name: 'orders', schema: 'public' },
+    ],
   },
 }
 
@@ -48,7 +59,9 @@ describe('schemaMetadataService — level A (connection objects)', () => {
   })
 
   it('returns empty for missing metadata', () => {
-    const svc = new SchemaMetadataService({ getMetadata: () => null })
+    const svc = new SchemaMetadataService({
+      getMetadata: () => null,
+    })
     expect(svc.getDatabases('c9')).toEqual([])
     expect(svc.getSchemas('c9', 'x')).toEqual([])
     expect(svc.getTables('c9', 'x')).toEqual([])
@@ -63,8 +76,20 @@ describe('schemaMetadataService — level B (column cache)', () => {
 
   it('(a) prefetchColumns stores columns under the exact key', async () => {
     mockInvoke.mockResolvedValue([
-      { name: 'id', data_type: 'int4', nullable: false, is_primary_key: true, is_auto_increment: true },
-      { name: 'email', data_type: 'text', nullable: true, is_primary_key: false, is_auto_increment: false },
+      {
+        name: 'id',
+        data_type: 'int4',
+        nullable: false,
+        is_primary_key: true,
+        is_auto_increment: true,
+      },
+      {
+        name: 'email',
+        data_type: 'text',
+        nullable: true,
+        is_primary_key: false,
+        is_auto_increment: false,
+      },
     ])
     const svc = makeService()
     await svc.prefetchColumns('c1', 'app', 'public', ['users'])
@@ -116,10 +141,20 @@ describe('schemaMetadataService — level B (column cache)', () => {
   })
 
   it('(e) getColumns on absent key triggers a lazy fetch', async () => {
-    mockInvoke.mockResolvedValue([{ name: 'id', data_type: 'int4', nullable: false, is_primary_key: false, is_auto_increment: false }])
+    mockInvoke.mockResolvedValue([
+      {
+        name: 'id',
+        data_type: 'int4',
+        nullable: false,
+        is_primary_key: false,
+        is_auto_increment: false,
+      },
+    ])
     const svc = makeService()
     const cols = await svc.fetchTableColumns('c1', 'app', 'public', 'orders')
-    expect(cols).toEqual([{ name: 'id', dataType: 'int4', isPrimaryKey: false }])
+    expect(cols).toEqual([
+      { name: 'id', dataType: 'int4', isPrimaryKey: false },
+    ])
     expect(mockInvoke).toHaveBeenCalledTimes(1)
   })
 

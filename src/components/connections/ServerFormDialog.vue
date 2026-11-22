@@ -156,7 +156,9 @@ const splitLocalDatacenter = (database?: string) => {
   if (!isCassandraFamily.value || !database)
     return
   const [keyspace, query = ''] = database.split('?')
-  const dc = [...new URLSearchParams(query)].find(([key]) => key.toLowerCase() === 'localdatacenter')
+  const dc = [
+    ...new URLSearchParams(query),
+  ].find(([key]) => key.toLowerCase() === 'localdatacenter')
   localDatacenter.value = dc?.[1] || 'datacenter1'
   formData.value.database = keyspace
 }
@@ -191,7 +193,9 @@ function togglePassword(key: string) {
 watch(() => ({ ...dl.progress }), (progress) => {
   for (const [id] of Object.entries(progress)) {
     const kind = dl.getKind(id)
-    const stepId = kind === 'driver' ? 'driver' : kind // jre→jre, bridge→bridge, driver→driver
+    const stepId = kind === 'driver'
+      ? 'driver'
+      : kind // jre→jre, bridge→bridge, driver→driver
     const step = setupSteps.value.find(s => s.id === stepId)
     if (step && step.status === 'running' && dl.getProgress(id)) {
       const p = dl.getProgress(id)!
@@ -217,7 +221,9 @@ async function runStep(step: StepDef): Promise<boolean> {
   }
   catch (e) {
     step.status = 'error'
-    step.error = e instanceof Error ? e.message : String(e)
+    step.error = e instanceof Error
+      ? e.message
+      : String(e)
     return false
   }
 }
@@ -440,7 +446,9 @@ function handleDuckDbFileStatus(status: DatabaseFileAssessment) {
 }
 
 const testFailureHint = computed(() =>
-  isDuckDb.value ? classifyDuckDbFailure(testError.value) : null,
+  isDuckDb.value
+    ? classifyDuckDbFailure(testError.value)
+    : null,
 )
 
 async function retryAsReadOnly() {
@@ -489,7 +497,12 @@ const databaseTypeOptions = computed(() =>
       const i18nKey = dbTypeI18nKeyMap[value] || value.toLowerCase()
       const fullKey = `components.serverForm.databaseTypes.${i18nKey}`
       const label = t(fullKey)
-      return { label: label === fullKey ? value : label, value }
+      return {
+        label: label === fullKey
+          ? value
+          : label,
+        value,
+      }
     }),
 )
 
@@ -568,11 +581,17 @@ function buildOracleOptionsFromRefs(): OracleConnectionOptions | undefined {
   const hasTnsAlias = oracleMethod.value !== 'basic' && !!tnsFullAlias.value
   return {
     connectionMethod: oracleMethod.value,
-    sidOrService: oracleMethod.value === 'basic' ? oracleSidOrService.value : undefined,
+    sidOrService: oracleMethod.value === 'basic'
+      ? oracleSidOrService.value
+      : undefined,
     role: oracleRole.value,
-    tnsAdminDir: oracleMethod.value !== 'basic' ? oracleTnsAdminDir.value || undefined : undefined,
+    tnsAdminDir: oracleMethod.value !== 'basic'
+      ? oracleTnsAdminDir.value || undefined
+      : undefined,
     tnsAlias: hasTnsAlias ? tnsFullAlias.value : undefined,
-    walletPassword: oracleMethod.value === 'cloud_wallet' ? oracleWalletPassword.value || undefined : undefined,
+    walletPassword: oracleMethod.value === 'cloud_wallet'
+      ? oracleWalletPassword.value || undefined
+      : undefined,
     // Service level is encoded in the TNS alias suffix (e.g. dbname_low, dbname_medium)
     serviceLevel: undefined,
   }
@@ -589,7 +608,15 @@ function onTnsAliasChange(val: string) {
 }
 
 // Sync formData.oracleOptions whenever relevant refs change
-watch([oracleMethod, oracleSidOrService, oracleRole, oracleTnsAdminDir, oracleTnsAlias, oracleWalletPassword, oracleServiceLevel], () => {
+watch([
+  oracleMethod,
+  oracleSidOrService,
+  oracleRole,
+  oracleTnsAdminDir,
+  oracleTnsAlias,
+  oracleWalletPassword,
+  oracleServiceLevel,
+], () => {
   formData.value.oracleOptions = buildOracleOptionsFromRefs()
 })
 
@@ -643,7 +670,9 @@ async function browseDirectory(target: 'tns' | 'wallet') {
   }
   catch (error) {
     toast.error(t('components.serverForm.errors.filePickerFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
@@ -808,7 +837,9 @@ async function handleTestConnection() {
         return
       }
     }
-    const driverStep = isJdbcDb.value ? setupSteps.value.find(s => s.id === 'driver') : undefined
+    const driverStep = isJdbcDb.value
+      ? setupSteps.value.find(s => s.id === 'driver')
+      : undefined
 
     // Test the actual connection
     const config = {
@@ -857,7 +888,9 @@ async function handleTestConnection() {
   }
   catch (error) {
     testStatus.value = 'error'
-    const msg = error instanceof Error ? error.message : String(error)
+    const msg = error instanceof Error
+      ? error.message
+      : String(error)
     testError.value = msg
     // If the error is Java-related, also mark JRE as failed so user can retry it
     if (msg.includes('Unable to locate a Java Runtime') || msg.includes('Java not found')) {
@@ -915,7 +948,9 @@ async function retryStep(stepId: string) {
   }
   catch (e) {
     step.status = 'error'
-    step.error = e instanceof Error ? e.message : String(e)
+    step.error = e instanceof Error
+      ? e.message
+      : String(e)
   }
 }
 
@@ -935,7 +970,10 @@ function handleSave() {
 
   emit('save', {
     ...formData.value,
-    ssl: { ...formData.value.ssl, mode: normalizeSslMode(formData.value.ssl.mode, formData.value.type) },
+    ssl: {
+      ...formData.value.ssl,
+      mode: normalizeSslMode(formData.value.ssl.mode, formData.value.type),
+    },
   })
   isOpen.value = false
 }

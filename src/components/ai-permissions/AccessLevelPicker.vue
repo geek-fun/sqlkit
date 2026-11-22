@@ -13,7 +13,9 @@ const props = defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [value: string] }>()
 const { t } = useI18n()
 const options = computed(() => [
-  ...(props.inherit ? ['inherit'] : []),
+  ...(props.inherit
+    ? ['inherit']
+    : []),
   'none',
   'read',
   'data',

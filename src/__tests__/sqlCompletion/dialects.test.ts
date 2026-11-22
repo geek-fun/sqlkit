@@ -30,7 +30,21 @@ describe('resolveMonacoDialect — formatter→monaco map', () => {
   })
 
   it('falls back to sql for unmapped formatter ids', () => {
-    for (const id of ['trino', 'snowflake', 'duckdb', 'clickhouse', 'hive', 'spark', 'bigquery', 'db2', 'hana', 'teradata', 'exasol', 'bogus', '']) {
+    for (const id of [
+      'trino',
+      'snowflake',
+      'duckdb',
+      'clickhouse',
+      'hive',
+      'spark',
+      'bigquery',
+      'db2',
+      'hana',
+      'teradata',
+      'exasol',
+      'bogus',
+      '',
+    ]) {
       expect(resolveMonacoDialect(id)).toBe('sql')
     }
   })
@@ -38,7 +52,14 @@ describe('resolveMonacoDialect — formatter→monaco map', () => {
 
 describe('dialect profiles', () => {
   it('exposes a profile for every SQLDialect id', () => {
-    for (const id of ['sql', 'mysql', 'pgsql', 'mssql', 'plsql', 'sqlite'] as const) {
+    for (const id of [
+      'sql',
+      'mysql',
+      'pgsql',
+      'mssql',
+      'plsql',
+      'sqlite',
+    ] as const) {
       expect(getDialectProfile(id).id).toBe(id)
     }
   })
@@ -79,7 +100,12 @@ describe('migrated keyword/type/function lists (single source of truth)', () => 
   })
 
   it('noParenFunctions is exactly the four no-paren functions', () => {
-    expect(NO_PAREN_FUNCTIONS).toEqual(['NOW', 'CURRENT_DATE', 'CURRENT_TIME', 'CURRENT_TIMESTAMP'])
+    expect(NO_PAREN_FUNCTIONS).toEqual([
+      'NOW',
+      'CURRENT_DATE',
+      'CURRENT_TIME',
+      'CURRENT_TIMESTAMP',
+    ])
     expect(getDialectProfile('sql').noParenFunctions).toBe(NO_PAREN_FUNCTIONS)
   })
 })

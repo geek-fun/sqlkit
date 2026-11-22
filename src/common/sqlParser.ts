@@ -52,7 +52,9 @@ export const extractStatementAtCursor = (sql: string, cursorPosition?: CursorPos
   const separators = Array.from(sql.matchAll(tokens))
     .filter(match => match[0] === ';')
     .map(match => match.index!)
-  const start = separators.reduce((start, position) => position < offset ? position + 1 : start, 0)
+  const start = separators.reduce((start, position) => position < offset
+    ? position + 1
+    : start, 0)
   const end = separators.find(position => position >= offset) ?? sql.length
 
   const statement = sql.substring(start, end).trim()

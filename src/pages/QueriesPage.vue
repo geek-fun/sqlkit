@@ -82,7 +82,9 @@ const activeConnection = computed(() => {
 const activeTab = computed(() => tabStore.activeTab)
 const isCqlEditor = computed(() => {
   const connId = activeTab.value?.connectionId
-  return isCqlDatabase(connId ? connectionStore.getConnectionById(connId)?.type : activeConnection.value?.type)
+  return isCqlDatabase(connId
+    ? connectionStore.getConnectionById(connId)?.type
+    : activeConnection.value?.type)
 })
 
 // Single source of truth for the database shown next to a result: the tab's
@@ -216,7 +218,9 @@ function isConnectionActive(connId: string | null | undefined): boolean {
 
 function getActiveConnectionId(): string | null {
   const connId = getConnectionId()
-  return isConnectionActive(connId) ? connId : null
+  return isConnectionActive(connId)
+    ? connId
+    : null
 }
 
 const listingTabObjects = computed(() => {
@@ -312,7 +316,9 @@ function getActiveDialect(): string | null {
 
 const activeMonacoDialect = computed(() => {
   const formatterId = getActiveDialect()
-  return formatterId ? resolveMonacoDialect(formatterId) : 'sql'
+  return formatterId
+    ? resolveMonacoDialect(formatterId)
+    : 'sql'
 })
 
 const completionContext = computed(() => {
@@ -357,7 +363,9 @@ watch(() => {
   const meta = databaseStore.metadata[connId]
   if (!meta)
     return ''
-  const key = selectedSchema.value ? `${db}.${selectedSchema.value}` : db
+  const key = selectedSchema.value
+    ? `${db}.${selectedSchema.value}`
+    : db
   return meta.tables[key]?.map(t => t.name).join(',') ?? ''
 }, (tablesCsv) => {
   const connId = getConnectionId()
@@ -525,7 +533,9 @@ onMounted(() => window.addEventListener('keydown', handleGlobalKeydown))
 onUnmounted(() => window.removeEventListener('keydown', handleGlobalKeydown))
 
 function handleCreateScript(table: TableInfo, database: string, schema?: string) {
-  const schemaPrefix = schema ? `"${schema}".` : ''
+  const schemaPrefix = schema
+    ? `"${schema}".`
+    : ''
   const script = `-- CREATE TABLE script for ${table.name}
 -- TODO: Generate actual CREATE TABLE from server
 CREATE TABLE ${schemaPrefix}"${table.name}" (
@@ -579,7 +589,9 @@ function buildSelectTopN(table: TableInfo, schema: string | undefined, n: number
 
 function handleSelectTopN(table: TableInfo, database: string, schema?: string, n = 100) {
   const connId = getActiveConnectionId()
-  const dbType = connId ? connectionStore.getConnectionById(connId)?.type : undefined
+  const dbType = connId
+    ? connectionStore.getConnectionById(connId)?.type
+    : undefined
   const query = buildSelectTopN(table, schema, n, dbType)
 
   if (connId) {
@@ -626,7 +638,13 @@ function handleDropTable(table: TableInfo, database: string, schema?: string) {
   const connectionId = getActiveConnectionId()
   if (!connectionId)
     return
-  destructiveAction.value = { type: 'drop', table, connectionId, database, schema }
+  destructiveAction.value = {
+    type: 'drop',
+    table,
+    connectionId,
+    database,
+    schema,
+  }
   destructiveDialogOpen.value = true
 }
 
@@ -634,7 +652,13 @@ function handleTruncateTable(table: TableInfo, database: string, schema?: string
   const connectionId = getActiveConnectionId()
   if (!connectionId)
     return
-  destructiveAction.value = { type: 'truncate', table, connectionId, database, schema }
+  destructiveAction.value = {
+    type: 'truncate',
+    table,
+    connectionId,
+    database,
+    schema,
+  }
   destructiveDialogOpen.value = true
 }
 
@@ -673,14 +697,21 @@ async function handleDestructiveConfirm() {
     })
     if (!isApiSuccess(response))
       throw new Error(response.error.message)
-    const actionLabel = action.type === 'drop' ? 'dropped' : 'truncated'
+    const actionLabel = action.type === 'drop'
+      ? 'dropped'
+      : 'truncated'
     toast.success(t('pages.queries.notifications.tableActionSuccess', { action: actionLabel, table: action.table.name }))
     destructiveDialogOpen.value = false
     destructiveAction.value = null
     schemaTreeRef.value?.refresh()
   }
   catch (err) {
-    toast.error(t('pages.queries.notifications.tableActionFailed', { action: action.type, error: err instanceof Error ? err.message : String(err) }))
+    toast.error(t('pages.queries.notifications.tableActionFailed', {
+      action: action.type,
+      error: err instanceof Error
+        ? err.message
+        : String(err),
+    }))
   }
   finally {
     isDestructiveActionExecuting.value = false
@@ -708,7 +739,9 @@ function handleSelectTable(table: TableInfo, database: string, schema?: string) 
   tabStore.openTableViewTab(connId, database, table.name, schema)
 }
 
-function handleOpenListingTab(type: 'VIEW' | 'PROCEDURE' | 'FUNCTION', database: string, schema?: string) {
+function handleOpenListingTab(type: string, database: string, schema?: string) {
+  if (type !== 'VIEW' && type !== 'PROCEDURE' && type !== 'FUNCTION')
+    return
   const connId = getActiveConnectionId()
   if (!connId)
     return
@@ -727,11 +760,15 @@ async function handleOpenDdlTab(name: string, type: string, database: string, sc
 
   // For PROCEDURE / FUNCTION: fetch DDL and open in a query tab
   const tab = tabStore.createTab(connId, database, schema)
-  const objectType = type === 'PROCEDURE' ? 'PROCEDURE' : 'FUNCTION'
+  const objectType = type === 'PROCEDURE'
+    ? 'PROCEDURE'
+    : 'FUNCTION'
   tabStore.updateTabName(tab.id, `${name}.sql`)
   try {
     const ddl = await browseApi.getObjectDdl(connId, database, schema ?? null, name, objectType)
-    const header = `-- ${objectType}: ${schema ? `${schema}.` : ''}${name}\n\n`
+    const header = `-- ${objectType}: ${schema
+      ? `${schema}.`
+      : ''}${name}\n\n`
     tabStore.updateTabContent(tab.id, header + ddl)
   }
   catch (err) {
@@ -786,7 +823,11 @@ async function handleOpenSavedQuery(filePath: string) {
     }
   }
   catch (error) {
-    toast.error(t('pages.queries.notifications.loadFailed'), { description: error instanceof Error ? error.message : String(error) })
+    toast.error(t('pages.queries.notifications.loadFailed'), {
+      description: error instanceof Error
+        ? error.message
+        : String(error),
+    })
   }
 }
 
@@ -801,7 +842,9 @@ function sanitizeFileName(name: string): string {
 async function saveMetadataEntry(filePath: string) {
   const now = Math.floor(Date.now() / 1000)
   const connId = getConnectionId()
-  const conn = connId ? connectionStore.getConnectionById(connId) : undefined
+  const conn = connId
+    ? connectionStore.getConnectionById(connId)
+    : undefined
   try {
     await saveQueryMetadata(filePath, {
       connectionId: connId ?? null,
@@ -844,7 +887,11 @@ async function handleSaveQuery() {
     }
   }
   catch (error) {
-    toast.error(t('pages.queries.notifications.saveFailed'), { description: error instanceof Error ? error.message : String(error) })
+    toast.error(t('pages.queries.notifications.saveFailed'), {
+      description: error instanceof Error
+        ? error.message
+        : String(error),
+    })
   }
 }
 
@@ -876,7 +923,11 @@ async function handleDownloadQuery() {
     }
   }
   catch (error) {
-    toast.error(t('pages.queries.notifications.loadFailed'), { description: error instanceof Error ? error.message : String(error) })
+    toast.error(t('pages.queries.notifications.loadFailed'), {
+      description: error instanceof Error
+        ? error.message
+        : String(error),
+    })
   }
 }
 
@@ -940,8 +991,45 @@ async function handleCreateDatabase(name: string, options: { charset?: string, c
     const dbType = activeConnection.value?.type
 
     // Build database-specific CREATE DATABASE SQL
-    const MYSQL_SET = new Set(['MYSQL', 'MARIADB', 'TIDB', 'OCEANBASE', 'TDSQL', 'POLARDB', 'DORIS', 'SELECTDB', 'STARROCKS', 'DATABEND', 'GOLDENDB', 'MANTICORESEARCH', 'SINGLESTOREMEMSQL', 'CLOUDSQLMYSQL'])
-    const PG_SET = new Set(['POSTGRESQL', 'COCKROACHDB', 'REDSHIFT', 'YUGABYTEDB', 'TIMESCALEDB', 'KINGBASEES', 'GAUSSDB', 'HIGHGO', 'UXDB', 'OPENGAUSS', 'GBASE8C', 'QUESTDB', 'VASTBASE', 'YASHANDB', 'GREENPLUM', 'ENTERPRISEDB', 'CRATEDB', 'MATERIALIZE', 'ALLOYDB', 'CLOUDSQLPG', 'FUJITSUPG'])
+    const MYSQL_SET = new Set([
+      'MYSQL',
+      'MARIADB',
+      'TIDB',
+      'OCEANBASE',
+      'TDSQL',
+      'POLARDB',
+      'DORIS',
+      'SELECTDB',
+      'STARROCKS',
+      'DATABEND',
+      'GOLDENDB',
+      'MANTICORESEARCH',
+      'SINGLESTOREMEMSQL',
+      'CLOUDSQLMYSQL',
+    ])
+    const PG_SET = new Set([
+      'POSTGRESQL',
+      'COCKROACHDB',
+      'REDSHIFT',
+      'YUGABYTEDB',
+      'TIMESCALEDB',
+      'KINGBASEES',
+      'GAUSSDB',
+      'HIGHGO',
+      'UXDB',
+      'OPENGAUSS',
+      'GBASE8C',
+      'QUESTDB',
+      'VASTBASE',
+      'YASHANDB',
+      'GREENPLUM',
+      'ENTERPRISEDB',
+      'CRATEDB',
+      'MATERIALIZE',
+      'ALLOYDB',
+      'CLOUDSQLPG',
+      'FUJITSUPG',
+    ])
     const MSSQL_SET = new Set(['SQLSERVER', 'HANA'])
 
     let sql: string
@@ -972,13 +1060,18 @@ async function handleCreateDatabase(name: string, options: { charset?: string, c
     })
     if (!isApiSuccess(result))
       throw new Error(result.error?.message || 'Unknown error')
-    toast.success(t('sidebar.databases.actions.createObject.created', { type: t('sidebar.databases.actions.createObject.types.database'), name }))
+    toast.success(t('sidebar.databases.actions.createObject.created', {
+      type: t('sidebar.databases.actions.createObject.types.database'),
+      name,
+    }))
     createDatabaseDialogOpen.value = false
     // Refresh database list without switching to Mode A
     await databaseStore.fetchDatabases(connId)
   }
   catch (err) {
-    toast.error(t('sidebar.databases.actions.createObject.error', { error: String(err) }))
+    toast.error(t('sidebar.databases.actions.createObject.error', {
+      error: String(err),
+    }))
   }
   finally {
     isDatabaseActionExecuting.value = false
@@ -997,12 +1090,17 @@ async function handleCreateSchema(name: string) {
     })
     if (!isApiSuccess(result))
       throw new Error(result.error?.message || 'Unknown error')
-    toast.success(t('sidebar.databases.actions.createObject.created', { type: t('sidebar.databases.actions.createObject.types.schema'), name }))
+    toast.success(t('sidebar.databases.actions.createObject.created', {
+      type: t('sidebar.databases.actions.createObject.types.schema'),
+      name,
+    }))
     createSchemaDialogOpen.value = false
     schemaTreeRef.value?.refresh()
   }
   catch (err) {
-    toast.error(t('sidebar.databases.actions.createObject.error', { error: String(err) }))
+    toast.error(t('sidebar.databases.actions.createObject.error', {
+      error: String(err),
+    }))
   }
   finally {
     isDatabaseActionExecuting.value = false
@@ -1017,8 +1115,45 @@ async function handleDropDatabase() {
   isDatabaseActionExecuting.value = true
   try {
     const dbType = activeConnection.value?.type
-    const MYSQL_SET = new Set(['MYSQL', 'MARIADB', 'TIDB', 'OCEANBASE', 'TDSQL', 'POLARDB', 'DORIS', 'SELECTDB', 'STARROCKS', 'DATABEND', 'GOLDENDB', 'MANTICORESEARCH', 'SINGLESTOREMEMSQL', 'CLOUDSQLMYSQL'])
-    const PG_SET = new Set(['POSTGRESQL', 'COCKROACHDB', 'REDSHIFT', 'YUGABYTEDB', 'TIMESCALEDB', 'KINGBASEES', 'GAUSSDB', 'HIGHGO', 'UXDB', 'OPENGAUSS', 'GBASE8C', 'QUESTDB', 'VASTBASE', 'YASHANDB', 'GREENPLUM', 'ENTERPRISEDB', 'CRATEDB', 'MATERIALIZE', 'ALLOYDB', 'CLOUDSQLPG', 'FUJITSUPG'])
+    const MYSQL_SET = new Set([
+      'MYSQL',
+      'MARIADB',
+      'TIDB',
+      'OCEANBASE',
+      'TDSQL',
+      'POLARDB',
+      'DORIS',
+      'SELECTDB',
+      'STARROCKS',
+      'DATABEND',
+      'GOLDENDB',
+      'MANTICORESEARCH',
+      'SINGLESTOREMEMSQL',
+      'CLOUDSQLMYSQL',
+    ])
+    const PG_SET = new Set([
+      'POSTGRESQL',
+      'COCKROACHDB',
+      'REDSHIFT',
+      'YUGABYTEDB',
+      'TIMESCALEDB',
+      'KINGBASEES',
+      'GAUSSDB',
+      'HIGHGO',
+      'UXDB',
+      'OPENGAUSS',
+      'GBASE8C',
+      'QUESTDB',
+      'VASTBASE',
+      'YASHANDB',
+      'GREENPLUM',
+      'ENTERPRISEDB',
+      'CRATEDB',
+      'MATERIALIZE',
+      'ALLOYDB',
+      'CLOUDSQLPG',
+      'FUJITSUPG',
+    ])
     const MSSQL_SET = new Set(['SQLSERVER', 'HANA'])
 
     let sql: string
@@ -1044,7 +1179,9 @@ async function handleDropDatabase() {
     await databaseStore.fetchDatabases(connId)
   }
   catch (err) {
-    toast.error(t('sidebar.databases.actions.dropDatabase.error', { error: String(err) }))
+    toast.error(t('sidebar.databases.actions.dropDatabase.error', {
+      error: String(err),
+    }))
   }
   finally {
     isDatabaseActionExecuting.value = false
@@ -1076,7 +1213,9 @@ function openTemplateTab(kind: string) {
 }
 
 function getTemplateSQL(kind: string): string {
-  const qualified = selectedSchema.value ? `${selectedSchema.value}.` : ''
+  const qualified = selectedSchema.value
+    ? `${selectedSchema.value}.`
+    : ''
 
   switch (kind) {
     case 'newView':

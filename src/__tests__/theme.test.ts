@@ -5,7 +5,9 @@ import { applyEditorTheme } from '@/composables/editorTheme'
 
 const css = readFileSync(join(__dirname, '../assets/index.css'), 'utf8')
 const parseTokens = (block: string) => Object.fromEntries(
-  [...block.matchAll(/--([\w-]+): ([^;]+);/g)].map(([, name, value]) => [name, value]),
+  [
+    ...block.matchAll(/--([\w-]+): ([^;]+);/g),
+  ].map(([, name, value]) => [name, value]),
 )
 const themes = {
   light: parseTokens(css.slice(css.indexOf('{') + 1, css.indexOf('}'))),
@@ -28,28 +30,50 @@ const luminance = (hsl: string) => {
     [chroma, 0, x],
   ][Math.floor(h / 60) % 6]
   return channels.map(value => value + m)
-    .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4)
+    .map(value => value <= 0.04045
+      ? value / 12.92
+      : ((value + 0.055) / 1.055) ** 2.4)
     .reduce((sum, value, index) => sum + value * [0.2126, 0.7152, 0.0722][index], 0)
 }
 
 const contrast = (a: string, b: string) => {
-  const values = [luminance(a), luminance(b)].sort((a, b) => a - b)
+  const values = [
+    luminance(a),
+    luminance(b),
+  ].sort((a, b) => a - b)
   return (values[1] + 0.05) / (values[0] + 0.05)
 }
 
 describe.each(['light', 'dark'] as const)('%s theme', (name) => {
   const tokens = themes[name]
 
-  it.each(['background', 'chrome', 'card', 'popover', 'accent', 'selection'])(
+  it.each([
+    'background',
+    'chrome',
+    'card',
+    'popover',
+    'accent',
+    'selection',
+  ])(
     'keeps normal and supporting text readable on %s',
     (surface) => {
-      ;['foreground', 'muted-foreground', 'primary-text', 'destructive-text'].forEach((text) => {
+      ;[
+        'foreground',
+        'muted-foreground',
+        'primary-text',
+        'destructive-text',
+      ].forEach((text) => {
         expect(contrast(tokens[text], tokens[surface])).toBeGreaterThanOrEqual(4.5)
       })
     },
   )
 
-  it.each(['primary', 'destructive', 'success', 'warning'])(
+  it.each([
+    'primary',
+    'destructive',
+    'success',
+    'warning',
+  ])(
     'provides a readable foreground on solid %s',
     (role) => {
       expect(contrast(tokens[`${role}-foreground`], tokens[role])).toBeGreaterThanOrEqual(4.5)
@@ -59,12 +83,19 @@ describe.each(['light', 'dark'] as const)('%s theme', (name) => {
   it.each(['success', 'warning', 'destructive'])(
     'keeps %s feedback readable on its subdued surface',
     (role) => {
-      const text = role === 'destructive' ? 'destructive-text' : role
+      const text = role === 'destructive'
+        ? 'destructive-text'
+        : role
       expect(contrast(tokens[text], tokens[`${role}-muted`])).toBeGreaterThanOrEqual(4.5)
     },
   )
 
-  it.each(['keyword', 'string', 'number', 'comment'])(
+  it.each([
+    'keyword',
+    'string',
+    'number',
+    'comment',
+  ])(
     'keeps SQL %s tokens readable',
     (token) => {
       expect(contrast(tokens[`syntax-${token}`], tokens.background)).toBeGreaterThanOrEqual(4.5)
@@ -73,7 +104,12 @@ describe.each(['light', 'dark'] as const)('%s theme', (name) => {
 })
 
 describe('monaco theme integration', () => {
-  const monaco = { editor: { defineTheme: jest.fn(), setTheme: jest.fn() } }
+  const monaco = {
+    editor: {
+      defineTheme: jest.fn(),
+      setTheme: jest.fn(),
+    },
+  }
   const applyTheme = (dark: boolean) => {
     document.documentElement.removeAttribute('style')
     Object.entries(dark ? themes.dark : themes.light).forEach(([key, value]) => {

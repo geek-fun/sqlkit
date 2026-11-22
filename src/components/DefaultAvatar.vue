@@ -12,11 +12,40 @@ const props = withDefaults(defineProps<{ seed?: string }>(), { seed: '' })
 // Letter index inside a-z → bucket table (5 buckets). Non-letters keep
 // their char code % — still deterministic, mapped through the same table
 // via modulo so any seed gets a valid bucket.
-const BUCKETS = [0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4]
+const BUCKETS = [
+  0,
+  0,
+  0,
+  0,
+  0,
+  1,
+  1,
+  1,
+  1,
+  1,
+  1,
+  2,
+  2,
+  2,
+  2,
+  2,
+  3,
+  3,
+  3,
+  3,
+  3,
+  4,
+  4,
+  4,
+  4,
+  4,
+]
 
 const initial = computed(() => {
   const first = (props.seed || '?').trim().charAt(0)
-  return first.toUpperCase() === first ? first : first.toUpperCase()
+  return first.toUpperCase() === first
+    ? first
+    : first.toUpperCase()
 })
 
 const lowerCode = computed(() => {
@@ -26,7 +55,9 @@ const lowerCode = computed(() => {
 
 const bucket = computed(() => {
   const i = lowerCode.value - 97
-  return i >= 0 && i < 26 ? BUCKETS[i] : lowerCode.value % 5
+  return i >= 0 && i < 26
+    ? BUCKETS[i]
+    : lowerCode.value % 5
 })
 
 const THEMES = [

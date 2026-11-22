@@ -16,7 +16,9 @@ export function rowsToCsv(rows: Record<string, unknown>[], columns: string[]): s
       const v = row[c]
       if (v === null || v === undefined)
         return ''
-      const s = typeof v === 'object' ? JSON.stringify(v) : String(v)
+      const s = typeof v === 'object'
+        ? JSON.stringify(v)
+        : String(v)
       return escape(s)
     }).join(','),
   )

@@ -31,13 +31,26 @@ const runAction = async (operation: () => Promise<void>, label: string, success 
   actionFeedback.value = { state: 'pending', label }
   try {
     await operation()
-    actionFeedback.value = { state: 'success', label: feedback(success) }
+    actionFeedback.value = {
+      state: 'success',
+      label: feedback(success),
+    }
   }
-  catch (error) { actionFeedback.value = { state: 'error', label: feedback('failed'), detail: error instanceof Error ? error.message : String(error) } }
+  catch (error) {
+    actionFeedback.value = {
+      state: 'error',
+      label: feedback('failed'),
+      detail: error instanceof Error
+        ? error.message
+        : String(error),
+    }
+  }
 }
 
 function toggleExpand(id: string) {
-  expandedProvider.value = expandedProvider.value === id ? null : id
+  expandedProvider.value = expandedProvider.value === id
+    ? null
+    : id
 }
 
 const handleToggleEnabled = (id: string) => runAction(() => appStore.toggleProviderEnabled(id), feedback('saving'))

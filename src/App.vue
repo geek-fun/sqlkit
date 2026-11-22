@@ -31,7 +31,9 @@ watch(themeType, (newTheme) => {
 
 // Device payloads report the effective UI locale (geek-fun/sqlkit#209) —
 // pushed before session start and refreshed whenever the language changes.
-const pushUiLocale = () => invoke('set_ui_locale', { locale: currentBcp47Locale() })
+const pushUiLocale = () => invoke('set_ui_locale', {
+  locale: currentBcp47Locale(),
+})
 watch(() => lang.global.locale.value, pushUiLocale)
 
 const sessionLifecycle = createSessionLifecycle({

@@ -8,8 +8,12 @@ import { getDialectProfile } from '@/composables/sqlCompletion/dialects'
 const profile = getDialectProfile('sql')
 
 const snapshot: SchemaSnapshot = {
-  databases: [{ name: 'app', isSystem: false }],
-  schemasByDb: { app: ['public', 'analytics'] },
+  databases: [
+    { name: 'app', isSystem: false },
+  ],
+  schemasByDb: {
+    app: ['public', 'analytics'],
+  },
   tablesByKey: {
     'app': ['users', 'orders'],
     'app.public': ['users', 'orders'],
@@ -50,7 +54,13 @@ describe('buildSuggestions', () => {
 
   it('(b) empty word after FROM → table names (current db first)', () => {
     const result = buildSuggestions(
-      ctx({ word: '', tableRefs: [{ table: 'users' }], activeTable: { table: 'users' } }),
+      ctx({
+        word: '',
+        tableRefs: [
+          { table: 'users' },
+        ],
+        activeTable: { table: 'users' },
+      }),
       snapshot,
       profile,
       opts,
@@ -61,7 +71,12 @@ describe('buildSuggestions', () => {
 
   it('(c) after alias dot → columns only, kind column, detail data_type', () => {
     const result = buildSuggestions(
-      ctx({ word: '', isAfterDot: true, qualifier: 'u.', activeTable: { table: 'users', alias: 'u' } }),
+      ctx({
+        word: '',
+        isAfterDot: true,
+        qualifier: 'u.',
+        activeTable: { table: 'users', alias: 'u' },
+      }),
       snapshot,
       profile,
       opts,
@@ -74,7 +89,12 @@ describe('buildSuggestions', () => {
 
   it('(c2) after alias dot with word prefix filters columns', () => {
     const result = buildSuggestions(
-      ctx({ word: 'cre', isAfterDot: true, qualifier: 'u.', activeTable: { table: 'users', alias: 'u' } }),
+      ctx({
+        word: 'cre',
+        isAfterDot: true,
+        qualifier: 'u.',
+        activeTable: { table: 'users', alias: 'u' },
+      }),
       snapshot,
       profile,
       opts,
@@ -98,7 +118,10 @@ describe('buildSuggestions', () => {
     // qualifiers, so the builder falls through to the schema branch.
     const snap: SchemaSnapshot = {
       ...snapshot,
-      tablesByKey: { ...snapshot.tablesByKey, 'app.public': ['users', 'orders', 'user_events'] },
+      tablesByKey: {
+        ...snapshot.tablesByKey,
+        'app.public': ['users', 'orders', 'user_events'],
+      },
       columnsByTable: {
         ...snapshot.columnsByTable,
         'c1|app|public|users': [
@@ -112,7 +135,9 @@ describe('buildSuggestions', () => {
         word: 'user',
         isAfterDot: true,
         qualifier: 'public.',
-        tableRefs: [{ table: 'users', alias: 'u' }],
+        tableRefs: [
+          { table: 'users', alias: 'u' },
+        ],
         activeTable: null,
       }),
       snap,
@@ -133,7 +158,13 @@ describe('buildSuggestions', () => {
 
   it('(f) prefix filters tables', () => {
     const result = buildSuggestions(
-      ctx({ word: 'us', tableRefs: [{ table: 'users' }], activeTable: { table: 'users' } }),
+      ctx({
+        word: 'us',
+        tableRefs: [
+          { table: 'users' },
+        ],
+        activeTable: { table: 'users' },
+      }),
       snapshot,
       profile,
       opts,
@@ -143,14 +174,28 @@ describe('buildSuggestions', () => {
   })
 
   it('(g) empty schema data → keywords still present (graceful degradation)', () => {
-    const empty: SchemaSnapshot = { ...snapshot, hasSchemaData: false, databases: [], schemasByDb: {}, tablesByKey: {}, columnsByTable: {} }
+    const empty: SchemaSnapshot = {
+      ...snapshot,
+      hasSchemaData: false,
+      databases: [],
+      schemasByDb: {},
+      tablesByKey: {},
+      columnsByTable: {},
+    }
     const result = buildSuggestions(ctx({ word: 'SEL' }), empty, profile, opts)
     expect(labels(result)).toContain('SELECT')
     expect(labels(result)).not.toContain('users')
   })
 
   it('(g2) after dot with empty snapshot → empty, no throw', () => {
-    const empty: SchemaSnapshot = { ...snapshot, hasSchemaData: false, databases: [], schemasByDb: {}, tablesByKey: {}, columnsByTable: {} }
+    const empty: SchemaSnapshot = {
+      ...snapshot,
+      hasSchemaData: false,
+      databases: [],
+      schemasByDb: {},
+      tablesByKey: {},
+      columnsByTable: {},
+    }
     const result = buildSuggestions(ctx({ word: '', isAfterDot: true, qualifier: 'x.' }), empty, profile, opts)
     expect(result).toEqual([])
   })
@@ -158,7 +203,9 @@ describe('buildSuggestions', () => {
   it('(h) >100 candidates → exactly 100', () => {
     const bigSnapshot: SchemaSnapshot = {
       ...snapshot,
-      tablesByKey: { app: Array.from({ length: 200 }, (_, i) => `table_${i}`) },
+      tablesByKey: {
+        app: Array.from({ length: 200 }, (_, i) => `table_${i}`),
+      },
     }
     const result = buildSuggestions(ctx({ word: 'table_' }), bigSnapshot, profile, opts)
     expect(result.length).toBeLessThanOrEqual(100)
@@ -172,7 +219,12 @@ describe('buildSuggestions', () => {
 
   it('no keywords after a dot (only objects)', () => {
     const result = buildSuggestions(
-      ctx({ word: '', isAfterDot: true, qualifier: 'u.', activeTable: { table: 'users', alias: 'u' } }),
+      ctx({
+        word: '',
+        isAfterDot: true,
+        qualifier: 'u.',
+        activeTable: { table: 'users', alias: 'u' },
+      }),
       snapshot,
       profile,
       opts,

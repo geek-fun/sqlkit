@@ -46,26 +46,60 @@ export const browseApi = {
   },
 
   listTriggers: async (connectionId: string, database: string, schema: string | null, table: string): Promise<TriggerInfo[]> => {
-    return await invoke<TriggerInfo[]>('list_triggers', { connectionId, database, schema, table })
+    return await invoke<TriggerInfo[]>('list_triggers', {
+      connectionId,
+      database,
+      schema,
+      table,
+    })
   },
 
   listIndexes: async (connectionId: string, database: string, schema: string | null, table: string): Promise<IndexInfo[]> => {
-    return await invoke<IndexInfo[]>('list_indexes', { connectionId, database, schema, table })
+    return await invoke<IndexInfo[]>('list_indexes', {
+      connectionId,
+      database,
+      schema,
+      table,
+    })
   },
 
   listForeignKeys: async (connectionId: string, database: string, schema: string | null, table: string): Promise<ForeignKeyInfo[]> => {
-    return await invoke<ForeignKeyInfo[]>('list_foreign_keys', { connectionId, database, schema, table })
+    return await invoke<ForeignKeyInfo[]>('list_foreign_keys', {
+      connectionId,
+      database,
+      schema,
+      table,
+    })
   },
 
   getObjectDdl: async (connectionId: string, database: string, schema: string | null, objectName: string, objectType: string): Promise<string> => {
-    return await invoke<string>('get_object_ddl', { connectionId, database, schema, objectName, objectType })
+    return await invoke<string>('get_object_ddl', {
+      connectionId,
+      database,
+      schema,
+      objectName,
+      objectType,
+    })
   },
 
   dropObject: async (connectionId: string, database: string, schema: string | null, objectName: string, objectType: string): Promise<void> => {
-    return await invoke<void>('drop_object', { connectionId, database, schema, objectName, objectType })
+    return await invoke<void>('drop_object', {
+      connectionId,
+      database,
+      schema,
+      objectName,
+      objectType,
+    })
   },
 
   renameObject: async (connectionId: string, database: string, schema: string | null, objectName: string, objectType: string, newName: string): Promise<void> => {
-    return await invoke<void>('rename_object', { connectionId, database, schema, objectName, objectType, newName })
+    return await invoke<void>('rename_object', {
+      connectionId,
+      database,
+      schema,
+      objectName,
+      objectType,
+      newName,
+    })
   },
 }

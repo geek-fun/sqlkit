@@ -116,7 +116,12 @@ export function useDataGridCopy() {
       const { save } = await import('@tauri-apps/plugin-dialog')
       const { invoke } = await import('@tauri-apps/api/core')
       const selectedPath = await save({
-        filters: [{ name: `${format.toUpperCase()} Files`, extensions: [extension] }],
+        filters: [
+          {
+            name: `${format.toUpperCase()} Files`,
+            extensions: [extension],
+          },
+        ],
         defaultPath: `${tableName ?? 'export'}.${extension}`,
       })
       if (selectedPath) {

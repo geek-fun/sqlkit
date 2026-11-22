@@ -53,7 +53,9 @@ const clearMode = ref<ClearMode>('all')
 const displayedEntries = computed(() =>
   historyStore.filteredEntries(
     searchQuery.value,
-    statusFilter.value === 'all' ? '' : statusFilter.value,
+    statusFilter.value === 'all'
+      ? ''
+      : statusFilter.value,
   ),
 )
 
@@ -77,7 +79,9 @@ function formatDuration(ms?: number): string {
 
 function truncateSql(sql: string, maxLength = 80): string {
   const single = sql.replace(/\s+/g, ' ').trim()
-  return single.length > maxLength ? `${single.slice(0, maxLength)}…` : single
+  return single.length > maxLength
+    ? `${single.slice(0, maxLength)}…`
+    : single
 }
 
 function openClearDialog(mode: ClearMode) {

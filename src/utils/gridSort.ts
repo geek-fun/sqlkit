@@ -60,7 +60,12 @@ type SortValueKind = 'boolean' | 'number' | 'date' | 'string'
  * The kind is resolved per column, never per cell — per-cell resolution
  * breaks comparator symmetry and flips order between passes.
  */
-const KIND_PRECEDENCE: Record<SortValueKind, number> = { number: 0, boolean: 1, date: 2, string: 3 }
+const KIND_PRECEDENCE: Record<SortValueKind, number> = {
+  number: 0,
+  boolean: 1,
+  date: 2,
+  string: 3,
+}
 
 /** Kind fixed by the declared column type, if it names one. */
 const resolveDeclaredKind = (columnType?: string): SortValueKind | null => {
@@ -128,8 +133,13 @@ function compareNumbers(a: unknown, b: unknown): number {
   const nb = Number(b)
   const aValid = !Number.isNaN(na)
   const bValid = !Number.isNaN(nb)
-  if (aValid && bValid)
-    return na === nb ? 0 : na < nb ? -1 : 1
+  if (aValid && bValid) {
+    return na === nb
+      ? 0
+      : na < nb
+        ? -1
+        : 1
+  }
   if (aValid)
     return -1
   if (bValid)
@@ -140,8 +150,13 @@ function compareNumbers(a: unknown, b: unknown): number {
 function compareDates(a: unknown, b: unknown): number {
   const ta = Date.parse(String(a))
   const tb = Date.parse(String(b))
-  if (!Number.isNaN(ta) && !Number.isNaN(tb))
-    return ta === tb ? 0 : ta < tb ? -1 : 1
+  if (!Number.isNaN(ta) && !Number.isNaN(tb)) {
+    return ta === tb
+      ? 0
+      : ta < tb
+        ? -1
+        : 1
+  }
   return compareStrings(a, b)
 }
 
@@ -161,7 +176,11 @@ export function compareSortValues(a: unknown, b: unknown, kindOrType?: string): 
 
   switch (kindFromToken(kindOrType)) {
     case 'boolean':
-      return (toBoolean(a) ? 1 : 0) - (toBoolean(b) ? 1 : 0)
+      return (toBoolean(a)
+        ? 1
+        : 0) - (toBoolean(b)
+        ? 1
+        : 0)
     case 'number':
       return compareNumbers(a, b)
     case 'date':
@@ -193,8 +212,11 @@ export function sortRowsByState<T extends Record<string, unknown>>(
     .sort((a, b) => {
       for (const rule of sortState) {
         const result = compareSortValues(a.row[rule.column], b.row[rule.column], kinds.get(rule.column))
-        if (result !== 0)
-          return rule.direction === 'DESC' ? -result : result
+        if (result !== 0) {
+          return rule.direction === 'DESC'
+            ? -result
+            : result
+        }
       }
       return a.index - b.index
     })
@@ -203,5 +225,7 @@ export function sortRowsByState<T extends Record<string, unknown>>(
 
 /** Human-readable summary of active sort rules, e.g. `id ↑, name ↓`. */
 export function formatSortState(sortState: SortState): string {
-  return sortState.map(rule => `${rule.column} ${rule.direction === 'ASC' ? '↑' : '↓'}`).join(', ')
+  return sortState.map(rule => `${rule.column} ${rule.direction === 'ASC'
+    ? '↑'
+    : '↓'}`).join(', ')
 }

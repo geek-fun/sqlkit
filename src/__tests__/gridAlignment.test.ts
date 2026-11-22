@@ -34,7 +34,16 @@ describe('getColumnAlignment', () => {
   })
 
   it('left-aligns text, date, json and blob types', () => {
-    ;['TEXT', 'VARCHAR', 'DATE', 'TIMESTAMP', 'JSONB', 'JSON', 'BYTEA', 'BLOB'].forEach(type =>
+    ;[
+      'TEXT',
+      'VARCHAR',
+      'DATE',
+      'TIMESTAMP',
+      'JSONB',
+      'JSON',
+      'BYTEA',
+      'BLOB',
+    ].forEach(type =>
       expect(getColumnAlignment(type)).toBe('start'),
     )
   })

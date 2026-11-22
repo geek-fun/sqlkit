@@ -22,16 +22,30 @@ const { t, locale: _locale } = useI18n()
 const entitlementStore = useEntitlementStore()
 
 const preferencesSaved = ref(false)
-watch(() => [appStore.themeType, appStore.languageType, appStore.editorConfig, appStore.queryConfig], () => {
+watch(() => [
+  appStore.themeType,
+  appStore.languageType,
+  appStore.editorConfig,
+  appStore.queryConfig,
+], () => {
   preferencesSaved.value = true
 }, { deep: true })
 // --- Theme ---
 const currentTheme = computed(() => appStore.themeType)
 
 const themeOptions = [
-  { value: ThemeType.AUTO, label: () => t('pages.settings.general.themes.system') },
-  { value: ThemeType.DARK, label: () => t('pages.settings.general.themes.dark') },
-  { value: ThemeType.LIGHT, label: () => t('pages.settings.general.themes.light') },
+  {
+    value: ThemeType.AUTO,
+    label: () => t('pages.settings.general.themes.system'),
+  },
+  {
+    value: ThemeType.DARK,
+    label: () => t('pages.settings.general.themes.dark'),
+  },
+  {
+    value: ThemeType.LIGHT,
+    label: () => t('pages.settings.general.themes.light'),
+  },
 ]
 
 const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)
@@ -40,14 +54,38 @@ const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)
 const currentLanguage = computed(() => appStore.languageType)
 
 const languageOptions = [
-  { value: LanguageType.AUTO, label: () => t('pages.settings.general.languages.auto') },
-  { value: LanguageType.EN_US, label: () => t('pages.settings.general.languages.enUS') },
-  { value: LanguageType.ZH_CN, label: () => t('pages.settings.general.languages.zhCN') },
-  { value: LanguageType.ZH_TW, label: () => t('pages.settings.general.languages.zhTW') },
-  { value: LanguageType.PT_BR, label: () => t('pages.settings.general.languages.ptBR') },
-  { value: LanguageType.JA_JP, label: () => t('pages.settings.general.languages.jaJP') },
-  { value: LanguageType.KO_KR, label: () => t('pages.settings.general.languages.koKR') },
-  { value: LanguageType.ES_ES, label: () => t('pages.settings.general.languages.esES') },
+  {
+    value: LanguageType.AUTO,
+    label: () => t('pages.settings.general.languages.auto'),
+  },
+  {
+    value: LanguageType.EN_US,
+    label: () => t('pages.settings.general.languages.enUS'),
+  },
+  {
+    value: LanguageType.ZH_CN,
+    label: () => t('pages.settings.general.languages.zhCN'),
+  },
+  {
+    value: LanguageType.ZH_TW,
+    label: () => t('pages.settings.general.languages.zhTW'),
+  },
+  {
+    value: LanguageType.PT_BR,
+    label: () => t('pages.settings.general.languages.ptBR'),
+  },
+  {
+    value: LanguageType.JA_JP,
+    label: () => t('pages.settings.general.languages.jaJP'),
+  },
+  {
+    value: LanguageType.KO_KR,
+    label: () => t('pages.settings.general.languages.koKR'),
+  },
+  {
+    value: LanguageType.ES_ES,
+    label: () => t('pages.settings.general.languages.esES'),
+  },
 ]
 
 const handleLanguageChange = (value: string) => {

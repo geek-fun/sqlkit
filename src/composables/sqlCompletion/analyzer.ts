@@ -205,12 +205,18 @@ function extractTableRefs(text: string, start: number, end: number): TableRef[] 
     // Parse schema.table / table out of the raw name (respecting quotes).
     const parts = rawName.match(/"[^"]*"|`[^`]*`|[\p{L}\p{N}_$]+/gu) ?? []
     const names = parts.map(unquote)
-    const table = names.length > 0 ? names[names.length - 1] : ''
-    const schema = names.length > 1 ? names[names.length - 2] : undefined
+    const table = names.length > 0
+      ? names[names.length - 1]
+      : ''
+    const schema = names.length > 1
+      ? names[names.length - 2]
+      : undefined
     if (!table)
       continue
 
-    const alias = rawAlias ? unquote(rawAlias) : undefined
+    const alias = rawAlias
+      ? unquote(rawAlias)
+      : undefined
     // A bare-alias capture that is actually a keyword (e.g. `FROM a JOIN b`
     // grabbing 'JOIN') means there is no alias — rewind so the next FROM/JOIN
     // in the statement is matched.
