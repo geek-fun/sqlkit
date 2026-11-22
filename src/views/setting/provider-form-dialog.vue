@@ -112,9 +112,9 @@ const presets = computed<Preset[]>(() => [
   },
   {
     id: 'uberllm',
-    name: 'UberLLM',
+    name: 'MartLLM',
     apiCompatibility: 'openai',
-    baseUrl: 'https://api.uberllm.dev/v1',
+    baseUrl: 'https://api.martllm.com/v1',
     kind: 'uberllm',
   },
   {
