@@ -3,7 +3,9 @@ import { mount } from '@vue/test-utils'
 import { SettingsFeedback } from '@/components/settings'
 
 it('unknown progress stays indeterminate rather than inventing a percentage', () => {
-  const wrapper = mount(SettingsFeedback, { props: { state: 'pending', label: 'Preparing download…' } })
+  const wrapper = mount(SettingsFeedback, {
+    props: { state: 'pending', label: 'Preparing download…' },
+  })
   const bar = wrapper.get('[role="progressbar"]')
   expect(bar.attributes('aria-valuenow')).toBeUndefined()
   expect(wrapper.text()).not.toContain('%')
@@ -11,7 +13,9 @@ it('unknown progress stays indeterminate rather than inventing a percentage', ()
 })
 
 it('clamps real progress and retains meaningful completion and failure states', async () => {
-  const wrapper = mount(SettingsFeedback, { props: { state: 'pending', label: 'Downloading…', progress: 47 } })
+  const wrapper = mount(SettingsFeedback, {
+    props: { state: 'pending', label: 'Downloading…', progress: 47 },
+  })
   expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('47')
   await wrapper.setProps({ progress: 120 })
   expect(wrapper.get('[role="progressbar"]').attributes('aria-valuenow')).toBe('100')

@@ -256,7 +256,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
   const error = computed(
     () =>
       localError.value
-      ?? (activeSession.value ? dataStudioStore.getSessionError(activeSession.value.id) : undefined),
+      ?? (activeSession.value
+        ? dataStudioStore.getSessionError(activeSession.value.id)
+        : undefined),
   )
   const lastSettings = ref<Record<string, unknown> | null>(null)
 
@@ -303,7 +305,11 @@ export function useChatAgent(config: UseChatAgentConfig) {
         ? Object.entries(contextSnapshot?.connections ?? {}).flatMap(([alias, conn]) => {
             const connection = connectionStore.getConnectionById(String(conn.connectionId))
             const prompt = connection?.prompt?.trim()
-            return prompt ? [{ alias, prompt }] : []
+            return prompt
+              ? [
+                  { alias, prompt },
+                ]
+              : []
           })
         : []
 
@@ -325,7 +331,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
 
       const assembledSystemPrompt = assembleSystemPrompt({
         base: systemPrompt,
-        userGlobal: hasConnections && canUseCustomPrompts ? appStore.llmSettings.chat.systemPrompt : undefined,
+        userGlobal: hasConnections && canUseCustomPrompts
+          ? appStore.llmSettings.chat.systemPrompt
+          : undefined,
         connectionPrompts,
         sidebarContext,
       })
@@ -342,8 +350,18 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const connectionConfig = contextSnapshot?.connections
         ? Object.fromEntries(
             Object.entries(contextSnapshot.connections).flatMap(([alias, conn]) => {
-              const entry = { sourceId: conn.sourceId, connectionId: String(conn.connectionId), dbType: conn.dbType }
-              return [[String(conn.connectionId), entry], [alias, entry]]
+              const entry = {
+                sourceId: conn.sourceId,
+                connectionId: String(conn.connectionId),
+                dbType: conn.dbType,
+              }
+              return [
+                [
+                  String(conn.connectionId),
+                  entry,
+                ],
+                [alias, entry],
+              ]
             }),
           )
         : {}
@@ -405,7 +423,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
       }
     }
     catch (err) {
-      const message = err instanceof Error ? err.message : String(err)
+      const message = err instanceof Error
+        ? err.message
+        : String(err)
       localError.value = message
       config.sessionStore.setSessionStatus(sessionId, 'error')
     }
@@ -462,7 +482,9 @@ export function useChatAgent(config: UseChatAgentConfig) {
         await appStore.getFeatureModelConfig(config.feature)
       }
       catch (err) {
-        localError.value = err instanceof Error ? err.message : String(err)
+        localError.value = err instanceof Error
+          ? err.message
+          : String(err)
         return
       }
 
@@ -471,14 +493,19 @@ export function useChatAgent(config: UseChatAgentConfig) {
         && Object.values(connections).every(conn => aiContext.readableConnectionIds.includes(String(conn.connectionId)))
       const safeContext = {
         ...context,
-        connections: Object.fromEntries(Object.entries(connections).map(([alias, connection]) => [alias, { ...connection, permissions: aiContext.effectivePermissions[alias] }])),
+        connections: Object.fromEntries(Object.entries(connections).map(([alias, connection]) => [
+          alias,
+          { ...connection, permissions: aiContext.effectivePermissions[alias] },
+        ])),
         schema: canReadContext ? context?.schema : undefined,
         activePanel: canReadContext ? context?.activePanel : undefined,
       }
       await runAgentLoop(sessionId, options.content, aiContext.schema, safeContext)
     }
     catch (err) {
-      localError.value = err instanceof Error ? err.message : String(err)
+      localError.value = err instanceof Error
+        ? err.message
+        : String(err)
       console.error('[useChatAgent] sendMessage error:', err)
     }
   }
@@ -526,7 +553,12 @@ export function useChatAgent(config: UseChatAgentConfig) {
       const message = config.sessionStore.activeSession.value?.messages.find(item => item.id === assistantMsgId)
       if (message) {
         config.sessionStore.setMessageToolCalls(sessionId, assistantMsgId, (message.toolCalls ?? []).map(call => call.id === toolCallId
-          ? { ...call, status: 'denied', requiresConfirmation: false, denial: { kind: 'user', source: 'unknown', message: 'Rejected by you' } }
+          ? {
+              ...call,
+              status: 'denied',
+              requiresConfirmation: false,
+              denial: { kind: 'user', source: 'unknown', message: 'Rejected by you' },
+            }
           : call))
       }
     }

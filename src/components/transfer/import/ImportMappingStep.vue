@@ -81,7 +81,9 @@ const targetParams = computed(() => {
 
 watch(targetParams, (params, oldParams) => {
   const tables: ImportTarget[] | undefined = params.table
-    ? [{ targetTable: params.table, columnMappings: mappings.value }]
+    ? [
+        { targetTable: params.table, columnMappings: mappings.value },
+      ]
     : undefined
 
   transferStore.importRequest = {

@@ -74,8 +74,12 @@ const connectionUrl = computed(() => {
       return 'Cloud Wallet'
     }
   }
-  const portStr = port ? `:${port}` : ''
-  const dbStr = database ? `/${database}` : ''
+  const portStr = port
+    ? `:${port}`
+    : ''
+  const dbStr = database
+    ? `/${database}`
+    : ''
   return `${host}${portStr}${dbStr}`
 })
 
@@ -98,7 +102,9 @@ const handleDisconnect = () => emit('disconnect', props.connection)
 
 const isConnected = computed(() => props.connectionStatus === ConnectionStatus.CONNECTED)
 const connectTooltip = computed(() =>
-  isConnected.value ? t('components.serverCard.actions.openEditor') : t('components.serverCard.actions.connect'),
+  isConnected.value
+    ? t('components.serverCard.actions.openEditor')
+    : t('components.serverCard.actions.connect'),
 )
 </script>
 

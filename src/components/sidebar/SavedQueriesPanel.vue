@@ -114,7 +114,10 @@ function handleItemAction(query: SavedQueryInfo, kind: string) {
       handleReveal(query)
       break
     case 'delete':
-      deleteTarget.value = { query, metadata: getMetadata(query.file_path) }
+      deleteTarget.value = {
+        query,
+        metadata: getMetadata(query.file_path),
+      }
       showDeleteDialog.value = true
       break
   }
@@ -141,7 +144,9 @@ async function handleDeleteConfirm() {
     toast.success(t('sidebar.savedQueries.actions.delete'))
   }
   catch (error) {
-    toast.error(`Failed to delete: ${error instanceof Error ? error.message : String(error)}`)
+    toast.error(`Failed to delete: ${error instanceof Error
+      ? error.message
+      : String(error)}`)
   }
   finally {
     showDeleteDialog.value = false
@@ -172,7 +177,9 @@ async function handleRenameConfirm(newName: string) {
     }
   }
   catch (error) {
-    toast.error(`Failed to rename: ${error instanceof Error ? error.message : String(error)}`)
+    toast.error(`Failed to rename: ${error instanceof Error
+      ? error.message
+      : String(error)}`)
   }
   finally {
     showRenameDialog.value = false

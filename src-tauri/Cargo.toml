@@ -22,14 +22,18 @@ crate-type = [
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [ "devtools" ] }
+tauri = { version = "2", features = [
+  "devtools",
+  "tray-icon"
+] }
 tauri-plugin-opener = "2"
 tauri-plugin-process = "2"
 tauri-plugin-updater = "2"
+tauri-plugin-clipboard-manager = "2"
 serde = { version = "1", features = [ "derive" ] }
 serde_json = "1"
 async-trait = "0.1"
-thiserror = "1.0"
+thiserror = "2.0"
 tokio = { version = "1", features = [ "full" ] }
 tokio-postgres = { version = "0.7", features = [
   "with-serde_json-1",
@@ -37,7 +41,7 @@ tokio-postgres = { version = "0.7", features = [
   "with-uuid-1"
 ] }
 deadpool-postgres = "0.14"
-mysql_async = { version = "0.34", default-features = false, features = [
+mysql_async = { version = "0.37", default-features = false, features = [
   "minimal-rust",
   "rustls-tls",
   "bigdecimal",
@@ -46,11 +50,11 @@ mysql_async = { version = "0.34", default-features = false, features = [
   "frunk",
   "binlog"
 ] }
-tokio-postgres-rustls = "0.13"
+tokio-postgres-rustls = "0.14"
 rustls = "0.23"
 rustls-pemfile = "2"
 rustls-native-certs = "0.8"
-tiberius = { version = "0.12", default-features = false, features = [
+tiberius = { version = "0.13", default-features = false, features = [
   "sql-browser-tokio",
   "tds73",
   "rustls",
@@ -58,7 +62,7 @@ tiberius = { version = "0.12", default-features = false, features = [
   "rust_decimal"
 ] }
 tokio-util = { version = "0.7", features = [ "compat" ] }
-rusqlite = { version = "0.32", default-features = false, features = [ "chrono" ] }
+rusqlite = { version = "0.43", default-features = false, features = [ "chrono" ] }
 # C library bundling is selected by cargo features:
 #   default → rusqlite/bundled (SQLite)
 #   sqlcipher → rusqlite/bundled-sqlcipher (SQLCipher, encrypted SQLite)
@@ -69,25 +73,25 @@ tauri-plugin-deep-link = "2"
 tauri-plugin-os = "2"
 tauri-plugin-window-state = "2"
 url = "2"
-base64 = "0.22"
+base64 = "0.23"
 chrono = "0.4"
 rust_decimal = { version = "1", features = [ "db-postgres" ] }
 hex = "0.4"
-rust_xlsxwriter = "0.64"
-calamine = "0.22"
+rust_xlsxwriter = "0.103"
+calamine = "0.38"
 
 # Agent / LLM dependencies
-reqwest = { version = "0.12", default-features = false, features = [
+reqwest = { version = "0.13", default-features = false, features = [
   "json",
-  "rustls-tls",
+  "rustls",
   "socks",
   "stream"
 ] }
 http = "1"
 log = "0.4"
 futures = "0.3"
-rand = "0.8"
-data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", tag = "v0.2.0" }
+# data-studio-agent: pinned to latest release tag.
+data-studio-agent = { git = "https://github.com/geek-fun/data-studio-agent.git", tag = "v0.2.2" }
 
 # Archive extraction (JRE downloads)
 flate2 = "1.0"
@@ -96,12 +100,12 @@ zip = { version = "2", features = [ "deflate" ] }
 
 # TOML parsing (drivers.toml)
 toml = "0.8"
-sha2 = "0.10"
-hmac = "0.12"
-sqlparser = "0.62"
+sha2 = "0.11"
+hmac = "0.13"
+sqlparser = "0.64"
 fast-socks5 = "1.0"
 percent-encoding = "2"
-russh = "0.60"
+russh = "0.65"
 hyper-util = { version = "0.1", default-features = false, features = [
   "client",
   "client-proxy",
@@ -112,16 +116,18 @@ portpicker = "0.1.1"
 pageant = "0.2"
 
 [dev-dependencies]
-mockall = "0.13"
+mockall = "0.15"
 tempfile = "3"
 wiremock = "0.6"
 
 [features]
 default = [ "rusqlite/bundled" ]
-ohos = []
 # Use SQLCipher (encrypted SQLite) instead of plain SQLite.
 # Build with: cargo build --no-default-features --features sqlcipher
 sqlcipher = [ "rusqlite/bundled-sqlcipher" ]
+
+[target.'cfg(any(target_os = "windows", target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = { version = "2", features = [ "deep-link" ] }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 system-configuration = "0.7"

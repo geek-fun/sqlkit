@@ -3,46 +3,90 @@ import { invoke } from '@tauri-apps/api/core'
 import { flushPromises, shallowMount } from '@vue/test-utils'
 import DataTableView from '@/components/database-browser/DataTableView.vue'
 
-jest.mock('@tauri-apps/api/core', () => ({ invoke: jest.fn() }))
-jest.mock('@tauri-apps/plugin-dialog', () => ({ save: jest.fn() }))
+jest.mock('@tauri-apps/api/core', () => ({
+  invoke: jest.fn(),
+}))
+jest.mock('@tauri-apps/plugin-dialog', () => ({
+  save: jest.fn(),
+}))
 jest.mock('@/components/pagination', () => ({
   PaginationControls: {
     name: 'PaginationControls',
-    props: { currentPage: Number, pageCount: Number, pageSize: [Number, String], disabled: Boolean, allowAll: Boolean },
+    props: {
+      currentPage: Number,
+      pageCount: Number,
+      pageSize: [Number, String],
+      disabled: Boolean,
+      allowAll: Boolean,
+      preview: Boolean,
+    },
     template: '<footer><slot /></footer>',
   },
 }))
-jest.mock('@/components/ui/button', () => ({ Button: { name: 'Button', template: '<button><slot /></button>' } }))
-jest.mock('@/components/ui/input', () => ({ Input: { name: 'Input', template: '<input>' } }))
-jest.mock('@/components/ui/label', () => ({ Label: { template: '<label><slot /></label>' } }))
-jest.mock('@/components/ui/spinner', () => ({ Spinner: { template: '<span />' } }))
-jest.mock('@/components/ui/destructive-confirm-dialog', () => ({ DestructiveConfirmDialog: { template: '<div />' } }))
+jest.mock('@/components/ui/button', () => ({
+  Button: { name: 'Button', template: '<button><slot /></button>' },
+}))
+jest.mock('@/components/ui/input', () => ({
+  Input: { name: 'Input', template: '<input>' },
+}))
+jest.mock('@/components/ui/label', () => ({
+  Label: { template: '<label><slot /></label>' },
+}))
+jest.mock('@/components/ui/spinner', () => ({
+  Spinner: { template: '<span />' },
+}))
+jest.mock('@/components/ui/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: { template: '<div />' },
+}))
 jest.mock('@/components/ui/dialog', () => Object.fromEntries(
-  ['Dialog', 'DialogContent', 'DialogTitle'].map(name => [name, { template: '<div><slot /></div>' }]),
+  ['Dialog', 'DialogContent', 'DialogTitle'].map(name => [
+    name,
+    { template: '<div><slot /></div>' },
+  ]),
 ))
+let mockDbType = 'POSTGRESQL'
+
 jest.mock('@/store', () => ({
   ConnectionStatus: { CONNECTED: 'connected' },
-  useConnectionStore: () => ({ getConnectionStatus: () => 'connected' }),
+  DatabaseType: { CASSANDRA: 'CASSANDRA', SCYLLADB: 'SCYLLADB' },
+  useConnectionStore: () => ({
+    getConnectionStatus: () => 'connected',
+    getConnectionById: () => ({ type: mockDbType }),
+  }),
 }))
 jest.mock('@/composables/useMinLoadingTime', () => ({
-  useMinLoadingTime: () => ({ withMinLoadingTime: (operation: () => Promise<unknown>) => operation() }),
+  useMinLoadingTime: () => ({
+    withMinLoadingTime: (operation: () => Promise<unknown>) => operation(),
+  }),
 }))
 jest.mock('@/composables/useNotifications', () => ({
-  toast: { success: jest.fn(), warning: jest.fn(), error: jest.fn() },
+  toast: {
+    success: jest.fn(),
+    warning: jest.fn(),
+    error: jest.fn(),
+  },
 }))
 jest.mock('vue-i18n', () => ({
-  useI18n: () => ({ t: (key: string, params?: Record<string, unknown>) => `${key} ${JSON.stringify(params ?? {})}` }),
+  useI18n: () => ({
+    t: (key: string, params?: Record<string, unknown>) => `${key} ${JSON.stringify(params ?? {})}`,
+  }),
 }))
 
 const mockInvoke = invoke as jest.Mock
 let total = 235
 const mountTable = () => shallowMount(DataTableView, {
   props: { connectionId: 'test', database: 'sample', tableName: 'items' },
-  global: { renderStubDefaultSlot: true, mocks: { $t: (key: string) => key } },
+  global: {
+    renderStubDefaultSlot: true,
+    mocks: {
+      $t: (key: string) => key,
+    },
+  },
 })
 const lastQuery = () => mockInvoke.mock.calls.filter(([command]) => command === 'get_table_data').slice(-1)[0][1].query
 
 beforeEach(() => {
+  mockDbType = 'POSTGRESQL'
   total = 235
   mockInvoke.mockReset().mockImplementation(async (command, args) => {
     if (command === 'get_table_count')
@@ -52,7 +96,9 @@ beforeEach(() => {
       return {
         columns: ['id'],
         columnTypes: ['integer'],
-        rows: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, i) => ({ id: offset + i + 1 })),
+        rows: Array.from({
+          length: Math.max(0, Math.min(limit, total - offset)),
+        }, (_, i) => ({ id: offset + i + 1 })),
       }
     }
     return []
@@ -60,6 +106,22 @@ beforeEach(() => {
 })
 
 describe('table browsing with shared pagination', () => {
+  it.each(['CASSANDRA', 'SCYLLADB'])('shows a bounded preview for %s', async (dbType) => {
+    mockDbType = dbType
+    const wrapper = mountTable()
+    await flushPromises()
+    const controls = wrapper.findComponent({ name: 'PaginationControls' })
+    expect(controls.props('preview')).toBe(true)
+    expect(lastQuery()).toMatchObject({ limit: 100, offset: 0 })
+    expect(mockInvoke.mock.calls.map(([command]) => command)).not.toContain('get_table_count')
+    expect(wrapper.get('[role="status"]').text()).toContain('components.dataTableView.previewRows {"count":100}')
+    controls.vm.$emit('pageChange', 2)
+    controls.vm.$emit('pageSizeChange', 25)
+    await flushPromises()
+    expect(lastQuery()).toMatchObject({ limit: 25, offset: 0 })
+    expect(mockInvoke.mock.calls.filter(([command]) => command === 'get_table_data')).toHaveLength(2)
+    wrapper.unmount()
+  })
   it('keeps returned rows visible without claiming a total when the count fails', async () => {
     const normalInvoke = mockInvoke.getMockImplementation()!
     mockInvoke.mockImplementation((command, args) => command === 'get_table_count'
@@ -125,7 +187,13 @@ describe('table browsing with shared pagination', () => {
     controls.vm.$emit('pageSizeChange', 50)
     await flushPromises()
     expect(mockInvoke.mock.calls.filter(([command]) => command === 'get_table_data')).toHaveLength(1)
-    finish({ columns: ['id'], columnTypes: ['integer'], rows: [{ id: 1 }] })
+    finish({
+      columns: ['id'],
+      columnTypes: ['integer'],
+      rows: [
+        { id: 1 },
+      ],
+    })
     await flushPromises()
     expect(controls.props('disabled')).toBe(false)
     mockInvoke.mockRejectedValueOnce(new Error('Data unavailable'))

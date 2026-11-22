@@ -93,7 +93,12 @@ describe('fileApi', () => {
       const result = await saveQueryFileAs('SELECT 1', 'new-query')
 
       expect(showSaveDialog).toHaveBeenCalledWith({
-        filters: [{ name: 'SQL Files', extensions: ['sql'] }],
+        filters: [
+          {
+            name: 'SQL Files',
+            extensions: ['sql'],
+          },
+        ],
         defaultPath: 'new-query.sql',
       })
       expect(result?.success).toBe(true)
@@ -106,7 +111,12 @@ describe('fileApi', () => {
       await saveQueryFileAs('SELECT 1', 'query')
 
       expect(showSaveDialog).toHaveBeenCalledWith({
-        filters: [{ name: 'SQL Files', extensions: ['sql'] }],
+        filters: [
+          {
+            name: 'SQL Files',
+            extensions: ['sql'],
+          },
+        ],
         defaultPath: 'query.sql',
       })
     })
@@ -151,7 +161,12 @@ describe('fileApi', () => {
       await saveQueryFileAs('SELECT 1')
 
       expect(showSaveDialog).toHaveBeenCalledWith({
-        filters: [{ name: 'SQL Files', extensions: ['sql'] }],
+        filters: [
+          {
+            name: 'SQL Files',
+            extensions: ['sql'],
+          },
+        ],
         defaultPath: 'query.sql',
       })
     })
@@ -190,16 +205,40 @@ describe('fileApi', () => {
   describe('listSavedQueryFiles', () => {
     it('returns list of saved query files with metadata', async () => {
       invoke.mockResolvedValue([
-        { file_name: 'query1.sql', file_path: '/path/query1.sql', folder: 'queries', modified_at: 1000, size_bytes: 100 },
-        { file_name: 'query2.sql', file_path: '/path/query2.sql', folder: 'queries', modified_at: 2000, size_bytes: 200 },
+        {
+          file_name: 'query1.sql',
+          file_path: '/path/query1.sql',
+          folder: 'queries',
+          modified_at: 1000,
+          size_bytes: 100,
+        },
+        {
+          file_name: 'query2.sql',
+          file_path: '/path/query2.sql',
+          folder: 'queries',
+          modified_at: 2000,
+          size_bytes: 200,
+        },
       ])
 
       const result = await listSavedQueryFiles()
 
       expect(invoke).toHaveBeenCalledWith('list_saved_queries')
       expect(result).toEqual([
-        { file_name: 'query1.sql', file_path: '/path/query1.sql', folder: 'queries', modified_at: 1000, size_bytes: 100 },
-        { file_name: 'query2.sql', file_path: '/path/query2.sql', folder: 'queries', modified_at: 2000, size_bytes: 200 },
+        {
+          file_name: 'query1.sql',
+          file_path: '/path/query1.sql',
+          folder: 'queries',
+          modified_at: 1000,
+          size_bytes: 100,
+        },
+        {
+          file_name: 'query2.sql',
+          file_path: '/path/query2.sql',
+          folder: 'queries',
+          modified_at: 2000,
+          size_bytes: 200,
+        },
       ])
     })
 

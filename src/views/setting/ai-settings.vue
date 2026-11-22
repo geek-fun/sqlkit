@@ -8,8 +8,8 @@ import { UPGRADE_URL } from '@/common'
 import { SettingsFeedback } from '@/components/settings'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { ProBadge } from '@/components/upgrade'
 import { useAppStore } from '@/store/appStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
@@ -66,16 +66,28 @@ const deletePrompt = async () => {
   }
 }
 
-const chatFeedback = ref<{ state: 'idle' | 'pending' | 'success' | 'error', label: string, detail?: string }>({ state: 'pending', label: t('pages.settings.feedback.loading') })
+const chatFeedback = ref<{ state: 'idle' | 'pending' | 'success' | 'error', label: string, detail?: string }>({
+  state: 'pending',
+  label: t('pages.settings.feedback.loading'),
+})
 const loadSettings = async () => {
-  chatFeedback.value = { state: 'pending', label: t('pages.settings.feedback.loading') }
+  chatFeedback.value = {
+    state: 'pending',
+    label: t('pages.settings.feedback.loading'),
+  }
   try {
     await appStore.fetchLlmSettings()
     settingsLoaded.value = true
     chatFeedback.value = { state: 'idle', label: '' }
   }
   catch (error) {
-    chatFeedback.value = { state: 'error', label: t('pages.settings.feedback.loadFailed'), detail: error instanceof Error ? error.message : String(error) }
+    chatFeedback.value = {
+      state: 'error',
+      label: t('pages.settings.feedback.loadFailed'),
+      detail: error instanceof Error
+        ? error.message
+        : String(error),
+    }
   }
 }
 onMounted(loadSettings)
@@ -85,16 +97,30 @@ let saveRevision = 0
 const saveChat = async (change: () => void) => {
   change()
   const revision = ++saveRevision
-  chatFeedback.value = { state: 'pending', label: t('pages.settings.feedback.saving') }
+  chatFeedback.value = {
+    state: 'pending',
+    label: t('pages.settings.feedback.saving'),
+  }
   saveQueue = saveQueue.catch(() => {}).then(() => appStore.persistLlmSettings())
   try {
     await saveQueue
-    if (revision === saveRevision)
-      chatFeedback.value = { state: 'success', label: t('pages.settings.feedback.saved') }
+    if (revision === saveRevision) {
+      chatFeedback.value = {
+        state: 'success',
+        label: t('pages.settings.feedback.saved'),
+      }
+    }
   }
   catch (error) {
-    if (revision === saveRevision)
-      chatFeedback.value = { state: 'error', label: t('pages.settings.feedback.failed'), detail: error instanceof Error ? error.message : String(error) }
+    if (revision === saveRevision) {
+      chatFeedback.value = {
+        state: 'error',
+        label: t('pages.settings.feedback.failed'),
+        detail: error instanceof Error
+          ? error.message
+          : String(error),
+      }
+    }
   }
 }
 function handleAdd() {
@@ -208,7 +234,7 @@ function handleCloseDialog() {
               {{ t('pages.settings.ai.chat.autoCompactDescription') }}
             </p>
           </div>
-          <Checkbox
+          <Switch
             class="shrink-0"
             :checked="llmSettings.chat.autoCompact"
             @update:checked="(val: boolean | string) => saveChat(() => appStore.setAutoCompact(val === true || val === 'true'))"

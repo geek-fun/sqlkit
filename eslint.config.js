@@ -37,4 +37,17 @@ export default antfu({
     'style/eol-last': ['error', 'always'],
     'ts/consistent-type-definitions': ['error', 'type'],
   },
-})
+}).then(configs => [
+  ...configs,
+  {
+    // @unocss/eslint-plugin infers the config location from each linted
+    // file's path; on Windows the markdown processor's virtual code-block
+    // paths use backslashes, so the inference lands on the .md file itself
+    // and the plugin crashes trying to import it as a config module. Pin
+    // the config path so the inference is bypassed on every platform.
+    name: 'sqlkit/unocss-config-path',
+    settings: {
+      unocss: { configPath: './uno.config.ts' },
+    },
+  },
+])

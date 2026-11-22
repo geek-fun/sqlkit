@@ -9,13 +9,14 @@ import DeviceReplaceDialog from '@/components/DeviceReplaceDialog.vue'
 import AppNotifications from '@/components/ui/notification/AppNotifications.vue'
 import UpdateNotification from '@/components/UpdateNotification.vue'
 import UpgradeDialog from '@/components/upgrade/UpgradeDialog.vue'
+import { openUpgradeDialog } from '@/components/upgrade/upgradeDialogService'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { toast } from '@/composables/useNotifications'
 import { useAccountStore } from '@/store/accountStore'
 import { useAppStore } from '@/store/appStore'
 import { useDeviceStore } from '@/store/deviceStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
-import { lang } from './lang'
+import { currentBcp47Locale, lang } from './lang'
 
 const appStore = useAppStore()
 const { themeType } = storeToRefs(appStore)
@@ -28,6 +29,13 @@ const { checkForUpdates } = useAppUpdater()
 watch(themeType, (newTheme) => {
   appStore.setThemeType(newTheme)
 }, { immediate: true })
+
+// Device payloads report the effective UI locale (geek-fun/sqlkit#209) —
+// pushed before session start and refreshed whenever the language changes.
+const pushUiLocale = () => invoke('set_ui_locale', {
+  locale: currentBcp47Locale(),
+})
+watch(() => lang.global.locale.value, pushUiLocale)
 
 const sessionLifecycle = createSessionLifecycle({
   read: () => ({ token: accountStore.token, refreshToken: accountStore.refreshToken, revision: accountStore.sessionRevision }),
@@ -52,6 +60,10 @@ const sessionLifecycle = createSessionLifecycle({
 onMounted(async () => {
   checkForUpdates(false)
 
+  // Tray → "Stopped (subscription required)" opens the upgrade dialog.
+  listen('mcp-bridge://subscription', () => openUpgradeDialog('mcp_bridge')).catch(() => {})
+
+  await pushUiLocale()
   await sessionLifecycle.start()
 })
 

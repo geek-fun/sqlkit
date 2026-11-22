@@ -1,27 +1,37 @@
 <script setup lang="ts">
 import type { SslMode } from '@/types/connection'
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Label } from '@/components/ui/label'
 import { SSL_MODE_LABELS, SSL_MODES } from '@/types/connection'
 
-defineProps<{
+const props = defineProps<{
+  hidePrefer?: boolean
   error?: string
 }>()
 
 const modelValue = defineModel<SslMode>({ required: true })
+
+const modes = computed(() => props.hidePrefer
+  ? SSL_MODES.filter(mode => mode !== 'prefer')
+  : SSL_MODES)
 
 const { t } = useI18n()
 
 function getLabel(mode: SslMode): string {
   const key = `ssl.mode.${mode.replace('-', '')}`
   const translated = t(key)
-  return translated !== key ? translated : SSL_MODE_LABELS[mode]
+  return translated !== key
+    ? translated
+    : SSL_MODE_LABELS[mode]
 }
 
 function getDescription(mode: SslMode): string {
   const key = `ssl.modeDesc.${mode.replace('-', '')}`
   const translated = t(key)
-  return translated !== key ? translated : ''
+  return translated !== key
+    ? translated
+    : ''
 }
 
 function selectMode(mode: SslMode) {
@@ -38,7 +48,7 @@ function selectMode(mode: SslMode) {
       </Label>
       <div class="p-0.5 border border-border rounded-md bg-muted/40 inline-flex gap-px">
         <button
-          v-for="mode in SSL_MODES"
+          v-for="mode in modes"
           :key="mode"
           type="button"
           :title="getDescription(mode)"

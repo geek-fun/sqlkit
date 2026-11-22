@@ -12,6 +12,7 @@ import { ThemeType, useAppStore } from '@/store/appStore'
 type Props = {
   modelValue?: string
   dialect?: SQLDialect
+  cql?: boolean
   readOnly?: boolean
   minimap?: boolean
   fontSize?: number
@@ -70,6 +71,7 @@ const isSettingValueFromProp = ref(false)
 
 const editorOptions: MonacoEditorOptions = {
   language: props.dialect,
+  isCql: () => props.cql ?? false,
   readOnly: props.readOnly,
   minimap: props.minimap,
   fontSize: props.fontSize,

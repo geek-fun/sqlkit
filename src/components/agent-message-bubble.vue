@@ -35,8 +35,14 @@ const connectionLabel = (call: AgentToolCall) => {
 }
 const outcomeTitle = (call: AgentToolCall) => {
   const key = call.status === 'denied'
-    ? call.denial?.kind === 'user' ? 'rejectedNotice' : call.denial?.kind === 'unavailable' ? 'unavailableNotice' : props.historical ? 'historicalBlockedNotice' : 'blockedNotice'
-    : call.status === 'interrupted' ? 'interruptedNotice' : 'toolError'
+    ? call.denial?.kind === 'user'
+      ? 'rejectedNotice'
+      : call.denial?.kind === 'unavailable'
+        ? 'unavailableNotice'
+        : props.historical ? 'historicalBlockedNotice' : 'blockedNotice'
+    : call.status === 'interrupted'
+      ? 'interruptedNotice'
+      : 'toolError'
   return t(`dataStudio.agent.message.${key}`)
 }
 
@@ -141,7 +147,9 @@ function toolResultText(tc: AgentToolCall): string | undefined {
 
 function resultPreview(text: string): string {
   const first = text.split('\n')[0].trim()
-  return first.length > 60 ? `${first.slice(0, 60)}…` : first
+  return first.length > 60
+    ? `${first.slice(0, 60)}…`
+    : first
 }
 
 function formatDuration(ms: number): string {
@@ -199,14 +207,20 @@ function toolIcon(toolName: string): string {
 }
 
 function toolVerb(toolName: string, tc: AgentToolCall): string {
-  if (tc.status === 'denied')
-    return t(`dataStudio.agent.message.${tc.denial?.kind === 'user' ? 'toolRejected' : 'toolBlocked'}`)
+  if (tc.status === 'denied') {
+    return t(`dataStudio.agent.message.${tc.denial?.kind === 'user'
+      ? 'toolRejected'
+      : 'toolBlocked'}`)
+  }
   if (tc.status === 'error')
     return t('dataStudio.agent.message.toolError')
   if (tc.status === 'interrupted')
     return t('dataStudio.agent.message.interruptedNotice')
-  if (tc.status !== 'done')
-    return t(`dataStudio.agent.message.${tc.status === 'pending' ? 'awaitingConfirm' : 'executingTool'}`, { tool: toolName })
+  if (tc.status !== 'done') {
+    return t(`dataStudio.agent.message.${tc.status === 'pending'
+      ? 'awaitingConfirm'
+      : 'executingTool'}`, { tool: toolName })
+  }
   const name = toolName.toLowerCase()
   let args: Record<string, unknown> = {}
   try {
@@ -218,9 +232,13 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
   const displayArg
     = Object.entries(args)
       .filter(([k]) => k !== 'connection_id')
-      .map(([, v]) => (typeof v === 'string' ? v : undefined))
+      .map(([, v]) => (typeof v === 'string'
+        ? v
+        : undefined))
       .find(v => v !== undefined) ?? ''
-  const truncated = displayArg.length > 40 ? `${displayArg.slice(0, 40)}...` : displayArg
+  const truncated = displayArg.length > 40
+    ? `${displayArg.slice(0, 40)}...`
+    : displayArg
 
   const verb = (() => {
     if (name.includes('index_document') || name.includes('create') || name.includes('write') || name.includes('insert') || name.includes('put'))
@@ -242,7 +260,9 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
     return ''
   if (!verb)
     return truncated
-  return truncated ? `${verb} ${truncated}` : verb
+  return truncated
+    ? `${verb} ${truncated}`
+    : verb
 }
 </script>
 

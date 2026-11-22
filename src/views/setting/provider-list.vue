@@ -17,6 +17,25 @@ defineEmits<{
 const appStore = useAppStore()
 const { t } = useI18n()
 
+// Monochrome brand marks per provider kind; generic glyphs for the long tail.
+const PROVIDER_ICONS: Record<string, string> = {
+  'openai': 'i-simple-icons-openai',
+  'deepseek': 'i-simple-icons-deepseek',
+  'openrouter': 'i-simple-icons-openrouter',
+  'anthropic': 'i-simple-icons-anthropic',
+  'gemini': 'i-simple-icons-googlegemini',
+  'grok': 'i-simple-icons-x',
+  'mistral': 'i-simple-icons-mistralai',
+  'azure-openai': 'i-simple-icons-microsoftazure',
+  'ollama': 'i-simple-icons-ollama',
+  'lm-studio': 'i-lucide-cpu',
+  'custom-openai': 'i-lucide-plug',
+  'custom-anthropic': 'i-lucide-plug',
+}
+
+const providerIcon = (kind: string): string =>
+  PROVIDER_ICONS[kind] ?? 'i-lucide-plug'
+
 const providers = computed(() => appStore.llmSettings.providers)
 
 const expandedProvider = ref<string | null>(null)
@@ -31,13 +50,26 @@ const runAction = async (operation: () => Promise<void>, label: string, success 
   actionFeedback.value = { state: 'pending', label }
   try {
     await operation()
-    actionFeedback.value = { state: 'success', label: feedback(success) }
+    actionFeedback.value = {
+      state: 'success',
+      label: feedback(success),
+    }
   }
-  catch (error) { actionFeedback.value = { state: 'error', label: feedback('failed'), detail: error instanceof Error ? error.message : String(error) } }
+  catch (error) {
+    actionFeedback.value = {
+      state: 'error',
+      label: feedback('failed'),
+      detail: error instanceof Error
+        ? error.message
+        : String(error),
+    }
+  }
 }
 
 function toggleExpand(id: string) {
-  expandedProvider.value = expandedProvider.value === id ? null : id
+  expandedProvider.value = expandedProvider.value === id
+    ? null
+    : id
 }
 
 const handleToggleEnabled = (id: string) => runAction(() => appStore.toggleProviderEnabled(id), feedback('saving'))
@@ -122,7 +154,12 @@ const handleSync = async (id: string) => {
           class="px-4 py-3 flex cursor-pointer items-center justify-between hover:bg-accent/50"
           @click="toggleExpand(provider.id)"
         >
-          <div class="flex gap-2 items-center">
+          <div class="flex gap-2.5 items-center">
+            <span
+              aria-hidden="true"
+              class="text-muted-foreground shrink-0 h-4 w-4"
+              :class="providerIcon(provider.kind)"
+            />
             <div
               :class="provider.enabled ? 'bg-green-500' : 'bg-gray-400'"
               class="rounded-full flex-shrink-0 h-2 w-2"

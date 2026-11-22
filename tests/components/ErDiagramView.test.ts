@@ -20,7 +20,9 @@ function calcNodeHeight(columns: number, isExpanded: boolean): number {
   const colCount = isExpanded
     ? columns
     : Math.min(5, columns)
-  const expandBtn = columns > 5 ? EXPAND_BTN_HEIGHT : 0
+  const expandBtn = columns > 5
+    ? EXPAND_BTN_HEIGHT
+    : 0
   return HEADER_HEIGHT + colCount * COL_HEIGHT + expandBtn + CARD_PADDING
 }
 
@@ -101,9 +103,27 @@ describe('erDiagramView', () => {
 
     it('fetches columns for a table via invoke', async () => {
       const mockColumns: ColumnInfo[] = [
-        { name: 'id', data_type: 'integer', nullable: false, is_primary_key: true, is_auto_increment: true },
-        { name: 'name', data_type: 'varchar', nullable: true, is_primary_key: false, is_auto_increment: false },
-        { name: 'email', data_type: 'varchar', nullable: false, is_primary_key: false, is_auto_increment: false },
+        {
+          name: 'id',
+          data_type: 'integer',
+          nullable: false,
+          is_primary_key: true,
+          is_auto_increment: true,
+        },
+        {
+          name: 'name',
+          data_type: 'varchar',
+          nullable: true,
+          is_primary_key: false,
+          is_auto_increment: false,
+        },
+        {
+          name: 'email',
+          data_type: 'varchar',
+          nullable: false,
+          is_primary_key: false,
+          is_auto_increment: false,
+        },
       ]
       ;(invoke as jest.Mock).mockResolvedValue(mockColumns)
 
@@ -146,8 +166,24 @@ describe('erDiagramView', () => {
   describe('table data enrichment', () => {
     it('attaches relevant foreign keys to each table', () => {
       const fkList: ForeignKeyInfo[] = [
-        { constraint_name: 'fk1', source_schema: 'public', source_table: 'orders', source_column: 'user_id', target_schema: 'public', target_table: 'users', target_column: 'id' },
-        { constraint_name: 'fk2', source_schema: 'public', source_table: 'reviews', source_column: 'user_id', target_schema: 'public', target_table: 'users', target_column: 'id' },
+        {
+          constraint_name: 'fk1',
+          source_schema: 'public',
+          source_table: 'orders',
+          source_column: 'user_id',
+          target_schema: 'public',
+          target_table: 'users',
+          target_column: 'id',
+        },
+        {
+          constraint_name: 'fk2',
+          source_schema: 'public',
+          source_table: 'reviews',
+          source_column: 'user_id',
+          target_schema: 'public',
+          target_table: 'users',
+          target_column: 'id',
+        },
       ]
 
       const tables = [
@@ -209,9 +245,33 @@ describe('erDiagramView', () => {
   describe('highlightedTables logic', () => {
     it('finds all directly connected tables', () => {
       const fkList: ForeignKeyInfo[] = [
-        { constraint_name: 'fk1', source_schema: 'public', source_table: 'orders', source_column: 'user_id', target_schema: 'public', target_table: 'users', target_column: 'id' },
-        { constraint_name: 'fk2', source_schema: 'public', source_table: 'reviews', source_column: 'user_id', target_schema: 'public', target_table: 'users', target_column: 'id' },
-        { constraint_name: 'fk3', source_schema: 'public', source_table: 'orders', source_column: 'product_id', target_schema: 'public', target_table: 'products', target_column: 'id' },
+        {
+          constraint_name: 'fk1',
+          source_schema: 'public',
+          source_table: 'orders',
+          source_column: 'user_id',
+          target_schema: 'public',
+          target_table: 'users',
+          target_column: 'id',
+        },
+        {
+          constraint_name: 'fk2',
+          source_schema: 'public',
+          source_table: 'reviews',
+          source_column: 'user_id',
+          target_schema: 'public',
+          target_table: 'users',
+          target_column: 'id',
+        },
+        {
+          constraint_name: 'fk3',
+          source_schema: 'public',
+          source_table: 'orders',
+          source_column: 'product_id',
+          target_schema: 'public',
+          target_table: 'products',
+          target_column: 'id',
+        },
       ]
 
       // Simulating the highlightedTables computed from ErDiagramView
@@ -232,7 +292,15 @@ describe('erDiagramView', () => {
 
     it('returns only the selected table when it has no relationships', () => {
       const fkList: ForeignKeyInfo[] = [
-        { constraint_name: 'fk1', source_schema: 'public', source_table: 'orders', source_column: 'user_id', target_schema: 'public', target_table: 'users', target_column: 'id' },
+        {
+          constraint_name: 'fk1',
+          source_schema: 'public',
+          source_table: 'orders',
+          source_column: 'user_id',
+          target_schema: 'public',
+          target_table: 'users',
+          target_column: 'id',
+        },
       ]
 
       const selectedTableId = 'standalone'

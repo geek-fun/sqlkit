@@ -20,6 +20,7 @@
     "dialog:default",
     "dialog:allow-save",
     "updater:default",
-    "deep-link:default"
+    "deep-link:default",
+    "clipboard-manager:allow-write-text"
   ]
 }

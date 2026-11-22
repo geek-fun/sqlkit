@@ -7,11 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 // Separator is rendered inline as a styled div
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PaidGate, ProBadge } from '@/components/upgrade'
-import { ThemeType, useAppStore } from '@/store/appStore'
+import { LanguageType, ThemeType, useAppStore } from '@/store/appStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
 import AiSettings from '@/views/setting/ai-settings.vue'
+import BridgeStatus from '@/views/setting/bridge-status.vue'
 import JreDriverSection from '@/views/setting/jre-driver-section.vue'
 import McpBridge from '@/views/setting/mcp-bridge.vue'
 import PlanSection from '@/views/setting/plan-section.vue'
@@ -21,22 +23,76 @@ const { t, locale: _locale } = useI18n()
 const entitlementStore = useEntitlementStore()
 
 const preferencesSaved = ref(false)
-watch(() => [appStore.themeType, appStore.editorConfig, appStore.queryConfig], () => {
+watch(() => [
+  appStore.themeType,
+  appStore.languageType,
+  appStore.editorConfig,
+  appStore.queryConfig,
+], () => {
   preferencesSaved.value = true
 }, { deep: true })
 // --- Theme ---
 const currentTheme = computed(() => appStore.themeType)
 
 const themeOptions = [
-  { value: ThemeType.AUTO, label: () => t('pages.settings.general.themes.system') },
-  { value: ThemeType.DARK, label: () => t('pages.settings.general.themes.dark') },
-  { value: ThemeType.LIGHT, label: () => t('pages.settings.general.themes.light') },
+  {
+    value: ThemeType.AUTO,
+    label: () => t('pages.settings.general.themes.system'),
+  },
+  {
+    value: ThemeType.DARK,
+    label: () => t('pages.settings.general.themes.dark'),
+  },
+  {
+    value: ThemeType.LIGHT,
+    label: () => t('pages.settings.general.themes.light'),
+  },
 ]
 
 const handleThemeChange = (theme: ThemeType) => appStore.setThemeType(theme)
 
 // --- Language ---
-// Note: Language change functionality removed - using i18n locale directly
+const currentLanguage = computed(() => appStore.languageType)
+
+const languageOptions = [
+  {
+    value: LanguageType.AUTO,
+    label: () => t('pages.settings.general.languages.auto'),
+  },
+  {
+    value: LanguageType.EN_US,
+    label: () => t('pages.settings.general.languages.enUS'),
+  },
+  {
+    value: LanguageType.ZH_CN,
+    label: () => t('pages.settings.general.languages.zhCN'),
+  },
+  {
+    value: LanguageType.ZH_TW,
+    label: () => t('pages.settings.general.languages.zhTW'),
+  },
+  {
+    value: LanguageType.PT_BR,
+    label: () => t('pages.settings.general.languages.ptBR'),
+  },
+  {
+    value: LanguageType.JA_JP,
+    label: () => t('pages.settings.general.languages.jaJP'),
+  },
+  {
+    value: LanguageType.KO_KR,
+    label: () => t('pages.settings.general.languages.koKR'),
+  },
+  {
+    value: LanguageType.ES_ES,
+    label: () => t('pages.settings.general.languages.esES'),
+  },
+]
+
+const handleLanguageChange = (value: string) => {
+  if (Object.values(LanguageType).includes(value as LanguageType))
+    appStore.setLanguageType(value as LanguageType)
+}
 
 const fontSizeInput = ref(String(appStore.editorConfig.fontSize))
 const fontSizeError = ref('')
@@ -237,6 +293,41 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                     </button>
                   </div>
                 </div>
+
+                <!-- Language selector -->
+                <div class="space-y-3">
+                  <Label>{{ t('pages.settings.general.language') }}</Label>
+                  <p class="text-xs text-muted-foreground">
+                    {{ t('pages.settings.general.languageHelp') }}
+                  </p>
+                  <RadioGroup
+                    :model-value="currentLanguage"
+                    class="gap-3 grid grid-cols-2 sm:grid-cols-4"
+                    :aria-label="t('pages.settings.general.languageSelect')"
+                    @update:model-value="handleLanguageChange($event as string)"
+                  >
+                    <label
+                      v-for="langOpt in languageOptions"
+                      :key="langOpt.value"
+                      class="px-3 py-2.5 border rounded-lg flex gap-2.5 min-w-0 cursor-pointer transition-all items-center focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-1"
+                      :class="currentLanguage === langOpt.value
+                        ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
+                        : 'border-input hover:border-primary/50 hover:bg-accent/50'"
+                    >
+                      <RadioGroupItem
+                        :id="`lang-${langOpt.value}`"
+                        :value="langOpt.value"
+                        :aria-labelledby="`lang-${langOpt.value}-label`"
+                        class="shrink-0"
+                      />
+                      <span
+                        :id="`lang-${langOpt.value}-label`"
+                        class="text-sm font-medium min-w-0 cursor-pointer truncate"
+                        :title="langOpt.label()"
+                      >{{ langOpt.label() }}</span>
+                    </label>
+                  </RadioGroup>
+                </div>
               </CardContent>
             </Card>
             <section aria-labelledby="settings-account-plan-title" class="space-y-3">
@@ -262,7 +353,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
               </CardHeader>
               <CardContent class="space-y-5">
                 <!-- Font Size -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.fontSize') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -285,7 +376,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Tab Size -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.tabSize') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -308,7 +399,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Indent Width -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.indentWidth') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -331,7 +422,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Line Width -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.editor.lineWidth') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -431,7 +522,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
               </CardHeader>
               <CardContent class="space-y-5">
                 <!-- Default Row Limit -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.query.defaultLimit') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -454,7 +545,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Query Timeout -->
-                <div class="gap-4 grid grid-cols-2 items-start">
+                <div class="flex gap-4 items-start justify-between">
                   <div class="space-y-1">
                     <Label>{{ t('pages.settings.query.queryTimeout') }}</Label>
                     <p class="text-xs text-muted-foreground">
@@ -509,7 +600,10 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
           </TabsContent>
 
           <!-- MCP Bridge Tab -->
-          <TabsContent value="mcp" class="mt-0">
+          <TabsContent value="mcp" class="mt-0 space-y-6">
+            <!-- Bridge status stays outside the gate: users without an active
+                 subscription need the "why is it stopped" answer most. -->
+            <BridgeStatus />
             <PaidGate feature="mcp_bridge">
               <McpBridge />
             </PaidGate>

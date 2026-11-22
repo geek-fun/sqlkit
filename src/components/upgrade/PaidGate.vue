@@ -50,7 +50,9 @@ const tiles = computed(() => {
 })
 
 const provTitleKey = computed(() =>
-  props.feature === 'mcp_bridge' ? 'plan.gate.detail.mcp' : 'plan.gate.detail.ai',
+  props.feature === 'mcp_bridge'
+    ? 'plan.gate.detail.mcp'
+    : 'plan.gate.detail.ai',
 )
 
 const providerGroups = computed(() => {
@@ -89,7 +91,7 @@ const providerGroups = computed(() => {
       {
         labelKey: 'plan.gate.groups.clients',
         items: [
-          { label: 'Claude Desktop', icon: 'i-simple-icons-claude' },
+          { label: 'Claude Code', icon: 'i-simple-icons-claude' },
           { label: 'Cursor', icon: 'i-simple-icons-cursor' },
           { label: 'Windsurf', icon: 'i-simple-icons-windsurf' },
           { label: 'Any MCP client', icon: 'i-lucide-plug' },

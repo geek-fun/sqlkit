@@ -9,9 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Device activation and session refresh report the app's UI language, so re-logging in after changing it keeps the console device list accurate (#209)
+
+## [1.0.2] - 2026-11-13
+
+### Added
+
+- UberLLM provider preset in AI settings (OpenAI compatible, base URL `https://api.uberllm.dev/v1`) (#205)
 - CloudGPU provider preset in AI settings (OpenAI compatible, base URL `https://cloudgpu.app/v1`)
 - Runcrate provider preset in AI settings (OpenAI compatible, base URL `https://api.runcrate.ai/v1`)
 - cheapaimodel provider preset in AI settings (OpenAI compatible, base URL `https://api.cheapaimodel.ai/v1`)
+
+### Changed
+
+- Unified the app's type scale and tightened workspace density: sidebar trees and query tabs read at the 13px body tier, with a more compact navigation rail, object tree, and toolbars.
+
+### Fixed
+
+- AI chat no longer sends the message when Enter confirms an IME candidate during Chinese/Japanese input.
 
 ## [1.0.1] - 2026-10-28
 
@@ -244,7 +259,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Refactor ER diagram to single TB layout with Record position tracking
 - Replace ER diagram SVG rendering with pure HTML for better performance
-- Adopt DBX-style compact toolbar layout
+- Adopt compact toolbar layout
 - Refactor sidebar: move ER diagram button to database actions dropdown
 
 ## [0.7.4] - 2026-07-01

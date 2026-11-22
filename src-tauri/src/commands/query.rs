@@ -322,7 +322,10 @@ pub async fn execute_sorted_query(
     // Derive database type from the active connection
     let db_type = {
         let connection = state.ensure_connection(&connection_id).await?;
-        crate::commands::browse::get_db_type_string(&connection).to_string()
+        match &connection {
+            ActiveConnection::JdbcBridge(adapter) => adapter.lock().await.config.db_type.slug(),
+            _ => crate::commands::browse::get_db_type_string(&connection).to_string(),
+        }
     };
 
     // Inject the database type into options and build the wrapped SQL

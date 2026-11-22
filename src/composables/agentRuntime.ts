@@ -166,7 +166,9 @@ async function initAgentRuntime(): Promise<void> {
         id: tool_call_id,
         toolName: tool_name,
         args: JSON.stringify(args ?? {}),
-        status: denied ? 'denied' : needsConfirmation ? 'pending' : 'executing',
+        status: denied
+          ? 'denied'
+          : needsConfirmation ? 'pending' : 'executing',
         riskLevel,
         requiresConfirmation: needsConfirmation,
       }
@@ -244,7 +246,10 @@ async function initAgentRuntime(): Promise<void> {
             result: envelope.summary,
             denial,
           }
-          store.setMessageToolCalls(target.id, [...(target.toolCalls ?? []), rejected], session_id)
+          store.setMessageToolCalls(target.id, [
+            ...(target.toolCalls ?? []),
+            rejected,
+          ], session_id)
         }
       }
 
@@ -252,7 +257,9 @@ async function initAgentRuntime(): Promise<void> {
         store.updateToolCallStatus(
           assistantMsg.id,
           tool_call_id,
-          denied ? 'denied' : error ? 'error' : 'done',
+          denied
+            ? 'denied'
+            : error ? 'error' : 'done',
           envelope.summary,
           envelope.metadata?.duration_ms,
           session_id,
@@ -260,7 +267,9 @@ async function initAgentRuntime(): Promise<void> {
 
         if (denial) {
           const updated = getSessionById(store.sessions, session_id)?.messages.find(message => message.id === assistantMsg.id)
-          store.setMessageToolCalls(assistantMsg.id, (updated?.toolCalls ?? []).map(call => call.id === tool_call_id ? { ...call, denial } : call), session_id)
+          store.setMessageToolCalls(assistantMsg.id, (updated?.toolCalls ?? []).map(call => call.id === tool_call_id
+            ? { ...call, denial }
+            : call), session_id)
         }
 
         if (envelope.full_result) {
@@ -333,7 +342,12 @@ async function initAgentRuntime(): Promise<void> {
   unlisteners.push(
     await agentApi.onAgentLoopStopped(({ session_id, reason, message }) => {
       const store = useDataStudioStore()
-      const normalized = (['iteration_cap', 'wall_clock_budget', 'token_budget', 'llm_error'].includes(reason)
+      const normalized = ([
+        'iteration_cap',
+        'wall_clock_budget',
+        'token_budget',
+        'llm_error',
+      ].includes(reason)
         ? reason
         : 'iteration_cap') as AgentSessionStopReason
       store.setSessionStopped(session_id, normalized, message)

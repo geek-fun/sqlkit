@@ -137,6 +137,8 @@ pub enum DatabaseType {
     Kylin,
     /// Apache Cassandra — JDBC bridge.
     Cassandra,
+    /// ScyllaDB — CQL-compatible wide-column store, JDBC bridge.
+    ScyllaDB,
     /// InterSystems IRIS — JDBC bridge.
     Iris,
     /// Microsoft Access — JDBC bridge.
@@ -160,6 +162,27 @@ pub enum DatabaseType {
 }
 
 impl DatabaseType {
+    pub(crate) fn is_cql(self) -> bool {
+        matches!(self, Self::Cassandra | Self::ScyllaDB)
+    }
+
+    /// Whether a backend slug (`db_type` string as used by the SQL services
+    /// and MCP tools) identifies a CQL engine. Case-insensitive on purpose:
+    /// the slug arrives from several layers with mixed casing.
+    pub(crate) fn slug_is_cql(slug: &str) -> bool {
+        matches!(slug.to_lowercase().as_str(), "cassandra" | "scylladb")
+    }
+
+    /// The backend slug for this type — the same `db_type` string the SQL
+    /// services key their dialect lookups on (matches the serde lowercase
+    /// representation the frontend persists).
+    pub(crate) fn slug(self) -> String {
+        serde_json::to_value(self)
+            .ok()
+            .and_then(|v| v.as_str().map(str::to_string))
+            .unwrap_or_else(|| "generic".to_string())
+    }
+
     /// Whether this connection type has an SSL/TLS concept at all.
     ///
     /// Embedded / file-based engines mirror the frontend
@@ -344,8 +367,43 @@ impl ConnectionConfig {
 
     /// Set the database name.
     pub fn with_database(mut self, database: impl Into<String>) -> Self {
-        self.database = Some(database.into());
+        let database = database.into();
+        if self.db_type.is_cql() {
+            // Older connection records store the datacenter in the database value.
+            let (keyspace, params) = database.split_once('?').unwrap_or((&database, ""));
+            if let Some((_, dc)) = url::form_urlencoded::parse(params.as_bytes())
+                .find(|(name, _)| name.eq_ignore_ascii_case("localdatacenter"))
+            {
+                self.options
+                    .insert("localdatacenter".into(), dc.into_owned());
+            }
+            let keyspace = keyspace.trim();
+            self.database = Some(
+                keyspace
+                    .strip_prefix('"')
+                    .and_then(|name| name.strip_suffix('"'))
+                    .unwrap_or(keyspace)
+                    .to_string(),
+            );
+        } else {
+            self.database = Some(database);
+        }
         self
+    }
+
+    pub(crate) fn cql_keyspace(&self) -> &str {
+        self.database
+            .as_deref()
+            .filter(|name| !name.is_empty())
+            .unwrap_or("system")
+    }
+
+    pub(crate) fn cql_datacenter(&self) -> &str {
+        self.options
+            .get("localdatacenter")
+            .map(|dc| dc.trim())
+            .filter(|dc| !dc.is_empty())
+            .unwrap_or("datacenter1")
     }
 
     /// Set the password.

@@ -2,7 +2,7 @@
 
 use crate::database::{
     adapter::DatabaseAdapter,
-    config::ConnectionConfig,
+    config::{ConnectionConfig, DatabaseType},
     error::{DbError, DbResult},
     types::{
         ColumnInfo, ConnectionStatus, DatabaseSchema, ForeignKeyInfo, IndexInfo, ObjectInfo,
@@ -38,11 +38,42 @@ impl JdbcBridgeAdapter {
         }
     }
 
+    fn fold_catalog_into_schema<'a>(
+        &self,
+        database: Option<&'a str>,
+        schema: Option<&'a str>,
+    ) -> (Option<&'a str>, Option<&'a str>) {
+        if self.config.db_type.is_cql() {
+            (None, schema.or(database))
+        } else {
+            (database, schema)
+        }
+    }
+
+    /// Run a CQL query and return its rows, bypassing `DatabaseMetaData` for
+    /// introspection (see `list_tables` / `list_columns`).
+    async fn cql_rows(&self, sql: &str) -> DbResult<Vec<QueryRow>> {
+        let launcher = self.launcher()?;
+        let data = Self::send_request(
+            launcher,
+            JdbcRequest::new(
+                JdbcMethod::ExecuteQuery,
+                serde_json::json!({
+                    "conn_id": self.conn_id,
+                    "sql": sql,
+                }),
+            ),
+        )
+        .await?;
+        Ok(Self::parse_query_result(data)?.rows)
+    }
+
     /// Ensure all prerequisites are met: JRE, bridge JAR, and JDBC driver.
     /// Uses the fallback chain to try multiple driver versions automatically.
     async fn init_bridge(&mut self) -> DbResult<Arc<Mutex<JdbcBridgeLauncher>>> {
         let db_type = self.config.db_type;
         let ssl_mode_str = match self.config.ssl_mode {
+            crate::database::config::SslMode::Prefer if db_type.is_cql() => "disable",
             crate::database::config::SslMode::Disable => "disable",
             crate::database::config::SslMode::Prefer => "prefer",
             crate::database::config::SslMode::Require => "require",
@@ -61,11 +92,27 @@ impl JdbcBridgeAdapter {
 
         // Use fallback chain for JDBC-dependent databases (Oracle, DB2, H2, etc.)
         // For non-registry types, fall back to the old single-driver approach
+        let database = if db_type.is_cql() {
+            let keyspace = self.config.cql_keyspace();
+            if !keyspace.starts_with(|c: char| c.is_ascii_alphabetic())
+                || !keyspace
+                    .bytes()
+                    .all(|c| c.is_ascii_alphanumeric() || c == b'_')
+            {
+                return Err(DbError::Connection(format!(
+                    "Invalid CQL keyspace: {keyspace}"
+                )));
+            }
+            Some(keyspace)
+        } else {
+            self.config.database.as_deref()
+        };
         let (_version, conn_id, launcher) = super::fallback::run_fallback_chain(
             db_type,
             &self.config.host,
             self.config.port,
-            self.config.database.as_deref(),
+            database,
+            db_type.is_cql().then(|| self.config.cql_datacenter()),
             &self.config.username,
             &self.config.password,
             self.config.oracle_options.as_ref(),
@@ -160,6 +207,7 @@ impl JdbcBridgeAdapter {
         schema: Option<&str>,
         table: Option<&str>,
     ) -> DbResult<T> {
+        let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,
@@ -219,15 +267,37 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
             ),
         )
         .await?;
-        Self::parse_connection_status(data)
+        let mut status = Self::parse_connection_status(data)?;
+        if self.config.db_type.is_cql() {
+            if self.config.db_type == DatabaseType::Cassandra
+                && status
+                    .server_version
+                    .as_deref()
+                    .and_then(|version| version.split('.').next())
+                    .and_then(|major| major.parse::<u32>().ok())
+                    .is_some_and(|major| major < 3)
+            {
+                return Err(DbError::UnsupportedOperation(
+                    "Cassandra 3.0 or later is required for keyspace and table browsing.".into(),
+                ));
+            }
+            // JDBC getCatalog() exposes the cluster name for the CQL wrapper.
+            status.current_database = Some(self.config.cql_keyspace().to_string());
+        }
+        Ok(status)
     }
 
     async fn execute_query(&self, query: &str) -> DbResult<QueryResult> {
         let launcher = self.launcher()?;
-        let statements = split_sql_statements_for_dialect(
-            query,
-            self.config.db_type == super::super::DatabaseType::Oracle,
-        );
+        let statements = if self.config.db_type.is_cql() {
+            crate::database::cql::split_statements(query)
+                .map_err(|error| DbError::InvalidQuery(error.into()))?
+                .into_iter()
+                .map(str::to_owned)
+                .collect()
+        } else {
+            split_sql_statements_for_dialect(query, self.config.db_type == DatabaseType::Oracle)
+        };
         if statements.is_empty() {
             return Ok(QueryResult {
                 columns: Vec::new(),
@@ -291,6 +361,22 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn list_databases(&self) -> DbResult<Vec<DatabaseSchema>> {
+        if self.config.db_type.is_cql() {
+            // The wrapper's catalog listing reports the cluster name, not
+            // keyspaces — read them from system_schema instead.
+            return Ok(self
+                .cql_rows("SELECT keyspace_name FROM system_schema.keyspaces")
+                .await?
+                .iter()
+                .filter_map(|row| row.get("keyspace_name").and_then(|v| v.as_string()))
+                .map(|name| DatabaseSchema {
+                    is_system: name.starts_with("system"),
+                    name,
+                    description: None,
+                    metadata: HashMap::new(),
+                })
+                .collect());
+        }
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,
@@ -316,6 +402,12 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     }
 
     async fn list_schemas(&self, database: Option<&str>) -> DbResult<Vec<String>> {
+        let (database, schema) = if self.config.db_type.is_cql() {
+            // The wrapper reports keyspaces as schemas — carry the database there.
+            (None, database)
+        } else {
+            (database, None)
+        };
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,
@@ -324,6 +416,7 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
                 serde_json::json!({
                     "conn_id": self.conn_id,
                     "database": database,
+                    "schema": schema,
                 }),
             ),
         )
@@ -337,6 +430,42 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<TableInfo>> {
+        if self.config.db_type.is_cql() {
+            // The wrapper's DatabaseMetaData only reports objects of the
+            // keyspace bound at connect time and ignores the catalog/schema
+            // arguments — so browsing a keyspace picked later in the UI would
+            // come back empty. Read system_schema directly instead, which also
+            // keeps working when the session keyspace is `system`.
+            let keyspace = schema.or(database);
+            let sql = match keyspace {
+                Some(ks) => format!(
+                    "SELECT table_name FROM system_schema.tables WHERE keyspace_name = '{}'",
+                    ks.replace('\'', "''")
+                ),
+                None => "SELECT keyspace_name, table_name FROM system_schema.tables".to_string(),
+            };
+            let rows = self.cql_rows(&sql).await?;
+            return Ok(rows
+                .iter()
+                .filter_map(|row| {
+                    let table = row.get("table_name")?.as_string()?;
+                    let ks = row
+                        .get("keyspace_name")
+                        .and_then(|v| v.as_string())
+                        .or_else(|| keyspace.map(|k| k.to_string()));
+                    Some(TableInfo {
+                        schema: ks,
+                        name: table,
+                        table_type: "TABLE".to_string(),
+                        row_count: None,
+                        size_bytes: None,
+                        description: None,
+                        metadata: HashMap::new(),
+                    })
+                })
+                .collect());
+        }
+        let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,
@@ -378,6 +507,59 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ColumnInfo>> {
+        if self.config.db_type.is_cql() {
+            // Same session-keyspace limitation as list_tables: read the column
+            // definitions (and primary-key flags) from system_schema.
+            let keyspace = schema
+                .or(database)
+                .unwrap_or_else(|| self.config.cql_keyspace());
+            let sql = format!(
+                "SELECT column_name, kind, position, type FROM system_schema.columns \
+                 WHERE keyspace_name = '{}' AND table_name = '{}'",
+                keyspace.replace('\'', "''"),
+                table.replace('\'', "''")
+            );
+            let mut cols: Vec<(String, bool, String)> = self
+                .cql_rows(&sql)
+                .await?
+                .iter()
+                .filter_map(|row| {
+                    let name = row.get("column_name").and_then(|v| v.as_string())?;
+                    let kind = row
+                        .get("kind")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
+                    let ty = row
+                        .get("type")
+                        .and_then(|v| v.as_string())
+                        .unwrap_or_default();
+                    Some((
+                        name,
+                        kind.contains("partition_key") || kind.contains("clustering"),
+                        ty,
+                    ))
+                })
+                .collect();
+            // Primary-key columns first, then the rest, mirroring CQL's layout.
+            cols.sort_by_key(|(_, is_pk, _)| !*is_pk);
+            return Ok(cols
+                .into_iter()
+                .map(|(name, is_primary_key, data_type)| ColumnInfo {
+                    name,
+                    data_type,
+                    nullable: !is_primary_key,
+                    default_value: None,
+                    is_primary_key,
+                    is_auto_increment: false,
+                    max_length: None,
+                    precision: None,
+                    scale: None,
+                    description: None,
+                    metadata: HashMap::new(),
+                })
+                .collect());
+        }
+        let (database, schema) = self.fold_catalog_into_schema(database, schema);
         let launcher = self.launcher()?;
         let data = Self::send_request(
             launcher,
@@ -449,6 +631,9 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<ObjectInfo>> {
+        if self.config.db_type.is_cql() {
+            return Ok(Vec::new());
+        }
         self.send_list_request(JdbcMethod::ListViews, database, schema, None)
             .await
     }
@@ -497,6 +682,9 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         schema: Option<&str>,
         table: &str,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
+        if self.config.db_type.is_cql() {
+            return Ok(Vec::new());
+        }
         self.send_list_request(JdbcMethod::ListForeignKeys, database, schema, Some(table))
             .await
     }
@@ -506,6 +694,9 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
         database: Option<&str>,
         schema: Option<&str>,
     ) -> DbResult<Vec<ForeignKeyInfo>> {
+        if self.config.db_type.is_cql() {
+            return Ok(Vec::new());
+        }
         self.send_list_request(JdbcMethod::GetForeignKeys, database, schema, None)
             .await
     }
@@ -775,6 +966,49 @@ fn split_sql_statements_for_dialect(sql: &str, oracle: bool) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    #[ignore = "Requires a disposable Cassandra server and the current JDBC bridge JAR"]
+    async fn cql_bridge_opens_exact_keyspace_and_executes_an_intact_batch() {
+        let port = std::env::var("SQLKIT_CQL_TEST_PORT")
+            .expect("set SQLKIT_CQL_TEST_PORT to the disposable server's local port")
+            .parse()
+            .expect("valid Cassandra port");
+        let config = ConnectionConfig::new(DatabaseType::Cassandra, "127.0.0.1", port, "")
+            .with_ssl_mode(crate::database::SslMode::Disable);
+        let mut admin = JdbcBridgeAdapter::new(config.clone());
+        admin.connect().await.unwrap();
+        let keyspace = format!("CqlTest{}", uuid::Uuid::new_v4().simple());
+        let quoted = format!("\"{keyspace}\"");
+        admin
+            .execute_query(&format!(
+                "CREATE KEYSPACE {quoted} WITH replication = \
+                 {{'class': 'SimpleStrategy', 'replication_factor': 1}}"
+            ))
+            .await
+            .unwrap();
+        let mut scoped = JdbcBridgeAdapter::new(config.with_database(&quoted));
+        let rows = async {
+            scoped.connect().await?;
+            scoped
+                .execute_query(
+                    "CREATE TABLE events (id int PRIMARY KEY); \
+                     BEGIN UNLOGGED BATCH \
+                     INSERT INTO events (id) VALUES (1); \
+                     INSERT INTO events (id) VALUES (2); \
+                     APPLY BATCH; SELECT * FROM events",
+                )
+                .await
+        }
+        .await;
+        scoped.disconnect().await.unwrap();
+        admin
+            .execute_query(&format!("DROP KEYSPACE {quoted}"))
+            .await
+            .unwrap();
+        admin.disconnect().await.unwrap();
+        assert_eq!(rows.unwrap().rows.len(), 2);
+    }
 
     #[test]
     fn comments_preserve_token_boundaries() {

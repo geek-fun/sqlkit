@@ -26,7 +26,9 @@ const { isMac, platformReady } = usePlatform()
 const trafficLightInset = computed(() => {
   if (!platformReady.value)
     return '78px'
-  return shouldReserveMacTrafficLightInset(isMac.value, windowControls.isFullscreen.value, true) ? '78px' : '0px'
+  return shouldReserveMacTrafficLightInset(isMac.value, windowControls.isFullscreen.value, true)
+    ? '78px'
+    : '0px'
 })
 </script>
 
@@ -40,9 +42,9 @@ const trafficLightInset = computed(() => {
     data-tauri-drag-region
   >
     <WindowControls />
-    <div class="px-2 flex flex-1 h-full w-0 items-center">
-      <span class="text-xs text-muted-foreground font-semibold select-none">SqlKit</span>
-      <div class="flex-1" data-tauri-drag-region />
+    <div class="px-2 flex flex-1 h-full w-0 items-center" data-tauri-drag-region>
+      <span class="text-xs text-muted-foreground font-semibold select-none" data-tauri-drag-region>SqlKit</span>
+      <div class="flex-1 h-full" data-tauri-drag-region />
       <TooltipProvider>
         <Tooltip v-if="!hideAiButton">
           <TooltipTrigger as-child>

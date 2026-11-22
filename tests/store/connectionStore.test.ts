@@ -19,13 +19,47 @@ jest.mock('@/datasources/connectionApi', () => ({
 }))
 
 const PROFILES = [
-  { id: 'hop-1', name: 'Bastion A', host: 'bastion-a', port: 22, username: 'ops', authMethod: 'password', password: 'p', keyPath: '', keyPassphrase: '', useSshAgent: false, sshAgentSockPath: '', connectTimeoutSecs: 10, keepaliveIntervalSecs: 30, verifyHostKey: false, exposeLan: false },
-  { id: 'hop-2', name: 'Bastion B', host: 'bastion-b', port: 22, username: 'ops', authMethod: 'key', password: '', keyPath: '/keys/id_rsa', keyPassphrase: '', useSshAgent: false, sshAgentSockPath: '', connectTimeoutSecs: 10, keepaliveIntervalSecs: 30, verifyHostKey: false, exposeLan: false },
+  {
+    id: 'hop-1',
+    name: 'Bastion A',
+    host: 'bastion-a',
+    port: 22,
+    username: 'ops',
+    authMethod: 'password',
+    password: 'p',
+    keyPath: '',
+    keyPassphrase: '',
+    useSshAgent: false,
+    sshAgentSockPath: '',
+    connectTimeoutSecs: 10,
+    keepaliveIntervalSecs: 30,
+    verifyHostKey: false,
+    exposeLan: false,
+  },
+  {
+    id: 'hop-2',
+    name: 'Bastion B',
+    host: 'bastion-b',
+    port: 22,
+    username: 'ops',
+    authMethod: 'key',
+    password: '',
+    keyPath: '/keys/id_rsa',
+    keyPassphrase: '',
+    useSshAgent: false,
+    sshAgentSockPath: '',
+    connectTimeoutSecs: 10,
+    keepaliveIntervalSecs: 30,
+    verifyHostKey: false,
+    exposeLan: false,
+  },
 ]
 
 jest.mock('@tauri-apps/api/core', () => ({
   invoke: jest.fn(async (cmd: string) =>
-    cmd === 'list_ssh_profiles' ? PROFILES : []),
+    cmd === 'list_ssh_profiles'
+      ? PROFILES
+      : []),
 }))
 
 /**
@@ -313,8 +347,22 @@ describe('connectionStore', () => {
       it('returns active connection', () => {
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'DB1', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
-          { id: 'conn-2', name: 'DB2', type: DatabaseType.MYSQL, host: 'localhost', port: 3306, ssl: false },
+          {
+            id: 'conn-1',
+            name: 'DB1',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
+          {
+            id: 'conn-2',
+            name: 'DB2',
+            type: DatabaseType.MYSQL,
+            host: 'localhost',
+            port: 3306,
+            ssl: false,
+          },
         ]
         store.activeConnectionId = 'conn-1'
 
@@ -331,9 +379,33 @@ describe('connectionStore', () => {
       it('returns only connected connections', () => {
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'DB1', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true, isConnected: true },
-          { id: 'conn-2', name: 'DB2', type: DatabaseType.MYSQL, host: 'localhost', port: 3306, ssl: false, isConnected: false },
-          { id: 'conn-3', name: 'DB3', type: DatabaseType.SQLITE, host: '', port: 0, ssl: false, isConnected: true },
+          {
+            id: 'conn-1',
+            name: 'DB1',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+            isConnected: true,
+          },
+          {
+            id: 'conn-2',
+            name: 'DB2',
+            type: DatabaseType.MYSQL,
+            host: 'localhost',
+            port: 3306,
+            ssl: false,
+            isConnected: false,
+          },
+          {
+            id: 'conn-3',
+            name: 'DB3',
+            type: DatabaseType.SQLITE,
+            host: '',
+            port: 0,
+            ssl: false,
+            isConnected: true,
+          },
         ]
 
         expect(store.connectedConnections).toHaveLength(2)
@@ -366,7 +438,15 @@ describe('connectionStore', () => {
       it('returns connection database when no current set', () => {
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'DB1', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true, database: 'defaultdb' },
+          {
+            id: 'conn-1',
+            name: 'DB1',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+            database: 'defaultdb',
+          },
         ]
 
         expect(store.getCurrentDatabase('conn-1')).toBe('defaultdb')
@@ -382,7 +462,9 @@ describe('connectionStore', () => {
   describe('actions', () => {
     describe('fetchConnections', () => {
       it('should fetch connections from API', async () => {
-        const mockBackendConnections = [createMockBackendConnection()]
+        const mockBackendConnections = [
+          createMockBackendConnection(),
+        ]
         connectionApi.list.mockResolvedValue(mockBackendConnections)
 
         const store = useConnectionStore()
@@ -406,10 +488,34 @@ describe('connectionStore', () => {
 
       it('maps backend connection types correctly', async () => {
         connectionApi.list.mockResolvedValue([
-          { id: '1', name: 'PG', db_type: 'PostgreSQL', host: 'localhost', port: 5432 },
-          { id: '2', name: 'My', db_type: 'MySQL', host: 'localhost', port: 3306 },
-          { id: '3', name: 'MS', db_type: 'SqlServer', host: 'localhost', port: 1433 },
-          { id: '4', name: 'Lite', db_type: 'SQLite', host: '', port: 0 },
+          {
+            id: '1',
+            name: 'PG',
+            db_type: 'PostgreSQL',
+            host: 'localhost',
+            port: 5432,
+          },
+          {
+            id: '2',
+            name: 'My',
+            db_type: 'MySQL',
+            host: 'localhost',
+            port: 3306,
+          },
+          {
+            id: '3',
+            name: 'MS',
+            db_type: 'SqlServer',
+            host: 'localhost',
+            port: 1433,
+          },
+          {
+            id: '4',
+            name: 'Lite',
+            db_type: 'SQLite',
+            host: '',
+            port: 0,
+          },
         ])
 
         const store = useConnectionStore()
@@ -423,7 +529,13 @@ describe('connectionStore', () => {
 
       it('defaults unknown db_type to PostgreSQL', async () => {
         connectionApi.list.mockResolvedValue([
-          { id: '1', name: 'Unknown', db_type: 'UnknownDB', host: 'localhost', port: 5432 },
+          {
+            id: '1',
+            name: 'Unknown',
+            db_type: 'UnknownDB',
+            host: 'localhost',
+            port: 5432,
+          },
         ])
 
         const store = useConnectionStore()
@@ -434,7 +546,14 @@ describe('connectionStore', () => {
 
       it('maps ssl_mode from backend to SslConfig', async () => {
         connectionApi.list.mockResolvedValue([
-          { id: '1', name: 'Test', db_type: 'PostgreSQL', host: 'localhost', port: 5432, ssl_mode: 'prefer' },
+          {
+            id: '1',
+            name: 'Test',
+            db_type: 'PostgreSQL',
+            host: 'localhost',
+            port: 5432,
+            ssl_mode: 'prefer',
+          },
         ])
 
         const store = useConnectionStore()
@@ -445,7 +564,14 @@ describe('connectionStore', () => {
 
       it('handles null ssl_mode from backend', async () => {
         connectionApi.list.mockResolvedValue([
-          { id: '1', name: 'Test', db_type: 'PostgreSQL', host: 'localhost', port: 5432, ssl_mode: null },
+          {
+            id: '1',
+            name: 'Test',
+            db_type: 'PostgreSQL',
+            host: 'localhost',
+            port: 5432,
+            ssl_mode: null,
+          },
         ])
 
         const store = useConnectionStore()
@@ -459,7 +585,10 @@ describe('connectionStore', () => {
       it('saves ordinary edits without changing permission drafts when Ultimate is unavailable', async () => {
         connectionApi.save.mockResolvedValue('community-connection')
         const store = useConnectionStore()
-        const result = await store.saveConnection(createMockConnection({ id: 'community-connection', aiPermissions: { delete: true } }))
+        const result = await store.saveConnection(createMockConnection({
+          id: 'community-connection',
+          aiPermissions: { delete: true },
+        }))
         expect(result.success).toBe(true)
         expect(connectionApi.save).toHaveBeenCalled()
         expect(invoke).not.toHaveBeenCalledWith('save_ai_permissions', expect.anything())
@@ -471,9 +600,15 @@ describe('connectionStore', () => {
         connectionApi.save.mockResolvedValue('ultimate-connection')
         jest.mocked(invoke).mockResolvedValueOnce({ connection_permissions: {} })
         const store = useConnectionStore()
-        const result = await store.saveConnection(createMockConnection({ id: 'ultimate-connection', aiPermissions: { update: false } }))
+        const result = await store.saveConnection(createMockConnection({
+          id: 'ultimate-connection',
+          aiPermissions: { update: false },
+        }))
         expect(result.success).toBe(true)
-        expect(invoke).toHaveBeenCalledWith('save_ai_permissions', { connectionId: 'ultimate-connection', permissions: { update: false } })
+        expect(invoke).toHaveBeenCalledWith('save_ai_permissions', {
+          connectionId: 'ultimate-connection',
+          permissions: { update: false },
+        })
       })
 
       it('should add new connection', async () => {
@@ -591,7 +726,14 @@ describe('connectionStore', () => {
     describe('detachSshProfile', () => {
       const tunnelled = (id: string, name: string, profileIds: string[]): ServerConnection => ({
         ...createMockConnection({ id, name }),
-        sshTunnel: { enabled: true, host: 'bastion', port: 22, username: 'ops', authMethod: 'password', profileIds },
+        sshTunnel: {
+          enabled: true,
+          host: 'bastion',
+          port: 22,
+          username: 'ops',
+          authMethod: 'password',
+          profileIds,
+        },
       })
 
       it('reports the connections that hop through a profile', () => {
@@ -626,7 +768,10 @@ describe('connectionStore', () => {
           }),
         )
         expect(connectionApi.save).toHaveBeenCalledTimes(2)
-        expect(savedProfilesById).toEqual({ 'conn-1': ['hop-1'], 'conn-2': [] })
+        expect(savedProfilesById).toEqual({
+          'conn-1': ['hop-1'],
+          'conn-2': [],
+        })
         expect(store.connections[0].sshTunnel?.profileIds).toEqual(['hop-1'])
         expect(store.connections[2].sshTunnel).toBeUndefined()
       })
@@ -635,7 +780,9 @@ describe('connectionStore', () => {
         connectionApi.save.mockRejectedValue(new Error('disk full'))
 
         const store = useConnectionStore()
-        store.connections = [tunnelled('conn-1', 'Prod', ['hop-1'])]
+        store.connections = [
+          tunnelled('conn-1', 'Prod', ['hop-1']),
+        ]
 
         await expect(store.detachSshProfile('hop-1')).rejects.toThrow('disk full')
       })
@@ -676,7 +823,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         const result = await store.connect('conn-1')
@@ -696,7 +850,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         const connectPromise = store.connect('conn-1')
@@ -722,7 +883,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         await expect(store.connect('conn-1')).rejects.toThrow('Failed to connect')
@@ -736,7 +904,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         await store.connect('conn-1')
@@ -749,7 +924,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+          },
         ]
 
         await store.connect('conn-1')
@@ -766,14 +948,23 @@ describe('connectionStore', () => {
         host: 'db.internal',
         port: 5432,
         ssl: false,
-        sshTunnel: { enabled: true, host: 'bastion', port: 22, username: 'ops', authMethod: 'password', profileIds: ['hop-1'] },
+        sshTunnel: {
+          enabled: true,
+          host: 'bastion',
+          port: 22,
+          username: 'ops',
+          authMethod: 'password',
+          profileIds: ['hop-1'],
+        },
       })
 
       it('drops the tunnel and connects directly on a free plan', async () => {
         connectionApi.connect.mockResolvedValue({ is_connected: true })
 
         const store = useConnectionStore()
-        store.connections = [sshConnection()]
+        store.connections = [
+          sshConnection(),
+        ]
 
         await store.connect('conn-1')
 
@@ -790,7 +981,9 @@ describe('connectionStore', () => {
         connectionApi.connect.mockResolvedValue({ is_connected: true })
 
         const store = useConnectionStore()
-        store.connections = [sshConnection()]
+        store.connections = [
+          sshConnection(),
+        ]
 
         await store.connect('conn-1')
 
@@ -802,7 +995,9 @@ describe('connectionStore', () => {
         connectionApi.connect.mockRejectedValue(new Error('Connection refused'))
 
         const store = useConnectionStore()
-        store.connections = [sshConnection()]
+        store.connections = [
+          sshConnection(),
+        ]
 
         const failure = await store.connect('conn-1').catch(err => err)
 
@@ -817,7 +1012,14 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'Plain', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: false },
+          {
+            id: 'conn-1',
+            name: 'Plain',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: false,
+          },
         ]
 
         const failure = await store.connect('conn-1').catch(err => err)
@@ -832,7 +1034,15 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true, isConnected: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+            isConnected: true,
+          },
         ]
         store.activeConnectionId = 'conn-1'
         store.connectionStatus['conn-1'] = ConnectionStatus.CONNECTED
@@ -863,7 +1073,15 @@ describe('connectionStore', () => {
 
         const store = useConnectionStore()
         store.connections = [
-          { id: 'conn-1', name: 'TestDB', type: DatabaseType.POSTGRESQL, host: 'localhost', port: 5432, ssl: true, isConnected: true },
+          {
+            id: 'conn-1',
+            name: 'TestDB',
+            type: DatabaseType.POSTGRESQL,
+            host: 'localhost',
+            port: 5432,
+            ssl: true,
+            isConnected: true,
+          },
         ]
         store.connectionStatus['conn-1'] = ConnectionStatus.CONNECTED
 

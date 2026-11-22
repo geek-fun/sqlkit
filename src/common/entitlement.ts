@@ -41,7 +41,9 @@ export function errorCarriesType(error: unknown, type: string): boolean {
   if (typeof error === 'object' && 'errorType' in error) {
     return (error as { errorType?: string }).errorType === type
   }
-  const raw = typeof error === 'string' ? error : String(error)
+  const raw = typeof error === 'string'
+    ? error
+    : String(error)
   try {
     const parsed = JSON.parse(raw) as { error_type?: string }
     return parsed.error_type === type

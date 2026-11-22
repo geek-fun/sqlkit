@@ -18,10 +18,16 @@ const props = withDefaults(defineProps<{
   pageCount: number
   pageSize: PageSize
   disabled?: boolean
+  preview?: boolean
   allowAll?: boolean
   maxPageSize?: number
   database?: string
-}>(), { disabled: false, allowAll: false, maxPageSize: Number.MAX_SAFE_INTEGER, database: undefined })
+}>(), {
+  disabled: false,
+  allowAll: false,
+  maxPageSize: Number.MAX_SAFE_INTEGER,
+  database: undefined,
+})
 const emit = defineEmits<{
   pageChange: [page: number]
   pageSizeChange: [size: PageSize]
@@ -35,12 +41,34 @@ const pageSizeLabel = computed(() => props.pageSize === 'all'
   ? t('components.pagination.allRows')
   : t('components.pagination.pageSize', { count: props.pageSize }))
 const validCustomSize = computed(() => isValidPageSize(Number(customSize.value), false, props.maxPageSize))
-const navigation = computed(() => [
-  { label: 'firstPage', icon: 'i-lucide-chevrons-left', page: 1, disabled: props.currentPage <= 1 },
-  { label: 'previousPage', icon: 'i-lucide-chevron-left', page: props.currentPage - 1, disabled: props.currentPage <= 1 },
-  { label: 'nextPage', icon: 'i-lucide-chevron-right', page: props.currentPage + 1, disabled: props.currentPage >= props.pageCount },
-  { label: 'lastPage', icon: 'i-lucide-chevrons-right', page: props.pageCount, disabled: props.currentPage >= props.pageCount },
-])
+const navigation = computed(() => props.preview
+  ? []
+  : [
+      {
+        label: 'firstPage',
+        icon: 'i-lucide-chevrons-left',
+        page: 1,
+        disabled: props.currentPage <= 1,
+      },
+      {
+        label: 'previousPage',
+        icon: 'i-lucide-chevron-left',
+        page: props.currentPage - 1,
+        disabled: props.currentPage <= 1,
+      },
+      {
+        label: 'nextPage',
+        icon: 'i-lucide-chevron-right',
+        page: props.currentPage + 1,
+        disabled: props.currentPage >= props.pageCount,
+      },
+      {
+        label: 'lastPage',
+        icon: 'i-lucide-chevrons-right',
+        page: props.pageCount,
+        disabled: props.currentPage >= props.pageCount,
+      },
+    ])
 
 watch(() => [props.currentPage, props.pageCount, props.disabled], () => {
   pageInput.value = String(props.currentPage)
@@ -78,7 +106,7 @@ const applyCustomSize = () => {
         <slot />
       </div>
     </div>
-    <nav class="app-pagination flex flex-wrap gap-1 items-center" :aria-label="t('components.pagination.label')" :aria-busy="disabled">
+    <nav class="app-pagination flex flex-wrap gap-1 items-center" :aria-label="t(preview ? 'components.dataTableView.previewRowLimit' : 'components.pagination.label')" :aria-busy="disabled">
       <DropdownMenu v-model:open="sizeMenuOpen">
         <DropdownMenuTrigger as-child>
           <Button
@@ -86,7 +114,7 @@ const applyCustomSize = () => {
             size="sm"
             class="text-xs text-foreground px-2 h-7"
             :disabled="disabled"
-            :aria-label="`${t('components.pagination.rowsPerPage')}: ${pageSizeLabel}`"
+            :aria-label="`${t(preview ? 'components.dataTableView.previewRowLimit' : 'components.pagination.rowsPerPage')}: ${pageSizeLabel}`"
           >
             {{ pageSizeLabel }}
             <span class="i-lucide-chevron-down ml-1 h-3 w-3" aria-hidden="true" />

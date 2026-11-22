@@ -105,6 +105,7 @@ pub async fn try_driver(
     host: &str,
     port: u16,
     database: Option<&str>,
+    cql_datacenter: Option<&str>,
     username: &str,
     password: &Option<String>,
     use_cap: bool,
@@ -115,7 +116,15 @@ pub async fn try_driver(
     ssl_client_key: Option<&str>,
     trust_server_certificate: bool,
 ) -> DriverAttempt {
-    let url = build_oracle_url(config, host, port, database, oracle_options);
+    let url = if let Some(dc) = cql_datacenter {
+        // The wrapper decodes the URI query and then decodes each parameter.
+        let encoded = url::form_urlencoded::byte_serialize(dc.as_bytes()).collect::<String>();
+        let encoded = url::form_urlencoded::byte_serialize(encoded.as_bytes()).collect::<String>();
+        let query = format!("?localdatacenter={encoded}");
+        super::registry::build_jdbc_url(config, host, port, Some(&query))
+    } else {
+        build_oracle_url(config, host, port, database, oracle_options)
+    };
 
     // Reuse the app-wide bridge process: a fresh JVM would re-map DuckDB's
     // ~107 MB native library (~1.4 s) on every single connection attempt.
@@ -162,7 +171,10 @@ pub async fn try_driver(
 
     // On the first attempt, try without version_cap (LATEST).
     // If the config has no cap, or we're explicitly using it, send the cap.
-    let effective_cap = if use_cap {
+    // Direct-download drivers are version-pinned by definition: always send
+    // the cap so the Java resolver names the cached JAR deterministically
+    // (a null cap would name it "-1.0.0.jar" and duplicate the download).
+    let effective_cap = if use_cap || config.download_url.is_some() {
         config.version_cap.as_deref()
     } else {
         None
@@ -283,7 +295,14 @@ async fn connect_with_jar(
         }
     };
 
-    let req = JdbcRequest::new(JdbcMethod::Connect, params);
+    // The bridge must honor the separately supplied keyspace and TLS mode.
+    let cql = db_type_from_config(config).is_cql();
+    let method = if cql {
+        JdbcMethod::ConnectCql
+    } else {
+        JdbcMethod::Connect
+    };
+    let req = JdbcRequest::new(method, params);
 
     // 30s timeout per attempt
     let conn_result = tokio::time::timeout(std::time::Duration::from_secs(30), async {
@@ -295,6 +314,11 @@ async fn connect_with_jar(
     match conn_result {
         Ok(Ok(resp)) => {
             if let Some(ref err) = resp.error {
+                if cql && err.starts_with("Unknown method") {
+                    return DriverAttempt::Fatal(DbError::Connection(
+                        "The installed JDBC bridge does not support the Cassandra and ScyllaDB connection protocol. Update the bridge in Settings → JRE & Drivers.".into(),
+                    ));
+                }
                 let category = classify_connection_error(
                     db_type_from_config(config),
                     err,
@@ -356,6 +380,7 @@ pub async fn run_fallback_chain(
     host: &str,
     port: u16,
     database: Option<&str>,
+    cql_datacenter: Option<&str>,
     username: &str,
     password: &Option<String>,
     oracle_options: Option<&OracleConnectionOptions>,
@@ -429,6 +454,7 @@ pub async fn run_fallback_chain(
             host,
             port,
             database,
+            cql_datacenter,
             username,
             password,
             false,
@@ -462,6 +488,7 @@ pub async fn run_fallback_chain(
             host,
             port,
             database,
+            cql_datacenter,
             username,
             password,
             true,
@@ -489,7 +516,6 @@ pub async fn run_fallback_chain(
     }
 }
 
-
 fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
     match config.name.as_str() {
         "Oracle Database" => DatabaseType::Oracle,
@@ -510,6 +536,7 @@ fn db_type_from_config(config: &DatabaseDriverConfig) -> DatabaseType {
         "IBM Informix" => DatabaseType::Informix,
         "Apache Kylin" => DatabaseType::Kylin,
         "Apache Cassandra" => DatabaseType::Cassandra,
+        "ScyllaDB" => DatabaseType::ScyllaDB,
         "InterSystems IRIS" => DatabaseType::Iris,
         "Microsoft Access" => DatabaseType::Access,
         _ => DatabaseType::PostgreSQL, // fallback, shouldn't happen

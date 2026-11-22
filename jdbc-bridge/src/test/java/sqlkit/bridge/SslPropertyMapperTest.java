@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SslPropertyMapperTest {
@@ -33,6 +34,25 @@ class SslPropertyMapperTest {
         assertTrue(apply("org.h2.Driver", "prefer").isEmpty());
         assertTrue(apply("org.firebirdsql.jdbc.FBDriver", "require").isEmpty());
         assertTrue(apply("com.example.UnknownDriver", "require").isEmpty());
+    }
+
+    @Test
+    void cqlRequiredModesEnableEncryptionAndUseTheRequestedHostnameCheck() throws Exception {
+        String url = "jdbc:cassandra://localhost:9042/system?localdatacenter=datacenter1";
+        assertTrue(SslPropertyMapper.requiresCqlTls("com.ing.data.cassandra.jdbc.CassandraDriver", "require"));
+        try (var require = SslPropertyMapper.cqlTlsSettings(url, "", null, "require", null, null, null);
+             var verify = SslPropertyMapper.cqlTlsSettings(url, "", null, "verify-full", null, null, null)) {
+            assertEquals("true", require.properties.getProperty("enableSsl"));
+            assertEquals("false", require.properties.getProperty("hostnameVerification"));
+            assertEquals("true", verify.properties.getProperty("enableSsl"));
+            assertEquals("true", verify.properties.getProperty("hostnameVerification"));
+        }
+    }
+
+    @Test
+    void cqlPreferModeConnectsPlaintext() {
+        assertFalse(SslPropertyMapper.requiresCqlTls("com.ing.data.cassandra.jdbc.CassandraDriver", "prefer"));
+        assertTrue(apply("com.ing.data.cassandra.jdbc.CassandraDriver", "prefer").isEmpty());
     }
 
     @Test

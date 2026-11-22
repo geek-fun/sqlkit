@@ -29,7 +29,7 @@ import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
 import { jdbcApi } from '@/datasources/jdbcApi'
 import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase, useConnectionStore, useEntitlementStore } from '@/store'
-import { DEFAULT_SSL_MODE, sslModeToBackend, validateSslConfig } from '@/types/connection'
+import { DEFAULT_SSL_MODE, isCqlDatabase, normalizeSslMode, sslModeToBackend, validateSslConfig } from '@/types/connection'
 import { buildMemoryDatabaseHost, createMemoryDatabaseLabel, isMemoryDatabaseHost, isSameDatabaseFile, memoryDatabaseLabel } from '@/utils/databaseFiles'
 import { classifyDuckDbFailure } from '@/utils/duckdbErrors'
 import ConnectionPromptDialog from './ConnectionPromptDialog.vue'
@@ -117,6 +117,7 @@ const defaultPorts: Record<string, number> = {
   [DatabaseType.INFORMIX]: 9088,
   [DatabaseType.KYLIN]: 7070,
   [DatabaseType.CASSANDRA]: 9042,
+  [DatabaseType.SCYLLADB]: 9042,
   [DatabaseType.IRIS]: 1972,
   [DatabaseType.ACCESS]: 0,
   [DatabaseType.FIREBIRD]: 3050,
@@ -137,6 +138,30 @@ const defaultConnection: ServerConnection = {
 }
 
 const formData = ref<ServerConnection>({ ...defaultConnection })
+// CQL stores (Cassandra/ScyllaDB) need an explicit local datacenter for the
+// driver's default load-balancing policy — kept as its own field and composed
+// into the keyspace value on save/test (see resolveDatabase on the store side).
+const isCassandraFamily = computed(() => isCqlDatabase(formData.value.type))
+const localDatacenter = ref('datacenter1')
+
+const databaseWithLocalDc = () => {
+  if (!isCassandraFamily.value)
+    return formData.value.database
+  const keyspace = formData.value.database?.trim() || 'system'
+  const dc = localDatacenter.value.trim() || 'datacenter1'
+  return `${keyspace}?localdatacenter=${encodeURIComponent(dc)}`
+}
+
+const splitLocalDatacenter = (database?: string) => {
+  if (!isCassandraFamily.value || !database)
+    return
+  const [keyspace, query = ''] = database.split('?')
+  const dc = [
+    ...new URLSearchParams(query),
+  ].find(([key]) => key.toLowerCase() === 'localdatacenter')
+  localDatacenter.value = dc?.[1] || 'datacenter1'
+  formData.value.database = keyspace
+}
 const testStatus = ref<'idle' | 'testing' | 'success' | 'error'>('idle')
 const testError = ref<string>('')
 /** The last test ran without the saved SSH tunnel (Ultimate-only feature). */
@@ -168,7 +193,9 @@ function togglePassword(key: string) {
 watch(() => ({ ...dl.progress }), (progress) => {
   for (const [id] of Object.entries(progress)) {
     const kind = dl.getKind(id)
-    const stepId = kind === 'driver' ? 'driver' : kind // jre→jre, bridge→bridge, driver→driver
+    const stepId = kind === 'driver'
+      ? 'driver'
+      : kind // jre→jre, bridge→bridge, driver→driver
     const step = setupSteps.value.find(s => s.id === stepId)
     if (step && step.status === 'running' && dl.getProgress(id)) {
       const p = dl.getProgress(id)!
@@ -194,7 +221,9 @@ async function runStep(step: StepDef): Promise<boolean> {
   }
   catch (e) {
     step.status = 'error'
-    step.error = e instanceof Error ? e.message : String(e)
+    step.error = e instanceof Error
+      ? e.message
+      : String(e)
     return false
   }
 }
@@ -227,8 +256,10 @@ const { platform } = usePlatform()
 
 watch(() => props.open, (open) => {
   if (open) {
+    localDatacenter.value = 'datacenter1'
     if (props.connection) {
       formData.value = { ...props.connection }
+      splitLocalDatacenter(formData.value.database)
       // Detect SQLite mode from path
       if (props.connection.type === DatabaseType.SQLITE) {
         if (props.connection.host === ':memory:') {
@@ -415,7 +446,9 @@ function handleDuckDbFileStatus(status: DatabaseFileAssessment) {
 }
 
 const testFailureHint = computed(() =>
-  isDuckDb.value ? classifyDuckDbFailure(testError.value) : null,
+  isDuckDb.value
+    ? classifyDuckDbFailure(testError.value)
+    : null,
 )
 
 async function retryAsReadOnly() {
@@ -464,7 +497,12 @@ const databaseTypeOptions = computed(() =>
       const i18nKey = dbTypeI18nKeyMap[value] || value.toLowerCase()
       const fullKey = `components.serverForm.databaseTypes.${i18nKey}`
       const label = t(fullKey)
-      return { label: label === fullKey ? value : label, value }
+      return {
+        label: label === fullKey
+          ? value
+          : label,
+        value,
+      }
     }),
 )
 
@@ -494,6 +532,8 @@ const showsStandardHostFields = computed(() =>
 )
 
 const databaseLabel = computed(() => {
+  if (isCassandraFamily.value)
+    return t('components.serverForm.labels.keyspace')
   if (isOracle.value && oracleMethod.value === 'basic') {
     return oracleSidOrService.value === 'sid'
       ? t('components.serverForm.oracle.sid')
@@ -541,11 +581,17 @@ function buildOracleOptionsFromRefs(): OracleConnectionOptions | undefined {
   const hasTnsAlias = oracleMethod.value !== 'basic' && !!tnsFullAlias.value
   return {
     connectionMethod: oracleMethod.value,
-    sidOrService: oracleMethod.value === 'basic' ? oracleSidOrService.value : undefined,
+    sidOrService: oracleMethod.value === 'basic'
+      ? oracleSidOrService.value
+      : undefined,
     role: oracleRole.value,
-    tnsAdminDir: oracleMethod.value !== 'basic' ? oracleTnsAdminDir.value || undefined : undefined,
+    tnsAdminDir: oracleMethod.value !== 'basic'
+      ? oracleTnsAdminDir.value || undefined
+      : undefined,
     tnsAlias: hasTnsAlias ? tnsFullAlias.value : undefined,
-    walletPassword: oracleMethod.value === 'cloud_wallet' ? oracleWalletPassword.value || undefined : undefined,
+    walletPassword: oracleMethod.value === 'cloud_wallet'
+      ? oracleWalletPassword.value || undefined
+      : undefined,
     // Service level is encoded in the TNS alias suffix (e.g. dbname_low, dbname_medium)
     serviceLevel: undefined,
   }
@@ -562,7 +608,15 @@ function onTnsAliasChange(val: string) {
 }
 
 // Sync formData.oracleOptions whenever relevant refs change
-watch([oracleMethod, oracleSidOrService, oracleRole, oracleTnsAdminDir, oracleTnsAlias, oracleWalletPassword, oracleServiceLevel], () => {
+watch([
+  oracleMethod,
+  oracleSidOrService,
+  oracleRole,
+  oracleTnsAdminDir,
+  oracleTnsAlias,
+  oracleWalletPassword,
+  oracleServiceLevel,
+], () => {
   formData.value.oracleOptions = buildOracleOptionsFromRefs()
 })
 
@@ -616,7 +670,9 @@ async function browseDirectory(target: 'tns' | 'wallet') {
   }
   catch (error) {
     toast.error(t('components.serverForm.errors.filePickerFailed'), {
-      description: error instanceof Error ? error.message : String(error),
+      description: error instanceof Error
+        ? error.message
+        : String(error),
     })
   }
   finally {
@@ -781,7 +837,9 @@ async function handleTestConnection() {
         return
       }
     }
-    const driverStep = isJdbcDb.value ? setupSteps.value.find(s => s.id === 'driver') : undefined
+    const driverStep = isJdbcDb.value
+      ? setupSteps.value.find(s => s.id === 'driver')
+      : undefined
 
     // Test the actual connection
     const config = {
@@ -792,8 +850,8 @@ async function handleTestConnection() {
       port: formData.value.port,
       username: formData.value.username || '',
       password: formData.value.password || undefined,
-      database: resolveDatabase(formData.value.type, formData.value.database) ?? undefined,
-      ssl_mode: sslModeToBackend(formData.value.ssl),
+      database: resolveDatabase(formData.value.type, databaseWithLocalDc()) ?? undefined,
+      ssl_mode: sslModeToBackend(formData.value.ssl, formData.value.type),
       ssl_ca_cert: formData.value.ssl.caCertPath || null,
       ssl_client_cert: formData.value.ssl.clientCertPath || null,
       ssl_client_key: formData.value.ssl.clientKeyPath || null,
@@ -830,7 +888,9 @@ async function handleTestConnection() {
   }
   catch (error) {
     testStatus.value = 'error'
-    const msg = error instanceof Error ? error.message : String(error)
+    const msg = error instanceof Error
+      ? error.message
+      : String(error)
     testError.value = msg
     // If the error is Java-related, also mark JRE as failed so user can retry it
     if (msg.includes('Unable to locate a Java Runtime') || msg.includes('Java not found')) {
@@ -888,7 +948,9 @@ async function retryStep(stepId: string) {
   }
   catch (e) {
     step.status = 'error'
-    step.error = e instanceof Error ? e.message : String(e)
+    step.error = e instanceof Error
+      ? e.message
+      : String(e)
   }
 }
 
@@ -903,7 +965,16 @@ function handleSave() {
     return
   }
 
-  emit('save', { ...formData.value })
+  if (isCassandraFamily.value)
+    formData.value.database = databaseWithLocalDc()
+
+  emit('save', {
+    ...formData.value,
+    ssl: {
+      ...formData.value.ssl,
+      mode: normalizeSslMode(formData.value.ssl.mode, formData.value.type),
+    },
+  })
   isOpen.value = false
 }
 </script>
@@ -1010,7 +1081,7 @@ function handleSave() {
               </div>
               <div class="space-y-2">
                 <Label for="database">
-                  {{ t('components.serverForm.labels.database') }}
+                  {{ databaseLabel }}
                   <span v-if="isDbNameRequired" class="text-destructive-text ml-0.5">*</span>
                 </Label>
                 <Input
@@ -1022,6 +1093,17 @@ function handleSave() {
                 <p v-if="formErrors.database" class="text-sm text-destructive-text">
                   {{ formErrors.database }}
                 </p>
+              </div>
+              <div v-if="isCassandraFamily" class="space-y-2">
+                <Label for="local-datacenter">
+                  {{ t('components.serverForm.labels.localDatacenter') }}
+                  <span class="text-destructive-text ml-0.5">*</span>
+                </Label>
+                <Input
+                  id="local-datacenter"
+                  v-model="localDatacenter"
+                  :placeholder="t('components.serverForm.placeholders.localDatacenter')"
+                />
               </div>
             </div>
 

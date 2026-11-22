@@ -3,14 +3,33 @@ import type { Update } from '@tauri-apps/plugin-updater'
 import { check } from '@tauri-apps/plugin-updater'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 
-jest.mock('@tauri-apps/plugin-updater', () => ({ check: jest.fn() }))
-jest.mock('@tauri-apps/plugin-process', () => ({ relaunch: jest.fn() }))
-jest.mock('vue-i18n', () => ({ useI18n: () => ({ t: (key: string) => key }) }))
-jest.mock('@vueuse/core', () => ({ useLocalStorage: () => jest.requireActual('vue').ref('') }))
-jest.mock('@/composables/useNotifications', () => ({ toast: { info: jest.fn(), success: jest.fn(), error: jest.fn() } }))
+jest.mock('@tauri-apps/plugin-updater', () => ({
+  check: jest.fn(),
+}))
+jest.mock('@tauri-apps/plugin-process', () => ({
+  relaunch: jest.fn(),
+}))
+jest.mock('vue-i18n', () => ({
+  useI18n: () => ({
+    t: (key: string) => key,
+  }),
+}))
+jest.mock('@vueuse/core', () => ({
+  useLocalStorage: () => jest.requireActual('vue').ref(''),
+}))
+jest.mock('@/composables/useNotifications', () => ({
+  toast: {
+    info: jest.fn(),
+    success: jest.fn(),
+    error: jest.fn(),
+  },
+}))
 
 const updater = useAppUpdater()
-const release = { version: '2.0.0', downloadAndInstall: jest.fn() } as unknown as Update
+const release = {
+  version: '2.0.0',
+  downloadAndInstall: jest.fn(),
+} as unknown as Update
 
 beforeEach(() => {
   jest.clearAllMocks()

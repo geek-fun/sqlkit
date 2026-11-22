@@ -213,6 +213,7 @@ fn db_type_to_enum(db_type: &str) -> Result<crate::database::DatabaseType, Strin
         "informix" => Ok(DatabaseType::Informix),
         "kylin" => Ok(DatabaseType::Kylin),
         "cassandra" => Ok(DatabaseType::Cassandra),
+        "scylladb" => Ok(DatabaseType::ScyllaDB),
         "iris" | "intersystems_iris" => Ok(DatabaseType::Iris),
         "access" | "ms_access" | "microsoft_access" => Ok(DatabaseType::Access),
         _ => Err(format!("Unsupported database type: {}", db_type)),
@@ -264,7 +265,15 @@ pub async fn connection_host_port(
     // tunnel across connections instead of stacking duplicates per bastion.
     let connection_key = tunnel_key(&layers, &config.host, config.port);
 
-    match start_transport_layers(&connection_key, &layers, &config.host, config.port, tunnels, true).await?
+    match start_transport_layers(
+        &connection_key,
+        &layers,
+        &config.host,
+        config.port,
+        tunnels,
+        true,
+    )
+    .await?
     {
         Some(local_port) => Ok(("127.0.0.1".to_string(), local_port)),
         None => Ok((config.host.clone(), config.port)),

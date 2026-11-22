@@ -43,6 +43,7 @@ import prestoLogo from '@/assets/images/database-icons/presto-logo.svg'
 import questdbLogo from '@/assets/images/database-icons/questdb-logo.svg'
 import redshiftLogo from '@/assets/images/database-icons/redshift-logo.svg'
 import rqliteLogo from '@/assets/images/database-icons/rqlite-logo.svg'
+import scylladbLogo from '@/assets/images/database-icons/scylladb-logo.png'
 import selectdbLogo from '@/assets/images/database-icons/selectdb-logo.svg'
 import singlestoreLogo from '@/assets/images/database-icons/singlestorememsql-logo.svg'
 import snowflakeLogo from '@/assets/images/database-icons/snowflake-logo.svg'
@@ -122,6 +123,7 @@ const databaseIcons: Record<DatabaseType, DatabaseIconConfig> = {
   INFORMIX: { icon: informixLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   KYLIN: { icon: kylinLogo, color: 'bg-blue-100 dark:bg-blue-900/30' },
   CASSANDRA: { icon: cassandraLogo, color: 'bg-gray-100 dark:bg-gray-800/30' },
+  SCYLLADB: { icon: scylladbLogo, color: 'bg-teal-100 dark:bg-teal-900/30' },
   IRIS: { icon: irisLogo, color: 'bg-teal-100 dark:bg-teal-900/30' },
   ACCESS: { icon: accessLogo, color: 'bg-red-100 dark:bg-red-900/30' },
   FIREBIRD: { icon: firebirdLogo, color: 'bg-purple-100 dark:bg-purple-900/30' },

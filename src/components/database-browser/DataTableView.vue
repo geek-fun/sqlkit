@@ -18,6 +18,7 @@ import { useMinLoadingTime } from '@/composables/useMinLoadingTime'
 import { toast } from '@/composables/useNotifications'
 import { useTableSearch } from '@/composables/useTableSearch'
 import { ConnectionStatus, useConnectionStore } from '@/store'
+import { isCqlDatabase } from '@/types/connection'
 import { collectSortableColumns, sortRowsByState } from '@/utils/gridSort'
 import {
   formatTableValue,
@@ -132,6 +133,9 @@ const invalidated = ref(false)
 
 // --- Connection state ---
 const connectionStore = useConnectionStore()
+const isCqlPreview = computed(() =>
+  isCqlDatabase(connectionStore.getConnectionById(props.connectionId)?.type),
+)
 const isReconnecting = ref(false)
 const connectionError = ref<string | null>(null)
 
@@ -181,7 +185,9 @@ const isExporting = ref(false)
 const { withMinLoadingTime } = useMinLoadingTime()
 
 const visibleColumns = computed(() =>
-  data.value ? data.value.columns.filter((c: string) => !hiddenColumns.value.has(c)) : [],
+  data.value
+    ? data.value.columns.filter((c: string) => !hiddenColumns.value.has(c))
+    : [],
 )
 
 const columnTypeMap = computed(() =>
@@ -198,7 +204,10 @@ const sortColumnTypes = computed(() => {
   const fromResult = result
     ? Object.fromEntries(result.columns.map((col, i) => [col, result.columnTypes?.[i] ?? '']))
     : {}
-  return { ...fromResult, ...columnTypeMap.value }
+  return {
+    ...fromResult,
+    ...columnTypeMap.value,
+  }
 })
 
 const sortableColumns = computed(() =>
@@ -229,13 +238,18 @@ const columnIsAutoIncrement = computed(() =>
   Object.fromEntries(columnInfoList.value.map(c => [c.name, c.is_auto_increment])),
 )
 
+const isEditColumnReadOnly = (column: string) =>
+  columnIsAutoIncrement.value[column] || (isCqlPreview.value && columnIsPK.value[column])
+
 /** PK columns (in order they appear in the result set) */
 const pkColumns = computed(() =>
   (data.value?.columns ?? []).filter((c: string) => columnIsPK.value[c]),
 )
 
 function extractPkValues(row: Record<string, unknown>): Record<string, unknown> {
-  const cols = pkColumns.value.length > 0 ? pkColumns.value : (data.value?.columns ?? [])
+  const cols = pkColumns.value.length > 0
+    ? pkColumns.value
+    : (data.value?.columns ?? [])
   return Object.fromEntries(cols.map((col: string) => [col, row[col] ?? null]))
 }
 
@@ -250,11 +264,23 @@ function formatPkSummary(row: Record<string, unknown>): string {
 
 const pageStatus = computed(() => {
   const count = data.value?.rows.length ?? 0
-  if (!countAvailable.value)
-    return t('components.pagination.showingWithoutTotal', { start: count > 0 ? offset.value + 1 : 0, end: offset.value + count })
+  if (isCqlPreview.value)
+    return t('components.dataTableView.previewRows', { count })
+  if (!countAvailable.value) {
+    return t('components.pagination.showingWithoutTotal', {
+      start: count > 0
+        ? offset.value + 1
+        : 0,
+      end: offset.value + count,
+    })
+  }
   return t('components.dataGrid.status.showing', {
-    start: count > 0 ? offset.value + 1 : 0,
-    end: count > 0 ? Math.min(totalCount.value, offset.value + count) : 0,
+    start: count > 0
+      ? offset.value + 1
+      : 0,
+    end: count > 0
+      ? Math.min(totalCount.value, offset.value + count)
+      : 0,
     total: totalCount.value.toLocaleString(),
   })
 })
@@ -284,7 +310,7 @@ async function fetchData() {
           schema: props.schema ?? null,
           filter: appliedFilter.value.trim() || null,
           limit: rowsPerPage.value,
-          offset: offset.value,
+          offset: isCqlPreview.value ? 0 : offset.value,
         },
       })
       data.value = result
@@ -346,13 +372,16 @@ async function ensureConnection(): Promise<boolean> {
   }
   catch (err) {
     isReconnecting.value = false
-    connectionError.value = err instanceof Error ? err.message : String(err)
+    connectionError.value = err instanceof Error
+      ? err.message
+      : String(err)
     return false
   }
 }
 
 async function refresh() {
-  await fetchCount()
+  if (!isCqlPreview.value)
+    await fetchCount()
   await fetchData()
 }
 
@@ -500,7 +529,7 @@ function onGlobalKeydown(e: KeyboardEvent) {
 }
 
 const goToPage = (page: number) => {
-  if (loading.value || countLoading.value || !Number.isSafeInteger(page) || page === currentPage.value)
+  if (isCqlPreview.value || loading.value || countLoading.value || !Number.isSafeInteger(page) || page === currentPage.value)
     return
   setPage(page)
   fetchData()
@@ -540,14 +569,21 @@ async function exportCSV() {
 
   try {
     const selectedPath = await showSaveDialog({
-      filters: [{ name: 'CSV Files', extensions: ['csv'] }],
+      filters: [
+        {
+          name: 'CSV Files',
+          extensions: ['csv'],
+        },
+      ],
       defaultPath: defaultName,
     })
     if (!selectedPath)
       return
 
     isExporting.value = true
-    const filePath = selectedPath.endsWith('.csv') ? selectedPath : `${selectedPath}.csv`
+    const filePath = selectedPath.endsWith('.csv')
+      ? selectedPath
+      : `${selectedPath}.csv`
 
     try {
       await withMinLoadingTime(async () => {
@@ -560,7 +596,9 @@ async function exportCSV() {
     }
   }
   catch (err) {
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = err instanceof Error
+      ? err.message
+      : String(err)
     toast.error(t('components.dataTableView.notifications.exportFailed'), { description: msg })
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
@@ -606,7 +644,9 @@ async function confirmDelete() {
   }
   catch (err) {
     toast.error(t('components.dataTableView.notifications.deleteFailed'), {
-      description: err instanceof Error ? err.message : String(err),
+      description: err instanceof Error
+        ? err.message
+        : String(err),
     })
   }
   finally {
@@ -691,7 +731,7 @@ function validateEditForm(): boolean {
 
   for (const col of columns) {
     const field = editForm.value[col]
-    if (!field)
+    if (!field || isEditColumnReadOnly(col))
       continue
 
     // Skip validation if set to NULL
@@ -754,7 +794,18 @@ function isValidNumber(value: string): boolean {
 
 function isValidBoolean(value: string): boolean {
   const lower = value.toLowerCase()
-  return ['true', 'false', '1', '0', 't', 'f', 'y', 'n', 'yes', 'no'].includes(lower)
+  return [
+    'true',
+    'false',
+    '1',
+    '0',
+    't',
+    'f',
+    'y',
+    'n',
+    'yes',
+    'no',
+  ].includes(lower)
 }
 
 function getEditInputType(col: string): string {
@@ -793,12 +844,18 @@ async function confirmEdit() {
     const updates = Object.fromEntries(
       columns
         .map((col: string) => {
-          // Skip auto-increment columns - they cannot be updated
-          if (columnIsAutoIncrement.value[col]) {
+          if (isEditColumnReadOnly(col)) {
             return null
           }
           const field = editForm.value[col]
-          return field ? [col, field.setNull ? null : coerceEditValue(col, field.value)] : null
+          return field
+            ? [
+                col,
+                field.setNull
+                  ? null
+                  : coerceEditValue(col, field.value),
+              ]
+            : null
         })
         .filter((entry): entry is [string, unknown] => entry !== null),
     )
@@ -820,7 +877,9 @@ async function confirmEdit() {
   }
   catch (err) {
     toast.error(t('components.dataTableView.notifications.updateFailed'), {
-      description: err instanceof Error ? err.message : String(err),
+      description: err instanceof Error
+        ? err.message
+        : String(err),
     })
   }
   finally {
@@ -864,7 +923,12 @@ onBeforeUnmount(() => {
 })
 
 watch(
-  () => [props.connectionId, props.database, props.tableName, props.schema] as const,
+  () => [
+    props.connectionId,
+    props.database,
+    props.tableName,
+    props.schema,
+  ] as const,
   async ([newConnId, _newDatabase, _newTable, _newSchema], [oldConnId]) => {
     currentPage.value = 1
     appliedFilter.value = ''
@@ -1251,6 +1315,7 @@ watch(
         :current-page="currentPage"
         :page-count="totalPages"
         :page-size="rowsPerPage"
+        :preview="isCqlPreview"
         :max-page-size="MAX_FETCH_PAGE_SIZE"
         :database="props.database"
         :disabled="loading || countLoading || isReconnecting || !!connectionError || !!error"
@@ -1370,7 +1435,7 @@ watch(
               </Label>
               <div class="flex-1" />
               <!-- Set to NULL toggle -->
-              <label v-if="!columnIsAutoIncrement[col]" class="text-xs text-muted-foreground flex gap-1 cursor-pointer select-none items-center">
+              <label v-if="!isEditColumnReadOnly(col)" class="text-xs text-muted-foreground flex gap-1 cursor-pointer select-none items-center">
                 <input
                   type="checkbox"
                   class="h-3 w-3 cursor-pointer"
@@ -1388,11 +1453,11 @@ watch(
               :id="`edit-field-${col}`"
               :type="getEditInputType(col)"
               :model-value="editForm[col]?.setNull ? '' : (editForm[col]?.value ?? '')"
-              :disabled="editForm[col]?.setNull || columnIsAutoIncrement[col]"
+              :disabled="editForm[col]?.setNull || isEditColumnReadOnly(col)"
               :placeholder="editForm[col]?.setNull ? 'NULL' : columnIsAutoIncrement[col] ? 'Auto-generated' : ''"
               :step="getEditInputType(col) === 'number' ? 'any' : undefined"
               class="text-xs font-mono h-7"
-              :class="{ 'border-destructive': editErrors[col], 'opacity-60': columnIsAutoIncrement[col] }"
+              :class="{ 'border-destructive': editErrors[col], 'opacity-60': isEditColumnReadOnly(col) }"
               @update:model-value="(v) => editForm[col] = { ...editForm[col], value: String(v), setNull: editForm[col]?.setNull ?? false }"
             />
             <p v-if="editErrors[col]" class="text-xs text-destructive-text">

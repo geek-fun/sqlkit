@@ -6,7 +6,14 @@ const mockConfirm = jest.fn().mockResolvedValue(undefined)
 const mockSession = {
   id: 'chat',
   permissionsMode: 'Auto',
-  messages: [{ id: 'assistant', role: 'assistant', status: 'streaming', toolCalls: [] as AgentToolCall[] }],
+  messages: [
+    {
+      id: 'assistant',
+      role: 'assistant',
+      status: 'streaming',
+      toolCalls: [] as AgentToolCall[],
+    },
+  ],
 }
 const mockStore = {
   sessions: [mockSession],
@@ -19,11 +26,15 @@ const mockStore = {
   clearSessionProgress: jest.fn(),
   removeOrphanedStreamingMessages: jest.fn(),
   setMessageToolCalls: jest.fn((messageId: string, calls: AgentToolCall[], _sessionId: string) => {
-    mockSession.messages = mockSession.messages.map(message => message.id === messageId ? { ...message, toolCalls: calls } : message)
+    mockSession.messages = mockSession.messages.map(message => message.id === messageId
+      ? { ...message, toolCalls: calls }
+      : message)
   }),
 }
 
-jest.mock('@/store/dataStudioStore', () => ({ useDataStudioStore: () => mockStore }))
+jest.mock('@/store/dataStudioStore', () => ({
+  useDataStudioStore: () => mockStore,
+}))
 jest.mock('@/datasources/agentApi', () => {
   const register = (name: string) => async (handler: (payload: any) => void) => {
     mockHandlers[name] = handler
@@ -63,7 +74,14 @@ const call = (confirmation_required?: boolean) => ({
 describe('agent permission events', () => {
   beforeEach(async () => {
     jest.useFakeTimers()
-    mockSession.messages = [{ id: 'assistant', role: 'assistant', status: 'streaming', toolCalls: [] }]
+    mockSession.messages = [
+      {
+        id: 'assistant',
+        role: 'assistant',
+        status: 'streaming',
+        toolCalls: [],
+      },
+    ]
     jest.clearAllMocks()
     mockStore.findConfirmationRule.mockReturnValue(undefined)
     await initAgentRuntime()
@@ -107,13 +125,29 @@ describe('agent permission events', () => {
 
   it('reports execution-time revocation as denial', () => {
     mockHandlers.onAgentLoopToolCall(call(false))
-    mockHandlers.onAgentLoopToolResult({ ...call(), denied: true, error: true, envelope: { summary: 'Permission revoked' } })
+    mockHandlers.onAgentLoopToolResult({
+      ...call(),
+      denied: true,
+      error: true,
+      envelope: { summary: 'Permission revoked' },
+    })
     expect(mockStore.updateToolCallStatus).toHaveBeenCalledWith('assistant', 'call', 'denied', 'Permission revoked', undefined, 'chat')
   })
 
   it('retains the denial source and pauses without converting it to a session error', () => {
-    const denial = { kind: 'permission', source: 'connection', connectionId: 'db', action: 'manage', message: 'Manage denied' }
-    mockHandlers.onAgentLoopToolResult({ ...call(), denied: true, denial, envelope: { summary: denial.message } })
+    const denial = {
+      kind: 'permission',
+      source: 'connection',
+      connectionId: 'db',
+      action: 'manage',
+      message: 'Manage denied',
+    }
+    mockHandlers.onAgentLoopToolResult({
+      ...call(),
+      denied: true,
+      denial,
+      envelope: { summary: denial.message },
+    })
     expect(mockSession.messages[0].toolCalls[0].denial).toEqual(denial)
     mockHandlers.onAgentLoopBlocked({ session_id: 'chat', tool_call_id: 'call', denial })
     expect(mockStore.setSessionStatus).toHaveBeenCalledWith('chat', 'blocked')
@@ -123,7 +157,10 @@ describe('agent permission events', () => {
   })
 
   it('retains existing confirmation behavior for runtimes without host metadata', () => {
-    mockHandlers.onAgentLoopToolCall({ ...call(), risk_level: 'destructive' })
+    mockHandlers.onAgentLoopToolCall({
+      ...call(),
+      risk_level: 'destructive',
+    })
     expect(mockConfirm).not.toHaveBeenCalled()
     expect(mockSession.messages[0].toolCalls[0].requiresConfirmation).toBe(true)
   })

@@ -10,7 +10,7 @@
  * monaco; the singleton uses the real monaco-editor ESM API.
  */
 
-import type * as monaco from 'monaco-editor/esm/vs/editor/editor.api'
+import type * as monaco from 'monaco-editor/editor/editor.api'
 import type { SchemaMetadataService } from './metadata'
 import type { CompletionContextInput, SchemaSnapshot, SQLDialect, Suggestion } from './types'
 import { analyzeCompletionContext } from './analyzer'
@@ -18,7 +18,14 @@ import { buildSuggestions } from './builder'
 import { getDialectProfile } from './dialects'
 import { getMetadataService } from './metadata'
 
-export const SQL_DIALECT_IDS: readonly SQLDialect[] = ['sql', 'mysql', 'pgsql', 'mssql', 'plsql', 'sqlite']
+export const SQL_DIALECT_IDS: readonly SQLDialect[] = [
+  'sql',
+  'mysql',
+  'pgsql',
+  'mssql',
+  'plsql',
+  'sqlite',
+]
 
 /** Per-editor identity + snapshot, keyed by the backing ITextModel. */
 export type ModelContext = {
@@ -86,7 +93,12 @@ export function createProvider(monacoLike: typeof monaco, deps: ProviderDeps) {
       else {
         const unqualified = metadata.getTables(connId, db)
         const qualified = metadata.getSchemas(connId, db).map(s => metadata.getTables(connId, db, s)).flat()
-        addTables(db, [...new Set([...unqualified, ...qualified])])
+        addTables(db, [
+          ...new Set([
+            ...unqualified,
+            ...qualified,
+          ]),
+        ])
       }
     }
 

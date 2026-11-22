@@ -193,6 +193,7 @@ fn parse_db_type(s: &str) -> Result<DatabaseType, String> {
         "informix" => Ok(DatabaseType::Informix),
         "kylin" => Ok(DatabaseType::Kylin),
         "cassandra" => Ok(DatabaseType::Cassandra),
+        "scylladb" => Ok(DatabaseType::ScyllaDB),
         "iris" => Ok(DatabaseType::Iris),
         "access" => Ok(DatabaseType::Access),
         "tdengine" | "td" => Ok(DatabaseType::TDengine),

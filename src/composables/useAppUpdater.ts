@@ -75,10 +75,14 @@ export function useAppUpdater() {
     }
     catch (error) {
       console.error('Failed to check for updates:', error)
-      updateError.value = error instanceof Error ? error.message : String(error)
+      updateError.value = error instanceof Error
+        ? error.message
+        : String(error)
       if (showToast) {
         toast.error(t('updater.checkFailed'), {
-          description: error instanceof Error ? error.message : String(error),
+          description: error instanceof Error
+            ? error.message
+            : String(error),
         })
       }
       return null
@@ -118,7 +122,9 @@ export function useAppUpdater() {
       })
     }
     catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
+      const message = error instanceof Error
+        ? error.message
+        : String(error)
       console.error('Update failed:', error)
       updateError.value = message
       isDownloading.value = false
