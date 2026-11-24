@@ -66,7 +66,8 @@
     "lint:check": "eslint ./",
     "lint:fix": "eslint --fix ./",
     "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand --coverage --coverageReporters json-summary text html lcov",
-    "test:ci": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand --ci --coverage --coverageReporters json-summary text html lcov"
+    "test:ci": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand --ci --coverage --coverageReporters json-summary text html lcov",
+    "test:ui": "playwright test --config tests/ui/playwright.config.ts"
   },
   "dependencies": {
     "@iconify-json/lucide": "^1.2.114",
@@ -109,6 +110,7 @@
     "@iconify-json/carbon": "^1.2.23",
     "@iconify-json/simple-icons": "^1.2.98",
     "@iconify/json": "^2.2.482",
+    "@playwright/test": "1.65.1",
     "@tauri-apps/cli": "^2",
     "@types/jest": "^30.0.0",
     "@types/node": "^24.19.2",
