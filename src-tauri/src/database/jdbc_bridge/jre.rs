@@ -376,6 +376,42 @@ async fn download_jre_stream(
     Ok(())
 }
 
+/// Prepare Java for an automatic JDBC connection or reconnect.
+pub(super) async fn ensure_java() -> DbResult<()> {
+    let _guard = JRE_INSTALL_LOCK.get_or_init(|| Mutex::new(())).lock().await;
+
+    if !is_managed_jre_installed() {
+        let system_version = JreDetector::detect_system_java()
+            .as_ref()
+            .and_then(system_java_version);
+        if system_version.is_some_and(|version| version >= 25) {
+            return Ok(());
+        }
+        install_managed_jre().await.map_err(|error| {
+            let system_java = system_version.map_or_else(
+                || "No Java 25+ found".to_string(),
+                |version| format!("System Java version is {version} but Java 25+ is required"),
+            );
+            DbError::Connection(format!(
+                "{system_java}. SQLKit could not download a managed JRE: {error}. Check your internet connection or install Java 25 manually."
+            ))
+        })?;
+    } else {
+        // Memoised: this used to be a blocking HTTP round trip (1.4-2.5 s) before
+        // every single connect, including local DuckDB/SQLite-style files.
+        if let Some(redirect_url) = check_adoptium_update_cached().await {
+            if let Some(latest) = parse_adoptium_build_version(&redirect_url) {
+                if let Some(current) = read_jre_version() {
+                    if compare_versions(&latest, &current) > 0 {
+                        install_managed_jre().await?;
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Download and extract the managed JRE for the current platform from Adoptium.
 ///
 /// Downloads the latest JRE 25 (Eclipse Temurin) build from the Adoptium API,
@@ -383,7 +419,10 @@ async fn download_jre_stream(
 /// Uses atomic operations: download to temp → validate → extract to temp dir → replace.
 pub async fn download_managed_jre() -> DbResult<()> {
     let _guard = JRE_INSTALL_LOCK.get_or_init(|| Mutex::new(())).lock().await;
+    install_managed_jre().await
+}
 
+async fn install_managed_jre() -> DbResult<()> {
     let (os, arch) = adoptium_os_arch()
         .ok_or_else(|| DbError::Connection("No JRE available for this platform".to_string()))?;
 

@@ -54,6 +54,7 @@ export type ServerConfig = {
   ssl_client_key?: string | null
   trust_server_certificate?: boolean | null
   transport_layers?: TransportLayerConfig[] | null
+  connect_timeout_secs?: number
   sshTunnel?: Record<string, unknown> | null
   oracle_options?: OracleConnectionOptions | null
   read_only?: boolean | null

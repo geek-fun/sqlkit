@@ -9,6 +9,7 @@ use crate::database::{
         QueryResult, QueryRow, QueryValue, TableInfo, TriggerInfo,
     },
 };
+use crate::download::{self, DownloadKind};
 use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -36,6 +37,46 @@ impl JdbcBridgeAdapter {
             launcher: None,
             conn_id: None,
         }
+    }
+
+    pub(crate) async fn prepare(db_type: DatabaseType) -> DbResult<()> {
+        let driver_id =
+            super::registry::DriverRegistry::registry_key(db_type).ok_or_else(|| {
+                DbError::Connection(format!("No driver registry entry for {:?}", db_type))
+            })?;
+
+        Self::prepare_step("jre", DownloadKind::Jre, super::jre::ensure_java()).await?;
+        Self::prepare_step(
+            "bridge",
+            DownloadKind::Bridge,
+            super::download::download_bridge_plugin(),
+        )
+        .await?;
+        // The Java resolver can still provide a driver if the direct download fails.
+        if let Err(error) = Self::prepare_step(
+            driver_id,
+            DownloadKind::Driver,
+            super::download::download_jdbc_driver_direct(driver_id),
+        )
+        .await
+        {
+            log::debug!("Direct JDBC driver download failed for {driver_id}: {error}");
+        }
+        Ok(())
+    }
+
+    async fn prepare_step(
+        id: &str,
+        kind: DownloadKind,
+        setup: impl std::future::Future<Output = DbResult<()>>,
+    ) -> DbResult<()> {
+        download::emit_progress(id, kind.clone(), 0, 1);
+        let result = setup.await;
+        match &result {
+            Ok(()) => download::emit_complete(id, kind),
+            Err(error) => download::emit_error(id, kind, error.to_string()),
+        }
+        result
     }
 
     fn fold_catalog_into_schema<'a>(
@@ -68,9 +109,8 @@ impl JdbcBridgeAdapter {
         Ok(Self::parse_query_result(data)?.rows)
     }
 
-    /// Ensure all prerequisites are met: JRE, bridge JAR, and JDBC driver.
-    /// Uses the fallback chain to try multiple driver versions automatically.
-    async fn init_bridge(&mut self) -> DbResult<Arc<Mutex<JdbcBridgeLauncher>>> {
+    /// Open a database session after the JDBC dependencies have been prepared.
+    pub(crate) async fn connect_prepared(&mut self) -> DbResult<()> {
         let db_type = self.config.db_type;
         let ssl_mode_str = match self.config.ssl_mode {
             crate::database::config::SslMode::Prefer if db_type.is_cql() => "disable",
@@ -90,8 +130,6 @@ impl JdbcBridgeAdapter {
             None
         };
 
-        // Use fallback chain for JDBC-dependent databases (Oracle, DB2, H2, etc.)
-        // For non-registry types, fall back to the old single-driver approach
         let database = if db_type.is_cql() {
             let keyspace = self.config.cql_keyspace();
             if !keyspace.starts_with(|c: char| c.is_ascii_alphabetic())
@@ -125,9 +163,9 @@ impl JdbcBridgeAdapter {
         .await?;
 
         self.conn_id = Some(conn_id);
-        self.launcher = Some(launcher.clone());
+        self.launcher = Some(launcher);
 
-        Ok(launcher)
+        Ok(())
     }
 
     /// Get the launcher (must be initialized first via `connect`).
@@ -232,8 +270,8 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     type Pool = JdbcBridgePool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        self.init_bridge().await?;
-        Ok(())
+        Self::prepare(self.config.db_type).await?;
+        self.connect_prepared().await
     }
 
     async fn disconnect(&mut self) -> DbResult<()> {

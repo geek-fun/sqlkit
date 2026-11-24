@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type { OracleConnectionOptions, ServerConnection } from '@/store'
 import type { DatabaseFileAssessment } from '@/utils/databaseFiles'
-import { invoke } from '@tauri-apps/api/core'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { openUrl } from '@tauri-apps/plugin-opener'
 import { computed, ref, watch } from 'vue'
@@ -27,6 +26,7 @@ import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { useDownloadEvents } from '@/composables/useDownloadEvents'
 import { toast } from '@/composables/useNotifications'
 import { usePlatform } from '@/composables/usePlatform'
+import { connectionApi } from '@/datasources'
 import { jdbcApi } from '@/datasources/jdbcApi'
 import { buildOracleOptions, buildTransportLayers, databasePlaceholderFor, DatabaseType, dbTypeToBackend, isDatabaseRequired, isJdbcDatabase, resolveDatabase, useConnectionStore, useEntitlementStore } from '@/store'
 import { DEFAULT_SSL_MODE, isCqlDatabase, normalizeSslMode, sslModeToBackend, validateSslConfig } from '@/types/connection'
@@ -138,6 +138,7 @@ const defaultConnection: ServerConnection = {
 }
 
 const formData = ref<ServerConnection>({ ...defaultConnection })
+const isJdbcDb = computed(() => isJdbcDatabase(formData.value.type))
 // CQL stores (Cassandra/ScyllaDB) need an explicit local datacenter for the
 // driver's default load-balancing policy — kept as its own field and composed
 // into the keyspace value on save/test (see resolveDatabase on the store side).
@@ -169,8 +170,7 @@ const testSshTunnelStripped = ref(false)
 const formErrors = ref<Record<string, string>>({})
 const isPickingFile = ref(false)
 
-// Step tracking for setup progress
-// Each step has its own status; clicking retry re-runs that individual step.
+// The backend reports progress while it prepares the JDBC dependencies.
 type StepDef = {
   id: string
   label: string
@@ -189,44 +189,41 @@ function togglePassword(key: string) {
   showPasswords.value[key] = !showPasswords.value[key]
 }
 
-// Sync download progress events into setup steps
-watch(() => ({ ...dl.progress }), (progress) => {
-  for (const [id] of Object.entries(progress)) {
-    const kind = dl.getKind(id)
-    const stepId = kind === 'driver'
-      ? 'driver'
-      : kind // jre→jre, bridge→bridge, driver→driver
-    const step = setupSteps.value.find(s => s.id === stepId)
-    if (step && step.status === 'running' && dl.getProgress(id)) {
-      const p = dl.getProgress(id)!
-      step.progress = { downloaded: p.downloaded, total: p.total }
-    }
-  }
-}, { deep: true })
+const jdbcDriverId = computed(() => {
+  const dbType = mapDatabaseTypeToBackend(formData.value.type)
+  if (dbType === 'kingbasees')
+    return 'kingbase'
+  return dbType.replace('-', '_')
+})
 
-// Run a single setup step (JRE or Bridge) with its own invoke
-async function runStep(step: StepDef): Promise<boolean> {
-  step.status = 'running'
-  step.progress = undefined
-  step.error = undefined
-  try {
-    if (step.id === 'jre') {
-      await invoke('download_jre')
+setupSteps.value.forEach((step) => {
+  watch(() => {
+    const id = step.id === 'driver'
+      ? jdbcDriverId.value
+      : step.id
+    return {
+      state: dl.getState(id),
+      progress: dl.getProgress(id),
+      error: dl.getError(id),
     }
-    else if (step.id === 'bridge') {
-      await invoke('download_bridge_jar')
+  }, ({ state, progress, error }) => {
+    if (testStatus.value !== 'testing' || !isJdbcDb.value)
+      return
+    step.progress = progress ?? undefined
+    if (state === 'downloading') {
+      step.status = 'running'
+      step.error = undefined
     }
-    step.status = 'done'
-    return true
-  }
-  catch (e) {
-    step.status = 'error'
-    step.error = e instanceof Error
-      ? e.message
-      : String(e)
-    return false
-  }
-}
+    else if (state === 'complete' || state === 'installing') {
+      step.status = 'done'
+      step.error = undefined
+    }
+    else if (state === 'error' && step.id !== 'driver') {
+      step.status = 'error'
+      step.error = error ?? undefined
+    }
+  })
+})
 
 // SQLite-specific state
 const sqliteTab = ref<'file' | 'in-memory'>('file')
@@ -403,8 +400,6 @@ const isFileBased = computed(() =>
 const isEncryptedFileDb = computed(() =>
   formData.value.type === DatabaseType.SQLCIPHER,
 )
-
-const isJdbcDb = computed(() => isJdbcDatabase(formData.value.type))
 
 const isDuckDb = computed(() => formData.value.type === DatabaseType.DUCKDB)
 
@@ -789,59 +784,6 @@ async function handleTestConnection() {
   })
 
   try {
-    const dbType = mapDatabaseTypeToBackend(formData.value.type)
-
-    // For JDBC bridge databases, ensure JRE/bridge/driver are ready first
-    if (isJdbcDb.value) {
-      const jreStep = setupSteps.value.find(s => s.id === 'jre')!
-      const bridgeStep = setupSteps.value.find(s => s.id === 'bridge')!
-      const driverStep = setupSteps.value.find(s => s.id === 'driver')!
-
-      const results = await Promise.allSettled([
-        // JRE download (skips if already installed)
-        invoke('check_jre_status').then(async (status: any) => {
-          if (!status.installed) {
-            const ok = await runStep(jreStep)
-            if (!ok)
-              throw new Error('JRE download failed')
-          }
-          else { jreStep.status = 'done' }
-        }),
-        // Bridge download (skips if already installed)
-        invoke('check_bridge_status').then(async (status: any) => {
-          if (!status.installed) {
-            const ok = await runStep(bridgeStep)
-            if (!ok)
-              throw new Error('Bridge download failed')
-          }
-          else { bridgeStep.status = 'done' }
-        }),
-        // JDBC driver download directly from Maven Central (no Java needed)
-        (async () => {
-          driverStep.status = 'running'
-          try {
-            await invoke('download_jdbc_driver_direct', { dbType })
-            driverStep.status = 'done'
-          }
-          catch {
-            driverStep.status = 'done' // Non-fatal
-          }
-        })(),
-      ])
-
-      // If JRE or Bridge failed, stop (keep steps visible with error state)
-      if (results[0].status === 'rejected' || results[1].status === 'rejected') {
-        const firstError = setupSteps.value.find(s => s.status === 'error')
-        if (firstError?.error)
-          testError.value = firstError.error
-        return
-      }
-    }
-    const driverStep = isJdbcDb.value
-      ? setupSteps.value.find(s => s.id === 'driver')
-      : undefined
-
-    // Test the actual connection
     const config = {
       id: formData.value.id || crypto.randomUUID(),
       name: formData.value.name,
@@ -859,98 +801,36 @@ async function handleTestConnection() {
       transport_layers: testSshTunnelStripped.value
         ? null
         : await buildTransportLayers(formData.value.sshTunnel),
+      connect_timeout_secs: formData.value.connectTimeoutSecs ?? 10,
       oracle_options: buildOracleOptions(formData.value.oracleOptions),
       read_only: formData.value.readOnly ?? false,
     }
 
-    // Small yield to let Vue render the loading state before the blocking invoke
-    await new Promise(r => setTimeout(r, 50))
+    const result = await connectionApi.test(config)
+    if (!result.is_connected)
+      throw new Error(t('components.serverForm.ssh.testReturnedNotConnected'))
 
-    const result = await invoke<{ is_connected: boolean, server_version?: string }>('test_connection', { config })
-
-    if (result.is_connected) {
-      if (result.server_version) {
-        formData.value.serverVersion = result.server_version
-      }
-      if (driverStep)
-        driverStep.status = 'done'
-      testStatus.value = 'success'
+    if (result.server_version)
+      formData.value.serverVersion = result.server_version
+    if (isJdbcDb.value) {
+      setupSteps.value.forEach((step) => {
+        step.status = 'done'
+        step.error = undefined
+      })
     }
-    else {
-      if (driverStep)
-        driverStep.status = 'error'
-      const msg = t('components.serverForm.ssh.testReturnedNotConnected')
-      if (driverStep)
-        driverStep.error = msg
-      testError.value = msg
-      testStatus.value = 'error'
-    }
+    testStatus.value = 'success'
   }
   catch (error) {
-    testStatus.value = 'error'
     const msg = error instanceof Error
       ? error.message
       : String(error)
-    testError.value = msg
-    // If the error is Java-related, also mark JRE as failed so user can retry it
-    if (msg.includes('Unable to locate a Java Runtime') || msg.includes('Java not found')) {
-      const jreStepFound = setupSteps.value.find(s => s.id === 'jre')
-      if (jreStepFound) {
-        jreStepFound.status = 'error'
-        jreStepFound.error = t('components.serverForm.ssh.jreBroken')
-      }
-    }
-    const running = setupSteps.value.find(s => s.status === 'running')
+    const running = setupSteps.value.find(step => step.status === 'running')
     if (running) {
       running.status = 'error'
       running.error = msg
     }
-  }
-
-  // If testStatus is error but testError is empty, collect from first errored step
-  if (testStatus.value === 'error' && !testError.value) {
-    const firstError = setupSteps.value.find(s => s.status === 'error')
-    if (firstError?.error)
-      testError.value = firstError.error
-  }
-}
-
-/** Retry an individual setup step by its id */
-async function retryStep(stepId: string) {
-  const step = setupSteps.value.find(s => s.id === stepId)
-  if (!step || step.status !== 'error')
-    return
-
-  if (stepId === 'driver') {
-    // For driver/connection, re-run full test
-    await handleTestConnection()
-    return
-  }
-
-  step.status = 'running'
-  step.error = undefined
-  step.progress = undefined
-
-  try {
-    if (stepId === 'jre') {
-      await invoke('download_jre')
-    }
-    else if (stepId === 'bridge') {
-      await invoke('download_bridge_jar')
-    }
-    step.status = 'done'
-
-    // If all dependencies are now done, try connecting
-    const allReady = setupSteps.value.every(s => s.status === 'done')
-    if (allReady && stepId !== 'driver') {
-      await handleTestConnection()
-    }
-  }
-  catch (e) {
-    step.status = 'error'
-    step.error = e instanceof Error
-      ? e.message
-      : String(e)
+    testError.value = msg
+    testStatus.value = 'error'
   }
 }
 
@@ -1642,7 +1522,7 @@ function handleSave() {
                   type="button"
                   class="text-muted-foreground inline-flex shrink-0 gap-0.5 cursor-pointer transition-colors items-center hover:text-foreground"
                   :title="t('common.buttons.retry')"
-                  @click="retryStep(step.id)"
+                  @click="handleTestConnection"
                 >
                   <span class="i-carbon-renew h-3.5 w-3.5" />
                 </button>
