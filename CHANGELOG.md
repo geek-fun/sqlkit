@@ -7,9 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.4] - 2026-11-24
+
 ### Added
 
+- MCP Bridge status at a glance: the tray shows whether the bridge is running (with its port), offers Copy Bridge URL, and when the bridge was stopped for subscription reasons adds an Unlock MCP Bridge shortcut that opens the upgrade dialog (#218)
+- The Settings MCP tab becomes a connection center: a Bridge card with status, restart, port, auto-start and the reason a gated bridge stopped, plus a server card with live sessions and a "Connect an AI client" guide for Claude Code, Codex, Cursor and generic clients (#218)
+- cheapaimodel provider preset in AI settings (OpenAI compatible, base URL `https://api.cheapaimodel.ai/v1`) (#204)
+
+### Changed
+
+- Settings rows follow one aligned pattern: label on the left, control on the right, and AI provider rows show monochrome brand icons (#218)
+- The UberLLM provider preset is renamed to MartLLM with the new API base URL `https://api.martllm.com/v1`; existing UberLLM configurations keep matching and the old domain still works (#221)
+
+### Fixed
+
+- The account avatar no longer turns into a blank box weeks after login: its signed URL renews automatically before it expires, a failed renewal falls back to the default avatar without touching your session, and avatars only load from trusted hosts (#219)
+
+## [1.0.3] - 2026-11-19
+
+### Added
+
+- Apache Cassandra and ScyllaDB support: connect with TLS or plaintext, browse keyspaces, and run CQL queries, with official database logos
+- App language setting: choose the UI language in Settings, with system detection aligned to the same choice, plus five new languages — 繁體中文, Português (Brasil), 日本語, 한국어, Español
+- SQLKit keeps running in the system tray when you close the window
 - Device activation and session refresh report the app's UI language, so re-logging in after changing it keeps the console device list accurate (#209)
+
+### Fixed
+
+- Running an empty or comment-only script on SQLite no longer errors
+- Cassandra/ScyllaDB `sslmode=prefer` connects in plaintext instead of forcing TLS
+- Title bar dragging works again
 
 ## [1.0.2] - 2026-11-13
 
@@ -18,7 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UberLLM provider preset in AI settings (OpenAI compatible, base URL `https://api.uberllm.dev/v1`) (#205)
 - CloudGPU provider preset in AI settings (OpenAI compatible, base URL `https://cloudgpu.app/v1`)
 - Runcrate provider preset in AI settings (OpenAI compatible, base URL `https://api.runcrate.ai/v1`)
-- cheapaimodel provider preset in AI settings (OpenAI compatible, base URL `https://api.cheapaimodel.ai/v1`)
 
 ### Changed
 
