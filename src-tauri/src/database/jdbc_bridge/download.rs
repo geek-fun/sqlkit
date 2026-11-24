@@ -14,8 +14,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
 use std::time::Duration;
+use tokio::sync::Mutex;
 
 const APP_VERSION: &str = env!("APP_VERSION");
+static BRIDGE_INSTALL_LOCK: Mutex<()> = Mutex::const_new(());
+static DRIVER_DOWNLOAD_LOCK: Mutex<()> = Mutex::const_new(());
 
 /// Subdirectory under user home for bridge data.
 const BRIDGE_DIR: &str = ".sqlkit/jdbc-bridge";
@@ -44,7 +47,7 @@ pub fn bridge_jar_path() -> PathBuf {
 
 /// Check if the current version's bridge JAR is installed.
 pub fn is_bridge_installed() -> bool {
-    bridge_jar_path().exists()
+    bridge_jar_path().is_file()
 }
 
 /// Upper bound for Maven metadata requests. Without one, a stalled endpoint
@@ -146,6 +149,7 @@ pub async fn download_to_path(
     let tmp_path = dest.with_extension("tmp");
     let response = http_client()
         .get(url)
+        .timeout(Duration::from_secs(300))
         .send()
         .await
         .map_err(|e| DbError::Connection(format!("Failed to download from {}: {}", url, e)))?;
@@ -187,13 +191,14 @@ pub async fn download_to_path(
         crate::download::emit_progress(id, kind.clone(), downloaded, total);
     }
 
+    drop(file);
     tokio::fs::rename(&tmp_path, dest)
         .await
         .map_err(|e| DbError::Connection(format!("Failed to finalize download: {}", e)))?;
     Ok(())
 }
 
-/// Download the bridge fat JAR from GitHub Releases (version-pinned).
+/// Install the app version's bridge fat JAR from GitHub Releases if missing.
 ///
 /// Validates the downloaded JAR by checking:
 /// 1. HTTP 200 response status
@@ -202,7 +207,11 @@ pub async fn download_to_path(
 ///
 /// Retries once on validation failure.
 pub async fn download_bridge_plugin() -> DbResult<()> {
+    let _guard = BRIDGE_INSTALL_LOCK.lock().await;
     let jar_path = bridge_jar_path();
+    if jar_path.is_file() {
+        return Ok(());
+    }
 
     if let Some(parent) = jar_path.parent() {
         tokio::fs::create_dir_all(parent)
@@ -215,22 +224,29 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
         APP_VERSION, APP_VERSION
     );
 
+    let staged_jar = jar_path.with_extension("download");
     let mut last_err = None::<String>;
     for attempt in 0..2 {
         if attempt > 0 {
             crate::download::emit_progress("bridge", DownloadKind::Bridge, 0, 1);
         }
-        if let Err(e) =
-            download_to_path(&url, &jar_path, "bridge", DownloadKind::Bridge, 10_000_000).await
+        if let Err(e) = download_to_path(
+            &url,
+            &staged_jar,
+            "bridge",
+            DownloadKind::Bridge,
+            10_000_000,
+        )
+        .await
         {
             last_err = Some(e.to_string());
             continue;
         }
 
-        let meta = std::fs::metadata(&jar_path)
+        let meta = std::fs::metadata(&staged_jar)
             .map_err(|e| DbError::Connection(format!("Failed to check JAR file size: {}", e)))?;
         if meta.len() < 1_000_000 {
-            let _ = std::fs::remove_file(&jar_path);
+            let _ = std::fs::remove_file(&staged_jar);
             last_err = Some(format!(
                 "JAR file too small ({} bytes, expected ≥ 1 MB)",
                 meta.len()
@@ -242,7 +258,9 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
             // Try to validate the JAR. If Java isn't actually runnable (e.g. macOS stub),
             // skip validation rather than deleting the downloaded JAR.
             match Command::new(&java)
-                .args(["-jar", &jar_path.to_string_lossy(), "--version"])
+                .arg("-jar")
+                .arg(&staged_jar)
+                .arg("--version")
                 .output()
             {
                 Ok(output) => {
@@ -251,7 +269,7 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
                         if stderr.contains("Unable to locate") || stderr.contains("no java") {
                             // macOS stub or missing JRE — skip validation, JAR is fine
                         } else {
-                            let _ = std::fs::remove_file(&jar_path);
+                            let _ = std::fs::remove_file(&staged_jar);
                             last_err = Some(format!(
                                 "Bridge JAR validation failed (exit: {}): {}",
                                 output.status, stderr
@@ -261,7 +279,7 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
                     } else {
                         let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
                         if stdout.is_empty() || stdout == "unknown" {
-                            let _ = std::fs::remove_file(&jar_path);
+                            let _ = std::fs::remove_file(&staged_jar);
                             last_err = Some(format!(
                                 "Bridge JAR --version returned invalid output: {}",
                                 stdout
@@ -289,7 +307,14 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
         )));
     }
 
-    cleanup_old_bridge_versions().await?;
+    tokio::fs::rename(&staged_jar, &jar_path)
+        .await
+        .map_err(|e| DbError::Connection(format!("Failed to install bridge JAR: {}", e)))?;
+    if std::env::var_os("SQLKIT_JDBC_BRIDGE_JAR").is_none() {
+        if let Err(error) = cleanup_old_bridge_versions().await {
+            log::warn!("Could not remove old JDBC bridge versions: {error}");
+        }
+    }
 
     Ok(())
 }
@@ -320,6 +345,11 @@ pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
     if cached_driver_jar(config).is_some() {
         return Ok(());
     }
+    let _guard = DRIVER_DOWNLOAD_LOCK.lock().await;
+    if cached_driver_jar(config).is_some() {
+        return Ok(());
+    }
+    evict_implausible_pinned_jar(config);
 
     // Drivers with a direct download URL (non-Maven, e.g. GBase 8a or the
     // Cassandra wrapper bundle). Name the cached file the way the Java

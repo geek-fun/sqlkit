@@ -281,7 +281,8 @@ pub async fn download_jdbc_driver_direct(db_type: String) -> Result<(), String> 
 #[tauri::command]
 pub async fn check_bridge_status() -> Result<BridgeStatus, String> {
     let jar_path = download::bridge_jar_path();
-    let current_version = if jar_path.exists() {
+    let installed = download::is_bridge_installed();
+    let current_version = if installed {
         jar_path
             .file_stem()
             .and_then(|s| s.to_str())
@@ -292,7 +293,7 @@ pub async fn check_bridge_status() -> Result<BridgeStatus, String> {
         env!("APP_VERSION").to_string()
     };
     Ok(BridgeStatus {
-        installed: jar_path.exists(),
+        installed,
         current_version,
         path: Some(jar_path.to_string_lossy().to_string()),
     })

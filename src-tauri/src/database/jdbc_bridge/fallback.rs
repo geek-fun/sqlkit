@@ -372,8 +372,8 @@ async fn connect_with_jar(
 
 /// Connect using the configured JDBC driver.
 ///
-/// Ensures JRE and bridge JAR are installed, then delegates to `try_driver`
-/// which resolves the driver dynamically via Java-side `ResolveDriver` RPC.
+/// With the bridge installed, delegates to `try_driver` to resolve the driver
+/// and open a database session.
 /// Supports Oracle-specific URL construction via `oracle_options`.
 pub async fn run_fallback_chain(
     db_type: DatabaseType,
@@ -394,54 +394,6 @@ pub async fn run_fallback_chain(
     let config = registry.get_config(db_type).ok_or_else(|| {
         DbError::Connection(format!("No driver registry entry for {:?}", db_type))
     })?;
-
-    if !super::jre::is_managed_jre_installed() {
-        if let Err(download_err) = super::jre::download_managed_jre().await {
-            match super::jre::JreDetector::detect_system_java() {
-                Some(system_path) => match super::jre::system_java_version(&system_path) {
-                    Some(version) if version >= 25 => {}
-                    Some(version) => {
-                        return Err(DbError::Connection(format!(
-                            "System Java version is {} but Java 25+ is required. \
-                             SQLKit could not download a managed JRE: {}. \
-                             Install Java 25 manually or retry with internet access.",
-                            version, download_err
-                        )));
-                    }
-                    None => {
-                        return Err(DbError::Connection(format!(
-                            "Could not determine system Java version. \
-                             SQLKit could not download a managed JRE: {}. \
-                             Install Java 25 manually or retry with internet access.",
-                            download_err
-                        )));
-                    }
-                },
-                None => {
-                    return Err(DbError::Connection(format!(
-                        "No Java 25+ found. SQLKit could not download a managed JRE: {}. \
-                         Check your internet connection or install Java 25 manually.",
-                        download_err
-                    )));
-                }
-            }
-        }
-    } else {
-        // Memoised: this used to be a blocking HTTP round trip (1.4-2.5 s) before
-        // every single connect, including local DuckDB/SQLite-style files.
-        if let Some(redirect_url) = super::jre::check_adoptium_update_cached().await {
-            if let Some(latest) = super::jre::parse_adoptium_build_version(&redirect_url) {
-                if let Some(current) = super::jre::read_jre_version() {
-                    if super::jre::compare_versions(&latest, &current) > 0 {
-                        super::jre::download_managed_jre().await?;
-                    }
-                }
-            }
-        }
-    }
-    if !download::is_bridge_installed() {
-        download::download_bridge_plugin().await?;
-    }
 
     // Two-phase driver resolution: LATEST first, capped retry on version
     // mismatch. Drivers with a pinned `version_cap` skip the LATEST phase

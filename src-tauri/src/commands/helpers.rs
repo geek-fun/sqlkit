@@ -1,3 +1,4 @@
+use crate::connection::handle::ConnectionHandle;
 use crate::database::config::DatabaseType;
 use crate::database::rqlite::RqliteAdapter;
 use crate::database::strategy::{resolve_effective_type, ConnectionStrategy, CoreDatabaseType};
@@ -14,6 +15,7 @@ use crate::ssh::start_transport_layers;
 use crate::ssh::TunnelManager;
 use crate::state::ActiveConnection;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
 
 /// Create and connect a database adapter based on database type string.
@@ -25,58 +27,74 @@ pub async fn create_and_connect_adapter(
     let db_type_enum = db_type_to_enum(db_type)?;
     let strategy = resolve_effective_type(db_type_enum);
 
-    match strategy {
-        ConnectionStrategy::Native(core) => match core {
-            CoreDatabaseType::PostgreSQL => {
-                let mut adapter = PostgresAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::Postgres(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::MySQL => {
-                let mut adapter = MySQLAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::MySQL(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::SqlServer => {
-                let mut adapter = SqlServerAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::SQLServer(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::SQLite => {
-                let mut adapter = SQLiteAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::SQLite(Arc::new(Mutex::new(adapter))))
-            }
-            CoreDatabaseType::ClickHouse => {
-                let mut adapter = ClickHouseAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::ClickHouse(Arc::new(Mutex::new(adapter))))
-            }
-            _ => Err(format!("Native adapter not yet implemented for {:?}", core)),
-        },
-        ConnectionStrategy::JdbcBridge => {
-            let mut adapter = JdbcBridgeAdapter::new(conn_config);
-            adapter.connect().await.map_err(|e| e.to_string())?;
-            Ok(ActiveConnection::JdbcBridge(Arc::new(Mutex::new(adapter))))
-        }
-        ConnectionStrategy::Http => match db_type_enum {
-            DatabaseType::RQLite => {
-                let mut adapter = RqliteAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::Rqlite(Arc::new(Mutex::new(adapter))))
-            }
-            DatabaseType::Turso => {
-                let mut adapter = TursoAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::Turso(Arc::new(Mutex::new(adapter))))
-            }
-            _ => {
-                let mut adapter = HttpSqlAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                Ok(ActiveConnection::HttpSql(Arc::new(Mutex::new(adapter))))
-            }
-        },
+    // Dependency installation has its own download limits. Start the database
+    // timeout only after setup so a first connection after an upgrade can finish.
+    if matches!(strategy, ConnectionStrategy::JdbcBridge) {
+        JdbcBridgeAdapter::prepare(conn_config.db_type)
+            .await
+            .map_err(|e| e.to_string())?;
     }
+
+    let timeout_secs = conn_config.connect_timeout_secs;
+    tokio::time::timeout(Duration::from_secs(timeout_secs), async {
+        match strategy {
+            ConnectionStrategy::Native(core) => match core {
+                CoreDatabaseType::PostgreSQL => {
+                    let mut adapter = PostgresAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::Postgres(Arc::new(Mutex::new(adapter))))
+                }
+                CoreDatabaseType::MySQL => {
+                    let mut adapter = MySQLAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::MySQL(Arc::new(Mutex::new(adapter))))
+                }
+                CoreDatabaseType::SqlServer => {
+                    let mut adapter = SqlServerAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::SQLServer(Arc::new(Mutex::new(adapter))))
+                }
+                CoreDatabaseType::SQLite => {
+                    let mut adapter = SQLiteAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::SQLite(Arc::new(Mutex::new(adapter))))
+                }
+                CoreDatabaseType::ClickHouse => {
+                    let mut adapter = ClickHouseAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::ClickHouse(Arc::new(Mutex::new(adapter))))
+                }
+                _ => Err(format!("Native adapter not yet implemented for {:?}", core)),
+            },
+            ConnectionStrategy::JdbcBridge => {
+                let mut adapter = JdbcBridgeAdapter::new(conn_config);
+                adapter
+                    .connect_prepared()
+                    .await
+                    .map_err(|e| e.to_string())?;
+                Ok(ActiveConnection::JdbcBridge(Arc::new(Mutex::new(adapter))))
+            }
+            ConnectionStrategy::Http => match db_type_enum {
+                DatabaseType::RQLite => {
+                    let mut adapter = RqliteAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::Rqlite(Arc::new(Mutex::new(adapter))))
+                }
+                DatabaseType::Turso => {
+                    let mut adapter = TursoAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::Turso(Arc::new(Mutex::new(adapter))))
+                }
+                _ => {
+                    let mut adapter = HttpSqlAdapter::new(conn_config);
+                    adapter.connect().await.map_err(|e| e.to_string())?;
+                    Ok(ActiveConnection::HttpSql(Arc::new(Mutex::new(adapter))))
+                }
+            },
+        }
+    })
+    .await
+    .map_err(|_| format!("Connection timed out after {} seconds", timeout_secs))?
 }
 
 /// Test connection for a given database configuration.
@@ -84,66 +102,16 @@ pub async fn test_connection(
     db_type: &str,
     conn_config: ConnectionConfig,
 ) -> Result<ConnectionStatus, String> {
-    let dt = db_type_to_enum(db_type)?;
-    let strategy = resolve_effective_type(dt);
-
-    match strategy {
-        ConnectionStrategy::Native(core) => match core {
-            CoreDatabaseType::PostgreSQL => {
-                let mut adapter = PostgresAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                adapter.test_connection().await.map_err(|e| e.to_string())
-            }
-            CoreDatabaseType::MySQL => {
-                let mut adapter = MySQLAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                adapter.test_connection().await.map_err(|e| e.to_string())
-            }
-            CoreDatabaseType::SqlServer => {
-                let mut adapter = SqlServerAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                adapter.test_connection().await.map_err(|e| e.to_string())
-            }
-            CoreDatabaseType::SQLite => {
-                let mut adapter = SQLiteAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                adapter.test_connection().await.map_err(|e| e.to_string())
-            }
-            CoreDatabaseType::ClickHouse => {
-                let mut adapter = ClickHouseAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                adapter.test_connection().await.map_err(|e| e.to_string())
-            }
-            _ => Err("Native adapter not yet implemented".into()),
-        },
-        ConnectionStrategy::JdbcBridge => {
-            let mut adapter = JdbcBridgeAdapter::new(conn_config);
-            adapter.connect().await.map_err(|e| e.to_string())?;
-            let status = adapter.test_connection().await.map_err(|e| e.to_string());
-            // Close the pool explicitly: the bridge process is shared, so a pooled
-            // connection left behind would hold the database (and a DuckDB file
-            // lock) open until the app exits.
-            let _ = adapter.disconnect().await;
-            status
-        }
-        ConnectionStrategy::Http => match dt {
-            DatabaseType::RQLite => {
-                let mut adapter = RqliteAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                adapter.test_connection().await.map_err(|e| e.to_string())
-            }
-            DatabaseType::Turso => {
-                let mut adapter = TursoAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                adapter.test_connection().await.map_err(|e| e.to_string())
-            }
-            _ => {
-                let mut adapter = HttpSqlAdapter::new(conn_config);
-                adapter.connect().await.map_err(|e| e.to_string())?;
-                adapter.test_connection().await.map_err(|e| e.to_string())
-            }
-        },
+    let connection = create_and_connect_adapter(db_type, conn_config).await?;
+    let status = connection
+        .check_connection()
+        .await
+        .map_err(|e| e.to_string());
+    // Release temporary JDBC pools explicitly so a test cannot keep a file locked.
+    if matches!(connection, ActiveConnection::JdbcBridge(_)) {
+        let _ = connection.disconnect().await;
     }
+    status
 }
 
 /// Map a db_type string to a DatabaseType enum.
@@ -301,4 +269,63 @@ fn tunnel_key(
         ));
     }
     format!("ssh:{}:{}:{}", hops.join("->"), host, port)
+}
+
+#[cfg(test)]
+mod jdbc_upgrade_smoke {
+    use super::*;
+    use crate::database::jdbc_bridge::download::bridge_jar_path;
+    use crate::state::ServerConfig;
+
+    #[tokio::test]
+    #[ignore = "Downloads the release JAR to an isolated SQLKIT_JDBC_BRIDGE_JAR path"]
+    async fn downloads_bridge_before_opening_a_saved_connection() {
+        assert!(std::env::var_os("SQLKIT_JDBC_BRIDGE_JAR").is_some());
+        let bridge = bridge_jar_path();
+        let directory = bridge.parent().unwrap();
+        assert!(!bridge.exists());
+        let old_jar = tempfile::Builder::new()
+            .prefix("jdbc-bridge-old-")
+            .suffix(".jar")
+            .tempfile_in(directory)
+            .unwrap();
+        let database_dir = tempfile::tempdir().unwrap();
+        let database = database_dir.path().join("upgrade.duckdb");
+        let mut config = ServerConfig::new(
+            "Upgrade smoke test".into(),
+            "duckdb".into(),
+            database.to_str().unwrap().into(),
+            0,
+            String::new(),
+        );
+        config.connect_timeout_secs = 2;
+
+        let started = std::time::Instant::now();
+        let state = crate::state::AppState::new();
+        state
+            .configs
+            .write()
+            .await
+            .insert(config.id.clone(), config.clone());
+        let connection = state.ensure_connection(&config.id).await.unwrap();
+        assert!(bridge.is_file());
+        assert!(old_jar.path().is_file());
+        assert_eq!(
+            connection
+                .execute_query("SELECT 42 AS answer")
+                .await
+                .unwrap()
+                .rows
+                .len(),
+            1
+        );
+        connection.disconnect().await.unwrap();
+        let elapsed = started.elapsed();
+
+        let status = crate::commands::server::test_connection(config)
+            .await
+            .unwrap();
+        assert!(status.is_connected);
+        eprintln!("Cold JDBC connection completed in {elapsed:?}");
+    }
 }

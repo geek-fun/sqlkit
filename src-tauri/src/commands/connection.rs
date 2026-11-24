@@ -20,12 +20,8 @@ pub async fn connect_server(
 
     let timeout_secs = conn_config.connect_timeout_secs;
 
-    let connection = tokio::time::timeout(
-        std::time::Duration::from_secs(timeout_secs),
-        crate::commands::helpers::create_and_connect_adapter(&config.db_type, conn_config),
-    )
-    .await
-    .map_err(|_| format!("Connection timed out after {} seconds", timeout_secs))??;
+    let connection =
+        crate::commands::helpers::create_and_connect_adapter(&config.db_type, conn_config).await?;
 
     let status = match connection.check_connection().await {
         Ok(status) if status.is_connected => status,
