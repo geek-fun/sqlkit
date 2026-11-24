@@ -2,7 +2,7 @@
 import type { ServerConnection } from '@/store/connectionStore'
 import { onClickOutside } from '@vueuse/core'
 import { storeToRefs } from 'pinia'
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ChatPanel from '@/components/chat-panel.vue'
 import AppLayout from '@/components/layout/AppLayout.vue'
@@ -10,7 +10,6 @@ import AppLayout from '@/components/layout/AppLayout.vue'
 // and the page renders its content completely ungated (no auto-import plugin
 // exists in this repo — components must be imported explicitly).
 import { PaidGate } from '@/components/upgrade'
-import { disposeAgentRuntime, initAgentRuntime } from '@/composables/agentRuntime'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
 import { useDataStudioChatAgent } from '@/composables/useDataStudioChatAgent'
 import { useAppStore } from '@/store'
@@ -259,7 +258,6 @@ async function initDataStudio() {
 const entitlementStore = useEntitlementStore()
 
 onMounted(async () => {
-  await initAgentRuntime()
   if (entitlementStore.isLocalUltimate) {
     await initDataStudio()
   }
@@ -274,10 +272,6 @@ watch(
       void initDataStudio()
   },
 )
-
-onBeforeUnmount(() => {
-  disposeAgentRuntime()
-})
 
 const appStore = useAppStore()
 const { llmSettings } = storeToRefs(appStore)

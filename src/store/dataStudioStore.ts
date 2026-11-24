@@ -823,8 +823,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
     },
 
-    replaceCompactionInProgressWithMarker(payload: CompactionMarkerInsertPayload) {
-      const session = this.activeSession
+    replaceCompactionInProgressWithMarker(payload: CompactionMarkerInsertPayload, sessionId: string) {
+      const session = this._resolveSession(sessionId)
       if (!session)
         return
 
@@ -858,8 +858,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
 
     // ── Placeholders ───────────────────────────────────────────────────────
 
-    insertPreparingPlaceholder() {
-      const session = this.activeSession
+    insertPreparingPlaceholder(sessionId: string) {
+      const session = this._resolveSession(sessionId)
       if (!session)
         return
 
@@ -884,8 +884,8 @@ export const useDataStudioStore = defineStore('dataStudio', {
       )
     },
 
-    removePreparingPlaceholder() {
-      const session = this.activeSession
+    removePreparingPlaceholder(sessionId: string) {
+      const session = this._resolveSession(sessionId)
       if (!session)
         return
 
@@ -955,7 +955,7 @@ export const useDataStudioStore = defineStore('dataStudio', {
       }
       if (status === 'idle' || status === 'stopped' || status === 'error') {
         this.clearSessionProgress(sessionId)
-        this.removePreparingPlaceholder()
+        this.removePreparingPlaceholder(sessionId)
         const { [sessionId]: _st, ...restStart } = this.sessionStartTimes
         this.sessionStartTimes = restStart
         const { [sessionId]: _tu, ...restToken } = this.sessionTokenUsage
