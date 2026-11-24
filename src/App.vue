@@ -17,6 +17,7 @@ import AppNotifications from '@/components/ui/notification/AppNotifications.vue'
 import UpdateNotification from '@/components/UpdateNotification.vue'
 import UpgradeDialog from '@/components/upgrade/UpgradeDialog.vue'
 import { openUpgradeDialog } from '@/components/upgrade/upgradeDialogService'
+import { disposeAgentRuntime } from '@/composables/agentRuntime'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { toast } from '@/composables/useNotifications'
 import { useAccountStore } from '@/store/accountStore'
@@ -103,6 +104,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  disposeAgentRuntime()
   sessionLifecycle.dispose()
   cancelAvatarRenewal()
 })

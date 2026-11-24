@@ -9,6 +9,7 @@ import { agentApi } from '@/datasources/agentApi'
 import { useConnectionStore } from '@/store/connectionStore'
 import { useDataStudioStore } from '@/store/dataStudioStore'
 import { useEntitlementStore } from '@/store/entitlementStore'
+import { initAgentRuntime } from './agentRuntime'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -262,16 +263,6 @@ export function useChatAgent(config: UseChatAgentConfig) {
   )
   const lastSettings = ref<Record<string, unknown> | null>(null)
 
-  // ── Event Listener Management ────────────────────────────────────────────
-
-  // Event listeners are managed globally by agentRuntime.ts.
-  // This composable relies on the global runtime for all event processing.
-  const setupLoopEventListeners = async (_sessionId: string): Promise<() => void> => {
-    return () => {}
-  }
-
-  // ── Core Methods ──────────────────────────────────────────────────────────
-
   const runAgentLoop = async (
     sessionId: string,
     userMessageContent: string,
@@ -389,38 +380,32 @@ export function useChatAgent(config: UseChatAgentConfig) {
 
       lastSettings.value = settings
 
-      // Set up event listeners before starting the loop
-      const cleanup = await setupLoopEventListeners(sessionId)
+      await initAgentRuntime()
 
-      try {
-        // Create assistant placeholder message
-        const assistantMsg: ChatMessage = {
-          id: ulid(),
-          role: 'assistant',
-          content: '',
-          status: 'streaming',
-          timestamp: Date.now(),
-        }
-
-        config.sessionStore.addMessage(sessionId, assistantMsg)
-
-        // Track the assistant message ID in runtime
-        sessionRuntimes.value = {
-          ...sessionRuntimes.value,
-          [sessionId]: {
-            ...runtime,
-            assistantMessageId: assistantMsg.id,
-            tools: runtime?.tools ?? [],
-            toolMetadata: runtime?.toolMetadata ?? {},
-          },
-        }
-
-        // Start the agent loop
-        await agentApi.runAgentLoop(sessionId, userMessageContent, settings)
+      // Create assistant placeholder message
+      const assistantMsg: ChatMessage = {
+        id: ulid(),
+        role: 'assistant',
+        content: '',
+        status: 'streaming',
+        timestamp: Date.now(),
       }
-      finally {
-        cleanup()
+
+      config.sessionStore.addMessage(sessionId, assistantMsg)
+
+      // Track the assistant message ID in runtime
+      sessionRuntimes.value = {
+        ...sessionRuntimes.value,
+        [sessionId]: {
+          ...runtime,
+          assistantMessageId: assistantMsg.id,
+          tools: runtime?.tools ?? [],
+          toolMetadata: runtime?.toolMetadata ?? {},
+        },
       }
+
+      // Start the agent loop
+      await agentApi.runAgentLoop(sessionId, userMessageContent, settings)
     }
     catch (err) {
       const message = err instanceof Error
@@ -451,7 +436,7 @@ export function useChatAgent(config: UseChatAgentConfig) {
       }
       config.sessionStore.addMessage(sessionId, userMessage)
 
-      dataStudioStore.insertPreparingPlaceholder()
+      dataStudioStore.insertPreparingPlaceholder(sessionId)
       dataStudioStore.setSessionProgress(sessionId, { phase: 'preparing' })
 
       const context = options.context ?? config.contextProvider?.()

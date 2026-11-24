@@ -4,6 +4,9 @@ import { useChatAgent } from '@/composables/useChatAgent'
 import { agentApi } from '@/datasources/agentApi'
 
 jest.mock('@/common', () => jest.requireActual('@/common/agentPrompt'))
+jest.mock('@/composables/agentRuntime', () => ({
+  initAgentRuntime: async () => undefined,
+}))
 jest.mock('@/datasources/agentApi', () => ({
   agentApi: {
     getAvailableTools: jest.fn(),

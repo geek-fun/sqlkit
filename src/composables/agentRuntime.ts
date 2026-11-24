@@ -16,10 +16,8 @@ type SessionRuntime = {
 }
 
 const sessionRuntimes = new Map<string, SessionRuntime>()
-let runtimeInitPromise: Promise<void> | null = null
-let runtimeInitialized = false
-let runtimeDisposed = false
-let runtimeUnlisteners: Array<() => void> = []
+type Unlisten = () => void
+let runtime: { ready: Promise<void>, dispose: () => void } | null = null
 
 // Tool execution timeout: mark tool as error if no result arrives within 60s
 const TOOL_TIMEOUT_MS = 60_000
@@ -76,17 +74,40 @@ function isDeniedByRule(sessionId: string, toolName: string): boolean {
   return useDataStudioStore().findConfirmationRule(sessionId, toolName)?.action === 'deny'
 }
 
-async function initAgentRuntime(): Promise<void> {
-  if (runtimeInitialized)
-    return
-  runtimeDisposed = false
+// One listener set serves both chat surfaces for the lifetime of the app.
+const initAgentRuntime = (): Promise<void> => {
+  if (runtime)
+    return runtime.ready
 
-  const unlisteners: Array<() => void> = []
+  let unlisteners: Unlisten[] = []
+  let disposed = false
+  const dispose = () => {
+    disposed = true
+    unlisteners.forEach(unlisten => unlisten())
+    unlisteners = []
+  }
+  const ready = registerAgentEvents(async (registration) => {
+    const unlisten = await registration
+    if (disposed) {
+      unlisten()
+      throw new Error('Agent event listeners were disposed')
+    }
+    unlisteners = [...unlisteners, unlisten]
+  }).catch((error) => {
+    dispose()
+    if (runtime?.ready === ready)
+      runtime = null
+    throw error
+  })
+  runtime = { ready, dispose }
+  return ready
+}
 
-  unlisteners.push(
-    await agentApi.onAgentLoopDelta(({ session_id, content }) => {
+async function registerAgentEvents(register: (registration: Promise<Unlisten>) => Promise<void>): Promise<void> {
+  await register(
+    agentApi.onAgentLoopDelta(({ session_id, content }) => {
       const store = useDataStudioStore()
-      store.removePreparingPlaceholder()
+      store.removePreparingPlaceholder(session_id)
       const session = getSessionById(store.sessions, session_id)
       if (!session)
         return
@@ -119,10 +140,10 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopThinkingDelta(({ session_id, content }) => {
+  await register(
+    agentApi.onAgentLoopThinkingDelta(({ session_id, content }) => {
       const store = useDataStudioStore()
-      store.removePreparingPlaceholder()
+      store.removePreparingPlaceholder(session_id)
       const session = getSessionById(store.sessions, session_id)
       if (!session)
         return
@@ -147,11 +168,11 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopToolCall(({ session_id, tool_call_id, tool_name, arguments: args, risk_level, confirmation_required }) => {
+  await register(
+    agentApi.onAgentLoopToolCall(({ session_id, tool_call_id, tool_name, arguments: args, risk_level, confirmation_required }) => {
       clearToolTimeout(tool_call_id)
       const store = useDataStudioStore()
-      store.removePreparingPlaceholder()
+      store.removePreparingPlaceholder(session_id)
       store.setSessionActiveTool(session_id, tool_name)
       const session = getSessionById(store.sessions, session_id)
       if (!session)
@@ -216,8 +237,8 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopToolResult(({ session_id, tool_call_id, envelope, error, denied, denial, tool_name, arguments: args }) => {
+  await register(
+    agentApi.onAgentLoopToolResult(({ session_id, tool_call_id, envelope, error, denied, denial, tool_name, arguments: args }) => {
       clearToolTimeout(tool_call_id)
       const store = useDataStudioStore()
       store.setSessionActiveTool(session_id, null)
@@ -282,8 +303,8 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopBlocked(({ session_id }) => {
+  await register(
+    agentApi.onAgentLoopBlocked(({ session_id }) => {
       const store = useDataStudioStore()
       const session = getSessionById(store.sessions, session_id)
       session?.messages.forEach((message) => {
@@ -306,8 +327,8 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopStepDone(({ session_id }) => {
+  await register(
+    agentApi.onAgentLoopStepDone(({ session_id }) => {
       const store = useDataStudioStore()
       const session = getSessionById(store.sessions, session_id)
       if (!session)
@@ -324,8 +345,8 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopDone(({ session_id }) => {
+  await register(
+    agentApi.onAgentLoopDone(({ session_id }) => {
       const store = useDataStudioStore()
       const session = getSessionById(store.sessions, session_id)
       if (session) {
@@ -339,8 +360,8 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopStopped(({ session_id, reason, message }) => {
+  await register(
+    agentApi.onAgentLoopStopped(({ session_id, reason, message }) => {
       const store = useDataStudioStore()
       const normalized = ([
         'iteration_cap',
@@ -357,8 +378,8 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopError(({ session_id, error }) => {
+  await register(
+    agentApi.onAgentLoopError(({ session_id, error }) => {
       const store = useDataStudioStore()
       const session = getSessionById(store.sessions, session_id)
 
@@ -377,8 +398,8 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopSummaryInjected((payload) => {
+  await register(
+    agentApi.onAgentLoopSummaryInjected((payload) => {
       const store = useDataStudioStore()
       store.replaceCompactionInProgressWithMarker({
         trigger: payload.trigger,
@@ -386,12 +407,12 @@ async function initAgentRuntime(): Promise<void> {
         post_tokens: payload.post_tokens,
         removed_count: payload.removed_count,
         fallback_keep_pairs: payload.fallback_keep_pairs,
-      })
+      }, payload.session_id)
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopIteration(({ session_id, iter_count, max_iterations }) => {
+  await register(
+    agentApi.onAgentLoopIteration(({ session_id, iter_count, max_iterations }) => {
       const store = useDataStudioStore()
       store.setSessionProgress(session_id, {
         phase: 'iterating',
@@ -401,10 +422,10 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopWaitingLlm(({ session_id, iter_count }) => {
+  await register(
+    agentApi.onAgentLoopWaitingLlm(({ session_id, iter_count }) => {
       const store = useDataStudioStore()
-      store.removePreparingPlaceholder()
+      store.removePreparingPlaceholder(session_id)
       store.setSessionProgress(session_id, {
         phase: 'waiting_llm',
         iter: iter_count,
@@ -425,11 +446,11 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopCompacting(({ session_id, phase }) => {
+  await register(
+    agentApi.onAgentLoopCompacting(({ session_id, phase }) => {
       const store = useDataStudioStore()
       if (phase === 'start') {
-        store.removePreparingPlaceholder()
+        store.removePreparingPlaceholder(session_id)
         store.setSessionProgress(session_id, { phase: 'compacting' })
         store.addMessage({
           id: `compacting-${session_id}`,
@@ -451,21 +472,21 @@ async function initAgentRuntime(): Promise<void> {
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopWarning(({ session_id, warning }) => {
+  await register(
+    agentApi.onAgentLoopWarning(({ session_id, warning }) => {
       console.warn(`[AgentRuntime] Session ${session_id}: ${warning}`)
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentContextUsage((payload) => {
+  await register(
+    agentApi.onAgentContextUsage((payload) => {
       const store = useDataStudioStore()
       store.setSessionTokenUsage(payload.session_id, payload.used_tokens, payload.capacity)
     }),
   )
 
-  unlisteners.push(
-    await agentApi.onAgentLoopToolRetry(({ session_id, tool_call_id, attempt, max_attempts, delay_secs }) => {
+  await register(
+    agentApi.onAgentLoopToolRetry(({ session_id, tool_call_id, attempt, max_attempts, delay_secs }) => {
       const store = useDataStudioStore()
       const session = getSessionById(store.sessions, session_id)
       if (!session)
@@ -485,33 +506,15 @@ async function initAgentRuntime(): Promise<void> {
       }
     }),
   )
-
-  runtimeInitPromise = Promise.resolve().then(() => {
-    if (runtimeDisposed) {
-      unlisteners.forEach(unlisten => unlisten())
-      return
-    }
-    runtimeUnlisteners = unlisteners
-    runtimeInitialized = true
-  })
-
-  await runtimeInitPromise
 }
 
 function disposeAgentRuntime() {
-  if (!runtimeInitialized || runtimeDisposed)
-    return
-  runtimeDisposed = true
-  for (const unlisten of runtimeUnlisteners)
-    unlisten()
-  runtimeUnlisteners = []
-  runtimeInitPromise = null
+  runtime?.dispose()
+  runtime = null
   sessionRuntimes.clear()
-  // Clear any pending tool timeouts
   for (const timer of toolTimeouts.values())
     clearTimeout(timer)
   toolTimeouts.clear()
-  runtimeInitialized = false
 }
 
 export { clearSessionRuntime, disposeAgentRuntime, getSessionRuntime, initAgentRuntime }
