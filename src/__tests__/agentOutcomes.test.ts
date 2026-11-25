@@ -1,5 +1,7 @@
 /** @jest-environment jsdom */
 import type { AgentToolCall } from '@/store/dataStudioStore'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { mount } from '@vue/test-utils'
 import AgentMessageBubble from '@/components/agent-message-bubble.vue'
 import { enUS } from '@/lang/enUS'
@@ -119,5 +121,80 @@ describe('tool outcome notices', () => {
     expect(wrapper.get('[role="alert"]').text()).toContain('Action unavailable — action not executed')
     expect(wrapper.get('[role="alert"]').text()).toContain('Saved connection is no longer available')
     expect(wrapper.text()).not.toContain('Review permissions')
+  })
+
+  it.each([
+    'pending',
+    'executing',
+    'done',
+    'error',
+    'denied',
+    'interrupted',
+  ] as const)(
+    'keeps tool call details closed by default when status is %s',
+    (status) => {
+      const denial = status === 'denied'
+        ? call.denial
+        : undefined
+      const wrapper = render({
+        ...call,
+        status,
+        denial,
+      })
+      const details = wrapper.get('details.activity-item-details').element as HTMLDetailsElement
+      expect(details.hasAttribute('open')).toBe(false)
+    },
+  )
+
+  it('does not auto-expand or collapse tool call details across status transitions', async () => {
+    const executingTool: AgentToolCall = {
+      ...call,
+      status: 'executing',
+      result: undefined,
+      denial: undefined,
+    }
+    const completedTool: AgentToolCall = {
+      ...executingTool,
+      status: 'done',
+      result: '{"rows":[]}',
+    }
+    const wrapper = render(executingTool)
+    const details = wrapper.get('details.activity-item-details').element as HTMLDetailsElement
+    expect(details.hasAttribute('open')).toBe(false)
+
+    await wrapper.setProps({
+      message: {
+        role: 'assistant',
+        status: 'done',
+        toolCalls: [completedTool],
+      },
+    })
+    expect(details.hasAttribute('open')).toBe(false)
+
+    // If the user explicitly opens a tool call while executing, finishing must not collapse it.
+    await wrapper.setProps({
+      message: {
+        role: 'assistant',
+        status: 'streaming',
+        toolCalls: [executingTool],
+      },
+    })
+    details.setAttribute('open', '')
+    await wrapper.setProps({
+      message: {
+        role: 'assistant',
+        status: 'done',
+        toolCalls: [completedTool],
+      },
+    })
+    expect(details.hasAttribute('open')).toBe(true)
+  })
+
+  it('does not apply pre-wrap whitespace to rendered thinking markdown', () => {
+    const sfc = readFileSync(join(__dirname, '../components/agent-message-bubble.vue'), 'utf8')
+    const activityBodyBlock = sfc.match(/\.activity-body\s*\{([^}]*)\}/)?.[1] ?? ''
+    const thinkingBodyBlock = sfc.match(/\.activity-body\.thinking-body\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(activityBodyBlock).not.toContain('white-space: pre-wrap')
+    expect(thinkingBodyBlock).toContain('white-space: normal')
   })
 })

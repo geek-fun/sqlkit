@@ -423,10 +423,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
         </div>
 
         <template v-for="tc in message.toolCalls" :key="tc.id">
-          <details
-            class="activity-item-details"
-            :open="tc.status === 'error' || tc.status === 'executing'"
-          >
+          <details class="activity-item-details">
             <summary class="activity-item">
               <span class="activity-icon" :class="toolIcon(tc.toolName)" />
               <span class="tool-name-badge">{{ tc.toolName }}</span>
@@ -827,8 +824,6 @@ details[open] .activity-chevron {
   color: hsl(var(--muted-foreground));
   background: hsl(var(--muted) / 0.5);
   border-radius: 6px;
-  white-space: pre-wrap;
-  word-break: break-all;
   overflow-wrap: anywhere;
   max-height: 260px;
   overflow-y: auto;
@@ -841,17 +836,37 @@ details[open] .activity-chevron {
   opacity: 0.85;
   line-height: 1.45;
   padding: 4px 8px;
+  white-space: normal;
+  word-break: normal;
 }
 
 .activity-body.thinking-body :deep(p) {
-  margin-top: 0.15em;
-  margin-bottom: 0.15em;
+  margin: 0 0 4px;
 }
 
+.activity-body.thinking-body :deep(h1),
+.activity-body.thinking-body :deep(h2),
+.activity-body.thinking-body :deep(h3),
+.activity-body.thinking-body :deep(h4),
+.activity-body.thinking-body :deep(h5),
+.activity-body.thinking-body :deep(h6) {
+  font-size: var(--font-size-dense);
+  margin: 6px 0 2px;
+}
+
+.activity-body.thinking-body :deep(ul),
+.activity-body.thinking-body :deep(ol),
+.activity-body.thinking-body :deep(pre),
+.activity-body.thinking-body :deep(blockquote) {
+  margin: 4px 0;
+}
+
+.activity-body.thinking-body :deep(.markdown-body > :first-child),
 .activity-body.thinking-body :deep(p:first-child) {
   margin-top: 0;
 }
 
+.activity-body.thinking-body :deep(.markdown-body > :last-child),
 .activity-body.thinking-body :deep(p:last-child) {
   margin-bottom: 0;
 }
