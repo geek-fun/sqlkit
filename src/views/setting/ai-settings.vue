@@ -7,7 +7,8 @@ import { useI18n } from 'vue-i18n'
 import { UPGRADE_URL } from '@/common'
 import { SettingsFeedback } from '@/components/settings'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { InfoTip } from '@/components/ui/info-tip'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { ProBadge } from '@/components/upgrade'
@@ -141,11 +142,7 @@ function handleCloseDialog() {
 
 <template>
   <Card>
-    <CardHeader>
-      <CardTitle>{{ t('pages.settings.ai.title') }}</CardTitle>
-      <CardDescription>{{ t('pages.settings.ai.description') }}</CardDescription>
-    </CardHeader>
-    <CardContent class="space-y-8">
+    <CardContent class="pt-6 space-y-8">
       <ProviderList
         v-if="settingsLoaded"
         @add="handleAdd"
@@ -158,14 +155,9 @@ function handleCloseDialog() {
       </Button>
       <!-- Agent Config -->
       <section v-if="settingsLoaded" class="space-y-4">
-        <div class="space-y-1">
-          <h3 class="text-lg font-semibold">
-            {{ t('pages.settings.ai.chat.title') }}
-          </h3>
-          <p class="text-sm text-muted-foreground">
-            {{ t('pages.settings.ai.chat.description') }}
-          </p>
-        </div>
+        <h3 class="text-lg font-semibold">
+          {{ t('pages.settings.ai.chat.title') }}
+        </h3>
 
         <button
           v-if="isPromptGated"
@@ -178,14 +170,12 @@ function handleCloseDialog() {
           <span class="text-xs text-primary-text font-medium ml-auto px-2 py-1 rounded-md bg-primary/10 shrink-0">{{ t('plan.upgrade.cta') }}</span>
         </button>
         <div v-else class="p-4 border border-border/70 rounded-xl bg-card/70 space-y-3">
-          <div class="flex gap-4 items-start justify-between">
-            <div class="space-y-1">
+          <div class="flex gap-4 items-center justify-between">
+            <div class="flex gap-1.5 items-center">
               <p class="font-semibold">
                 {{ t('pages.settings.ai.chat.systemPromptLabel') }}
               </p>
-              <p class="text-sm text-muted-foreground">
-                {{ t('pages.settings.ai.chat.systemPromptDescription') }}
-              </p>
+              <InfoTip :text="t('pages.settings.ai.chat.systemPromptDescription')" />
             </div>
             <div v-if="!isEditingPrompt" class="flex shrink-0 gap-1">
               <Button v-if="!systemPrompt" variant="outline" size="sm" @click="startEditPrompt">
@@ -226,13 +216,11 @@ function handleCloseDialog() {
 
         <!-- Auto-compact -->
         <div class="px-5 py-4 border border-border/70 rounded-3xl bg-card/70 flex flex-col gap-3 shadow-sm md:flex-row md:items-center md:justify-between">
-          <div class="min-w-0 space-y-1">
+          <div class="flex gap-1.5 min-w-0 items-center">
             <p class="text-base font-semibold">
               {{ t('pages.settings.ai.chat.autoCompactLabel') }}
             </p>
-            <p class="text-sm text-muted-foreground">
-              {{ t('pages.settings.ai.chat.autoCompactDescription') }}
-            </p>
+            <InfoTip :text="t('pages.settings.ai.chat.autoCompactDescription')" />
           </div>
           <Switch
             class="shrink-0"
@@ -243,13 +231,11 @@ function handleCloseDialog() {
 
         <!-- Max iterations -->
         <div class="px-5 py-4 border border-border/70 rounded-3xl bg-card/70 flex flex-col gap-3 shadow-sm md:flex-row md:items-center md:justify-between">
-          <div class="min-w-0 space-y-1">
+          <div class="flex gap-1.5 min-w-0 items-center">
             <p class="text-base font-semibold">
               {{ t('pages.settings.ai.chat.maxIterationsLabel') }}
             </p>
-            <p class="text-sm text-muted-foreground">
-              {{ t('pages.settings.ai.chat.maxIterationsDescription') }}
-            </p>
+            <InfoTip :text="t('pages.settings.ai.chat.maxIterationsDescription')" />
           </div>
           <Input
             type="number"
@@ -263,14 +249,9 @@ function handleCloseDialog() {
 
         <!-- Wall clock budget -->
         <div class="px-5 py-4 border border-border/70 rounded-3xl bg-card/70 flex flex-col gap-3 shadow-sm md:flex-row md:items-center md:justify-between">
-          <div class="min-w-0 space-y-1">
-            <p class="text-base font-semibold">
-              {{ t('pages.settings.ai.chat.wallClockBudgetLabel') }}
-            </p>
-            <p class="text-sm text-muted-foreground">
-              {{ t('pages.settings.ai.chat.wallClockBudgetDescription') }}
-            </p>
-          </div>
+          <p class="text-base font-semibold min-w-0">
+            {{ t('pages.settings.ai.chat.wallClockBudgetLabel') }}
+          </p>
           <Input
             type="number"
             min="1"
@@ -283,13 +264,11 @@ function handleCloseDialog() {
 
         <!-- Token budget -->
         <div class="px-5 py-4 border border-border/70 rounded-3xl bg-card/70 flex flex-col gap-3 shadow-sm md:flex-row md:items-center md:justify-between">
-          <div class="min-w-0 space-y-1">
+          <div class="flex gap-1.5 min-w-0 items-center">
             <p class="text-base font-semibold">
               {{ t('pages.settings.ai.chat.tokenBudgetLabel') }}
             </p>
-            <p class="text-sm text-muted-foreground">
-              {{ t('pages.settings.ai.chat.tokenBudgetDescription') }}
-            </p>
+            <InfoTip :text="t('pages.settings.ai.chat.tokenBudgetDescription')" />
           </div>
           <Input
             type="number"

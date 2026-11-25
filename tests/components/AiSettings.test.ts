@@ -46,6 +46,12 @@ jest.mock('@/components/ui/checkbox', () => ({
 jest.mock('@/components/ui/input', () => ({
   Input: { template: '<input />' },
 }))
+jest.mock('@/components/ui/tooltip', () => ({
+  Tooltip: { template: '<div><slot /></div>' },
+  TooltipContent: { template: '<div><slot /></div>' },
+  TooltipProvider: { template: '<div><slot /></div>' },
+  TooltipTrigger: { template: '<div><slot /></div>' },
+}))
 jest.mock('@/views/setting/provider-list.vue', () => ({
   default: { template: '<div data-testid="provider-list" />' },
 }))

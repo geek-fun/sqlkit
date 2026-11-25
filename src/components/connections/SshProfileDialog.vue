@@ -5,6 +5,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { InfoTip } from '@/components/ui/info-tip'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -210,11 +211,11 @@ async function save() {
               </TabsContent>
 
               <TabsContent value="agent" class="mt-3 space-y-1.5">
-                <Label for="profile-agent-sock">{{ t('components.serverForm.ssh.agentSockPath') }}</Label>
+                <div class="flex gap-1.5 items-center">
+                  <Label for="profile-agent-sock">{{ t('components.serverForm.ssh.agentSockPath') }}</Label>
+                  <InfoTip :text="t('components.serverForm.ssh.agentHelpText')" />
+                </div>
                 <Input id="profile-agent-sock" v-model="form.sshAgentSockPath" placeholder="$SSH_AUTH_SOCK" />
-                <p class="text-xs text-muted-foreground">
-                  {{ t('components.serverForm.ssh.agentHelpText') }}
-                </p>
               </TabsContent>
             </div>
           </Tabs>

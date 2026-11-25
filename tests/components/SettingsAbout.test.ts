@@ -20,6 +20,12 @@ jest.mock('@/composables/useAppUpdater', () => ({
 jest.mock('@/components/ui/button', () => ({
   Button: { template: '<button><slot /></button>' },
 }))
+jest.mock('@/components/ui/tooltip', () => ({
+  Tooltip: { template: '<div><slot /></div>' },
+  TooltipContent: { template: '<div><slot /></div>' },
+  TooltipProvider: { template: '<div><slot /></div>' },
+  TooltipTrigger: { template: '<div><slot /></div>' },
+}))
 jest.mock('@/components/ui/card', () => Object.fromEntries(
   [
     'Card',
@@ -98,27 +104,29 @@ it('uses the package version when native version lookup is unavailable', async (
 
 it('keeps update discovery separate from the explicit install action', async () => {
   const wrapper = render()
-  await wrapper.get('button').trigger('click')
+  const actionButton = () => wrapper.get('button:not([data-info-tip])')
+  await actionButton().trigger('click')
   expect(updater.checkForUpdates).toHaveBeenLastCalledWith(true, { includeSkipped: true })
   updater.updateAvailable.value = true
   updater.updateInfo.value = { version: '2.4.0' }
   await flushPromises()
   expect(wrapper.text()).toContain('Version 2.4.0 is available')
-  expect(wrapper.get('button').text()).toBe('Update Now')
+  expect(actionButton().text()).toBe('Update Now')
   expect(updater.downloadAndInstall).not.toHaveBeenCalled()
-  await wrapper.get('button').trigger('click')
+  await actionButton().trigger('click')
   expect(updater.downloadAndInstall).toHaveBeenCalledTimes(1)
   wrapper.unmount()
 })
 
 it('shows current, pending, and error states without claiming success after failure', async () => {
   const wrapper = render()
+  const actionButton = () => wrapper.get('button:not([data-info-tip])')
   updater.isUpToDate.value = true
   await flushPromises()
   expect(wrapper.text()).toContain('You have the latest version')
   updater.isChecking.value = true
   await flushPromises()
-  expect(wrapper.get('button').attributes('disabled')).toBeDefined()
+  expect(actionButton().attributes('disabled')).toBeDefined()
   expect(wrapper.find('[role="progressbar"]').exists()).toBe(true)
   updater.isChecking.value = false
   updater.isUpToDate.value = false
@@ -126,6 +134,6 @@ it('shows current, pending, and error states without claiming success after fail
   await flushPromises()
   expect(wrapper.get('[role="alert"]').text()).toContain('Network unavailable')
   expect(wrapper.text()).not.toContain('You have the latest version')
-  expect(wrapper.get('button').attributes('disabled')).toBeUndefined()
+  expect(actionButton().attributes('disabled')).toBeUndefined()
   wrapper.unmount()
 })

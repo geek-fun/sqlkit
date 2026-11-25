@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { DefaultPermissionEditor } from '@/components/ai-permissions'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import CodeCopyBlock from './code-copy-block.vue'
 
@@ -101,7 +101,6 @@ onBeforeUnmount(() => clearInterval(poll))
             {{ serverText }}
           </span>
         </div>
-        <CardDescription>{{ t('pages.settings.mcp.serverDesc') }}</CardDescription>
       </CardHeader>
       <CardContent class="space-y-4">
         <div

@@ -98,14 +98,9 @@ function selectModel(value: string) {
     <PopoverContent align="end" :class="panelClasses">
       <div class="model-picker-panel">
         <div class="model-picker-header">
-          <div>
-            <p class="model-picker-title">
-              {{ title }}
-            </p>
-            <p class="model-picker-subtitle">
-              esc
-            </p>
-          </div>
+          <p class="model-picker-title">
+            {{ title }}
+          </p>
         </div>
 
         <div class="model-picker-list">
@@ -183,13 +178,6 @@ function selectModel(value: string) {
   font-size: var(--font-size-form);
   font-weight: 700;
   letter-spacing: 0.03em;
-}
-
-.model-picker-subtitle {
-  margin-top: 2px;
-  font-size: var(--font-size-caption);
-  text-transform: uppercase;
-  color: hsl(var(--muted-foreground));
 }
 
 .model-picker-list {

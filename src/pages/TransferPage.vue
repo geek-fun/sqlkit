@@ -45,9 +45,6 @@ const tabConfig = computed(() => [
             <h1 class="text-xl tracking-tight font-semibold">
               {{ t('transfer.title') }}
             </h1>
-            <p class="text-caption text-muted-foreground">
-              {{ t('transfer.subtitle') }}
-            </p>
           </div>
           <TaskManagerButton @click="showTaskManager = true" />
         </header>

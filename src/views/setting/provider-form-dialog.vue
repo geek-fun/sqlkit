@@ -8,10 +8,10 @@ import { Button } from '@/components/ui/button'
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { InfoTip } from '@/components/ui/info-tip'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -406,9 +406,6 @@ watch(() => props.open, (open) => {
       <DialogTitle>
         {{ isEdit ? t('pages.settings.ai.form.editTitle') : t('pages.settings.ai.form.addTitle') }}
       </DialogTitle>
-      <DialogDescription>
-        {{ t('pages.settings.ai.form.providerTypeHelp') }}
-      </DialogDescription>
 
       <!-- Provider type selector — only in create mode -->
       <div v-if="!isEdit" class="space-y-2">
@@ -582,15 +579,15 @@ watch(() => props.open, (open) => {
 
         <!-- Models (manual entry) -->
         <div class="space-y-1">
-          <Label for="models">{{ t('pages.settings.ai.form.models') }}</Label>
+          <div class="flex gap-1.5 items-center">
+            <Label for="models">{{ t('pages.settings.ai.form.models') }}</Label>
+            <InfoTip :text="t('pages.settings.ai.form.modelsHelp')" />
+          </div>
           <Input
             id="models"
             v-model="modelsInput"
             :placeholder="t('pages.settings.ai.form.modelsPlaceholder')"
           />
-          <p class="text-xs text-muted-foreground">
-            {{ t('pages.settings.ai.form.modelsHelp') }}
-          </p>
         </div>
       </div>
 

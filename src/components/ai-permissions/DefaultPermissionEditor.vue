@@ -5,6 +5,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { AI_ACTIONS, aiPreset, getAiPolicy } from '@/common'
 import { Button } from '@/components/ui/button'
+import { InfoTip } from '@/components/ui/info-tip'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import AccessLevelPicker from './AccessLevelPicker.vue'
@@ -72,13 +73,11 @@ const selectPreset = (value: string) => {
 
 <template>
   <section class="space-y-4" :aria-label="t('aiPermissions.defaults')" :aria-busy="loading || saving">
-    <div class="space-y-1">
+    <div class="flex gap-1.5 items-center">
       <h3 class="text-sm font-semibold">
         {{ t('aiPermissions.defaults') }}
       </h3>
-      <p class="text-xs text-muted-foreground leading-relaxed max-w-prose">
-        {{ t('aiPermissions.defaultsHelp') }}
-      </p>
+      <InfoTip :text="t('aiPermissions.defaultsHelp')" />
     </div>
     <p v-if="loading" role="status" class="text-sm text-muted-foreground">
       {{ t('aiPermissions.loading') }}

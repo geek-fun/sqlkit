@@ -8,7 +8,6 @@ export const jaJP = {
     deniedByConnection: '接続の権限により拒否されています',
     conversationReadOnly: 'この会話では読み取り専用',
     title: 'AI 権限',
-    help: 'Data Studio と外部 MCP クライアントに適用されます。システムのデフォルトを使用するか、この接続の権限を設定してください。',
     loading: '権限を読み込み中…',
     loadFailed: '権限を読み込めませんでした。この接続を保存する前に再試行してください。',
     retry: '再試行',
@@ -141,7 +140,6 @@ export const jaJP = {
     },
     section: {
       title: 'アカウントとプラン',
-      desc: 'このインストールのサブスクリプションエンタイトルメントとバージョンロックの状態。',
       versionPermanent: '現在のバージョンは永久に使用できます (バージョンロックの対象です)。',
       subscriptionActive: 'Ultimate が有効です — サブスクライブ中はすべての機能が利用できます。',
       versionLockedOut: 'このバージョン ({date}) はバージョンロックの対象外のため、Community モードで表示しています。',
@@ -166,7 +164,6 @@ export const jaJP = {
     prompt: {
       title: 'エージェントプロンプト',
       label: 'エージェントプロンプト',
-      description: 'この接続に関するコンテキストを AI エージェントに追加します。',
       help: 'この接続がアタッチされると、グローバルシステムプロンプトの後にエージェントへ送信されます。',
       placeholder: 'データの業務上の意味、命名規則、よく使うクエリなどを記述してください。',
       configured: '設定済み',
@@ -174,7 +171,7 @@ export const jaJP = {
       edit: '編集',
       clear: 'クリア',
       cancel: 'キャンセル',
-      confirm: '確認',
+      confirm: 'プロンプトを保存',
     },
   },
   connectionsPage: {
@@ -263,7 +260,6 @@ export const jaJP = {
   },
   transfer: {
     title: '転送',
-    subtitle: 'データのインポート、エクスポート、移行',
     tabs: {
       export: 'エクスポート',
       import: 'インポート',
@@ -547,7 +543,6 @@ export const jaJP = {
   pages: {
     connections: {
       title: '接続',
-      subtitle: 'データベース接続の管理',
       search: '接続を検索...',
       stats: {
         totalConnections: '接続の総数',
@@ -573,10 +568,8 @@ export const jaJP = {
     },
     settings: {
       title: '設定',
-      subtitle: 'アプリケーションの環境設定を行います',
       general: {
         title: '一般',
-        description: 'アカウント、プラン、テーマ、アプリケーションの更新を管理します',
         theme: 'テーマ',
         themeSelect: 'テーマを選択',
         themeHelp: 'ライト、ダーク、またはシステムテーマを選択してください',
@@ -587,7 +580,6 @@ export const jaJP = {
         },
         language: '言語',
         languageSelect: '言語を選択',
-        languageHelp: 'お好みの言語を選択してください',
         languages: {
           enUS: 'English',
           zhCN: '简体中文',
@@ -622,7 +614,6 @@ export const jaJP = {
         sessions: '{count} セッション — {clients}',
         sessionsEmpty: 'Data Studio MCP を AI ツールに追加してください。以下のガイドを参照。',
         serverTitle: 'SqlKit MCP Server',
-        serverDesc: 'SqlKit が AI クライアントに公開する MCP ツールカタログ。',
         serverStopped: '提供されていません——MCPブリッジ が停止しています。',
         serverIdle: 'アクティブなセッションなし',
         stoppedReason: 'サブスクリプションが無効なため、MCPブリッジ は停止しています。現在 AI クライアントから SqlKit のデータベースにアクセスできません。',
@@ -655,7 +646,6 @@ export const jaJP = {
         repository: 'リポジトリ',
         website: 'ウェブサイト',
         copyright: '© {year} GEEKFUN. All rights reserved.',
-        description: 'SqlKit はエージェント機能を備えたクロスプラットフォームの SQL データベース GUI クライアントです。Rust + Tauri で構築されています。',
       },
       feedback: {
         preparing: 'ダウンロードを準備中…',
@@ -682,7 +672,6 @@ export const jaJP = {
       },
       jre: {
         title: 'JRE とドライバー',
-        description: 'データベース接続用の Java ランタイムと JDBC ドライバーを管理します',
         jreCard: {
           title: 'Java ランタイム',
           description: 'JDBC ブリッジ接続 (Oracle、DB2、H2、Derby) に必要です',
@@ -715,7 +704,6 @@ export const jaJP = {
         },
         bridgeCard: {
           title: 'ブリッジ JAR',
-          description: 'データベース接続用の JDBC ブリッジコンポーネント',
           status: {
             installed: 'インストール済み',
             notInstalled: '未インストール',
@@ -741,7 +729,6 @@ export const jaJP = {
         },
         driversCard: {
           title: 'JDBC ドライバー',
-          description: 'データベース固有の JDBC ドライバーファイル',
           label: {
             versions: '個のバージョン',
           },
@@ -773,19 +760,13 @@ export const jaJP = {
       },
       editor: {
         title: 'エディター',
-        description: 'SQL エディターの動作と外観を設定します',
         fontSize: 'フォントサイズ',
-        fontSizeHelp: 'エディターのフォントサイズ (ピクセル、8–32)',
         fontSizeError: 'フォントサイズは 8 から 32 の間で指定してください',
         tabSize: 'タブサイズ',
-        tabSizeHelp: 'タブあたりのスペース数 (1–8)',
         tabSizeError: 'タブサイズは 1 から 8 の間で指定してください',
         wordWrap: '折り返し',
-        wordWrapHelp: 'エディターで長い行を折り返します',
         showLineNumbers: '行番号を表示',
-        showLineNumbersHelp: 'エディターのガターに行番号を表示します',
         showMinimap: 'ミニマップを表示',
-        showMinimapHelp: '右側にミニマップの概要を表示します',
         indentWidth: 'インデント幅',
         indentWidthHelp: 'フォーマット済み SQL のインデントレベルごとのスペース数 (1–8)',
         indentWidthError: 'インデント幅は 1 から 8 の間で指定してください',
@@ -795,24 +776,17 @@ export const jaJP = {
       },
       query: {
         title: 'クエリ',
-        description: 'クエリ実行のデフォルト設定を行います',
         defaultLimit: 'デフォルトの行数上限',
-        defaultLimitHelp: 'クエリごとに返される最大行数 (10–10000)',
         defaultLimitError: '行数上限は 10 から 10000 の間で指定してください',
         queryTimeout: 'クエリタイムアウト (秒)',
-        queryTimeoutHelp: 'クエリ実行の最大時間 (秒、1–300)',
         queryTimeoutError: 'タイムアウトは 1 から 300 秒の間で指定してください',
         autoSave: '自動保存',
-        autoSaveHelp: 'クエリの変更を自動的に保存します',
       },
       ai: {
-        title: 'AI 設定',
         tabLabel: 'LLM',
-        description: 'AI モデルプロバイダーとチャットの動作を設定します',
         missing: 'AI モデルが設定されていません。設定でプロバイダーを追加し、モデルを選択してください。',
         providerList: {
           title: 'プロバイダー',
-          description: 'AI モデルプロバイダーを管理します',
           addProvider: 'プロバイダーを追加',
           empty: 'プロバイダーが設定されていません。追加すると AI 機能が有効になります。',
           emptyAction: '最初のプロバイダーを追加',
@@ -870,13 +844,11 @@ export const jaJP = {
         },
         chat: {
           title: 'エージェント',
-          description: 'エージェントの実行時の動作を設定します',
           autoCompactLabel: 'メッセージの自動圧縮',
           autoCompactDescription: 'コンテキスト上限に近づくと、古いメッセージを自動的に要約してトークンを節約します',
           maxIterationsLabel: '最大反復回数',
           maxIterationsDescription: 'エージェントが停止するまでのツール呼び出し反復の最大数 (1–1000)',
           wallClockBudgetLabel: '実行時間の上限 (分)',
-          wallClockBudgetDescription: 'エージェントが停止するまでの最大実時間 (分、1–240)',
           tokenBudgetLabel: 'トークン上限',
           tokenBudgetDescription: 'エージェントが停止するまでの最大トークン消費量',
           systemPromptLabel: 'システムプロンプト',
@@ -911,9 +883,6 @@ export const jaJP = {
     },
     history: {
       title: '履歴',
-      subtitle: 'クエリ履歴の表示と管理',
-      recent: '最近のクエリ',
-      recentDescription: '最近実行したクエリ',
       empty: 'クエリ履歴はまだありません。',
       search: 'クエリを検索...',
       filterAll: 'すべて',
@@ -969,7 +938,6 @@ export const jaJP = {
         connectedAs: '接続ユーザー',
         currentDatabase: 'データベース',
         selectConnection: '接続を選択',
-        tip: 'ヒント: サイドバーのテーブルをダブルクリックするとデータを表示できます',
       },
       editor: {
         title: 'SQL エディター',
@@ -1082,7 +1050,6 @@ export const jaJP = {
       noSource: '開始するにはデータソースをアタッチしてください。',
       stop: '停止',
       continue: '続行',
-      continueHint: 'エージェントが一時停止しました。「続行」をクリックして再開するか、「停止」でセッションを終了してください。',
       clearChat: 'チャットをクリア',
       riskSafe: '安全な操作',
       riskElevated: '中程度のリスク',
@@ -1205,10 +1172,6 @@ export const jaJP = {
       title: {
         edit: '接続を編集',
         new: '新規接続',
-      },
-      description: {
-        edit: 'データベース接続の設定を更新します。',
-        new: '新しいデータベース接続を設定します。',
       },
       labels: {
         connectionName: '接続名',
@@ -1884,7 +1847,6 @@ export const jaJP = {
     downloadingPercent: '{percent}% をダウンロード中',
     relaunchFailed: 'アップデート後の再起動に失敗しました',
     retry: '再試行',
-    installFailedHelp: 'F12 キーを押してデベロッパーツールを開き、エラーの詳細を確認してください。',
   },
   errors: {
     unexpected: '予期しないエラー: {error}',

@@ -10,7 +10,8 @@ import { ConnectionPermissionEditor } from '@/components/ai-permissions'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { SearchableSelect } from '@/components/ui/combobox'
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { InfoTip } from '@/components/ui/info-tip'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -892,9 +893,6 @@ function handleSave() {
       <DialogTitle>
         {{ isEditing ? t('components.serverForm.title.edit') : t('components.serverForm.title.new') }}
       </DialogTitle>
-      <DialogDescription>
-        {{ isEditing ? t('components.serverForm.description.edit') : t('components.serverForm.description.new') }}
-      </DialogDescription>
 
       <form class="space-y-4" @submit.prevent="handleSave">
         <Tabs :model-value="formSectionTab" @update:model-value="formSectionTab = $event as 'basic' | 'advanced'">
@@ -1491,6 +1489,7 @@ function handleSave() {
             <div v-if="!isPromptGated" class="p-3 border rounded-lg space-y-2">
               <div class="flex gap-2 items-center">
                 <Label>{{ t('connection.prompt.label') }}</Label>
+                <InfoTip :text="t('connection.prompt.help')" />
                 <Badge v-if="promptValue" variant="secondary">
                   {{ t('connection.prompt.configured') }}
                 </Badge>
@@ -1498,9 +1497,6 @@ function handleSave() {
                   {{ promptValue ? t('connection.prompt.edit') : t('connection.prompt.add') }}
                 </Button>
               </div>
-              <p class="text-xs text-muted-foreground">
-                {{ t('connection.prompt.help') }}
-              </p>
               <p v-if="promptValue" class="text-xs text-muted-foreground whitespace-pre-wrap line-clamp-2">
                 {{ promptValue }}
               </p>
