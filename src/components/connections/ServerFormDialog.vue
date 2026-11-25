@@ -196,32 +196,42 @@ const jdbcDriverId = computed(() => {
   return dbType.replace('-', '_')
 })
 
+const stepDownloadId = (step: StepDef) => step.id === 'driver'
+  ? jdbcDriverId.value
+  : step.id
+
+const syncSetupStep = (step: StepDef) => {
+  const id = stepDownloadId(step)
+  const state = dl.getState(id)
+  const progress = dl.getProgress(id)
+  const error = dl.getError(id)
+  step.progress = progress ?? undefined
+  if (state === 'downloading') {
+    step.status = 'running'
+    step.error = undefined
+  }
+  else if (state === 'complete' || state === 'installing') {
+    step.status = 'done'
+    step.error = undefined
+  }
+  else if (state === 'error') {
+    step.status = 'error'
+    step.error = error ?? undefined
+  }
+}
+
 setupSteps.value.forEach((step) => {
   watch(() => {
-    const id = step.id === 'driver'
-      ? jdbcDriverId.value
-      : step.id
+    const id = stepDownloadId(step)
     return {
       state: dl.getState(id),
       progress: dl.getProgress(id),
       error: dl.getError(id),
     }
-  }, ({ state, progress, error }) => {
+  }, () => {
     if (testStatus.value !== 'testing' || !isJdbcDb.value)
       return
-    step.progress = progress ?? undefined
-    if (state === 'downloading') {
-      step.status = 'running'
-      step.error = undefined
-    }
-    else if (state === 'complete' || state === 'installing') {
-      step.status = 'done'
-      step.error = undefined
-    }
-    else if (state === 'error' && step.id !== 'driver') {
-      step.status = 'error'
-      step.error = error ?? undefined
-    }
+    syncSetupStep(step)
   })
 })
 
@@ -783,7 +793,16 @@ async function handleTestConnection() {
     s.error = undefined
   })
 
+  const trackedDownloadIds = isJdbcDb.value
+    ? ['jre', 'bridge', jdbcDriverId.value]
+    : []
+
   try {
+    if (trackedDownloadIds.length > 0) {
+      await dl.ensureReady().catch(() => {})
+      trackedDownloadIds.forEach(dl.resetIfNotPending)
+    }
+
     const config = {
       id: formData.value.id || crypto.randomUUID(),
       name: formData.value.name,
@@ -824,13 +843,21 @@ async function handleTestConnection() {
     const msg = error instanceof Error
       ? error.message
       : String(error)
-    const running = setupSteps.value.find(step => step.status === 'running')
-    if (running) {
-      running.status = 'error'
-      running.error = msg
+    if (isJdbcDb.value) {
+      setupSteps.value.forEach(syncSetupStep)
+      if (!setupSteps.value.some(step => step.status === 'error')) {
+        const running = setupSteps.value.find(step => step.status === 'running')
+        if (running) {
+          running.status = 'error'
+          running.error = msg
+        }
+      }
     }
     testError.value = msg
     testStatus.value = 'error'
+  }
+  finally {
+    trackedDownloadIds.forEach(dl.resetIfNotPending)
   }
 }
 

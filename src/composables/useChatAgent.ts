@@ -418,9 +418,10 @@ export function useChatAgent(config: UseChatAgentConfig) {
 
   const sendMessage = async (options: SendMessageOptions) => {
     localError.value = undefined
+    let sessionId: string | null = null
 
     try {
-      const sessionId = await config.sessionStore.getOrCreateSession()
+      sessionId = await config.sessionStore.getOrCreateSession()
       dataStudioStore.clearSessionError(sessionId)
 
       if (config.sessionStore.clearSessionStop) {
@@ -467,6 +468,8 @@ export function useChatAgent(config: UseChatAgentConfig) {
         await appStore.getFeatureModelConfig(config.feature)
       }
       catch (err) {
+        dataStudioStore.removePreparingPlaceholder(sessionId)
+        dataStudioStore.clearSessionProgress(sessionId)
         localError.value = err instanceof Error
           ? err.message
           : String(err)
@@ -488,6 +491,10 @@ export function useChatAgent(config: UseChatAgentConfig) {
       await runAgentLoop(sessionId, options.content, aiContext.schema, safeContext)
     }
     catch (err) {
+      if (sessionId) {
+        dataStudioStore.removePreparingPlaceholder(sessionId)
+        dataStudioStore.clearSessionProgress(sessionId)
+      }
       localError.value = err instanceof Error
         ? err.message
         : String(err)

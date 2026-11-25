@@ -18,8 +18,11 @@ import {
   SQL_EXECUTE_GUTTER_CLASS,
 } from './useSqlStatements'
 
-// The standalone API needs the suggestion widget and commands registered explicitly.
+// The standalone API needs editor widgets and commands registered explicitly.
 import 'monaco-editor/editor/contrib/suggest/browser/suggestController.js'
+import 'monaco-editor/editor/contrib/comment/browser/comment.js'
+import 'monaco-editor/editor/contrib/contextmenu/browser/contextmenu.js'
+import 'monaco-editor/editor/contrib/find/browser/findController.js'
 
 // Import only SQL-related grammars instead of all Monaco languages
 // (Typescript/CSS/HTML/JSON workers alone add ~8MB to the bundle).

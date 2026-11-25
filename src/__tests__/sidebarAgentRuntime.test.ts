@@ -24,15 +24,16 @@ jest.mock('@/store/entitlementStore', () => ({
 jest.mock('@/store/tabStore', () => ({
   useTabStore: () => ({}),
 }))
+const mockGetFeatureModelConfig = jest.fn(async () => ({
+  provider: { name: 'test-provider' },
+  model: { label: 'test-model' },
+}))
 jest.mock('@/store/appStore', () => ({
   useAppStore: () => ({
     llmSettings: {
       chat: { maxIterations: 3 },
     },
-    getFeatureModelConfig: async () => ({
-      provider: { name: 'test-provider' },
-      model: { label: 'test-model' },
-    }),
+    getFeatureModelConfig: mockGetFeatureModelConfig,
   }),
 }))
 
@@ -123,4 +124,31 @@ describe('sidebar assistant event delivery', () => {
       expect(assistant.activeSession.value?.status).toBe('error')
     }
   })
+
+  it.each(['modelConfig', 'aiContext'] as const)(
+    'clears preparing placeholder and progress when %s fails before the loop starts',
+    async (failurePoint) => {
+      if (failurePoint === 'modelConfig')
+        mockGetFeatureModelConfig.mockRejectedValueOnce(new Error('No model configured'))
+      jest.mocked(invoke).mockImplementation(async (command) => {
+        if (command === 'create_agent_session')
+          return sessionRow as never
+        if (command === 'get_available_tools')
+          return { tools: [], metadata: {} } as never
+        if (command === 'get_ai_context')
+          throw new Error('Context unavailable')
+        throw new Error(`Unexpected command ${command}`)
+      })
+
+      const assistant = useSidebarChatAgent()
+      await assistant.sendMessage('Summarize the data')
+      expect(assistant.progress.value).toBeUndefined()
+      expect(assistant.messages.value.some(message => message.preparingInProgress)).toBe(false)
+      expect(assistant.error.value).toBe(
+        failurePoint === 'modelConfig'
+          ? 'No model configured'
+          : 'Context unavailable',
+      )
+    },
+  )
 })
