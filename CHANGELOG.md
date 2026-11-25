@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- onomeo provider preset in AI settings (OpenAI compatible, base URL `https://onomeo.com/v1`)
+
 ## [1.0.4] - 2026-11-24
 
 ### Added

@@ -125,6 +125,13 @@ const presets = computed<Preset[]>(() => [
     kind: 'cheapaimodel',
   },
   {
+    id: 'onomeo',
+    name: 'onomeo',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://onomeo.com/v1',
+    kind: 'onomeo',
+  },
+  {
     id: 'anthropic',
     name: 'Anthropic',
     apiCompatibility: 'anthropic',
