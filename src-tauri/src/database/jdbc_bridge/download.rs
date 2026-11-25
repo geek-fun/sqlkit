@@ -226,10 +226,8 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
 
     let staged_jar = jar_path.with_extension("download");
     let mut last_err = None::<String>;
-    for attempt in 0..2 {
-        if attempt > 0 {
-            crate::download::emit_progress("bridge", DownloadKind::Bridge, 0, 1);
-        }
+    for _attempt in 0..2 {
+        crate::download::emit_progress("bridge", DownloadKind::Bridge, 0, 1);
         if let Err(e) = download_to_path(
             &url,
             &staged_jar,
@@ -257,13 +255,17 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
         if let Some(java) = super::jre::JreDetector::detect() {
             // Try to validate the JAR. If Java isn't actually runnable (e.g. macOS stub),
             // skip validation rather than deleting the downloaded JAR.
-            match Command::new(&java)
-                .arg("-jar")
-                .arg(&staged_jar)
-                .arg("--version")
-                .output()
-            {
-                Ok(output) => {
+            let jar_for_check = staged_jar.clone();
+            let output = tokio::task::spawn_blocking(move || {
+                Command::new(&java)
+                    .arg("-jar")
+                    .arg(&jar_for_check)
+                    .arg("--version")
+                    .output()
+            })
+            .await;
+            match output {
+                Ok(Ok(output)) => {
                     if !output.status.success() {
                         let stderr = String::from_utf8_lossy(&output.stderr);
                         if stderr.contains("Unable to locate") || stderr.contains("no java") {
@@ -288,7 +290,7 @@ pub async fn download_bridge_plugin() -> DbResult<()> {
                         }
                     }
                 }
-                Err(_) => {
+                Ok(Err(_)) | Err(_) => {
                     // Can't run Java at all — skip validation, JAR is fine
                 }
             }
@@ -366,6 +368,7 @@ pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
         if dest.exists() {
             return Ok(());
         }
+        crate::download::emit_progress(db_type, DownloadKind::Driver, 0, 1);
         return download_to_path(
             download_url,
             &dest,
@@ -375,6 +378,8 @@ pub async fn download_jdbc_driver_direct(db_type: &str) -> DbResult<()> {
         )
         .await;
     }
+
+    crate::download::emit_progress(db_type, DownloadKind::Driver, 0, 1);
 
     // Resolve the version to download
     let version: String = if let Some(cap) = &config.version_cap {

@@ -103,6 +103,11 @@ export const useDownloadEvents = () => {
 
   const isDownloading = (id: string): boolean => ['preparing', 'downloading', 'installing'].includes(getState(id))
 
+  const ensureReady = async (): Promise<void> => {
+    await registerListener()
+    ready.value = true
+  }
+
   const startDownload = async (kind: DownloadKind, id: string, invokeFn: () => Promise<void>): Promise<boolean> => {
     if (isDownloading(id))
       return false
@@ -143,6 +148,11 @@ export const useDownloadEvents = () => {
     delete kinds[id]
   }
 
+  const resetIfNotPending = (id: string): void => {
+    if (!pending[id])
+      reset(id)
+  }
+
   return {
     ready,
     progress,
@@ -154,7 +164,9 @@ export const useDownloadEvents = () => {
     getError,
     getKind,
     isDownloading,
+    ensureReady,
     startDownload,
     reset,
+    resetIfNotPending,
   }
 }

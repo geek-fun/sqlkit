@@ -381,12 +381,18 @@ pub(super) async fn ensure_java() -> DbResult<()> {
     let _guard = JRE_INSTALL_LOCK.get_or_init(|| Mutex::new(())).lock().await;
 
     if !is_managed_jre_installed() {
-        let system_version = JreDetector::detect_system_java()
-            .as_ref()
-            .and_then(system_java_version);
+        let system_version = tokio::task::spawn_blocking(|| {
+            JreDetector::detect_system_java()
+                .as_ref()
+                .and_then(system_java_version)
+        })
+        .await
+        .ok()
+        .flatten();
         if system_version.is_some_and(|version| version >= 25) {
             return Ok(());
         }
+        crate::download::emit_progress("jre", crate::download::DownloadKind::Jre, 0, 1);
         install_managed_jre().await.map_err(|error| {
             let system_java = system_version.map_or_else(
                 || "No Java 25+ found".to_string(),
@@ -403,6 +409,12 @@ pub(super) async fn ensure_java() -> DbResult<()> {
             if let Some(latest) = parse_adoptium_build_version(&redirect_url) {
                 if let Some(current) = read_jre_version() {
                     if compare_versions(&latest, &current) > 0 {
+                        crate::download::emit_progress(
+                            "jre",
+                            crate::download::DownloadKind::Jre,
+                            0,
+                            1,
+                        );
                         install_managed_jre().await?;
                     }
                 }

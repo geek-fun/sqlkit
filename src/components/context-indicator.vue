@@ -3,6 +3,7 @@ import type { ContextUsage } from '@/datasources/agentApi'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Spinner } from '@/components/ui/spinner'
+import { initAgentRuntime } from '@/composables/agentRuntime'
 import { toast } from '@/composables/useNotifications'
 import {
   compactAgentSession,
@@ -103,6 +104,7 @@ async function onCompact() {
     return
   compacting.value = true
   try {
+    await initAgentRuntime()
     const next = await compactAgentSession(props.sessionId, props.settings)
     usage.value = next
     emit('compacted', next)

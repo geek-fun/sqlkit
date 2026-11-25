@@ -122,3 +122,53 @@ it('does not lose a backend error when the command resolves', async () => {
   expect(downloads.getError('backend-error')).toBe('Checksum failed')
   unmount()
 })
+
+it('waits for listener registration in ensureReady and resets only non-pending entries', async () => {
+  let registered!: (handle: () => void) => void
+  listenMock.mockImplementationOnce((_name, handler) => {
+    receive = handler
+    return new Promise((resolve) => {
+      registered = resolve
+    })
+  })
+  const { downloads, unmount } = mountDownloads()
+  let readyResolved = false
+  const readyPromise = downloads.ensureReady().then(() => {
+    readyResolved = true
+  })
+  await flushPromises()
+  expect(readyResolved).toBe(false)
+  registered(jest.fn())
+  await readyPromise
+  expect(readyResolved).toBe(true)
+
+  // Non-pending event (e.g. from connection test) is cleared by resetIfNotPending.
+  receive({
+    payload: { phase: 'complete', id: 'bridge', kind: 'bridge' },
+  })
+  expect(downloads.getState('bridge')).toBe('complete')
+  downloads.resetIfNotPending('bridge')
+  expect(downloads.getState('bridge')).toBe('idle')
+
+  // Active startDownload (pending) is preserved by resetIfNotPending.
+  let finish!: () => void
+  const active = downloads.startDownload('jre', 'jre', () => new Promise<void>((resolve) => {
+    finish = resolve
+  }))
+  await flushPromises()
+  receive({
+    payload: {
+      phase: 'progress',
+      id: 'jre',
+      kind: 'jre',
+      downloaded: 40,
+      total: 100,
+    },
+  })
+  downloads.resetIfNotPending('jre')
+  expect(downloads.getState('jre')).toBe('downloading')
+  expect(downloads.getProgress('jre')).toEqual({ downloaded: 40, total: 100 })
+  finish()
+  await active
+  unmount()
+})

@@ -30,6 +30,19 @@ pub struct JdbcBridgeAdapter {
     conn_id: Option<String>,
 }
 
+pub(crate) struct PreparedJdbc {
+    driver_id: &'static str,
+    driver_direct_failed: bool,
+}
+
+impl PreparedJdbc {
+    pub(crate) fn finish_timeout(&self, message: &str) {
+        if self.driver_direct_failed {
+            download::emit_error(self.driver_id, DownloadKind::Driver, message);
+        }
+    }
+}
+
 impl JdbcBridgeAdapter {
     pub fn new(config: ConnectionConfig) -> Self {
         Self {
@@ -39,38 +52,42 @@ impl JdbcBridgeAdapter {
         }
     }
 
-    pub(crate) async fn prepare(db_type: DatabaseType) -> DbResult<()> {
+    pub(crate) async fn prepare(db_type: DatabaseType) -> DbResult<PreparedJdbc> {
         let driver_id =
             super::registry::DriverRegistry::registry_key(db_type).ok_or_else(|| {
                 DbError::Connection(format!("No driver registry entry for {:?}", db_type))
             })?;
 
-        Self::prepare_step("jre", DownloadKind::Jre, super::jre::ensure_java()).await?;
-        Self::prepare_step(
+        Self::run_required_step("jre", DownloadKind::Jre, super::jre::ensure_java()).await?;
+        Self::run_required_step(
             "bridge",
             DownloadKind::Bridge,
             super::download::download_bridge_plugin(),
         )
         .await?;
         // The Java resolver can still provide a driver if the direct download fails.
-        if let Err(error) = Self::prepare_step(
+        let driver_direct_failed =
+            match super::download::download_jdbc_driver_direct(driver_id).await {
+                Ok(()) => {
+                    download::emit_complete(driver_id, DownloadKind::Driver);
+                    false
+                }
+                Err(error) => {
+                    log::debug!("Direct JDBC driver download failed for {driver_id}: {error}");
+                    true
+                }
+            };
+        Ok(PreparedJdbc {
             driver_id,
-            DownloadKind::Driver,
-            super::download::download_jdbc_driver_direct(driver_id),
-        )
-        .await
-        {
-            log::debug!("Direct JDBC driver download failed for {driver_id}: {error}");
-        }
-        Ok(())
+            driver_direct_failed,
+        })
     }
 
-    async fn prepare_step(
+    async fn run_required_step(
         id: &str,
         kind: DownloadKind,
         setup: impl std::future::Future<Output = DbResult<()>>,
     ) -> DbResult<()> {
-        download::emit_progress(id, kind.clone(), 0, 1);
         let result = setup.await;
         match &result {
             Ok(()) => download::emit_complete(id, kind),
@@ -110,7 +127,20 @@ impl JdbcBridgeAdapter {
     }
 
     /// Open a database session after the JDBC dependencies have been prepared.
-    pub(crate) async fn connect_prepared(&mut self) -> DbResult<()> {
+    pub(crate) async fn connect_prepared(&mut self, prepared: &PreparedJdbc) -> DbResult<()> {
+        let result = self.connect_prepared_inner().await;
+        if prepared.driver_direct_failed {
+            match &result {
+                Ok(()) => download::emit_complete(prepared.driver_id, DownloadKind::Driver),
+                Err(error) => {
+                    download::emit_error(prepared.driver_id, DownloadKind::Driver, error.to_string())
+                }
+            }
+        }
+        result
+    }
+
+    async fn connect_prepared_inner(&mut self) -> DbResult<()> {
         let db_type = self.config.db_type;
         let ssl_mode_str = match self.config.ssl_mode {
             crate::database::config::SslMode::Prefer if db_type.is_cql() => "disable",
@@ -270,8 +300,8 @@ impl DatabaseAdapter for JdbcBridgeAdapter {
     type Pool = JdbcBridgePool;
 
     async fn connect(&mut self) -> DbResult<()> {
-        Self::prepare(self.config.db_type).await?;
-        self.connect_prepared().await
+        let prepared = Self::prepare(self.config.db_type).await?;
+        self.connect_prepared(&prepared).await
     }
 
     async fn disconnect(&mut self) -> DbResult<()> {

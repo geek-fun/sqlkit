@@ -29,11 +29,15 @@ pub async fn create_and_connect_adapter(
 
     // Dependency installation has its own download limits. Start the database
     // timeout only after setup so a first connection after an upgrade can finish.
-    if matches!(strategy, ConnectionStrategy::JdbcBridge) {
-        JdbcBridgeAdapter::prepare(conn_config.db_type)
-            .await
-            .map_err(|e| e.to_string())?;
-    }
+    let prepared_jdbc = if matches!(strategy, ConnectionStrategy::JdbcBridge) {
+        Some(
+            JdbcBridgeAdapter::prepare(conn_config.db_type)
+                .await
+                .map_err(|e| e.to_string())?,
+        )
+    } else {
+        None
+    };
 
     let timeout_secs = conn_config.connect_timeout_secs;
     tokio::time::timeout(Duration::from_secs(timeout_secs), async {
@@ -68,8 +72,11 @@ pub async fn create_and_connect_adapter(
             },
             ConnectionStrategy::JdbcBridge => {
                 let mut adapter = JdbcBridgeAdapter::new(conn_config);
+                let prepared = prepared_jdbc
+                    .as_ref()
+                    .expect("JDBC bridge preparation runs before connect_prepared");
                 adapter
-                    .connect_prepared()
+                    .connect_prepared(prepared)
                     .await
                     .map_err(|e| e.to_string())?;
                 Ok(ActiveConnection::JdbcBridge(Arc::new(Mutex::new(adapter))))
@@ -94,7 +101,13 @@ pub async fn create_and_connect_adapter(
         }
     })
     .await
-    .map_err(|_| format!("Connection timed out after {} seconds", timeout_secs))?
+    .map_err(|_| {
+        let message = format!("Connection timed out after {} seconds", timeout_secs);
+        if let Some(prepared) = &prepared_jdbc {
+            prepared.finish_timeout(&message);
+        }
+        message
+    })?
 }
 
 /// Test connection for a given database configuration.

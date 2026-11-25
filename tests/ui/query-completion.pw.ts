@@ -50,5 +50,7 @@ engines.forEach((engine) => {
     await expect(option).toBeVisible()
     await page.keyboard.press('Enter')
     await expect(editor.locator('.view-line').last()).toHaveText('SELECT')
+    await page.keyboard.press('ControlOrMeta+Slash')
+    await expect(editor.locator('.view-line').last()).toHaveText('-- SELECT')
   })
 })
