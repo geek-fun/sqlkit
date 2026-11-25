@@ -36,6 +36,12 @@ jest.mock('@/components/ui/badge', () => ({
 jest.mock('@/components/ui/button', () => ({
   Button: { template: '<button><slot /></button>' },
 }))
+jest.mock('@/components/ui/tooltip', () => ({
+  Tooltip: { template: '<div><slot /></div>' },
+  TooltipContent: { template: '<div><slot /></div>' },
+  TooltipProvider: { template: '<div><slot /></div>' },
+  TooltipTrigger: { template: '<div><slot /></div>' },
+}))
 jest.mock('@/datasources', () => ({
   jdbcApi: {
     checkJreStatus: jest.fn(),

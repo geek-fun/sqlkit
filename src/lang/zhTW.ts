@@ -8,7 +8,6 @@ export const zhTW = {
     deniedByConnection: '已被連線權限禁止',
     conversationReadOnly: '此對話為唯讀',
     title: 'AI 權限',
-    help: '適用於 Data Studio 與外部 MCP 用戶端。可使用系統預設值，或為此連線個別設定權限。',
     loading: '正在載入權限…',
     loadFailed: '無法載入權限。請重試後再儲存此連線。',
     retry: '重試',
@@ -141,7 +140,6 @@ export const zhTW = {
     },
     section: {
       title: '帳戶與方案',
-      desc: '此安裝的訂閱授權與版本鎖定狀態。',
       versionPermanent: '目前的版本可永久使用（受您的版本鎖定涵蓋）。',
       subscriptionActive: 'Ultimate 已啟用，訂閱期間所有功能皆已解鎖。',
       versionLockedOut: '此版本（{date}）不在版本鎖定涵蓋範圍內，目前顯示為 Community 模式。',
@@ -166,7 +164,6 @@ export const zhTW = {
     prompt: {
       title: '代理提示詞',
       label: '代理提示詞',
-      description: '為 AI 代理補充此連線的上下文。',
       help: '此連線附加到代理時，會在全域系統提示詞之後傳送給代理。',
       placeholder: '描述資料的業務意義、命名慣例或常用查詢。',
       configured: '已設定',
@@ -174,7 +171,7 @@ export const zhTW = {
       edit: '編輯',
       clear: '清除',
       cancel: '取消',
-      confirm: '確認',
+      confirm: '儲存提示詞',
     },
   },
   connectionsPage: {
@@ -263,7 +260,6 @@ export const zhTW = {
   },
   transfer: {
     title: '傳輸',
-    subtitle: '匯入、匯出與移轉您的資料',
     tabs: {
       export: '匯出',
       import: '匯入',
@@ -547,7 +543,6 @@ export const zhTW = {
   pages: {
     connections: {
       title: '連線管理',
-      subtitle: '管理您的資料庫連線',
       search: '搜尋連線...',
       stats: {
         totalConnections: '連線總數',
@@ -573,10 +568,8 @@ export const zhTW = {
     },
     settings: {
       title: '設定',
-      subtitle: '設定應用程式偏好',
       general: {
         title: '一般',
-        description: '管理您的帳戶、方案、主題與應用程式更新',
         theme: '主題',
         themeSelect: '選擇主題',
         themeHelp: '選擇淺色、深色或跟隨系統的主題',
@@ -587,7 +580,6 @@ export const zhTW = {
         },
         language: '語言',
         languageSelect: '選擇語言',
-        languageHelp: '選擇您偏好的語言',
         languages: {
           enUS: 'English',
           zhCN: '简体中文',
@@ -622,7 +614,6 @@ export const zhTW = {
         sessions: '{count} 個會話 — {clients}',
         sessionsEmpty: '將 Data Studio MCP 加入你的 AI 工具（見下方指引）。',
         serverTitle: 'SqlKit MCP Server',
-        serverDesc: 'SqlKit 暴露給 AI 用戶端的 MCP 工具目錄。',
         serverStopped: '未提供服務——MCP Bridge 已停止。',
         serverIdle: '無活躍會話',
         stoppedReason: '訂閱未啟用，MCP Bridge 已停止——AI 用戶端暫時無法透過 SqlKit 存取資料庫。',
@@ -655,7 +646,6 @@ export const zhTW = {
         repository: '儲存庫',
         website: '網站',
         copyright: '© {year} GEEKFUN，保留一切權利。',
-        description: 'SqlKit 是一款具 AI 代理能力的跨平台 SQL 資料庫圖形化用戶端。以 Rust + Tauri 建構。',
       },
       feedback: {
         preparing: '正在準備下載…',
@@ -682,7 +672,6 @@ export const zhTW = {
       },
       jre: {
         title: 'JRE 與驅動程式',
-        description: '管理資料庫連線所需的 Java 執行環境與 JDBC 驅動程式',
         jreCard: {
           title: 'Java 執行環境',
           description: 'JDBC 橋接連線所需（Oracle、DB2、H2、Derby）',
@@ -715,7 +704,6 @@ export const zhTW = {
         },
         bridgeCard: {
           title: '橋接 JAR',
-          description: '用於資料庫連線的 JDBC 橋接元件',
           status: {
             installed: '已安裝',
             notInstalled: '未安裝',
@@ -741,7 +729,6 @@ export const zhTW = {
         },
         driversCard: {
           title: 'JDBC 驅動程式',
-          description: '各資料庫專用的 JDBC 驅動程式檔案',
           label: {
             versions: '個版本',
           },
@@ -773,19 +760,13 @@ export const zhTW = {
       },
       editor: {
         title: '編輯器',
-        description: '設定 SQL 編輯器的行為與外觀',
         fontSize: '字型大小',
-        fontSizeHelp: '編輯器字型大小（像素，8–32）',
         fontSizeError: '字型大小必須介於 8 到 32 之間',
         tabSize: 'Tab 大小',
-        tabSizeHelp: '每個 Tab 的空格數（1–8）',
         tabSizeError: 'Tab 大小必須介於 1 到 8 之間',
         wordWrap: '自動換行',
-        wordWrapHelp: '在編輯器中換行顯示長行',
         showLineNumbers: '顯示行號',
-        showLineNumbersHelp: '在編輯器邊欄顯示行號',
         showMinimap: '顯示縮圖',
-        showMinimapHelp: '在右側顯示縮圖總覽',
         indentWidth: '縮排寬度',
         indentWidthHelp: '格式化 SQL 時每層縮排的空格數（1–8）',
         indentWidthError: '縮排寬度必須介於 1 到 8 之間',
@@ -795,24 +776,17 @@ export const zhTW = {
       },
       query: {
         title: '查詢',
-        description: '設定查詢執行的預設值',
         defaultLimit: '預設列數上限',
-        defaultLimitHelp: '每次查詢傳回的最大列數（10–10000）',
         defaultLimitError: '列數上限必須介於 10 到 10000 之間',
         queryTimeout: '查詢逾時（秒）',
-        queryTimeoutHelp: '查詢執行時間上限（秒，1–300）',
         queryTimeoutError: '逾時時間必須介於 1 到 300 秒之間',
         autoSave: '自動儲存',
-        autoSaveHelp: '自動儲存查詢變更',
       },
       ai: {
-        title: 'AI 設定',
         tabLabel: 'LLMs',
-        description: '設定 AI 模型供應商與對話行為',
         missing: '尚未設定 AI 模型。請在設定中新增供應商並選擇模型。',
         providerList: {
           title: '供應商',
-          description: '管理您的 AI 模型供應商',
           addProvider: '新增供應商',
           empty: '尚未設定任何供應商。新增供應商即可啟用 AI 功能。',
           emptyAction: '新增第一個供應商',
@@ -870,13 +844,11 @@ export const zhTW = {
         },
         chat: {
           title: 'Agent',
-          description: '設定代理的執行階段行為',
           autoCompactLabel: '自動壓縮訊息',
           autoCompactDescription: '接近上下文上限時，自動摘要較舊的訊息以節省 Token',
           maxIterationsLabel: '最大迭代次數',
           maxIterationsDescription: '代理停止前的最大工具呼叫迭代次數（1–1000）',
           wallClockBudgetLabel: '時間上限（分鐘）',
-          wallClockBudgetDescription: '代理停止前的最長實際時間（1–240 分鐘）',
           tokenBudgetLabel: 'Token 預算',
           tokenBudgetDescription: '代理停止前可消耗的最大 Token 數量',
           systemPromptLabel: '系統提示詞',
@@ -911,9 +883,6 @@ export const zhTW = {
     },
     history: {
       title: '歷史記錄',
-      subtitle: '檢視並管理您的查詢歷史記錄',
-      recent: '最近的查詢',
-      recentDescription: '您最近執行的查詢',
       empty: '尚無查詢歷史記錄。',
       search: '搜尋查詢...',
       filterAll: '全部',
@@ -969,7 +938,6 @@ export const zhTW = {
         connectedAs: '連線身分',
         currentDatabase: '資料庫',
         selectConnection: '選擇連線',
-        tip: '提示：在側邊欄雙擊資料表即可檢視其資料',
       },
       editor: {
         title: 'SQL 編輯器',
@@ -1082,7 +1050,6 @@ export const zhTW = {
       noSource: '請先附加資料來源以開始。',
       stop: '停止',
       continue: '繼續',
-      continueHint: '代理已暫停。點擊「繼續」以恢復，或點擊「停止」以結束此工作階段。',
       clearChat: '清除對話',
       riskSafe: '安全操作',
       riskElevated: '較高風險',
@@ -1205,10 +1172,6 @@ export const zhTW = {
       title: {
         edit: '編輯連線',
         new: '新增連線',
-      },
-      description: {
-        edit: '更新您的資料庫連線設定。',
-        new: '設定新的資料庫連線。',
       },
       labels: {
         connectionName: '連線名稱',
@@ -1884,7 +1847,6 @@ export const zhTW = {
     downloadingPercent: '下載中 {percent}%',
     relaunchFailed: '更新後重新啟動失敗',
     retry: '重試',
-    installFailedHelp: '按 F12 開啟開發人員工具檢查錯誤詳細資訊。',
   },
   errors: {
     unexpected: '發生未預期的錯誤：{error}',

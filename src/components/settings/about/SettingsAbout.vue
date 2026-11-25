@@ -4,7 +4,8 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { SettingsFeedback } from '@/components/settings'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { InfoTip } from '@/components/ui/info-tip'
 import { useAppUpdater } from '@/composables/useAppUpdater'
 import { version as buildVersion } from '../../../../package.json'
 
@@ -68,19 +69,14 @@ onMounted(() => {
   <Card>
     <CardHeader>
       <CardTitle>{{ t('pages.settings.about.title') }}</CardTitle>
-      <CardDescription>{{ t('pages.settings.about.description') }}</CardDescription>
     </CardHeader>
     <CardContent class="space-y-5">
       <div class="flex flex-wrap gap-3 items-center justify-between">
-        <div class="space-y-1">
-          <p class="text-sm font-medium flex gap-2 items-center">
-            {{ t('pages.settings.about.version') }}
-            <span class="text-muted-foreground font-mono">{{ version }}</span>
-          </p>
-          <p class="text-xs text-muted-foreground max-w-lg">
-            {{ t('pages.settings.updates.checkForUpdatesHelp') }}
-          </p>
-        </div>
+        <p class="text-sm font-medium flex gap-2 items-center">
+          {{ t('pages.settings.about.version') }}
+          <span class="text-muted-foreground font-mono">{{ version }}</span>
+          <InfoTip :text="t('pages.settings.updates.checkForUpdatesHelp')" />
+        </p>
         <Button variant="outline" size="sm" :disabled="busy" @click="handleUpdate">
           <span v-if="busy" class="i-carbon-circle-dash mr-2 shrink-0 h-4 w-4 animate-spin" aria-hidden="true" />
           {{ updateLabel }}

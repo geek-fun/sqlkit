@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 
 const emit = defineEmits<{ save: [value: string] }>()
 const { t } = useI18n()
@@ -27,7 +27,6 @@ defineExpose({ show })
     <DialogContent class="sm:max-w-[560px]">
       <DialogHeader>
         <DialogTitle>{{ t('connection.prompt.title') }}</DialogTitle>
-        <DialogDescription>{{ t('connection.prompt.description') }}</DialogDescription>
       </DialogHeader>
       <textarea
         v-model="draft"

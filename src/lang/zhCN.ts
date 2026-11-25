@@ -8,7 +8,6 @@ export const zhCN = {
     deniedByConnection: '连接权限已禁止',
     conversationReadOnly: '当前会话只读',
     title: 'AI 权限',
-    help: '适用于 Data Studio 和外部 MCP 客户端。可使用系统默认值，也可为此连接单独设置权限。',
     loading: '正在加载权限…',
     loadFailed: '无法加载权限。请重试后再保存连接。',
     retry: '重试',
@@ -142,7 +141,6 @@ export const zhCN = {
     },
     section: {
       title: '账户与订阅',
-      desc: '当前安装的订阅权益与版本锁状态。',
       versionPermanent: '当前版本已被版本锁覆盖，永久可用。',
       subscriptionActive: '旗舰版订阅生效中，全部功能可用。',
       versionLockedOut: '当前版本（{date}）未被版本锁覆盖，当前为社区版模式。',
@@ -167,7 +165,6 @@ export const zhCN = {
     prompt: {
       title: '代理提示词',
       label: '代理提示词',
-      description: '为 AI 代理补充此连接的上下文。',
       help: '此连接附加到代理时会发送这段提示词，排在全局系统提示词之后。',
       placeholder: '描述数据的业务含义、命名约定或常用查询。',
       configured: '已配置',
@@ -175,7 +172,7 @@ export const zhCN = {
       edit: '编辑',
       clear: '清除',
       cancel: '取消',
-      confirm: '确认',
+      confirm: '保存提示词',
     },
   },
   connectionsPage: {
@@ -264,7 +261,6 @@ export const zhCN = {
   },
   transfer: {
     title: '传输',
-    subtitle: '导入、导出和迁移您的数据',
     tabs: {
       export: '导出',
       import: '导入',
@@ -548,7 +544,6 @@ export const zhCN = {
   pages: {
     connections: {
       title: '连接管理',
-      subtitle: '管理您的数据库连接',
       search: '搜索连接...',
       stats: {
         totalConnections: '总连接数',
@@ -574,10 +569,8 @@ export const zhCN = {
     },
     settings: {
       title: '设置',
-      subtitle: '配置应用程序首选项',
       general: {
         title: '常规',
-        description: '管理账户、订阅方案、主题和应用更新',
         theme: '主题',
         themeSelect: '选择主题',
         themeHelp: '在亮色、暗色或系统主题之间选择',
@@ -588,7 +581,6 @@ export const zhCN = {
         },
         language: '语言',
         languageSelect: '选择语言',
-        languageHelp: '选择您的首选语言',
         languages: {
           enUS: 'English',
           zhCN: '简体中文',
@@ -623,7 +615,6 @@ export const zhCN = {
         sessions: '{count} 个会话 — {clients}',
         sessionsEmpty: '把 Data Studio MCP 添加到你的 AI 工具（见下方指引）。',
         serverTitle: 'SqlKit MCP Server',
-        serverDesc: 'SqlKit 暴露给 AI 客户端的 MCP 工具目录。',
         serverStopped: '未提供服务——MCP 桥接已停止。',
         serverIdle: '无活跃会话',
         stoppedReason: '订阅未激活，MCP 桥接已停止——AI 客户端暂时无法通过 SqlKit 访问数据库。',
@@ -656,7 +647,6 @@ export const zhCN = {
         repository: '代码仓库',
         website: '官网',
         copyright: '© {year} GEEKFUN. 保留所有权利。',
-        description: 'SqlKit 是一款智能跨平台 SQL 数据库图形化客户端。基于 Rust + Tauri 构建。',
       },
       feedback: {
         preparing: '正在准备下载…',
@@ -683,7 +673,6 @@ export const zhCN = {
       },
       jre: {
         title: 'JRE 与驱动',
-        description: '管理 Java 运行环境和 JDBC 驱动',
         jreCard: {
           title: 'Java 运行环境',
           description: 'JDBC 桥接连接所需（Oracle、DB2、H2、Derby 等）',
@@ -716,7 +705,6 @@ export const zhCN = {
         },
         bridgeCard: {
           title: '桥接 JAR',
-          description: '用于数据库连接的 JDBC 桥接组件',
           status: {
             installed: '已安装',
             notInstalled: '未安装',
@@ -742,7 +730,6 @@ export const zhCN = {
         },
         driversCard: {
           title: 'JDBC 驱动',
-          description: '数据库专用的 JDBC 驱动文件',
           label: {
             versions: '个版本',
           },
@@ -774,19 +761,13 @@ export const zhCN = {
       },
       editor: {
         title: '编辑器',
-        description: '配置SQL编辑器的行为和外观',
         fontSize: '字体大小',
-        fontSizeHelp: '编辑器字体大小（像素，8–32）',
         fontSizeError: '字体大小必须在8到32之间',
         tabSize: '缩进大小',
-        tabSizeHelp: '每个Tab的空格数（1–8）',
         tabSizeError: '缩进大小必须在1到8之间',
         wordWrap: '自动换行',
-        wordWrapHelp: '在编辑器中自动换行长行',
         showLineNumbers: '显示行号',
-        showLineNumbersHelp: '在编辑器边栏显示行号',
         showMinimap: '显示小地图',
-        showMinimapHelp: '在右侧显示小地图概览',
         indentWidth: '缩进宽度',
         indentWidthHelp: '格式化SQL时每级缩进的空格数（1–8）',
         indentWidthError: '缩进宽度必须在1到8之间',
@@ -796,24 +777,17 @@ export const zhCN = {
       },
       query: {
         title: '查询',
-        description: '配置查询执行默认值',
         defaultLimit: '默认行数限制',
-        defaultLimitHelp: '每次查询返回的最大行数（10–10000）',
         defaultLimitError: '行数限制必须在10到10000之间',
         queryTimeout: '查询超时（秒）',
-        queryTimeoutHelp: '最大查询执行时间（秒，1–300）',
         queryTimeoutError: '超时时间必须在1到300秒之间',
         autoSave: '自动保存',
-        autoSaveHelp: '自动保存查询更改',
       },
       ai: {
-        title: 'AI 设置',
         tabLabel: 'LLMs',
-        description: '配置 AI 模型提供商和对话行为',
         missing: '未配置 AI 模型。请在设置中添加提供商并选择模型。',
         providerList: {
           title: '提供商',
-          description: '管理您的 AI 模型提供商',
           addProvider: '添加提供商',
           empty: '未配置提供商。添加一个以启用 AI 功能。',
           emptyAction: '添加第一个提供商',
@@ -871,13 +845,11 @@ export const zhCN = {
         },
         chat: {
           title: 'Agent',
-          description: '配置代理运行时行为',
           autoCompactLabel: '自动压缩消息',
           autoCompactDescription: '接近上下文限制时自动总结旧消息以节省 tokens',
           maxIterationsLabel: '最大迭代次数',
           maxIterationsDescription: '代理停止前的最大工具调用迭代次数（1–1000）',
           wallClockBudgetLabel: '运行时间预算（分钟）',
-          wallClockBudgetDescription: '代理停止前的最大运行时间（1–240 分钟）',
           tokenBudgetLabel: 'Token 预算',
           tokenBudgetDescription: '代理停止前消耗的最大 token 数量',
           systemPromptLabel: '系统提示词',
@@ -912,9 +884,6 @@ export const zhCN = {
     },
     history: {
       title: '历史记录',
-      subtitle: '查看和管理您的查询历史',
-      recent: '最近的查询',
-      recentDescription: '您最近执行的查询',
       empty: '暂无查询历史记录。',
       search: '搜索查询...',
       filterAll: '全部',
@@ -970,7 +939,6 @@ export const zhCN = {
         connectedAs: '连接用户',
         currentDatabase: '数据库',
         selectConnection: '选择连接',
-        tip: '提示：双击侧边栏中的表格可查看其数据',
       },
       editor: {
         title: 'SQL编辑器',
@@ -1083,7 +1051,6 @@ export const zhCN = {
       noSource: '请先连接数据源。',
       stop: '停止',
       continue: '继续',
-      continueHint: '代理已暂停。点击继续以恢复，或点击停止以结束会话。',
       clearChat: '清空对话',
       riskSafe: '安全操作',
       riskElevated: '中等风险',
@@ -1206,10 +1173,6 @@ export const zhCN = {
       title: {
         edit: '编辑连接',
         new: '新建连接',
-      },
-      description: {
-        edit: '更新数据库连接设置。',
-        new: '配置新的数据库连接。',
       },
       labels: {
         connectionName: '连接名称',
@@ -1885,7 +1848,6 @@ export const zhCN = {
     downloadingPercent: '下载中 {percent}%',
     relaunchFailed: '更新后重启失败',
     retry: '重试',
-    installFailedHelp: '按 F12 打开开发者工具查看错误详情。',
   },
   errors: {
     unexpected: '意外错误：{error}',

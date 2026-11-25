@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
   Select,
@@ -137,8 +137,6 @@ function handleToggleFavorite(id: string) {
           <h1 class="text-xl font-semibold">
             {{ t('pages.history.title') }}
           </h1>
-          <span class="text-muted-foreground">|</span>
-          <span class="text-sm text-muted-foreground">{{ t('pages.history.subtitle') }}</span>
         </div>
         <div class="flex gap-2">
           <Button
@@ -161,13 +159,7 @@ function handleToggleFavorite(id: string) {
       </div>
 
       <Card class="flex flex-1 flex-col min-h-0">
-        <CardHeader>
-          <CardTitle>{{ t('pages.history.recent') }}</CardTitle>
-          <CardDescription>
-            {{ t('pages.history.recentDescription') }}
-          </CardDescription>
-        </CardHeader>
-        <CardContent class="flex flex-1 flex-col gap-4 min-h-0">
+        <CardContent class="pt-6 flex flex-1 flex-col gap-4 min-h-0">
           <!-- Filters -->
           <div class="flex gap-3 items-center">
             <Input
@@ -396,7 +388,7 @@ function handleToggleFavorite(id: string) {
           <AlertDialogAction
             @click="confirmClear"
           >
-            {{ t('common.buttons.confirm') }}
+            {{ clearMode === 'all' ? t('pages.history.clearAll') : t('pages.history.clearNonFavorites') }}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

@@ -8,7 +8,6 @@ export const koKR = {
     deniedByConnection: '연결 권한에 의해 거부됨',
     conversationReadOnly: '이 대화에서는 읽기 전용',
     title: 'AI 권한',
-    help: 'Data Studio 및 외부 MCP 클라이언트에 적용됩니다. 시스템 기본값을 사용하거나 이 연결에 대한 권한을 설정하세요.',
     loading: '권한을 불러오는 중…',
     loadFailed: '권한을 불러올 수 없습니다. 이 연결을 저장하기 전에 다시 시도하세요.',
     retry: '다시 시도',
@@ -142,7 +141,6 @@ export const koKR = {
     },
     section: {
       title: '계정 및 플랜',
-      desc: '이 설치 버전의 구독 권한과 버전 잠금 상태입니다.',
       versionPermanent: '현재 버전은 영구적으로 사용할 수 있습니다 (버전 잠금에 포함됨).',
       subscriptionActive: 'Ultimate이 활성화되어 있습니다 — 구독 중에는 모든 기능이 잠금 해제됩니다.',
       versionLockedOut: '이 버전({date})은 버전 잠금에 포함되지 않습니다 — Community 모드로 표시됩니다.',
@@ -167,7 +165,6 @@ export const koKR = {
     prompt: {
       title: '에이전트 프롬프트',
       label: '에이전트 프롬프트',
-      description: 'AI 에이전트에게 이 연결에 대한 맥락을 추가합니다.',
       help: '이 연결이 연결될 때마다 전역 시스템 프롬프트 뒤에 에이전트에게 전송됩니다.',
       placeholder: '데이터의 비즈니스 의미, 명명 규칙, 자주 사용하는 쿼리 등을 설명하세요.',
       configured: '구성됨',
@@ -175,7 +172,7 @@ export const koKR = {
       edit: '편집',
       clear: '지우기',
       cancel: '취소',
-      confirm: '확인',
+      confirm: '프롬프트 저장',
     },
   },
   connectionsPage: {
@@ -264,7 +261,6 @@ export const koKR = {
   },
   transfer: {
     title: '전송',
-    subtitle: '데이터 가져오기, 내보내기, 마이그레이션',
     tabs: {
       export: '내보내기',
       import: '가져오기',
@@ -548,7 +544,6 @@ export const koKR = {
   pages: {
     connections: {
       title: '연결',
-      subtitle: '데이터베이스 연결을 관리합니다',
       search: '연결 검색...',
       stats: {
         totalConnections: '전체 연결',
@@ -574,10 +569,8 @@ export const koKR = {
     },
     settings: {
       title: '설정',
-      subtitle: '애플리케이션 환경설정을 구성합니다',
       general: {
         title: '일반',
-        description: '계정, 플랜, 테마, 앱 업데이트를 관리합니다',
         theme: '테마',
         themeSelect: '테마 선택',
         themeHelp: '라이트, 다크, 시스템 테마 중에서 선택하세요',
@@ -588,7 +581,6 @@ export const koKR = {
         },
         language: '언어',
         languageSelect: '언어 선택',
-        languageHelp: '선호하는 언어를 선택하세요',
         languages: {
           enUS: 'English',
           zhCN: '简体中文',
@@ -623,7 +615,6 @@ export const koKR = {
         sessions: '{count}개 세션 — {clients}',
         sessionsEmpty: 'Data Studio MCP를 AI 도구에 추가세요. 아래 가이드를 참조하세요.',
         serverTitle: 'SqlKit MCP Server',
-        serverDesc: 'SqlKit이 AI 클라이언트에 노출하는 MCP 도구 카탈로그.',
         serverStopped: '제공되지 않음 — MCP 브리지가 중지되었습니다.',
         serverIdle: '활성 세션 없음',
         stoppedReason: '구독이 비활성화되어 MCP 브리지가 중지되었습니다. 현재 AI 클라이언트는 SqlKit을 통해 데이터베이스에 접근할 수 없습니다.',
@@ -656,7 +647,6 @@ export const koKR = {
         repository: '저장소',
         website: '웹사이트',
         copyright: '© {year} GEEKFUN. 모든 권리 보유.',
-        description: 'SqlKit은 에이전트 기능을 갖춘 크로스 플랫폼 SQL 데이터베이스 GUI 클라이언트입니다. Rust + Tauri로 개발되었습니다.',
       },
       feedback: {
         preparing: '다운로드 준비 중…',
@@ -683,7 +673,6 @@ export const koKR = {
       },
       jre: {
         title: 'JRE 및 드라이버',
-        description: '데이터베이스 연결용 Java 런타임 및 JDBC 드라이버를 관리합니다',
         jreCard: {
           title: 'Java 런타임',
           description: 'JDBC 브리지 연결에 필요합니다 (Oracle, DB2, H2, Derby)',
@@ -716,7 +705,6 @@ export const koKR = {
         },
         bridgeCard: {
           title: '브리지 JAR',
-          description: '데이터베이스 연결용 JDBC 브리지 구성 요소',
           status: {
             installed: '설치됨',
             notInstalled: '설치되지 않음',
@@ -742,7 +730,6 @@ export const koKR = {
         },
         driversCard: {
           title: 'JDBC 드라이버',
-          description: '데이터베이스별 JDBC 드라이버 파일',
           label: {
             versions: '버전',
           },
@@ -774,19 +761,13 @@ export const koKR = {
       },
       editor: {
         title: '편집기',
-        description: 'SQL 편집기의 동작과 모양을 구성합니다',
         fontSize: '글꼴 크기',
-        fontSizeHelp: '편집기 글꼴 크기 (픽셀, 8–32)',
         fontSizeError: '글꼴 크기는 8에서 32 사이여야 합니다',
         tabSize: '탭 크기',
-        tabSizeHelp: '탭당 공백 수 (1–8)',
         tabSizeError: '탭 크기는 1에서 8 사이여야 합니다',
         wordWrap: '자동 줄 바꿈',
-        wordWrapHelp: '편집기에서 긴 줄을 자동으로 줄 바꿈합니다',
         showLineNumbers: '줄 번호 표시',
-        showLineNumbersHelp: '편집기 거터에 줄 번호를 표시합니다',
         showMinimap: '미니맵 표시',
-        showMinimapHelp: '오른쪽에 미니맵 개요를 표시합니다',
         indentWidth: '들여쓰기 너비',
         indentWidthHelp: '서식이 지정된 SQL의 들여쓰기 수준당 공백 수 (1–8)',
         indentWidthError: '들여쓰기 너비는 1에서 8 사이여야 합니다',
@@ -796,24 +777,17 @@ export const koKR = {
       },
       query: {
         title: '쿼리',
-        description: '쿼리 실행 기본값을 구성합니다',
         defaultLimit: '기본 행 제한',
-        defaultLimitHelp: '쿼리당 최대 반환 행 수 (10–10000)',
         defaultLimitError: '행 제한은 10에서 10000 사이여야 합니다',
         queryTimeout: '쿼리 제한 시간 (초)',
-        queryTimeoutHelp: '최대 쿼리 실행 시간 (초, 1–300)',
         queryTimeoutError: '제한 시간은 1초에서 300초 사이여야 합니다',
         autoSave: '자동 저장',
-        autoSaveHelp: '쿼리 변경 사항을 자동으로 저장합니다',
       },
       ai: {
-        title: 'AI 설정',
         tabLabel: 'LLM',
-        description: 'AI 모델 공급자와 채팅 동작을 구성합니다',
         missing: '구성된 AI 모델이 없습니다. 설정에서 공급자를 추가하고 모델을 선택하세요.',
         providerList: {
           title: '공급자',
-          description: 'AI 모델 공급자를 관리합니다',
           addProvider: '공급자 추가',
           empty: '구성된 공급자가 없습니다. 추가하면 AI 기능을 사용할 수 있습니다.',
           emptyAction: '첫 공급자 추가',
@@ -871,13 +845,11 @@ export const koKR = {
         },
         chat: {
           title: '에이전트',
-          description: '에이전트 실행 동작을 구성합니다',
           autoCompactLabel: '메시지 자동 압축',
           autoCompactDescription: '컨텍스트 한도에 가까워지면 이전 메시지를 자동으로 요약해 토큰을 절약합니다',
           maxIterationsLabel: '최대 반복 횟수',
           maxIterationsDescription: '에이전트가 중지하기 전까지의 최대 도구 호출 반복 횟수 (1–1000)',
           wallClockBudgetLabel: '실행 시간 예산 (분)',
-          wallClockBudgetDescription: '에이전트가 중지하기 전까지의 최대 실제 실행 시간 (분, 1–240)',
           tokenBudgetLabel: '토큰 예산',
           tokenBudgetDescription: '에이전트가 중지하기 전까지 소비할 수 있는 최대 토큰 수',
           systemPromptLabel: '시스템 프롬프트',
@@ -912,9 +884,6 @@ export const koKR = {
     },
     history: {
       title: '기록',
-      subtitle: '쿼리 기록을 확인하고 관리합니다',
-      recent: '최근 쿼리',
-      recentDescription: '최근에 실행한 쿼리',
       empty: '아직 쿼리 기록이 없습니다.',
       search: '쿼리 검색...',
       filterAll: '전체',
@@ -970,7 +939,6 @@ export const koKR = {
         connectedAs: '다음 계정으로 연결됨',
         currentDatabase: '데이터베이스',
         selectConnection: '연결 선택',
-        tip: '팁: 사이드바에서 테이블을 두 번 클릭하면 데이터를 볼 수 있습니다',
       },
       editor: {
         title: 'SQL 편집기',
@@ -1083,7 +1051,6 @@ export const koKR = {
       noSource: '시작하려면 데이터 소스를 연결하세요.',
       stop: '중지',
       continue: '계속',
-      continueHint: '에이전트가 일시 중지되었습니다. 계속을 눌러 재개하거나 중지로 세션을 끝내세요.',
       clearChat: '채팅 지우기',
       riskSafe: '안전 작업',
       riskElevated: '주의 필요 작업',
@@ -1206,10 +1173,6 @@ export const koKR = {
       title: {
         edit: '연결 편집',
         new: '새 연결',
-      },
-      description: {
-        edit: '데이터베이스 연결 설정을 수정합니다.',
-        new: '새 데이터베이스 연결을 구성합니다.',
       },
       labels: {
         connectionName: '연결 이름',
@@ -1885,7 +1848,6 @@ export const koKR = {
     downloadingPercent: '{percent}% 다운로드 중',
     relaunchFailed: '업데이트 후 재시작에 실패했습니다',
     retry: '다시 시도',
-    installFailedHelp: 'F12를 눌러 개발자 도구를 열고 오류 세부 정보를 확인하세요.',
   },
   errors: {
     unexpected: '예기치 않은 오류: {error}',

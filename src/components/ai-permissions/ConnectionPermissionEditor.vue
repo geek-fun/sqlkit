@@ -112,9 +112,6 @@ const selectPreset = (value: string) => {
       </span>
     </summary>
     <div class="px-3 pb-3 space-y-3">
-      <p class="text-xs text-muted-foreground leading-relaxed">
-        {{ t('aiPermissions.help') }}
-      </p>
       <p v-if="loading" role="status" class="text-sm text-muted-foreground">
         {{ t('aiPermissions.loading') }}
       </p>

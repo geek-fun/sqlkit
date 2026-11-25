@@ -8,7 +8,6 @@ export const ptBR = {
     deniedByConnection: 'Negado pelas permissões da conexão',
     conversationReadOnly: 'Somente leitura nesta conversa',
     title: 'Permissões de IA',
-    help: 'Aplica-se ao Data Studio e a clientes MCP externos. Use os padrões do sistema ou defina permissões para esta conexão.',
     loading: 'Carregando permissões…',
     loadFailed: 'Não foi possível carregar as permissões. Tente novamente antes de salvar esta conexão.',
     retry: 'Tentar novamente',
@@ -142,7 +141,6 @@ export const ptBR = {
     },
     section: {
       title: 'Conta e plano',
-      desc: 'Benefícios da assinatura e estado do bloqueio de versão desta instalação.',
       versionPermanent: 'A versão atual pode ser usada para sempre (coberta pelo seu bloqueio de versão).',
       subscriptionActive: 'O Ultimate está ativo — todos os recursos ficam desbloqueados durante a assinatura.',
       versionLockedOut: 'Esta versão ({date}) não está coberta por um bloqueio de versão — exibindo o modo Community.',
@@ -167,7 +165,6 @@ export const ptBR = {
     prompt: {
       title: 'Prompt do agente',
       label: 'Prompt do agente',
-      description: 'Adicione contexto sobre esta conexão para o agente de IA.',
       help: 'Enviado ao agente sempre que esta conexão é anexada, após o prompt de sistema global.',
       placeholder: 'Descreva o significado de negócio dos dados, convenções de nomenclatura ou consultas comuns.',
       configured: 'Configurado',
@@ -175,7 +172,7 @@ export const ptBR = {
       edit: 'Editar',
       clear: 'Limpar',
       cancel: 'Cancelar',
-      confirm: 'Confirmar',
+      confirm: 'Salvar prompt',
     },
   },
   connectionsPage: {
@@ -264,7 +261,6 @@ export const ptBR = {
   },
   transfer: {
     title: 'Transferência',
-    subtitle: 'Importe, exporte e migre seus dados',
     tabs: {
       export: 'Exportar',
       import: 'Importar',
@@ -548,7 +544,6 @@ export const ptBR = {
   pages: {
     connections: {
       title: 'Conexões',
-      subtitle: 'Gerencie suas conexões de banco de dados',
       search: 'Pesquisar conexões...',
       stats: {
         totalConnections: 'Total de conexões',
@@ -574,10 +569,8 @@ export const ptBR = {
     },
     settings: {
       title: 'Configurações',
-      subtitle: 'Configure as preferências do aplicativo',
       general: {
         title: 'Geral',
-        description: 'Gerencie sua conta, plano, tema e atualizações do aplicativo',
         theme: 'Tema',
         themeSelect: 'Selecionar tema',
         themeHelp: 'Escolha entre tema claro, escuro ou do sistema',
@@ -588,7 +581,6 @@ export const ptBR = {
         },
         language: 'Idioma',
         languageSelect: 'Selecionar idioma',
-        languageHelp: 'Escolha seu idioma preferido',
         languages: {
           enUS: 'English',
           zhCN: '简体中文',
@@ -623,7 +615,6 @@ export const ptBR = {
         sessions: '{count} sessão — {clients} | {count} sessões — {clients}',
         sessionsEmpty: 'Adicione o Data Studio MCP à sua ferramenta de IA com o guia abaixo.',
         serverTitle: 'SqlKit MCP Server',
-        serverDesc: 'O catálogo de ferramentas MCP que o SqlKit expõe aos clientes de IA.',
         serverStopped: 'Não servido — a Ponte MCP está parada.',
         serverIdle: 'sem sessões ativas',
         stoppedReason: 'A Ponte MCP está parada porque sua assinatura está inativa. Os clientes de IA não conseguem acessar seus bancos de dados pelo SqlKit neste momento.',
@@ -656,7 +647,6 @@ export const ptBR = {
         repository: 'Repositório',
         website: 'Site',
         copyright: '© {year} GEEKFUN. Todos os direitos reservados.',
-        description: 'SqlKit é um cliente GUI multiplataforma e agêntico para bancos de dados SQL. Construído com Rust + Tauri.',
       },
       feedback: {
         preparing: 'Preparando download…',
@@ -683,7 +673,6 @@ export const ptBR = {
       },
       jre: {
         title: 'JRE e drivers',
-        description: 'Gerencie o Java Runtime e os drivers JDBC para conexões de banco de dados',
         jreCard: {
           title: 'Java Runtime',
           description: 'Necessário para conexões via ponte JDBC (Oracle, DB2, H2, Derby)',
@@ -716,7 +705,6 @@ export const ptBR = {
         },
         bridgeCard: {
           title: 'JAR da ponte',
-          description: 'Componente da ponte JDBC para conexões de banco de dados',
           status: {
             installed: 'Instalado',
             notInstalled: 'Não instalado',
@@ -742,7 +730,6 @@ export const ptBR = {
         },
         driversCard: {
           title: 'Drivers JDBC',
-          description: 'Arquivos de driver JDBC específicos por banco de dados',
           label: {
             versions: 'versões',
           },
@@ -774,19 +761,13 @@ export const ptBR = {
       },
       editor: {
         title: 'Editor',
-        description: 'Configure o comportamento e a aparência do editor SQL',
         fontSize: 'Tamanho da fonte',
-        fontSizeHelp: 'Tamanho da fonte do editor em pixels (8–32)',
         fontSizeError: 'O tamanho da fonte deve estar entre 8 e 32',
         tabSize: 'Tamanho da tabulação',
-        tabSizeHelp: 'Número de espaços por tabulação (1–8)',
         tabSizeError: 'O tamanho da tabulação deve estar entre 1 e 8',
         wordWrap: 'Quebra de linha',
-        wordWrapHelp: 'Quebra linhas longas no editor',
         showLineNumbers: 'Mostrar números de linha',
-        showLineNumbersHelp: 'Exibe números de linha na margem do editor',
         showMinimap: 'Mostrar minimapa',
-        showMinimapHelp: 'Mostra uma visão geral em minimapa à direita',
         indentWidth: 'Largura do recuo',
         indentWidthHelp: 'Espaços por nível de recuo no SQL formatado (1–8)',
         indentWidthError: 'A largura do recuo deve estar entre 1 e 8',
@@ -796,24 +777,17 @@ export const ptBR = {
       },
       query: {
         title: 'Consulta',
-        description: 'Configure os padrões de execução de consultas',
         defaultLimit: 'Limite padrão de linhas',
-        defaultLimitHelp: 'Máximo de linhas retornadas por consulta (10–10000)',
         defaultLimitError: 'O limite de linhas deve estar entre 10 e 10000',
         queryTimeout: 'Tempo limite da consulta (s)',
-        queryTimeoutHelp: 'Tempo máximo de execução da consulta em segundos (1–300)',
         queryTimeoutError: 'O tempo limite deve estar entre 1 e 300 segundos',
         autoSave: 'Salvamento automático',
-        autoSaveHelp: 'Salva automaticamente as alterações da consulta',
       },
       ai: {
-        title: 'Configurações de IA',
         tabLabel: 'LLMs',
-        description: 'Configure provedores de modelos de IA e o comportamento do chat',
         missing: 'Nenhum modelo de IA configurado. Adicione um provedor e selecione um modelo nas Configurações.',
         providerList: {
           title: 'Provedores',
-          description: 'Gerencie seus provedores de modelos de IA',
           addProvider: 'Adicionar provedor',
           empty: 'Nenhum provedor configurado. Adicione um para ativar os recursos de IA.',
           emptyAction: 'Adicionar seu primeiro provedor',
@@ -871,13 +845,11 @@ export const ptBR = {
         },
         chat: {
           title: 'Agente',
-          description: 'Configure o comportamento de execução do agente',
           autoCompactLabel: 'Compactar mensagens automaticamente',
           autoCompactDescription: 'Resume mensagens antigas automaticamente para economizar tokens ao se aproximar dos limites de contexto',
           maxIterationsLabel: 'Máx. de iterações',
           maxIterationsDescription: 'Número máximo de iterações de chamadas de ferramenta antes de o agente parar (1–1000)',
           wallClockBudgetLabel: 'Limite de tempo total (min)',
-          wallClockBudgetDescription: 'Tempo máximo total em minutos antes de o agente parar (1–240)',
           tokenBudgetLabel: 'Orçamento de tokens',
           tokenBudgetDescription: 'Máximo de tokens consumidos antes de o agente parar',
           systemPromptLabel: 'Prompt de sistema',
@@ -912,9 +884,6 @@ export const ptBR = {
     },
     history: {
       title: 'Histórico',
-      subtitle: 'Veja e gerencie seu histórico de consultas',
-      recent: 'Consultas recentes',
-      recentDescription: 'Suas consultas executadas recentemente',
       empty: 'Ainda não há histórico de consultas.',
       search: 'Pesquisar consultas...',
       filterAll: 'Todas',
@@ -970,7 +939,6 @@ export const ptBR = {
         connectedAs: 'Conectado como',
         currentDatabase: 'Banco de dados',
         selectConnection: 'Selecionar uma conexão',
-        tip: 'Dica: clique duas vezes em uma tabela na barra lateral para ver os dados',
       },
       editor: {
         title: 'Editor SQL',
@@ -1083,7 +1051,6 @@ export const ptBR = {
       noSource: 'Anexe uma fonte de dados para começar.',
       stop: 'Parar',
       continue: 'Continuar',
-      continueHint: 'O agente foi pausado. Clique em Continuar para retomar ou em Parar para encerrar a sessão.',
       clearChat: 'Limpar chat',
       riskSafe: 'Operação segura',
       riskElevated: 'Risco elevado',
@@ -1206,10 +1173,6 @@ export const ptBR = {
       title: {
         edit: 'Editar conexão',
         new: 'Nova conexão',
-      },
-      description: {
-        edit: 'Atualize as configurações da sua conexão de banco de dados.',
-        new: 'Configure uma nova conexão de banco de dados.',
       },
       labels: {
         connectionName: 'Nome da conexão',
@@ -1885,7 +1848,6 @@ export const ptBR = {
     downloadingPercent: 'Baixando {percent}%',
     relaunchFailed: 'Falha ao reiniciar após a atualização',
     retry: 'Tentar novamente',
-    installFailedHelp: 'Pressione F12 para abrir as ferramentas de desenvolvedor e verificar os detalhes do erro.',
   },
   errors: {
     unexpected: 'Erro inesperado: {error}',

@@ -8,7 +8,6 @@ export const enUS = {
     deniedByConnection: 'Denied by connection permissions',
     conversationReadOnly: 'Read-only for this conversation',
     title: 'AI permissions',
-    help: 'Applies to Data Studio and external MCP clients. Use system defaults or set permissions for this connection.',
     loading: 'Loading permissions…',
     loadFailed: 'Could not load permissions. Retry before saving this connection.',
     retry: 'Retry',
@@ -142,7 +141,6 @@ export const enUS = {
     },
     section: {
       title: 'Account & Plan',
-      desc: 'Subscription entitlements and version-lock state for this installation.',
       versionPermanent: 'Current version is permanently usable (covered by your version lock).',
       subscriptionActive: 'Ultimate is active — all features unlocked while subscribed.',
       versionLockedOut: 'This version ({date}) is not covered by a version lock — showing Community mode.',
@@ -167,7 +165,6 @@ export const enUS = {
     prompt: {
       title: 'Agent Prompt',
       label: 'Agent Prompt',
-      description: 'Add context about this connection for the AI agent.',
       help: 'Sent to the agent whenever this connection is attached, after the global system prompt.',
       placeholder: 'Describe the business meaning of the data, naming conventions, or common queries.',
       configured: 'Configured',
@@ -175,7 +172,7 @@ export const enUS = {
       edit: 'Edit',
       clear: 'Clear',
       cancel: 'Cancel',
-      confirm: 'Confirm',
+      confirm: 'Save Prompt',
     },
   },
   connectionsPage: {
@@ -264,7 +261,6 @@ export const enUS = {
   },
   transfer: {
     title: 'Transfer',
-    subtitle: 'Import, export, and migrate your data',
     tabs: {
       export: 'Export',
       import: 'Import',
@@ -548,7 +544,6 @@ export const enUS = {
   pages: {
     connections: {
       title: 'Connections',
-      subtitle: 'Manage your database connections',
       search: 'Search connections...',
       stats: {
         totalConnections: 'Total Connections',
@@ -574,10 +569,8 @@ export const enUS = {
     },
     settings: {
       title: 'Settings',
-      subtitle: 'Configure your application preferences',
       general: {
         title: 'General',
-        description: 'Manage your account, plan, theme, and application updates',
         theme: 'Theme',
         themeSelect: 'Select theme',
         themeHelp: 'Choose between light, dark, or system theme',
@@ -588,7 +581,6 @@ export const enUS = {
         },
         language: 'Language',
         languageSelect: 'Select language',
-        languageHelp: 'Choose your preferred language',
         languages: {
           enUS: 'English',
           zhCN: '简体中文',
@@ -623,7 +615,6 @@ export const enUS = {
         sessions: '{count} session — {clients} | {count} sessions — {clients}',
         sessionsEmpty: 'Add Data Studio MCP to your AI tool with the guide below.',
         serverTitle: 'SqlKit MCP Server',
-        serverDesc: 'The MCP tool catalog SqlKit exposes to AI clients.',
         serverStopped: 'Not served — the MCP Bridge is stopped.',
         serverIdle: 'no active sessions',
         stoppedReason: 'The MCP Bridge is stopped because your subscription is inactive. AI clients cannot reach your databases through SqlKit right now.',
@@ -656,7 +647,6 @@ export const enUS = {
         repository: 'Repository',
         website: 'Website',
         copyright: '© {year} GEEKFUN. All rights reserved.',
-        description: 'SqlKit is an agentic cross-platform SQL database GUI client. Built with Rust + Tauri.',
       },
       feedback: {
         preparing: 'Preparing download…',
@@ -683,7 +673,6 @@ export const enUS = {
       },
       jre: {
         title: 'JRE & Drivers',
-        description: 'Manage Java Runtime and JDBC drivers for database connections',
         jreCard: {
           title: 'Java Runtime',
           description: 'Required for JDBC bridge connections (Oracle, DB2, H2, Derby)',
@@ -716,7 +705,6 @@ export const enUS = {
         },
         bridgeCard: {
           title: 'Bridge JAR',
-          description: 'JDBC bridge component for database connections',
           status: {
             installed: 'Installed',
             notInstalled: 'Not Installed',
@@ -742,7 +730,6 @@ export const enUS = {
         },
         driversCard: {
           title: 'JDBC Drivers',
-          description: 'Database-specific JDBC driver files',
           label: {
             versions: 'versions',
           },
@@ -774,19 +761,13 @@ export const enUS = {
       },
       editor: {
         title: 'Editor',
-        description: 'Configure the SQL editor behavior and appearance',
         fontSize: 'Font Size',
-        fontSizeHelp: 'Editor font size in pixels (8–32)',
         fontSizeError: 'Font size must be between 8 and 32',
         tabSize: 'Tab Size',
-        tabSizeHelp: 'Number of spaces per tab (1–8)',
         tabSizeError: 'Tab size must be between 1 and 8',
         wordWrap: 'Word Wrap',
-        wordWrapHelp: 'Wrap long lines in the editor',
         showLineNumbers: 'Show Line Numbers',
-        showLineNumbersHelp: 'Display line numbers in the editor gutter',
         showMinimap: 'Show Minimap',
-        showMinimapHelp: 'Show a minimap overview on the right side',
         indentWidth: 'Indent Width',
         indentWidthHelp: 'Spaces per indentation level in formatted SQL (1–8)',
         indentWidthError: 'Indent width must be between 1 and 8',
@@ -796,24 +777,17 @@ export const enUS = {
       },
       query: {
         title: 'Query',
-        description: 'Configure query execution defaults',
         defaultLimit: 'Default Row Limit',
-        defaultLimitHelp: 'Maximum rows returned per query (10–10000)',
         defaultLimitError: 'Row limit must be between 10 and 10000',
         queryTimeout: 'Query Timeout (s)',
-        queryTimeoutHelp: 'Maximum query execution time in seconds (1–300)',
         queryTimeoutError: 'Timeout must be between 1 and 300 seconds',
         autoSave: 'Auto Save',
-        autoSaveHelp: 'Automatically save query changes',
       },
       ai: {
-        title: 'AI Settings',
         tabLabel: 'LLMs',
-        description: 'Configure AI model providers and chat behavior',
         missing: 'No AI model configured. Please add a provider and select a model in Settings.',
         providerList: {
           title: 'Providers',
-          description: 'Manage your AI model providers',
           addProvider: 'Add Provider',
           empty: 'No providers configured. Add one to enable AI features.',
           emptyAction: 'Add your first provider',
@@ -871,13 +845,11 @@ export const enUS = {
         },
         chat: {
           title: 'Agent',
-          description: 'Configure agent runtime behavior',
           autoCompactLabel: 'Auto-compact messages',
           autoCompactDescription: 'Automatically summarize old messages to save tokens when approaching context limits',
           maxIterationsLabel: 'Max iterations',
           maxIterationsDescription: 'Maximum number of tool-call iterations before the agent stops (1–1000)',
           wallClockBudgetLabel: 'Wall clock budget (min)',
-          wallClockBudgetDescription: 'Maximum wall-clock time in minutes before the agent stops (1–240)',
           tokenBudgetLabel: 'Token budget',
           tokenBudgetDescription: 'Maximum tokens consumed before the agent stops',
           systemPromptLabel: 'System Prompt',
@@ -912,9 +884,6 @@ export const enUS = {
     },
     history: {
       title: 'History',
-      subtitle: 'View and manage your query history',
-      recent: 'Recent Queries',
-      recentDescription: 'Your recently executed queries',
       empty: 'No query history available yet.',
       search: 'Search queries...',
       filterAll: 'All',
@@ -970,7 +939,6 @@ export const enUS = {
         connectedAs: 'Connected as',
         currentDatabase: 'Database',
         selectConnection: 'Select a Connection',
-        tip: 'Tip: Double-click a table in the sidebar to view its data',
       },
       editor: {
         title: 'SQL Editor',
@@ -1083,7 +1051,6 @@ export const enUS = {
       noSource: 'Attach a data source to get started.',
       stop: 'Stop',
       continue: 'Continue',
-      continueHint: 'The agent has paused. Click Continue to resume or Stop to end the session.',
       clearChat: 'Clear Chat',
       riskSafe: 'Safe Operation',
       riskElevated: 'Elevated Risk',
@@ -1206,10 +1173,6 @@ export const enUS = {
       title: {
         edit: 'Edit Connection',
         new: 'New Connection',
-      },
-      description: {
-        edit: 'Update your database connection settings.',
-        new: 'Configure a new database connection.',
       },
       labels: {
         connectionName: 'Connection Name',
@@ -1885,7 +1848,6 @@ export const enUS = {
     downloadingPercent: 'Downloading {percent}%',
     relaunchFailed: 'Failed to restart after update',
     retry: 'Retry',
-    installFailedHelp: 'Press F12 to open developer tools and check for error details.',
   },
   errors: {
     unexpected: 'Unexpected error: {error}',

@@ -3,7 +3,8 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import { SettingsAbout } from '@/components/settings/about'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
+import { InfoTip } from '@/components/ui/info-tip'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 // Separator is rendered inline as a styled div
@@ -205,8 +206,6 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
           <h1 class="text-xl font-semibold">
             {{ t('pages.settings.title') }}
           </h1>
-          <span class="text-muted-foreground">|</span>
-          <span class="text-sm text-muted-foreground">{{ t('pages.settings.subtitle') }}</span>
           <span v-if="preferencesSaved" class="text-xs text-muted-foreground ml-auto flex gap-1.5 items-center" role="status"><span class="i-lucide-circle-check text-success h-3.5 w-3.5" aria-hidden="true" />{{ t('pages.settings.feedback.saved') }}</span>
         </div>
       </div>
@@ -243,11 +242,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
           <!-- General Tab -->
           <TabsContent value="general" class="mt-0 space-y-6">
             <Card>
-              <CardHeader>
-                <CardTitle>{{ t('pages.settings.general.title') }}</CardTitle>
-                <CardDescription>{{ t('pages.settings.general.description') }}</CardDescription>
-              </CardHeader>
-              <CardContent class="space-y-6">
+              <CardContent class="pt-6 space-y-6">
                 <!-- Theme selector -->
                 <div class="space-y-3">
                   <Label>{{ t('pages.settings.general.theme') }}</Label>
@@ -297,9 +292,6 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 <!-- Language selector -->
                 <div class="space-y-3">
                   <Label>{{ t('pages.settings.general.language') }}</Label>
-                  <p class="text-xs text-muted-foreground">
-                    {{ t('pages.settings.general.languageHelp') }}
-                  </p>
                   <RadioGroup
                     :model-value="currentLanguage"
                     class="gap-3 grid grid-cols-2 sm:grid-cols-4"
@@ -331,14 +323,9 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
               </CardContent>
             </Card>
             <section aria-labelledby="settings-account-plan-title" class="space-y-3">
-              <div class="space-y-1">
-                <h2 id="settings-account-plan-title" class="text-base font-semibold">
-                  {{ t('plan.section.title') }}
-                </h2>
-                <p class="text-sm text-muted-foreground">
-                  {{ t('plan.section.desc') }}
-                </p>
-              </div>
+              <h2 id="settings-account-plan-title" class="text-base font-semibold">
+                {{ t('plan.section.title') }}
+              </h2>
               <PlanSection />
             </section>
             <SettingsAbout />
@@ -347,19 +334,10 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
           <!-- Editor Tab -->
           <TabsContent value="editor" class="mt-0">
             <Card>
-              <CardHeader>
-                <CardTitle>{{ t('pages.settings.editor.title') }}</CardTitle>
-                <CardDescription>{{ t('pages.settings.editor.description') }}</CardDescription>
-              </CardHeader>
-              <CardContent class="space-y-5">
+              <CardContent class="pt-6 space-y-5">
                 <!-- Font Size -->
-                <div class="flex gap-4 items-start justify-between">
-                  <div class="space-y-1">
-                    <Label>{{ t('pages.settings.editor.fontSize') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.editor.fontSizeHelp') }}
-                    </p>
-                  </div>
+                <div class="flex gap-4 items-center justify-between">
+                  <Label>{{ t('pages.settings.editor.fontSize') }}</Label>
                   <div class="space-y-1">
                     <Input
                       type="number"
@@ -376,13 +354,8 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Tab Size -->
-                <div class="flex gap-4 items-start justify-between">
-                  <div class="space-y-1">
-                    <Label>{{ t('pages.settings.editor.tabSize') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.editor.tabSizeHelp') }}
-                    </p>
-                  </div>
+                <div class="flex gap-4 items-center justify-between">
+                  <Label>{{ t('pages.settings.editor.tabSize') }}</Label>
                   <div class="space-y-1">
                     <Input
                       type="number"
@@ -399,12 +372,10 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Indent Width -->
-                <div class="flex gap-4 items-start justify-between">
-                  <div class="space-y-1">
+                <div class="flex gap-4 items-center justify-between">
+                  <div class="flex gap-1.5 items-center">
                     <Label>{{ t('pages.settings.editor.indentWidth') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.editor.indentWidthHelp') }}
-                    </p>
+                    <InfoTip :text="t('pages.settings.editor.indentWidthHelp')" />
                   </div>
                   <div class="space-y-1">
                     <Input
@@ -422,12 +393,10 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Line Width -->
-                <div class="flex gap-4 items-start justify-between">
-                  <div class="space-y-1">
+                <div class="flex gap-4 items-center justify-between">
+                  <div class="flex gap-1.5 items-center">
                     <Label>{{ t('pages.settings.editor.lineWidth') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.editor.lineWidthHelp') }}
-                    </p>
+                    <InfoTip :text="t('pages.settings.editor.lineWidthHelp')" />
                   </div>
                   <div class="space-y-1">
                     <Input
@@ -446,12 +415,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
 
                 <!-- Word Wrap -->
                 <div class="flex items-center justify-between">
-                  <div class="space-y-1">
-                    <Label>{{ t('pages.settings.editor.wordWrap') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.editor.wordWrapHelp') }}
-                    </p>
-                  </div>
+                  <Label>{{ t('pages.settings.editor.wordWrap') }}</Label>
                   <button
                     class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :class="wordWrap ? 'bg-primary' : 'bg-muted'"
@@ -468,12 +432,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
 
                 <!-- Show Line Numbers -->
                 <div class="flex items-center justify-between">
-                  <div class="space-y-1">
-                    <Label>{{ t('pages.settings.editor.showLineNumbers') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.editor.showLineNumbersHelp') }}
-                    </p>
-                  </div>
+                  <Label>{{ t('pages.settings.editor.showLineNumbers') }}</Label>
                   <button
                     class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :class="showLineNumbers ? 'bg-primary' : 'bg-muted'"
@@ -490,12 +449,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
 
                 <!-- Show Minimap -->
                 <div class="flex items-center justify-between">
-                  <div class="space-y-1">
-                    <Label>{{ t('pages.settings.editor.showMinimap') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.editor.showMinimapHelp') }}
-                    </p>
-                  </div>
+                  <Label>{{ t('pages.settings.editor.showMinimap') }}</Label>
                   <button
                     class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :class="showMinimap ? 'bg-primary' : 'bg-muted'"
@@ -516,19 +470,10 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
           <!-- Query Tab -->
           <TabsContent value="query" class="mt-0">
             <Card>
-              <CardHeader>
-                <CardTitle>{{ t('pages.settings.query.title') }}</CardTitle>
-                <CardDescription>{{ t('pages.settings.query.description') }}</CardDescription>
-              </CardHeader>
-              <CardContent class="space-y-5">
+              <CardContent class="pt-6 space-y-5">
                 <!-- Default Row Limit -->
-                <div class="flex gap-4 items-start justify-between">
-                  <div class="space-y-1">
-                    <Label>{{ t('pages.settings.query.defaultLimit') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.query.defaultLimitHelp') }}
-                    </p>
-                  </div>
+                <div class="flex gap-4 items-center justify-between">
+                  <Label>{{ t('pages.settings.query.defaultLimit') }}</Label>
                   <div class="space-y-1">
                     <Input
                       type="number"
@@ -545,13 +490,8 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
                 </div>
 
                 <!-- Query Timeout -->
-                <div class="flex gap-4 items-start justify-between">
-                  <div class="space-y-1">
-                    <Label>{{ t('pages.settings.query.queryTimeout') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.query.queryTimeoutHelp') }}
-                    </p>
-                  </div>
+                <div class="flex gap-4 items-center justify-between">
+                  <Label>{{ t('pages.settings.query.queryTimeout') }}</Label>
                   <div class="space-y-1">
                     <Input
                       type="number"
@@ -569,12 +509,7 @@ const toggleAutoSave = () => appStore.setAutoSave(!appStore.queryConfig.autoSave
 
                 <!-- Auto Save -->
                 <div class="flex items-center justify-between">
-                  <div class="space-y-1">
-                    <Label>{{ t('pages.settings.query.autoSave') }}</Label>
-                    <p class="text-xs text-muted-foreground">
-                      {{ t('pages.settings.query.autoSaveHelp') }}
-                    </p>
-                  </div>
+                  <Label>{{ t('pages.settings.query.autoSave') }}</Label>
                   <button
                     class="border-2 border-transparent rounded-full inline-flex flex-shrink-0 h-6 w-11 cursor-pointer transition-colors relative focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     :class="autoSave ? 'bg-primary' : 'bg-muted'"

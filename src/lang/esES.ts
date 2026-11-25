@@ -8,7 +8,6 @@ export const esES = {
     deniedByConnection: 'Denegado por los permisos de la conexión',
     conversationReadOnly: 'Solo lectura para esta conversación',
     title: 'Permisos de IA',
-    help: 'Se aplica a Data Studio y a clientes MCP externos. Usa los valores predeterminados del sistema o establece permisos para esta conexión.',
     loading: 'Cargando permisos…',
     loadFailed: 'No se pudieron cargar los permisos. Reintenta antes de guardar esta conexión.',
     retry: 'Reintentar',
@@ -142,7 +141,6 @@ export const esES = {
     },
     section: {
       title: 'Cuenta y plan',
-      desc: 'Beneficios de la suscripción y estado del bloqueo de versión de esta instalación.',
       versionPermanent: 'La versión actual se usa de forma permanente (cubierto por tu bloqueo de versión).',
       subscriptionActive: 'Ultimate está activo: todas las funciones desbloqueadas mientras dure la suscripción.',
       versionLockedOut: 'Esta versión ({date}) no está cubierta por un bloqueo de versión; se muestra el modo Community.',
@@ -167,7 +165,6 @@ export const esES = {
     prompt: {
       title: 'Prompt de agente',
       label: 'Prompt de agente',
-      description: 'Agrega contexto sobre esta conexión para el agente de IA.',
       help: 'Se envía al agente cada vez que se adjunta esta conexión, después del prompt de sistema global.',
       placeholder: 'Describe el significado de negocio de los datos, las convenciones de nombres o las consultas habituales.',
       configured: 'Configurado',
@@ -175,7 +172,7 @@ export const esES = {
       edit: 'Editar',
       clear: 'Limpiar',
       cancel: 'Cancelar',
-      confirm: 'Confirmar',
+      confirm: 'Guardar prompt',
     },
   },
   connectionsPage: {
@@ -264,7 +261,6 @@ export const esES = {
   },
   transfer: {
     title: 'Transferencia',
-    subtitle: 'Importa, exporta y migra tus datos',
     tabs: {
       export: 'Exportar',
       import: 'Importar',
@@ -548,7 +544,6 @@ export const esES = {
   pages: {
     connections: {
       title: 'Conexiones',
-      subtitle: 'Administra tus conexiones de base de datos',
       search: 'Buscar conexiones...',
       stats: {
         totalConnections: 'Conexiones totales',
@@ -574,10 +569,8 @@ export const esES = {
     },
     settings: {
       title: 'Configuración',
-      subtitle: 'Configura tus preferencias de la aplicación',
       general: {
         title: 'General',
-        description: 'Administra tu cuenta, plan, tema y actualizaciones de la aplicación',
         theme: 'Tema',
         themeSelect: 'Seleccionar tema',
         themeHelp: 'Elige entre tema claro, oscuro o del sistema',
@@ -588,7 +581,6 @@ export const esES = {
         },
         language: 'Idioma',
         languageSelect: 'Seleccionar idioma',
-        languageHelp: 'Elige tu idioma preferido',
         languages: {
           enUS: 'English',
           zhCN: '简体中文',
@@ -623,7 +615,6 @@ export const esES = {
         sessions: '{count} sesión — {clients} | {count} sesiones — {clients}',
         sessionsEmpty: 'Añade Data Studio MCP a tu herramienta de IA con la guía de abajo.',
         serverTitle: 'SqlKit MCP Server',
-        serverDesc: 'El catálogo de herramientas MCP que SqlKit expone a los clientes de IA.',
         serverStopped: 'No servido — el Puente MCP está detenido.',
         serverIdle: 'sin sesiones activas',
         stoppedReason: 'El Puente MCP está detenido porque tu suscripción está inactiva. Los clientes de IA no pueden acceder a tus bases de datos a través de SqlKit en este momento.',
@@ -656,7 +647,6 @@ export const esES = {
         repository: 'Repositorio',
         website: 'Sitio web',
         copyright: '© {year} GEEKFUN. Todos los derechos reservados.',
-        description: 'SqlKit es un cliente GUI multiplataforma para bases de datos SQL basado en agentes de IA. Construido con Rust + Tauri.',
       },
       feedback: {
         preparing: 'Preparando descarga…',
@@ -683,7 +673,6 @@ export const esES = {
       },
       jre: {
         title: 'JRE y controladores',
-        description: 'Administra el Java Runtime y los controladores JDBC para las conexiones de base de datos',
         jreCard: {
           title: 'Java Runtime',
           description: 'Necesario para conexiones mediante puente JDBC (Oracle, DB2, H2, Derby)',
@@ -716,7 +705,6 @@ export const esES = {
         },
         bridgeCard: {
           title: 'JAR del puente',
-          description: 'Componente de puente JDBC para conexiones de base de datos',
           status: {
             installed: 'Instalado',
             notInstalled: 'No instalado',
@@ -742,7 +730,6 @@ export const esES = {
         },
         driversCard: {
           title: 'Controladores JDBC',
-          description: 'Archivos de controladores JDBC específicos por base de datos',
           label: {
             versions: 'versiones',
           },
@@ -774,19 +761,13 @@ export const esES = {
       },
       editor: {
         title: 'Editor',
-        description: 'Configura el comportamiento y la apariencia del editor SQL',
         fontSize: 'Tamaño de fuente',
-        fontSizeHelp: 'Tamaño de fuente del editor en píxeles (8–32)',
         fontSizeError: 'El tamaño de fuente debe estar entre 8 y 32',
         tabSize: 'Tamaño de tabulación',
-        tabSizeHelp: 'Número de espacios por tabulación (1–8)',
         tabSizeError: 'El tamaño de tabulación debe estar entre 1 y 8',
         wordWrap: 'Ajuste de línea',
-        wordWrapHelp: 'Ajusta las líneas largas en el editor',
         showLineNumbers: 'Mostrar números de línea',
-        showLineNumbersHelp: 'Muestra los números de línea en el margen del editor',
         showMinimap: 'Mostrar minimapa',
-        showMinimapHelp: 'Muestra una vista de minimapa al lado derecho',
         indentWidth: 'Ancho de sangría',
         indentWidthHelp: 'Espacios por nivel de sangría en el SQL formateado (1–8)',
         indentWidthError: 'El ancho de sangría debe estar entre 1 y 8',
@@ -796,24 +777,17 @@ export const esES = {
       },
       query: {
         title: 'Consulta',
-        description: 'Configura los valores predeterminados de ejecución de consultas',
         defaultLimit: 'Límite de filas predeterminado',
-        defaultLimitHelp: 'Máximo de filas devueltas por consulta (10–10000)',
         defaultLimitError: 'El límite de filas debe estar entre 10 y 10000',
         queryTimeout: 'Tiempo de espera de consulta (s)',
-        queryTimeoutHelp: 'Tiempo máximo de ejecución de la consulta en segundos (1–300)',
         queryTimeoutError: 'El tiempo de espera debe estar entre 1 y 300 segundos',
         autoSave: 'Autoguardado',
-        autoSaveHelp: 'Guarda automáticamente los cambios de la consulta',
       },
       ai: {
-        title: 'Configuración de IA',
         tabLabel: 'LLMs',
-        description: 'Configura los proveedores de modelos de IA y el comportamiento del chat',
         missing: 'No hay ningún modelo de IA configurado. Agrega un proveedor y selecciona un modelo en Configuración.',
         providerList: {
           title: 'Proveedores',
-          description: 'Administra tus proveedores de modelos de IA',
           addProvider: 'Agregar proveedor',
           empty: 'No hay proveedores configurados. Agrega uno para habilitar las funciones de IA.',
           emptyAction: 'Agrega tu primer proveedor',
@@ -871,13 +845,11 @@ export const esES = {
         },
         chat: {
           title: 'Agente',
-          description: 'Configura el comportamiento del agente en tiempo de ejecución',
           autoCompactLabel: 'Compactar mensajes automáticamente',
           autoCompactDescription: 'Resume automáticamente los mensajes antiguos para ahorrar tokens al acercarse al límite de contexto',
           maxIterationsLabel: 'Iteraciones máximas',
           maxIterationsDescription: 'Número máximo de iteraciones de llamadas a herramientas antes de que el agente se detenga (1–1000)',
           wallClockBudgetLabel: 'Tiempo máximo (min)',
-          wallClockBudgetDescription: 'Tiempo máximo de reloj en minutos antes de que el agente se detenga (1–240)',
           tokenBudgetLabel: 'Presupuesto de tokens',
           tokenBudgetDescription: 'Máximo de tokens consumidos antes de que el agente se detenga',
           systemPromptLabel: 'Prompt del sistema',
@@ -912,9 +884,6 @@ export const esES = {
     },
     history: {
       title: 'Historial',
-      subtitle: 'Consulta y administra tu historial de consultas',
-      recent: 'Consultas recientes',
-      recentDescription: 'Tus consultas ejecutadas recientemente',
       empty: 'Aún no hay historial de consultas.',
       search: 'Buscar consultas...',
       filterAll: 'Todas',
@@ -970,7 +939,6 @@ export const esES = {
         connectedAs: 'Conectado como',
         currentDatabase: 'Base de datos',
         selectConnection: 'Selecciona una conexión',
-        tip: 'Consejo: haz doble clic en una tabla de la barra lateral para ver sus datos',
       },
       editor: {
         title: 'Editor SQL',
@@ -1083,7 +1051,6 @@ export const esES = {
       noSource: 'Adjunta una fuente de datos para comenzar.',
       stop: 'Detener',
       continue: 'Continuar',
-      continueHint: 'El agente se pausó. Haz clic en Continuar para reanudar o en Detener para finalizar la sesión.',
       clearChat: 'Limpiar chat',
       riskSafe: 'Operación segura',
       riskElevated: 'Riesgo elevado',
@@ -1206,10 +1173,6 @@ export const esES = {
       title: {
         edit: 'Editar conexión',
         new: 'Nueva conexión',
-      },
-      description: {
-        edit: 'Actualiza la configuración de tu conexión de base de datos.',
-        new: 'Configura una nueva conexión de base de datos.',
       },
       labels: {
         connectionName: 'Nombre de la conexión',
@@ -1885,7 +1848,6 @@ export const esES = {
     downloadingPercent: 'Descargando {percent}%',
     relaunchFailed: 'No se pudo reiniciar después de la actualización',
     retry: 'Reintentar',
-    installFailedHelp: 'Pulsa F12 para abrir las herramientas de desarrollo y ver los detalles del error.',
   },
   errors: {
     unexpected: 'Error inesperado: {error}',

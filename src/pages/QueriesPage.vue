@@ -1594,11 +1594,6 @@ function closeResultPanel() {
                       {{ t('pages.queries.landing.selectConnection') }}
                     </Button>
                   </div>
-
-                  <!-- Quick tips -->
-                  <div v-if="getConnectionId()" class="text-xs text-muted-foreground mt-6">
-                    <p>{{ t('pages.queries.landing.tip') }}</p>
-                  </div>
                 </div>
               </div>
             </div>

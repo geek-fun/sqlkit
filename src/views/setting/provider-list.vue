@@ -112,14 +112,9 @@ const handleSync = async (id: string) => {
   <div class="space-y-4">
     <!-- Header -->
     <div class="flex items-center justify-between">
-      <div>
-        <h3 class="text-lg font-semibold">
-          {{ t('pages.settings.ai.providerList.title') }}
-        </h3>
-        <p class="text-sm text-muted-foreground">
-          {{ t('pages.settings.ai.providerList.description') }}
-        </p>
-      </div>
+      <h3 class="text-lg font-semibold">
+        {{ t('pages.settings.ai.providerList.title') }}
+      </h3>
       <Button :disabled="actionFeedback.state === 'pending'" @click="$emit('add')">
         {{ t('pages.settings.ai.providerList.addProvider') }}
       </Button>

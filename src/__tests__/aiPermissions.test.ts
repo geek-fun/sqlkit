@@ -37,6 +37,12 @@ jest.mock('vue-i18n', () => ({
 jest.mock('@/components/ui/button', () => ({
   Button: { template: '<button><slot /></button>' },
 }))
+jest.mock('@/components/ui/tooltip', () => ({
+  Tooltip: { template: '<div><slot /></div>' },
+  TooltipContent: { template: '<div><slot /></div>' },
+  TooltipProvider: { template: '<div><slot /></div>' },
+  TooltipTrigger: { template: '<div><slot /></div>' },
+}))
 jest.mock('@/components/ui/label', () => ({
   Label: { template: '<label><slot /></label>' },
 }))
@@ -311,7 +317,7 @@ describe('aI permission chain', () => {
     await wrapper.get('#ai-default-create').setValue(false)
     expect(wrapper.get('[data-value]').attributes('data-value')).toBe('custom')
     expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(5)
-    await wrapper.get('button').trigger('click')
+    await wrapper.findAll('button').find(button => button.text() === 'aiPermissions.save')!.trigger('click')
     await flushPromises()
     expect(mockInvoke).toHaveBeenLastCalledWith('save_ai_permissions', {
       defaults: aiPreset('read'),
@@ -323,7 +329,7 @@ describe('aI permission chain', () => {
     await flushPromises()
     await wrapper.get('input[value="custom"]').setValue()
     expect(wrapper.findAll('input[type="checkbox"]')).toHaveLength(5)
-    await wrapper.get('button').trigger('click')
+    await wrapper.findAll('button').find(button => button.text() === 'aiPermissions.save')!.trigger('click')
     await flushPromises()
     expect(mockInvoke).toHaveBeenLastCalledWith('save_ai_permissions', {
       defaults: aiPreset('read'),

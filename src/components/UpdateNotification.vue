@@ -140,9 +140,6 @@ const buttonsDisabled = computed(() =>
               <span class="i-carbon-close h-3.5 w-3.5" />
             </button>
           </div>
-          <p class="text-xs text-destructive-text pl-6">
-            {{ t('updater.installFailedHelp') }}
-          </p>
         </div>
       </div>
 

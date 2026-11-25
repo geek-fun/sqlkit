@@ -355,8 +355,6 @@ function getConnectionStatus(connectionId: string | undefined): ConnectionStatus
             <h1 class="text-xl font-semibold">
               {{ t('pages.connections.title') }}
             </h1>
-            <span class="text-muted-foreground">|</span>
-            <span class="text-sm text-muted-foreground">{{ t('pages.connections.subtitle') }}</span>
           </div>
           <div class="w-64 relative">
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-muted-foreground h-4 w-4 left-3 top-1/2 absolute -translate-y-1/2">
