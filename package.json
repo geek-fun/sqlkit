@@ -3,7 +3,7 @@
   "type": "module",
   "version": "1.0.4",
   "private": true,
-  "description": "Agentic SQL database manager for 70+ databases — PostgreSQL, MySQL, SQL Server, SQLite, DuckDB, ClickHouse, Oracle, and more. Privacy-first, AI-powered, cross-platform. Built with Tauri (Rust).",
+  "description": "Agentic SQL client & database GUI for 70+ databases — PostgreSQL, MySQL, SQL Server, Oracle, SQLite, DuckDB, ClickHouse, Cassandra, and more. Built-in AI assistant and MCP server. Privacy-first, open-source, cross-platform (macOS, Windows, Linux).",
   "author": "geekfun <support@geekfun.club>",
   "license": "Apache-2.0",
   "homepage": "https://www.geekfun.club/products/sqlkit/",
