@@ -101,10 +101,7 @@ onUnmounted(() => {
           <div class="p-3 border border-border/40 rounded-full bg-muted/30">
             <span class="i-carbon-task-complete opacity-40 h-6 w-6 block" />
           </div>
-          <div class="flex flex-col gap-1 items-center">
-            <span class="text-xs text-foreground/60 font-medium">{{ t('transfer.tasks.noTasks') }}</span>
-            <span class="text-caption text-muted-foreground">{{ t('transfer.tasks.emptyDescription') }}</span>
-          </div>
+          <span class="text-xs text-foreground/60 font-medium">{{ t('transfer.tasks.noTasks') }}</span>
         </div>
 
         <TaskCard

@@ -162,16 +162,27 @@ const connectTooltip = computed(() =>
                 <svg
                   v-if="strategy === 'native'"
                   xmlns="http://www.w3.org/2000/svg"
-                  width="12"
-                  height="12"
+                  width="14"
+                  height="14"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
                   stroke-width="2"
                   stroke-linecap="round"
                   stroke-linejoin="round"
+                  aria-hidden="true"
                 >
-                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                  <ellipse cx="12" cy="15" rx="6" ry="4.5" />
+                  <path d="M7.5 11.8 5 9.2" />
+                  <path d="M3 5.5c-.6 2 .5 3.7 2 3.7 1.6 0 2.5-1.5 2-3.4" />
+                  <path d="M16.5 11.8 19 9.2" />
+                  <path d="M21 5.5c.6 2-.5 3.7-2 3.7-1.6 0-2.5-1.5-2-3.4" />
+                  <path d="M6 15.2 3 16" />
+                  <path d="M7.2 18 4.5 20.2" />
+                  <path d="M18 15.2 21 16" />
+                  <path d="M16.8 18 19.5 20.2" />
+                  <path d="M9.5 14.5h.01" />
+                  <path d="M14.5 14.5h.01" />
                 </svg>
                 <svg
                   v-else-if="strategy === 'jdbc-bridge'"

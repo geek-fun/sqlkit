@@ -4,6 +4,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { InfoTip } from '@/components/ui/info-tip'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -132,7 +133,7 @@ onBeforeUnmount(() => clearInterval(poll))
   <Card>
     <CardHeader>
       <div class="flex flex-wrap gap-3 items-center justify-between">
-        <CardTitle>{{ t('pages.settings.mcp.title') }}</CardTitle>
+        <CardTitle>{{ t('pages.settings.mcp.status') }}</CardTitle>
         <div class="flex gap-2 items-center">
           <span role="status" class="text-xs text-muted-foreground flex gap-2 items-center">
             <span class="sr-only">{{ t('pages.settings.mcp.status') }}:</span>
@@ -230,14 +231,12 @@ onBeforeUnmount(() => clearInterval(poll))
           {{ feedback }}
         </p>
         <div class="flex gap-4 items-center justify-between">
-          <div class="min-w-0 space-y-1">
+          <div class="flex gap-1.5 min-w-0 items-center">
             <Label for="mcp-port">{{ t('pages.settings.mcp.port') }}</Label>
-            <p id="mcp-port-help" class="text-xs text-muted-foreground leading-relaxed">
-              {{ t('pages.settings.mcp.portDesc') }}
-            </p>
+            <InfoTip :text="t('pages.settings.mcp.portDesc')" />
           </div>
           <div class="flex shrink-0 flex-wrap gap-2 items-center">
-            <Input id="mcp-port" type="number" :model-value="port" placeholder="9121" min="1024" max="65535" class="w-28" aria-describedby="mcp-port-help" @update:model-value="port = $event === '' ? undefined : Number($event)" />
+            <Input id="mcp-port" type="number" :model-value="port" placeholder="9121" min="1024" max="65535" class="w-28" @update:model-value="port = $event === '' ? undefined : Number($event)" />
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger as-child>
@@ -258,13 +257,8 @@ onBeforeUnmount(() => clearInterval(poll))
           </div>
         </div>
         <div class="flex gap-4 items-center justify-between">
-          <div class="space-y-1">
-            <Label for="mcp-autostart">{{ t('pages.settings.mcp.autoStart') }}</Label>
-            <p id="mcp-autostart-help" class="text-xs text-muted-foreground leading-relaxed">
-              {{ t('pages.settings.mcp.autoStartDesc') }}
-            </p>
-          </div>
-          <Switch id="mcp-autostart" class="shrink-0" :checked="autoStart" :disabled="loading || saving || !loaded" aria-describedby="mcp-autostart-help" @update:checked="saveConfig(false, $event)" />
+          <Label for="mcp-autostart">{{ t('pages.settings.mcp.autoStart') }}</Label>
+          <Switch id="mcp-autostart" class="shrink-0" :checked="autoStart" :disabled="loading || saving || !loaded" @update:checked="saveConfig(false, $event)" />
         </div>
       </fieldset>
     </CardContent>
