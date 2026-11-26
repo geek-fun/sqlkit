@@ -6,7 +6,7 @@ import javaLogo from '@/assets/images/java-logo.svg'
 import { SettingsFeedback } from '@/components/settings'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { InfoTip } from '@/components/ui/info-tip'
 import { useDownloadEvents } from '@/composables'
 import { useDatabaseIcon } from '@/composables/useDatabaseIcon'
@@ -205,21 +205,20 @@ onMounted(() => {
 
 <template>
   <Card>
-    <CardHeader class="flex-row gap-4 items-center justify-between">
-      <CardTitle>{{ t('pages.settings.jre.title') }}</CardTitle>
-      <Button size="sm" variant="outline" :disabled="anyBusy" :aria-busy="task('refresh').state === 'pending'" @click="handleRefresh">
-        <span class="i-lucide-refresh-cw mr-2 h-3.5 w-3.5" :class="{ 'settings-action-spin': task('refresh').state === 'pending' }" aria-hidden="true" />
-        {{ t('pages.settings.jre.actions.refresh') }}
-      </Button>
-    </CardHeader>
-    <CardContent class="space-y-6">
+    <CardContent class="pt-6 space-y-6">
       <SettingsFeedback v-bind="task('refresh')" />
       <section class="space-y-3" :aria-label="t('pages.settings.jre.jreCard.title')">
-        <div class="flex gap-1.5 items-center">
-          <h3 class="text-sm font-medium">
-            {{ t('pages.settings.jre.jreCard.title') }}
-          </h3>
-          <InfoTip :text="t('pages.settings.jre.jreCard.description')" />
+        <div class="flex gap-4 items-center justify-between">
+          <div class="flex gap-1.5 items-center">
+            <h3 class="text-sm font-medium">
+              {{ t('pages.settings.jre.jreCard.title') }}
+            </h3>
+            <InfoTip :text="t('pages.settings.jre.jreCard.description')" />
+          </div>
+          <Button size="sm" variant="outline" :disabled="anyBusy" :aria-busy="task('refresh').state === 'pending'" @click="handleRefresh">
+            <span class="i-lucide-refresh-cw mr-2 h-3.5 w-3.5" :class="{ 'settings-action-spin': task('refresh').state === 'pending' }" aria-hidden="true" />
+            {{ t('pages.settings.jre.actions.refresh') }}
+          </Button>
         </div>
         <SettingsFeedback v-if="loading.jre && !jreStatus" state="pending" :label="t('pages.settings.jre.jreCard.status.checking')" />
         <div v-else-if="jreStatus" class="border rounded-md divide-y">
@@ -274,9 +273,12 @@ onMounted(() => {
       </section>
 
       <section class="pt-5 border-t space-y-3" :aria-label="t('pages.settings.jre.bridgeCard.title')">
-        <h3 class="text-sm font-medium">
-          {{ t('pages.settings.jre.bridgeCard.title') }}
-        </h3>
+        <div class="flex gap-1.5 items-center">
+          <h3 class="text-sm font-medium">
+            {{ t('pages.settings.jre.bridgeCard.title') }}
+          </h3>
+          <InfoTip :text="t('pages.settings.jre.bridgeCard.description')" />
+        </div>
         <SettingsFeedback v-if="loading.bridge && !bridgeStatus" state="pending" :label="t('pages.settings.jre.bridgeCard.status.checking')" />
         <div v-else-if="bridgeStatus" class="flex flex-wrap gap-3 items-center">
           <Badge variant="secondary" class="runtime-badge" :class="{ 'is-installed': bridgeStatus.installed }">

@@ -6,6 +6,7 @@ import { SettingsFeedback } from '@/components/settings'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { InfoTip } from '@/components/ui/info-tip'
 import { openUpgradeDialog } from '@/components/upgrade'
 import { useAccountStore } from '@/store/accountStore'
 import { useDeviceStore } from '@/store/deviceStore'
@@ -44,9 +45,28 @@ const expiryText = computed(() => {
   if (!expiresAt || !entitlementStore.isCloudUltimate)
     return ''
   return t('plan.section.expiresAt', {
+    time: new Date(expiresAt).toLocaleDateString(),
+  })
+})
+
+const expiryDetailText = computed(() => {
+  if (entitlementStore.sessionExpired)
+    return ''
+  const expiresAt = entitlementStore.view?.ultimateExpiresAt
+  if (!expiresAt || !entitlementStore.isCloudUltimate)
+    return ''
+  return t('plan.section.expiresAt', {
     time: new Date(expiresAt).toLocaleString(),
   })
 })
+
+const hasStatusNotice = computed(() =>
+  (!entitlementStore.isLocalUltimate && Boolean(versionStateText.value))
+  || entitlementStore.cancelScheduled
+  || entitlementStore.sessionExpired
+  || (accountStore.isLoggedIn && !accountStore.refreshToken && Boolean(deviceStore.activationError))
+  || (entitlementStore.hasEntitlementError && accountStore.isLoggedIn),
+)
 
 const compareRows = [
   { key: 'plan.compare.ai' },
@@ -93,45 +113,46 @@ const handleLogout = () => runAccountAction(() => entitlementStore.clearSessionS
 <template>
   <Card>
     <CardContent class="px-5 py-4 space-y-4">
-      <div class="flex flex-wrap gap-3 items-center">
-        <Badge :variant="entitlementStore.isLocalUltimate && !entitlementStore.sessionExpired ? 'default' : 'secondary'">
-          <Loader2 v-if="entitlementStore.planState === 'checking'" class="mr-1 h-3 w-3 animate-spin" />
-          {{ t(`plan.state.${entitlementStore.planState}`) }}
-        </Badge>
-        <span v-if="accountStore.isLoggedIn" class="text-sm text-muted-foreground">
-          {{ accountStore.email || accountStore.username }}
-        </span>
-        <span class="text-xs text-muted-foreground">
-          {{ versionStateText }}
-        </span>
-        <span v-if="expiryText" class="text-xs text-muted-foreground">
-          {{ expiryText }}
-        </span>
-        <span v-if="entitlementStore.cancelScheduled" class="text-xs text-amber-600">
-          {{ t('plan.section.cancelScheduled') }}
-        </span>
-        <span v-if="entitlementStore.sessionExpired" class="text-xs text-amber-600">
-          {{ t('plan.section.sessionExpired') }}
-        </span>
-        <span
-          v-else-if="accountStore.isLoggedIn && !accountStore.refreshToken && deviceStore.activationError"
-          class="text-xs text-amber-600"
-        >
-          {{ t('plan.section.deviceActivationFailed') }}
-        </span>
-        <span
-          v-else-if="entitlementStore.hasEntitlementError && accountStore.isLoggedIn"
-          class="text-xs text-destructive-text"
-        >
-          {{ t('plan.section.checkFailed') }}
-        </span>
-        <span v-if="!accountStore.isLoggedIn" class="text-xs text-muted-foreground">
-          {{ t('plan.section.notLoggedIn') }}
-          <button class="text-primary-text underline cursor-pointer hover:opacity-80" :disabled="refreshing" @click="handleLogin">
-            {{ t('plan.section.loginLink') }}
-          </button>
-        </span>
-        <div class="ml-auto flex gap-2 items-center">
+      <div class="flex gap-3 items-center justify-between">
+        <div class="flex flex-1 gap-2 min-w-0 items-center">
+          <Badge class="shrink-0" :variant="entitlementStore.isLocalUltimate && !entitlementStore.sessionExpired ? 'default' : 'secondary'">
+            <Loader2 v-if="entitlementStore.planState === 'checking'" class="mr-1 h-3 w-3 animate-spin" />
+            {{ t(`plan.state.${entitlementStore.planState}`) }}
+          </Badge>
+          <span
+            v-if="accountStore.isLoggedIn"
+            class="text-sm text-muted-foreground truncate"
+            :title="accountStore.email || accountStore.username"
+          >
+            {{ accountStore.email || accountStore.username }}
+          </span>
+          <span
+            v-if="entitlementStore.isLocalUltimate && entitlementStore.view?.versionLocked && versionStateText"
+            class="text-xs text-muted-foreground flex shrink-0 gap-1 whitespace-nowrap items-center"
+          >
+            <span aria-hidden="true">·</span>
+            <span>{{ t('plan.compare.versionLock') }}</span>
+            <InfoTip :text="versionStateText" />
+          </span>
+          <InfoTip
+            v-else-if="entitlementStore.isLocalUltimate && versionStateText"
+            :text="versionStateText"
+          />
+          <span
+            v-if="expiryText"
+            class="text-xs text-muted-foreground shrink-0 whitespace-nowrap"
+            :title="expiryDetailText"
+          >
+            <span aria-hidden="true" class="mr-1">·</span>{{ expiryText }}
+          </span>
+          <span v-if="!accountStore.isLoggedIn" class="text-xs text-muted-foreground truncate">
+            {{ t('plan.section.notLoggedIn') }}
+            <button class="text-primary-text underline cursor-pointer hover:opacity-80" :disabled="refreshing" @click="handleLogin">
+              {{ t('plan.section.loginLink') }}
+            </button>
+          </span>
+        </div>
+        <div class="flex shrink-0 gap-2 items-center">
           <Button
             v-if="entitlementStore.sessionExpired"
             size="sm"
@@ -176,6 +197,30 @@ const handleLogout = () => runAccountAction(() => entitlementStore.clearSessionS
             {{ t('plan.section.logout') }}
           </Button>
         </div>
+      </div>
+
+      <div v-if="hasStatusNotice" class="flex flex-wrap gap-x-3 gap-y-1 items-center">
+        <span v-if="!entitlementStore.isLocalUltimate && versionStateText" class="text-xs text-muted-foreground">
+          {{ versionStateText }}
+        </span>
+        <span v-if="entitlementStore.cancelScheduled" class="text-xs text-amber-600">
+          {{ t('plan.section.cancelScheduled') }}
+        </span>
+        <span v-if="entitlementStore.sessionExpired" class="text-xs text-amber-600">
+          {{ t('plan.section.sessionExpired') }}
+        </span>
+        <span
+          v-else-if="accountStore.isLoggedIn && !accountStore.refreshToken && deviceStore.activationError"
+          class="text-xs text-amber-600"
+        >
+          {{ t('plan.section.deviceActivationFailed') }}
+        </span>
+        <span
+          v-else-if="entitlementStore.hasEntitlementError && accountStore.isLoggedIn"
+          class="text-xs text-destructive-text"
+        >
+          {{ t('plan.section.checkFailed') }}
+        </span>
       </div>
 
       <SettingsFeedback v-bind="accountFeedback" />
