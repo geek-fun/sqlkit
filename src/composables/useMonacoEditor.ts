@@ -61,6 +61,7 @@ type StatementNotFoundCallback = () => void
 export type EditorCallbacks = {
   onExecuteQuery: ExecuteQueryCallback
   onStatementNotFound: StatementNotFoundCallback
+  onExplainStatement?: ExecuteQueryCallback
   onGutterExecute?: ExecuteGutterCallback
   onGutterContextMenu?: (lineNumber: number, x: number, y: number) => void
   onSave?: (query: string) => void
@@ -191,6 +192,15 @@ export function useMonacoEditor(containerRef: Ref<HTMLElement | null>, initialVa
       else {
         callbacks.onStatementNotFound()
       }
+    })
+
+    // Explain the statement at the cursor, mirroring Cmd+Enter semantics. The
+    // command consumes F6 (stopPropagation), so the page-level fallback that
+    // explains the whole content only fires when the editor is not focused.
+    editor.addCommand(monaco.KeyCode.F6, () => {
+      if (!editor)
+        return
+      callbacks.onExplainStatement?.(getStatementToExecute(editor, statementsForExecution()))
     })
 
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {

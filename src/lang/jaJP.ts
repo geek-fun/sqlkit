@@ -991,7 +991,6 @@ export const jaJP = {
         treeView: 'ツリー',
         summaryView: 'サマリー',
         rawView: 'RAW',
-        analyze: 'Explain Analyze',
         running: '実行計画を生成中...',
         empty: '実行計画データがありません',
         nodeCount: '{count} ノード',
@@ -1013,7 +1012,6 @@ export const jaJP = {
           results: '結果',
           explain: 'Explain',
         },
-        analyzeToggle: 'EXPLAIN ANALYZE モードを切り替え (現在: {mode})',
         columnHeaders: {
           nodeType: 'ノードタイプ',
           relation: 'リレーション',
@@ -1680,6 +1678,7 @@ export const jaJP = {
     },
     sqlEditor: {
       execute: '実行',
+      explain: 'Explain',
       format: 'フォーマット',
       copy: 'コピー',
     },

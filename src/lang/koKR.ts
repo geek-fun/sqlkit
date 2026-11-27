@@ -992,7 +992,6 @@ export const koKR = {
         treeView: '트리',
         summaryView: '요약',
         rawView: '원본',
-        analyze: 'Explain Analyze',
         running: '실행 계획을 생성하는 중...',
         empty: '실행 계획 데이터가 없습니다',
         nodeCount: '노드 {count}개',
@@ -1014,7 +1013,6 @@ export const koKR = {
           results: '결과',
           explain: 'Explain',
         },
-        analyzeToggle: 'EXPLAIN ANALYZE 모드 전환 (현재: {mode})',
         columnHeaders: {
           nodeType: '노드 유형',
           relation: '관계',
@@ -1681,6 +1679,7 @@ export const koKR = {
     },
     sqlEditor: {
       execute: '실행',
+      explain: 'Explain',
       format: '포맷',
       copy: '복사',
     },

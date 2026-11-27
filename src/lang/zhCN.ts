@@ -992,7 +992,6 @@ export const zhCN = {
         treeView: '树形',
         summaryView: '概要',
         rawView: '原始',
-        analyze: '分析执行',
         running: '正在生成执行计划...',
         empty: '暂无执行计划数据',
         nodeCount: '{count} 个节点',
@@ -1014,7 +1013,6 @@ export const zhCN = {
           results: '结果',
           explain: '计划',
         },
-        analyzeToggle: '切换 EXPLAIN ANALYZE 模式 (当前: {mode})',
         columnHeaders: {
           nodeType: '节点类型',
           relation: '关系',
@@ -1620,6 +1618,7 @@ export const zhCN = {
     },
     sqlEditor: {
       execute: '执行',
+      explain: '解释',
       format: '格式化',
       copy: '复制',
     },

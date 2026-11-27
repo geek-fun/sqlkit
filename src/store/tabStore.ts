@@ -444,12 +444,12 @@ export const useTabStore = defineStore('tabs', {
       }
     },
 
-    async explainQuery(tabId: string, analyze = false) {
+    async explainQuery(tabId: string, sqlOverride?: string) {
       const tab = this.tabs.find(t => t.id === tabId)
       if (!tab || tab.orphanFromConnectionId)
         return
 
-      const sql = tab.content
+      const sql = sqlOverride ?? tab.content
       if (!sql.trim())
         return
 
@@ -470,7 +470,7 @@ export const useTabStore = defineStore('tabs', {
         }>('explain_query', {
           connectionId: connId,
           sql,
-          analyze,
+          analyze: true,
           database: tab.database,
         })
 
