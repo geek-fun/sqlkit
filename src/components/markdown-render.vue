@@ -1,37 +1,19 @@
 <script setup lang="ts">
 import DOMPurify from 'dompurify'
 import hljs from 'highlight.js'
-import hljsThemeDarkUrl from 'highlight.js/styles/atom-one-dark.css?url'
-import hljsThemeLightUrl from 'highlight.js/styles/atom-one-light.css?url'
 import MarkdownIt from 'markdown-it'
 import taskLists from 'markdown-it-task-lists'
 import { onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useHighlightTheme } from '@/composables'
 import { toast } from '@/composables/useNotifications'
-import { ThemeType, useAppStore } from '@/store/appStore'
 
 const props = defineProps<{
   markdown: string
 }>()
 
 const { t } = useI18n()
-const appStore = useAppStore()
-
-// Load the highlight.js theme matching the current UI theme via a single
-// module-level <link> so it can be swapped at runtime without flicker.
-let highlightLink: HTMLLinkElement | null = null
-function applyHighlightTheme(uiThemeType: Exclude<ThemeType, ThemeType.AUTO>) {
-  const href = uiThemeType === ThemeType.DARK
-    ? hljsThemeDarkUrl
-    : hljsThemeLightUrl
-  if (!highlightLink) {
-    highlightLink = document.createElement('link')
-    highlightLink.rel = 'stylesheet'
-    document.head.appendChild(highlightLink)
-  }
-  highlightLink.href = href
-}
-watch(() => appStore.uiThemeType, applyHighlightTheme, { immediate: true })
+useHighlightTheme()
 
 const parsedMarkdown = ref('')
 
