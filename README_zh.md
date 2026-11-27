@@ -131,6 +131,48 @@ SqlKit 是一个 **Agentic 数据库客户端** —— 它不仅执行 SQL，还
   <img src="https://img.shields.io/badge/官网-geekfun.club-blue?logo=google-chrome&logoColor=white" alt="官网">
 </a>
 
+### AI 编程助手集成（MCP）
+
+SqlKit 内置本地 HTTP **MCP 桥接**（仅监听 `127.0.0.1`），配合开源的 [Data Studio MCP 服务器（`@geek-fun/data-studio-mcp`）](https://github.com/geek-fun/data-studio-agent)，让 AI 编程助手可以直接通过 SqlKit 中已配置的连接查询和检查 70+ 种 SQL 数据库。数据库凭据、SSH 密钥和 TLS 证书始终留在本地，绝不跨过 MCP 边界 —— Agent 只能看到不透明的连接 ID。
+
+```bash
+# Claude Code
+claude mcp add --transport stdio data-studio -- npx -y @geek-fun/data-studio-mcp
+
+# OpenAI Codex
+codex mcp add data-studio -- npx -y @geek-fun/data-studio-mcp
+
+# 或直接运行
+npx -y @geek-fun/data-studio-mcp
+```
+
+<details>
+<summary><strong>JSON 配置（Cursor、Windsurf、.mcp.json 或自定义端口）</strong></summary>
+
+添加到 `.mcp.json`（或 `.cursor/mcp.json` / `~/.cursor/mcp.json`）。端口默认通过 SqlKit 本地端口文件自动发现（默认 `9121`）；如无需固定端口，可省略 `env`：
+
+```json
+{
+  "mcpServers": {
+    "data-studio": {
+      "command": "npx",
+      "args": ["-y", "@geek-fun/data-studio-mcp"],
+      "env": {
+        "SQLKIT_MCP_PORT": "9121"
+      }
+    }
+  }
+}
+```
+
+</details>
+
+在 **设置 → MCP 桥接 → 默认 AI 权限** 中管理权限（**禁止访问**、**读取**、**读取和修改数据**、**完全访问**，或**自定义**单项操作规则），并可在单个连接的 **AI 权限** 中单独覆盖。设为**禁止访问**的连接不会出现在 MCP 发现列表中，每条语句在执行前都会经由 AST 分类并重新校验权限策略。请保持 SqlKit 运行并在 **设置 → MCP 桥接** 中开启 **自动启动**（默认开启；关闭窗口后桥接服务会在菜单栏或系统托盘继续运行）。
+
+兼容 Claude Code、OpenAI Codex、Cursor、Windsurf、OpenCode 及所有支持 MCP 的客户端。支持列出连接、浏览数据库/Schema/表/视图/索引与 DDL、执行经 AST 校验的只读查询、分析执行计划、查看会话与慢查询，以及在权限范围内执行写入或 DDL 操作。同时运行 SqlKit 与 [DocKit](https://github.com/geek-fun/dockit) 时，同一个 MCP 服务器即可同时暴露 SQL 和 NoSQL 数据库能力。
+
+详见 [SqlKit MCP 桥接指南](https://www.geekfun.club/zh/docs/sqlkit/mcp-bridge)、[Data Studio Agent 快速开始](https://www.geekfun.club/zh/docs/data-studio-agent/quick-start) 及 [MCP 服务器 README](https://github.com/geek-fun/data-studio-agent/blob/master/packages/data-studio-mcp/README_zh.md)。
+
 ## 功能特性
 
 ### Agentic 数据工作室
