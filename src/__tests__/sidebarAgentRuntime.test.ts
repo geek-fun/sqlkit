@@ -12,7 +12,10 @@ jest.mock('@tauri-apps/api/core', () => ({
 jest.mock('@tauri-apps/api/event', () => ({
   listen: jest.fn(),
 }))
-jest.mock('@/common', () => jest.requireActual('@/common/agentPrompt'))
+jest.mock('@/common', () => ({
+  ...jest.requireActual('@/common/agentPrompt'),
+  ...jest.requireActual('@/common/toolCallPresentation'),
+}))
 jest.mock('@/store/connectionStore', () => ({
   useConnectionStore: () => ({
     getConnectionById: () => undefined,

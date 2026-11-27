@@ -26,12 +26,9 @@ const connectionLabel = (call: AgentToolCall) => {
   const id = call.denial?.connectionId
   if (id)
     return connectionStore.getConnectionById(id)?.name ?? id
-  try {
-    return JSON.parse(call.args).connection_id ?? ''
-  }
-  catch {
-    return ''
-  }
+  return typeof call.args.connection_id === 'string'
+    ? call.args.connection_id
+    : ''
 }
 const outcomeTitle = (call: AgentToolCall) => {
   const key = call.status === 'denied'
@@ -166,13 +163,10 @@ function formatTokens(n: number): string {
 }
 
 function formatToolArgs(tc: AgentToolCall): string {
-  if (!tc.args || tc.args === '{}')
+  if (!tc.args || !Object.keys(tc.args).length)
     return tc.toolName
   try {
-    const parsed = JSON.parse(tc.args)
-    if (!Object.keys(parsed).length)
-      return tc.toolName
-    return JSON.stringify(parsed, null, 2)
+    return JSON.stringify(tc.args, null, 2)
   }
   catch {
     return String(tc.args)
@@ -222,13 +216,7 @@ function toolVerb(toolName: string, tc: AgentToolCall): string {
       : 'executingTool'}`, { tool: toolName })
   }
   const name = toolName.toLowerCase()
-  let args: Record<string, unknown> = {}
-  try {
-    const parsed: unknown = JSON.parse(tc.args || '{}')
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed))
-      args = parsed as Record<string, unknown>
-  }
-  catch { /* display the tool name when arguments are unavailable */ }
+  const args = tc.args ?? {}
   const displayArg
     = Object.entries(args)
       .filter(([k]) => k !== 'connection_id')

@@ -65,7 +65,10 @@ const recoveryBusy = computed(() => props.isLoading || (props.progress?.phase ==
 const retryToolCall = (tool: AgentToolCall) => {
   if (recoveryBusy.value)
     return
-  emit('send', t('dataStudio.agent.message.retryPrompt', { tool: tool.toolName, args: tool.args }))
+  emit('send', t('dataStudio.agent.message.retryPrompt', {
+    tool: tool.toolName,
+    args: JSON.stringify(tool.args, null, 2),
+  }))
   forceScrollToBottom()
 }
 const currentTurnStart = computed(() => props.messages.reduce((index, message, current) => message.role === 'user'

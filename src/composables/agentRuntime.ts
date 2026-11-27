@@ -1,6 +1,7 @@
 import type { ToolDefinition, ToolMetadata } from '@/datasources/agentApi'
 import type { AgentSession, AgentSessionStopReason, AgentToolCall } from '@/store/dataStudioStore'
 import { ulid } from 'ulidx'
+import { parseToolArguments } from '@/common'
 import {
   agentApi,
 
@@ -186,7 +187,7 @@ async function registerAgentEvents(register: (registration: Promise<Unlisten>) =
       const toolCall: AgentToolCall = {
         id: tool_call_id,
         toolName: tool_name,
-        args: JSON.stringify(args ?? {}),
+        args: parseToolArguments(args),
         status: denied
           ? 'denied'
           : needsConfirmation ? 'pending' : 'executing',
@@ -260,7 +261,7 @@ async function registerAgentEvents(register: (registration: Promise<Unlisten>) =
           const rejected: AgentToolCall = {
             id: tool_call_id,
             toolName: tool_name,
-            args: JSON.stringify(args ?? {}),
+            args: parseToolArguments(args),
             status: 'denied',
             riskLevel: 'safe',
             requiresConfirmation: false,

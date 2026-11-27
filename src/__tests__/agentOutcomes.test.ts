@@ -37,7 +37,7 @@ jest.mock('@/components/ui/button', () => ({
 const call: AgentToolCall = {
   id: 'call',
   toolName: 'sqlkit__execute_ddl',
-  args: '{"connection_id":"dev","sql":"CREATE TABLE example(id INT)"}',
+  args: { connection_id: 'dev', sql: 'CREATE TABLE example(id INT)' },
   status: 'denied',
   riskLevel: 'destructive',
   requiresConfirmation: false,

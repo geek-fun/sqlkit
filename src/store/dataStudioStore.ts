@@ -1,7 +1,8 @@
-import type { AccessDenial } from '@/common/aiPermissions'
+import type { AccessDenial, ToolCallArgs } from '@/common'
 import type { AgentMessage as AgentApiMessage, AttachedSourceRow, ConfirmationRuleRow } from '@/datasources/agentApi'
 import { defineStore } from 'pinia'
 import { ulid } from 'ulidx'
+import { parseToolArguments } from '@/common'
 import { agentApi } from '@/datasources/agentApi'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -47,7 +48,7 @@ export type AgentToolCallStatus = 'pending' | 'confirmed' | 'denied' | 'executin
 export type AgentToolCall = {
   id: string
   toolName: string
-  args: string
+  args: ToolCallArgs
   status: AgentToolCallStatus
   result?: string
   resultTruncated?: string
@@ -225,7 +226,7 @@ function fromBackendMessage(row: AgentApiMessage): AgentMessage {
       const toolCalls: AgentToolCall[] = row.tool_calls?.map(tc => ({
         id: tc.id,
         toolName: tc.tool_name,
-        args: tc.arguments,
+        args: parseToolArguments(tc.arguments),
         status: tc.status === 'completed'
           ? 'done'
           : tc.status === 'failed' && tc.result
@@ -242,7 +243,7 @@ function fromBackendMessage(row: AgentApiMessage): AgentMessage {
       })) ?? (parsed.tool_calls ?? []).map(tc => ({
         id: tc.id,
         toolName: tc.function?.name ?? '',
-        args: tc.function?.arguments ?? '{}',
+        args: parseToolArguments(tc.function?.arguments),
         status: 'interrupted' as AgentToolCallStatus,
         riskLevel: 'elevated' as RiskLevel,
         requiresConfirmation: false,
