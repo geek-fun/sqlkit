@@ -44,6 +44,7 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   'update:modelValue': [value: string]
   'execute': [details: StatementToExecute]
+  'explain': [details: StatementToExecute]
   'statementNotFound': []
   'save': [query: string]
 }>()
@@ -107,7 +108,7 @@ function handleDocumentKeydown(event: KeyboardEvent) {
 }
 
 const CONTEXT_MENU_WIDTH = 180
-const CONTEXT_MENU_HEIGHT = 100
+const CONTEXT_MENU_HEIGHT = 130
 
 function clampMenuPosition(x: number, y: number): { x: number, y: number } {
   const vw = window.innerWidth
@@ -122,6 +123,9 @@ onMounted(() => {
   editorInstance = initEditor({
     onExecuteQuery: (result: StatementToExecute) => {
       emit('execute', result)
+    },
+    onExplainStatement: (result: StatementToExecute) => {
+      emit('explain', result)
     },
     onStatementNotFound: () => {
       emit('statementNotFound')
@@ -184,6 +188,16 @@ function handleContextMenuExecute() {
   const line = contextMenuLine.value
   hideContextMenu()
   executeAtLine(line)
+}
+
+function handleContextMenuExplain() {
+  if (contextMenuLine.value === null)
+    return
+  const line = contextMenuLine.value
+  hideContextMenu()
+  const statementText = getStatementTextAtLine(line)
+  if (statementText)
+    emit('explain', { sql: statementText, source: 'statement', found: true })
 }
 
 function handleFormat() {
@@ -255,6 +269,10 @@ defineExpose({ getValue, setValue, handleFormat })
         <li @click="handleContextMenuExecute">
           <span>{{ t('components.sqlEditor.execute') }}</span>
           <span class="shortcut">{{ cmdKey }}Enter</span>
+        </li>
+        <li @click="handleContextMenuExplain">
+          <span>{{ t('components.sqlEditor.explain') }}</span>
+          <span class="shortcut">F6</span>
         </li>
         <li @click="handleContextMenuFormat">
           <span>{{ t('components.sqlEditor.format') }}</span>

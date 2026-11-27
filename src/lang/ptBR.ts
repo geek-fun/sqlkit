@@ -992,7 +992,6 @@ export const ptBR = {
         treeView: 'Árvore',
         summaryView: 'Resumo',
         rawView: 'Bruto',
-        analyze: 'Explain Analyze',
         running: 'Gerando o plano de execução...',
         empty: 'Sem dados do plano de execução',
         nodeCount: '{count} nós',
@@ -1014,7 +1013,6 @@ export const ptBR = {
           results: 'Resultados',
           explain: 'Explicar',
         },
-        analyzeToggle: 'Alternar o modo EXPLAIN ANALYZE (atualmente: {mode})',
         columnHeaders: {
           nodeType: 'Tipo de nó',
           relation: 'Relação',
@@ -1681,6 +1679,7 @@ export const ptBR = {
     },
     sqlEditor: {
       execute: 'Executar',
+      explain: 'Explicar',
       format: 'Formatar',
       copy: 'Copiar',
     },

@@ -991,7 +991,6 @@ export const zhTW = {
         treeView: '樹狀',
         summaryView: '摘要',
         rawView: '原始',
-        analyze: 'Explain Analyze',
         running: '正在產生執行計畫...',
         empty: '沒有執行計畫資料',
         nodeCount: '{count} 個節點',
@@ -1013,7 +1012,6 @@ export const zhTW = {
           results: '結果',
           explain: '解釋',
         },
-        analyzeToggle: '切換 EXPLAIN ANALYZE 模式（目前：{mode}）',
         columnHeaders: {
           nodeType: '節點類型',
           relation: '關聯',
@@ -1680,6 +1678,7 @@ export const zhTW = {
     },
     sqlEditor: {
       execute: '執行',
+      explain: '解釋',
       format: '格式化',
       copy: '複製',
     },

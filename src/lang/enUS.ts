@@ -992,7 +992,6 @@ export const enUS = {
         treeView: 'Tree',
         summaryView: 'Summary',
         rawView: 'Raw',
-        analyze: 'Explain Analyze',
         running: 'Generating explain plan...',
         empty: 'No explain plan data',
         nodeCount: '{count} nodes',
@@ -1014,7 +1013,6 @@ export const enUS = {
           results: 'Results',
           explain: 'Explain',
         },
-        analyzeToggle: 'Toggle EXPLAIN ANALYZE mode (currently: {mode})',
         columnHeaders: {
           nodeType: 'Node Type',
           relation: 'Relation',
@@ -1681,6 +1679,7 @@ export const enUS = {
     },
     sqlEditor: {
       execute: 'Execute',
+      explain: 'Explain',
       format: 'Format',
       copy: 'Copy',
     },

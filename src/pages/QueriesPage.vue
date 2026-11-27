@@ -283,9 +283,7 @@ async function executeQuery(details?: StatementToExecute) {
   await tabStore.executeQuery(activeTab.value.id, sqlToExecute)
 }
 
-const explainAnalyzeMode = ref(false)
-
-async function handleExplainQuery(analyze = false) {
+async function handleExplainQuery() {
   if (!activeTab.value || activeTab.value.orphanFromConnectionId)
     return
   if (!activeTab.value.content.trim())
@@ -296,11 +294,22 @@ async function handleExplainQuery(analyze = false) {
     return
   }
   showResultPanel.value = true
-  await tabStore.explainQuery(activeTab.value.id, analyze)
+  await tabStore.explainQuery(activeTab.value.id)
 }
 
-function toggleExplainMode() {
-  explainAnalyzeMode.value = !explainAnalyzeMode.value
+async function handleExplainStatement(details: StatementToExecute) {
+  if (!activeTab.value || activeTab.value.orphanFromConnectionId)
+    return
+  const sql = details.found ? details.sql : activeTab.value.content
+  if (!sql.trim())
+    return
+  const connId = getConnectionId()
+  if (!connId) {
+    toast.warning(t('pages.queries.notifications.selectConnectionFirst'))
+    return
+  }
+  showResultPanel.value = true
+  await tabStore.explainQuery(activeTab.value.id, sql)
 }
 
 function getActiveDialect(): string | null {
@@ -517,14 +526,17 @@ function handleGlobalKeydown(e: KeyboardEvent) {
     }
   }
   if (e.key === 'F6') {
-    // Don't fire F6 when user is typing in an input/textarea/contenteditable
+    // Skip form inputs, but keep Monaco's hidden inputarea allowed — it is a
+    // <textarea class="inputarea">, and F6 must work while the editor is focused.
     const target = e.target as HTMLElement
-    const isInput = target.tagName === 'INPUT'
-      || target.tagName === 'TEXTAREA'
-      || target.isContentEditable
+    const isMonacoInputArea = !!target.classList?.contains('inputarea')
+    const isInput = !isMonacoInputArea
+      && (target.tagName === 'INPUT'
+        || target.tagName === 'TEXTAREA'
+        || target.isContentEditable)
     if (!isInput) {
       e.preventDefault()
-      handleExplainQuery(explainAnalyzeMode.value)
+      handleExplainQuery()
     }
   }
 }
@@ -1449,37 +1461,15 @@ function closeResultPanel() {
                       variant="ghost"
                       size="icon"
                       class="text-violet-600 h-7 w-7 dark:text-violet-400 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:bg-violet-500/20"
-                      :class="{ '!text-emerald-600 !bg-emerald-500/10 !dark:bg-emerald-500/20': explainAnalyzeMode }"
                       :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
                       :aria-label="t('pages.queries.editor.explain')"
-                      @click="handleExplainQuery(explainAnalyzeMode)"
+                      @click="handleExplainQuery"
                     >
                       <span class="i-lucide-line-chart shrink-0 h-3.5 w-3.5" />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>{{ t('pages.queries.editor.explain') }} ({{ t('pages.queries.shortcuts.explain', { key: modifierKey }) }})</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger as-child>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      class="text-muted-foreground h-7 w-7 hover:text-violet-600 hover:bg-violet-500/10 disabled:opacity-40 dark:hover:text-violet-400 dark:hover:bg-violet-500/20"
-                      :class="explainAnalyzeMode ? '!text-violet-600 !bg-violet-100 dark:!text-violet-300 dark:!bg-violet-900/30' : ''"
-                      :disabled="!activeTab || activeTab.orphanFromConnectionId || activeTab.isExplaining"
-                      :aria-pressed="explainAnalyzeMode"
-                      :aria-label="t('pages.queries.explain.analyzeToggle', { mode: explainAnalyzeMode ? 'ON' : 'OFF' })"
-                      @click="toggleExplainMode"
-                    >
-                      <span class="i-lucide-activity shrink-0 h-3.5 w-3.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{{ t('pages.queries.explain.analyzeToggle', { mode: explainAnalyzeMode ? 'ON' : 'OFF' }) }}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -1553,6 +1543,7 @@ function closeResultPanel() {
                 :show-line-numbers="appStore.editorConfig.showLineNumbers"
                 :format-sql="handleFormatSql"
                 @execute="(details) => executeQuery(details)"
+                @explain="handleExplainStatement"
                 @statement-not-found="toast.error(t('pages.queries.notifications.noStatementFound'))"
                 @save="handleSaveQuery"
               />

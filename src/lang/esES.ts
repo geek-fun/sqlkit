@@ -992,7 +992,6 @@ export const esES = {
         treeView: 'Árbol',
         summaryView: 'Resumen',
         rawView: 'Sin formato',
-        analyze: 'EXPLAIN ANALYZE',
         running: 'Generando el plan de ejecución...',
         empty: 'Sin datos del plan de ejecución',
         nodeCount: '{count} nodos',
@@ -1014,7 +1013,6 @@ export const esES = {
           results: 'Resultados',
           explain: 'Explicar',
         },
-        analyzeToggle: 'Alternar el modo EXPLAIN ANALYZE (actualmente: {mode})',
         columnHeaders: {
           nodeType: 'Tipo de nodo',
           relation: 'Relación',
@@ -1681,6 +1679,7 @@ export const esES = {
     },
     sqlEditor: {
       execute: 'Ejecutar',
+      explain: 'Explicar',
       format: 'Formatear',
       copy: 'Copiar',
     },
