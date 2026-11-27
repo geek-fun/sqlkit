@@ -116,24 +116,16 @@ SqlKit es un **cliente de bases de datos agéntico** — no solo ejecuta SQL, si
 
 ## Instalación
 
-<a href="https://www.geekfun.club/download">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?logo=download&logoColor=white">
-    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?logo=download&logoColor=white" alt="Descargar">
-  </picture>
-</a>
-&nbsp;
-<a href="https://github.com/geek-fun/sqlkit/releases">
-  <img src="https://img.shields.io/badge/Releases-GitHub-lightgrey?logo=github" alt="Versiones">
-</a>
-&nbsp;
-<a href="https://www.geekfun.club/products/sqlkit/">
-  <img src="https://img.shields.io/badge/Website-geekfun.club-blue?logo=google-chrome&logoColor=white" alt="Sitio web">
-</a>
+Descarga el instalador más reciente para **macOS** (Apple Silicon e Intel `.dmg`), **Windows** (`.exe` / `.msi`) o **Linux** (`.deb`, `.rpm`, `.AppImage`):
+
+- **[Página de descargas (geekfun.club)](https://www.geekfun.club/es/download#sqlkit)** — instaladores directos para macOS, Windows y Linux
+- **[GitHub Releases](https://github.com/geek-fun/sqlkit/releases/latest)** — todos los instaladores y notas de la versión
+
+> Cerrar la ventana de SqlKit mantiene en ejecución las tareas en segundo plano y el servidor MCP. Usa **Mostrar ventana** desde la barra de menús o la bandeja del sistema para volver, o **Salir** para detener la aplicación.
 
 ### Integración con agentes de IA (MCP)
 
-SqlKit integra un **Puente MCP** HTTP local (`127.0.0.1`) y funciona con el servidor de código abierto [Data Studio MCP (`@geek-fun/data-studio-mcp`)](https://github.com/geek-fun/data-studio-agent) para que los agentes de programación con IA consulten e inspeccionen tus más de 70 bases de datos SQL usando conexiones ya configuradas en SqlKit. Las credenciales de base de datos, claves SSH y certificados TLS permanecen en tu equipo y nunca cruzan el límite de MCP: los agentes solo ven IDs de conexión opacos.
+Conecta Claude Code, OpenAI Codex, Cursor, Windsurf, OpenCode o cualquier cliente MCP a tus más de 70 bases de datos de SqlKit mediante [`@geek-fun/data-studio-mcp`](https://github.com/geek-fun/data-studio-agent).
 
 ```bash
 # Claude Code
@@ -142,14 +134,14 @@ claude mcp add --transport stdio data-studio -- npx -y @geek-fun/data-studio-mcp
 # OpenAI Codex
 codex mcp add data-studio -- npx -y @geek-fun/data-studio-mcp
 
-# O ejecutar directamente
+# Ejecutar directamente
 npx -y @geek-fun/data-studio-mcp
 ```
 
 <details>
 <summary><strong>Configuración JSON (Cursor, Windsurf, .mcp.json o puerto personalizado)</strong></summary>
 
-Agrégala a `.mcp.json` (o `.cursor/mcp.json` / `~/.cursor/mcp.json`). Los puertos se descubren automáticamente mediante el archivo de puerto local de SqlKit (por defecto `9121`); omite `env` salvo que necesites fijar un puerto específico:
+Agrégala a `.mcp.json`, `.cursor/mcp.json` o `~/.cursor/mcp.json` (omite `env` para descubrir el puerto automáticamente, por defecto `9121`):
 
 ```json
 {
@@ -167,11 +159,13 @@ Agrégala a `.mcp.json` (o `.cursor/mcp.json` / `~/.cursor/mcp.json`). Los puert
 
 </details>
 
-Administra el acceso en **Configuración → Puente MCP → Permisos de IA predeterminados** (**Sin acceso**, **Lectura**, **Leer y modificar datos**, **Acceso total** o reglas por acción en **Personalizado**) y sobrescribe conexiones individuales en la sección **Permisos de IA** de cada conexión. Las conexiones configuradas como **Sin acceso** quedan ocultas en el descubrimiento MCP y cada sentencia se clasifica mediante AST y se valida contra la política antes de ejecutarse. Mantén SqlKit en ejecución con **Inicio automático** activado en **Configuración → Puente MCP** (activado por defecto; cerrar la ventana mantiene el puente activo en la barra de menús o bandeja del sistema).
+- **Local y privado** — puente HTTP local en `127.0.0.1`; las credenciales, claves SSH y certificados TLS permanecen en SqlKit y los agentes solo ven IDs de conexión opacos
+- **Permisos granulares** — configura **Configuración → Puente MCP → Permisos de IA predeterminados** (**Sin acceso**, **Lectura**, **Leer y modificar datos**, **Acceso total**, **Personalizado**) con sobrescrituras por conexión y clasificación AST de consultas
+- **Herramientas SQL** — lista conexiones, explora esquemas, tablas, vistas, índices y DDL, ejecuta consultas de solo lectura, analiza planes de ejecución, inspecciona sesiones y consultas lentas, y ejecuta escrituras o DDL permitidos
 
-Compatible con Claude Code, OpenAI Codex, Cursor, Windsurf, OpenCode y cualquier cliente compatible con MCP. Permite listar conexiones, explorar bases de datos, esquemas, tablas, vistas, índices y DDL, ejecutar consultas de solo lectura verificadas por AST, analizar planes de ejecución, inspeccionar sesiones y consultas lentas, y ejecutar operaciones permitidas de escritura o DDL. Ejecuta SqlKit junto con [DocKit](https://github.com/geek-fun/dockit) para exponer bases de datos SQL y NoSQL a través del mismo servidor MCP.
-
-Consulta la [guía del Puente MCP de SqlKit](https://www.geekfun.club/es/docs/sqlkit/mcp-bridge), la [guía de inicio rápido de Data Studio Agent](https://www.geekfun.club/docs/data-studio-agent/quick-start) y el [README del servidor MCP](https://github.com/geek-fun/data-studio-agent/blob/master/packages/data-studio-mcp/README.md) para más detalles.
+> **Nota:** Mantén SqlKit en ejecución con **Inicio automático** activado en **Configuración → Puente MCP** (activado por defecto; cerrar la ventana mantiene el puente activo en la barra de menús o bandeja del sistema). Ejecútalo junto con [DocKit](https://github.com/geek-fun/dockit) para exponer bases de datos SQL y NoSQL desde el mismo servidor MCP.
+>
+> **Documentación:** [Guía del Puente MCP](https://www.geekfun.club/es/docs/sqlkit/mcp-bridge) · [Inicio rápido](https://www.geekfun.club/docs/data-studio-agent/quick-start) · [README del servidor MCP](https://github.com/geek-fun/data-studio-agent/blob/master/packages/data-studio-mcp/README.md)
 
 ## Características
 

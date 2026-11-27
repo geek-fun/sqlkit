@@ -116,24 +116,16 @@ SqlKit は **Agentic なデータベースクライアント** です — 単に
 
 ## インストール
 
-<a href="https://www.geekfun.club/download">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?logo=download&logoColor=white">
-    <img src="https://img.shields.io/badge/Download-macOS_|_Windows_|_Linux-orange?logo=download&logoColor=white" alt="ダウンロード">
-  </picture>
-</a>
-&nbsp;
-<a href="https://github.com/geek-fun/sqlkit/releases">
-  <img src="https://img.shields.io/badge/Releases-GitHub-lightgrey?logo=github" alt="リリース">
-</a>
-&nbsp;
-<a href="https://www.geekfun.club/products/sqlkit/">
-  <img src="https://img.shields.io/badge/Website-geekfun.club-blue?logo=google-chrome&logoColor=white" alt="ウェブサイト">
-</a>
+**macOS**（Apple Silicon / Intel 向け `.dmg`）、**Windows**（`.exe` / `.msi`）、**Linux**（`.deb`、`.rpm`、`.AppImage`）の最新インストーラーをダウンロードしてください：
+
+- **[ダウンロードページ（geekfun.club）](https://www.geekfun.club/ja/download#sqlkit)** — macOS・Windows・Linux 向けインストーラー
+- **[GitHub Releases](https://github.com/geek-fun/sqlkit/releases/latest)** — すべてのインストーラーとリリースノート
+
+> SqlKit のウィンドウを閉じても、バックグラウンドタスクと MCP サーバーは稼働を継続します。メニューバーまたはシステムトレイから **ウィンドウを表示** で復帰、**終了** でアプリを停止できます。
 
 ### AI エージェント連携（MCP）
 
-SqlKit はローカル HTTP **MCPブリッジ**（`127.0.0.1`）を内蔵しており、オープンソースの [Data Studio MCP サーバー（`@geek-fun/data-studio-mcp`）](https://github.com/geek-fun/data-studio-agent) と連携することで、AI コーディングエージェントが SqlKit に設定済みの接続を通じて 70 種類以上の SQL データベースをクエリ・検査できます。データベースの認証情報、SSH 鍵、TLS 証明書はローカル端末内に留まり、MCP の境界を越えることはありません。エージェントが参照するのは不透明な接続 ID のみです。
+[`@geek-fun/data-studio-mcp`](https://github.com/geek-fun/data-studio-agent) を使って、Claude Code、OpenAI Codex、Cursor、Windsurf、OpenCode および任意の MCP クライアントを SqlKit の 70 種類以上のデータベースに接続できます。
 
 ```bash
 # Claude Code
@@ -142,14 +134,14 @@ claude mcp add --transport stdio data-studio -- npx -y @geek-fun/data-studio-mcp
 # OpenAI Codex
 codex mcp add data-studio -- npx -y @geek-fun/data-studio-mcp
 
-# または直接実行
+# 直接実行
 npx -y @geek-fun/data-studio-mcp
 ```
 
 <details>
 <summary><strong>JSON 設定（Cursor、Windsurf、.mcp.json、またはポート指定）</strong></summary>
 
-`.mcp.json`（または `.cursor/mcp.json` / `~/.cursor/mcp.json`）に追加します。ポートは SqlKit のローカルポートファイルから自動検出されます（デフォルト `9121`）。特定のポートに固定しない場合は `env` を省略してください：
+`.mcp.json`、`.cursor/mcp.json`、または `~/.cursor/mcp.json` に追加します（ポート自動検出を使う場合は `env` を省略可、デフォルト `9121`）：
 
 ```json
 {
@@ -167,11 +159,13 @@ npx -y @geek-fun/data-studio-mcp
 
 </details>
 
-アクセス制御は **設定 → MCPブリッジ → デフォルトの AI 権限**（**アクセスなし**、**読み取り**、**データの読み取りと変更**、**フルアクセス**、またはアクション単位の**カスタム**設定）で管理でき、各接続の **AI 権限** セクションで個別に上書きできます。**アクセスなし**に設定された接続は MCP の接続検出に表示されず、すべての SQL 文は実行前に AST 分類とポリシー検証が行われます。**設定 → MCPブリッジ** で **自動起動** を有効にした状態で SqlKit を起動しておいてください（デフォルトで有効。ウィンドウを閉じてもメニューバーやシステムトレイで稼働を継続します）。
+- **ローカル＆安全** — `127.0.0.1` のローカル HTTP ブリッジで動作。認証情報・SSH 鍵・TLS 証明書は SqlKit 内に留まり、エージェントには不透明な接続 ID のみ公開
+- **細かな権限管理** — **設定 → MCPブリッジ → デフォルトの AI 権限**（**アクセスなし**、**読み取り**、**データの読み取りと変更**、**フルアクセス**、**カスタム**）、接続ごとの上書き設定、AST クエリ分類に対応
+- **SQL ツール** — 接続一覧の取得、スキーマ・テーブル・ビュー・インデックス・DDL の閲覧、読み取り専用クエリ実行、実行計画の解析、セッションやスロークエリの確認、許可された書き込み・DDL を実行
 
-Claude Code、OpenAI Codex、Cursor、Windsurf、OpenCode およびすべての MCP 対応クライアントで動作します。接続一覧の取得、データベース・スキーマ・テーブル・ビュー・インデックス・DDL の閲覧、AST 検証済みの読み取り専用クエリ実行、実行計画の解析、セッションやスロークエリの確認、許可された書き込み・DDL 操作に対応しています。SqlKit と [DocKit](https://github.com/geek-fun/dockit) を併用すると、同じ MCP サーバーから SQL と NoSQL の両方のデータベースを利用できます。
-
-詳しくは [SqlKit MCP ブリッジガイド](https://www.geekfun.club/ja/docs/sqlkit/mcp-bridge)、[Data Studio Agent クイックスタート](https://www.geekfun.club/docs/data-studio-agent/quick-start)、[MCP サーバー README](https://github.com/geek-fun/data-studio-agent/blob/master/packages/data-studio-mcp/README.md) をご覧ください。
+> **ヒント：** **設定 → MCPブリッジ** の **自動起動**（デフォルト有効）をオンにした状態で SqlKit を起動しておいてください（ウィンドウを閉じてもメニューバーやシステムトレイで稼働を継続します）。[DocKit](https://github.com/geek-fun/dockit) と併用すると、同じ MCP サーバーから SQL と NoSQL の両方にアクセスできます。
+>
+> **ドキュメント：** [MCP ブリッジガイド](https://www.geekfun.club/ja/docs/sqlkit/mcp-bridge) · [クイックスタート](https://www.geekfun.club/docs/data-studio-agent/quick-start) · [MCP サーバー README](https://github.com/geek-fun/data-studio-agent/blob/master/packages/data-studio-mcp/README.md)
 
 ## 機能
 
