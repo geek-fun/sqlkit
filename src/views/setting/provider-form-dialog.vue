@@ -125,6 +125,13 @@ const presets = computed<Preset[]>(() => [
     kind: 'cheapaimodel',
   },
   {
+    id: 'llmtr',
+    name: 'LLMTR',
+    apiCompatibility: 'openai',
+    baseUrl: 'https://llmtr.com/v1',
+    kind: 'llmtr',
+  },
+  {
     id: 'anthropic',
     name: 'Anthropic',
     apiCompatibility: 'anthropic',
